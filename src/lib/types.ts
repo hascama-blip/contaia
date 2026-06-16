@@ -15,8 +15,8 @@ export interface SunatInfo {
   tributos: string[];
   /** Indica si emite comprobantes electrónicos. */
   comprobanteElectronico: boolean;
-  /** Fuente de los datos: "oficial" (API SUNAT) o "simulado". */
-  fuente: "oficial" | "simulado";
+  /** Fuente de los datos: "oficial" (API SUNAT SOL), "externo" (apis.net.pe) o "simulado". */
+  fuente: "oficial" | "externo" | "simulado";
   consultadoAt: string;
 }
 

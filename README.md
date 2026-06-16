@@ -33,12 +33,28 @@ npm run start
 
 ## Integración SUNAT
 
-La capa `src/lib/sunat.ts` implementa el flujo **OAuth2 oficial de SUNAT**:
+La capa `src/lib/sunat.ts` soporta **tres fuentes** y elige automáticamente
+(`SUNAT_PROVIDER=auto`) la mejor disponible:
 
-1. Obtiene un token contra el servidor de seguridad (`SUNAT_TOKEN_URL`).
-2. Consulta los datos del contribuyente (`SUNAT_API_BASE`).
+1. **apis.net.pe** (fuente externa, recomendada por su facilidad) — solo necesita un token.
+2. **API oficial SUNAT (SOL)** — OAuth2 con Clave SOL.
+3. **Simulado** — datos de ejemplo deterministas por RUC, si no hay credenciales.
 
-Configura en `.env.local`:
+El campo `fuente` (`externo` | `oficial` | `simulado`) indica el origen del dato,
+y el dashboard muestra la fuente activa.
+
+### Opción A — apis.net.pe (más fácil)
+
+1. Regístrate gratis en https://apis.net.pe y copia tu token.
+2. En `.env.local`:
+
+```
+APISNET_TOKEN=tu_token_aqui
+```
+
+¡Listo! El buscador de RUC jalará datos reales de SUNAT.
+
+### Opción B — API oficial SUNAT (SOL)
 
 ```
 SUNAT_CLIENT_ID=...

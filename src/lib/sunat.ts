@@ -18,7 +18,10 @@ import type { SunatInfo } from "./types";
 // Toda la app consume `consultarSunat()` sin saber el origen; el campo
 // `fuente` indica si el dato es "oficial" o "simulado".
 
+type Provider = "oficial" | "apisnet" | "mock";
+
 interface SunatConfig {
+  provider: string;
   clientId: string;
   clientSecret: string;
   ruc: string;
@@ -26,11 +29,16 @@ interface SunatConfig {
   solPass: string;
   tokenUrl: string;
   apiBase: string;
+  apisnetToken: string;
+  apisnetUrl: string;
   forceMock: boolean;
 }
 
 function getConfig(): SunatConfig {
   return {
+    // "auto" (por defecto) elige la mejor fuente disponible según las credenciales.
+    // También puede forzarse: "apisnet" | "oficial" | "mock".
+    provider: process.env.SUNAT_PROVIDER ?? "auto",
     clientId: process.env.SUNAT_CLIENT_ID ?? "",
     clientSecret: process.env.SUNAT_CLIENT_SECRET ?? "",
     ruc: process.env.SUNAT_RUC ?? "",
@@ -42,6 +50,9 @@ function getConfig(): SunatConfig {
     apiBase:
       process.env.SUNAT_API_BASE ??
       "https://api.sunat.gob.pe/v1/contribuyente/contribuyentes",
+    // Fuente externa apis.net.pe (consulta RUC). Requiere token gratuito.
+    apisnetToken: process.env.APISNET_TOKEN ?? "",
+    apisnetUrl: process.env.APISNET_URL ?? "https://api.apis.net.pe/v2/sunat/ruc",
     forceMock: (process.env.SUNAT_FORCE_MOCK ?? "false") === "true",
   };
 }
@@ -50,6 +61,19 @@ function tieneCredenciales(cfg: SunatConfig): boolean {
   return Boolean(
     cfg.clientId && cfg.clientSecret && cfg.solUser && cfg.solPass
   );
+}
+
+/** Decide qué fuente usar según configuración y credenciales disponibles. */
+function resolverProvider(cfg: SunatConfig): Provider {
+  if (cfg.forceMock) return "mock";
+  const p = cfg.provider.toLowerCase();
+  if (p === "mock") return "mock";
+  if (p === "apisnet") return cfg.apisnetToken ? "apisnet" : "mock";
+  if (p === "oficial") return tieneCredenciales(cfg) ? "oficial" : "mock";
+  // auto: prioriza la fuente externa (apis.net.pe), luego la oficial SOL.
+  if (cfg.apisnetToken) return "apisnet";
+  if (tieneCredenciales(cfg)) return "oficial";
+  return "mock";
 }
 
 /** Valida estructura básica de un RUC peruano (11 dígitos). */
@@ -123,6 +147,45 @@ async function consultarOficial(
   };
 }
 
+// ---- Fuente externa: apis.net.pe -------------------------------------------
+
+async function consultarApisNet(
+  ruc: string,
+  cfg: SunatConfig
+): Promise<SunatInfo> {
+  const url = `${cfg.apisnetUrl}?numero=${ruc}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${cfg.apisnetToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`apis.net.pe error ${res.status}`);
+  }
+  const d = (await res.json()) as Record<string, any>;
+  // Mapeo defensivo: apis.net.pe ha usado distintos nombres de campo (v1/v2).
+  const direccion =
+    d.direccion ??
+    d.direccionCompleta ??
+    [d.direccion, d.distrito, d.provincia, d.departamento]
+      .filter(Boolean)
+      .join(", ");
+  return {
+    ruc,
+    razonSocial: d.razonSocial ?? d.nombre ?? "",
+    estado: String(d.estado ?? "DESCONOCIDO").toUpperCase(),
+    condicion: String(d.condicion ?? "DESCONOCIDO").toUpperCase(),
+    tipoContribuyente: d.tipo ?? d.tipoContribuyente ?? "",
+    direccion: direccion || "",
+    tributos: Array.isArray(d.tributos) ? d.tributos : [],
+    // apis.net.pe no expone afiliación a comprobante electrónico; lo asumimos.
+    comprobanteElectronico: true,
+    fuente: "externo",
+    consultadoAt: new Date().toISOString(),
+  };
+}
+
 // ---- Modo simulado (determinista por RUC) ----------------------------------
 
 function pick<T>(arr: T[], seed: number): T {
@@ -170,20 +233,22 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
     throw new Error("RUC inválido: debe tener 11 dígitos numéricos.");
   }
   const cfg = getConfig();
+  const provider = resolverProvider(cfg);
 
-  if (!cfg.forceMock && tieneCredenciales(cfg)) {
-    try {
-      return await consultarOficial(cleaned, cfg);
-    } catch (err) {
-      // Si la API oficial falla, degradamos a simulado para no romper el flujo,
-      // pero dejamos rastro en consola para diagnóstico.
-      console.error("[SUNAT] Falló consulta oficial, usando simulado:", err);
-    }
+  try {
+    if (provider === "apisnet") return await consultarApisNet(cleaned, cfg);
+    if (provider === "oficial") return await consultarOficial(cleaned, cfg);
+  } catch (err) {
+    // Si la fuente real falla, degradamos a simulado para no romper el flujo,
+    // pero dejamos rastro en consola para diagnóstico.
+    console.error(`[SUNAT] Falló fuente "${provider}", usando simulado:`, err);
   }
   return simular(cleaned);
 }
 
-export function sunatModo(): "oficial" | "simulado" {
-  const cfg = getConfig();
-  return !cfg.forceMock && tieneCredenciales(cfg) ? "oficial" : "simulado";
+export function sunatModo(): "oficial" | "externo" | "simulado" {
+  const provider = resolverProvider(getConfig());
+  if (provider === "apisnet") return "externo";
+  if (provider === "oficial") return "oficial";
+  return "simulado";
 }

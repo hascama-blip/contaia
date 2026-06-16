@@ -67,9 +67,14 @@ export default async function DashboardPage() {
           </p>
         </div>
         <span
-          className={`badge ${modo === "oficial" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}
+          className={`badge ${modo === "simulado" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}
         >
-          SUNAT: {modo === "oficial" ? "API oficial" : "modo simulado"}
+          SUNAT:{" "}
+          {modo === "oficial"
+            ? "API oficial SOL"
+            : modo === "externo"
+              ? "apis.net.pe"
+              : "modo simulado"}
         </span>
       </div>
 
