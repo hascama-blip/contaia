@@ -13,12 +13,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # SUNAT en modo simulado por defecto. Para usar la API oficial,
-      # agrega estas variables en el panel de Render (Environment):
-      #   SUNAT_CLIENT_ID, SUNAT_CLIENT_SECRET, SUNAT_RUC,
-      #   SUNAT_SOL_USER, SUNAT_SOL_PASS
-      - key: SUNAT_FORCE_MOCK
-        value: "false"
+      # Fuente FIJA: decolecta.com (datos reales de SUNAT).
+      - key: SUNAT_PROVIDER
+        value: decolecta
+      # Token de decolecta.com: NO se guarda en el código.
+      # Render te pedirá pegarlo al desplegar (queda guardado en su panel,
+      # pestaña Environment). Sin este token la consulta mostrará error.
+      - key: DECOLECTA_TOKEN
+        sync: false
 
     # --- Almacenamiento persistente (opcional, requiere plan "starter") -------
     # Descomenta este bloque para que los clientes y archivos NO se borren

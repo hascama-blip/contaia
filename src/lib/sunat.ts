@@ -290,14 +290,31 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
   const cfg = getConfig();
   const provider = resolverProvider(cfg);
 
+  // Si se exige explícitamente una fuente real (decolecta/apisnet/oficial),
+  // NO devolvemos datos simulados de respaldo: ante un fallo, lanzamos error
+  // para que el usuario nunca confunda datos reales con datos de ejemplo.
+  const fuenteRealExigida = ["decolecta", "apisnet", "oficial"].includes(
+    cfg.provider.toLowerCase()
+  );
+
+  if (fuenteRealExigida && provider === "mock") {
+    throw new Error(
+      "Falta configurar el token de la fuente externa (revisa DECOLECTA_TOKEN / APISNET_TOKEN o las credenciales SOL)."
+    );
+  }
+
   try {
     if (provider === "decolecta") return await consultarDecolecta(cleaned, cfg);
     if (provider === "apisnet") return await consultarApisNet(cleaned, cfg);
     if (provider === "oficial") return await consultarOficial(cleaned, cfg);
   } catch (err) {
-    // Si la fuente real falla, degradamos a simulado para no romper el flujo,
-    // pero dejamos rastro en consola para diagnóstico.
-    console.error(`[SUNAT] Falló fuente "${provider}", usando simulado:`, err);
+    console.error(`[SUNAT] Falló fuente "${provider}":`, err);
+    if (fuenteRealExigida) {
+      throw new Error(
+        "No se pudo obtener la información real de SUNAT en este momento. Verifica el token o intenta nuevamente."
+      );
+    }
+    // En modo "auto" degradamos a simulado para no romper el flujo de desarrollo.
   }
   return simular(cleaned);
 }
