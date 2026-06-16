@@ -47,6 +47,23 @@ function esUrgente(texto: string): boolean {
   return URGENTES.some((k) => t.includes(k));
 }
 
+/** Clasifica el asunto en la categoría urgente que interesa. */
+function categoriaDe(asunto: string): string {
+  const t = (asunto || "").toLowerCase();
+  if (/coactiv|ejecuci[oó]n|cobranza|embargo|medida cautelar/.test(t))
+    return "Resolución de Cobranza";
+  if (/orden de pago|resoluci[oó]n de determinaci[oó]n|resoluci[oó]n de multa|valor|esquela/.test(t))
+    return "Valor";
+  return "";
+}
+
+/** Parsea "dd/mm/yyyy [hh:mm:ss]" a Date. */
+function parseFecha(s: string): Date | null {
+  const m = (s || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+}
+
 async function rellenar(page: any, selectores: string[], valor: string): Promise<boolean> {
   for (const sel of selectores) {
     try {
@@ -116,18 +133,21 @@ function mapearMensajes(body: string): BuzonMensaje[] {
   }
   const arr: any[] = Array.isArray(data)
     ? data
-    : data?.lista ?? data?.mensajes ?? data?.registros ?? data?.rows ?? data?.data ?? [];
+    : data?.rows ?? data?.lista ?? data?.mensajes ?? data?.registros ?? data?.data ?? [];
   return arr.map((m, i) => {
-    const asunto = String(m.asunto ?? m.txtAsunto ?? m.subject ?? m.titulo ?? m.descripcion ?? "");
-    const fecha = String(m.fecVigencia ?? m.fechaEnvio ?? m.fecha ?? m.fecPublica ?? m.fecNotificacion ?? "");
-    const tipo = String(m.tipoMensaje ?? m.desTipoMensaje ?? m.tipo ?? m.categoria ?? m.codCarpeta ?? "");
+    const asunto = String(m.desAsunto ?? m.asunto ?? m.txtAsunto ?? m.titulo ?? "")
+      .replace(/^ASUNTO:\s*/i, "")
+      .trim();
+    // fecPublica/fecEnvio son la fecha de notificación; fecVigencia es a futuro.
+    const fecha = String(m.fecPublica ?? m.fecEnvio ?? m.fecha ?? "");
+    const categoria = categoriaDe(asunto);
     return {
       id: String(m.codMensaje ?? m.numMensaje ?? m.id ?? i),
       fecha,
       asunto,
-      tipo,
-      urgente: esUrgente(`${asunto} ${tipo}`),
-      leido: Boolean(m.indLeido ?? m.leido ?? false),
+      tipo: categoria,
+      urgente: categoria !== "" || esUrgente(asunto),
+      leido: false,
     };
   });
 }
@@ -162,6 +182,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
 
   const pasos: any[] = [];
   const diagnostico = params.diagnostico === true;
+  const dias = params.dias && params.dias > 0 ? params.dias : 15;
   let browser: any = null;
 
   try {
@@ -258,27 +279,53 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
 
     // Llamar al endpoint interno desde el contexto del visor (origin correcto).
     const ejecutor = visor ?? page;
-    const urlLista = `${LIST_URL}${LIST_URL.includes("?") ? "&" : "?"}_=${Date.now()}`;
-    const resp = (await ejecutor.evaluate(async (url: string) => {
-      try {
-        const r = await fetch(url, { credentials: "include" });
-        return { status: r.status, body: (await r.text()).slice(0, 4000) };
-      } catch (e) {
-        return { status: 0, body: String(e) };
-      }
-    }, urlLista)) as { status: number; body: string };
-    pasos.push({ paso: "listNotiMenPag", status: resp.status, respuesta: resp.body.slice(0, 800) });
+    const fetchPagina = async (pag: number) => {
+      const url =
+        (/[?&]page=\d+/.test(LIST_URL)
+          ? LIST_URL.replace(/([?&]page=)\d+/, `$1${pag}`)
+          : `${LIST_URL}${LIST_URL.includes("?") ? "&" : "?"}page=${pag}`) +
+        `&_=${Date.now()}`;
+      return (await ejecutor.evaluate(async (u: string) => {
+        try {
+          const r = await fetch(u, { credentials: "include" });
+          return { status: r.status, body: (await r.text()).slice(0, 60000) };
+        } catch (e) {
+          return { status: 0, body: String(e) };
+        }
+      }, url)) as { status: number; body: string };
+    };
 
+    const primera = await fetchPagina(1);
+    pasos.push({ paso: "listNotiMenPag", status: primera.status, respuesta: primera.body.slice(0, 800) });
     if (diagnostico) {
       return { mensajes: [], urgentes: [], diag: { pasos } };
     }
-
-    if (resp.status !== 200) {
-      throw new Error(`No se pudo leer el buzón (estado ${resp.status}). Posible bloqueo o sesión.`);
+    if (primera.status !== 200) {
+      throw new Error(`No se pudo leer el buzón (estado ${primera.status}). Posible bloqueo o sesión.`);
     }
-    const mensajes = mapearMensajes(resp.body);
-    const urgentes = mensajes.filter((m) => m.urgente);
-    return { mensajes, urgentes };
+
+    // Paginar hasta cubrir los últimos N días (la lista viene de más reciente a más antigua).
+    const cutoff = Date.now() - dias * 24 * 60 * 60 * 1000;
+    const todas: BuzonMensaje[] = [];
+    const agregar = (body: string) => {
+      const ms = mapearMensajes(body);
+      let seguir = true;
+      for (const m of ms) {
+        const f = parseFecha(m.fecha);
+        if (f && f.getTime() < cutoff) { seguir = false; break; }
+        todas.push(m);
+      }
+      return { seguir, count: ms.length };
+    };
+    let r = agregar(primera.body);
+    for (let pag = 2; pag <= 20 && r.seguir && r.count > 0; pag++) {
+      const p = await fetchPagina(pag);
+      if (p.status !== 200) break;
+      r = agregar(p.body);
+    }
+
+    const urgentes = todas.filter((m) => m.urgente);
+    return { mensajes: todas, urgentes };
   } catch (err) {
     if (diagnostico) {
       pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
