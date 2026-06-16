@@ -4,6 +4,7 @@ import { getCliente } from "@/lib/db";
 import { generarDiagnostico } from "@/lib/diagnostico";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
+import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo } from "@/lib/types";
 
@@ -37,8 +38,37 @@ export default async function InformePage({ params }: { params: { id: string } }
     0
   );
 
+  // --- Datos para el dashboard del informe ---
+  const sire = cliente.sire ?? [];
+  const ultimoSire = sire[0] ?? null; // sire viene ordenado desc por periodo
+  const ventasUlt = ultimoSire?.ventas.importeTotal ?? 0;
+  const comprasUlt = ultimoSire?.compras.importeTotal ?? 0;
+  const igvVentasUlt = ultimoSire?.ventas.igv ?? 0;
+  const igvComprasUlt = ultimoSire?.compras.igv ?? 0;
+  const igvPorPagar = igvVentasUlt - igvComprasUlt;
+
+  // Serie de periodos (ascendente) para el gráfico de barras.
+  const sireChartData = [...sire]
+    .sort((a, b) => a.periodo.localeCompare(b.periodo))
+    .slice(-12)
+    .map((s) => ({
+      name: `${s.periodo.slice(4, 6)}/${s.periodo.slice(2, 4)}`,
+      ventas: s.ventas.importeTotal,
+      compras: s.compras.importeTotal,
+    }));
+
+  const niveles: NivelRiesgo[] = ["bajo", "medio", "alto", "critico"];
+  const hallazgosData = niveles.map((n) => ({
+    name: n,
+    value: d.hallazgos.filter((h) => h.severidad === n).length,
+  }));
+
+  const scoreColor =
+    d.score >= 85 ? "#10b981" : d.score >= 65 ? "#f59e0b" : d.score >= 40 ? "#f97316" : "#ef4444";
+  const scoreDeg = (d.score / 100) * 360;
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <div className="no-print mb-4 flex items-center justify-between">
         <Link href={`/clientes/${cliente.id}`} className="text-sm text-brand-600 hover:underline">
           ← Volver al cliente
@@ -79,21 +109,78 @@ export default async function InformePage({ params }: { params: { id: string } }
           </div>
         </section>
 
-        {/* Resumen ejecutivo */}
-        <section className="mt-6 rounded-lg bg-slate-50 p-5">
-          <div className="flex items-center justify-between">
+        {/* ===================== DASHBOARD ===================== */}
+        {/* Fila 1: puntaje (anillo) + KPIs */}
+        <section className="mt-6 grid gap-4 md:grid-cols-3">
+          {/* Tarjeta puntaje con anillo */}
+          <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
+            <div
+              className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
+              style={{ background: `conic-gradient(${scoreColor} ${scoreDeg}deg, #e2e8f0 ${scoreDeg}deg)` }}
+            >
+              <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-white">
+                <span className="text-2xl font-bold text-slate-800">{d.score}</span>
+                <span className="text-[10px] text-slate-400">/100</span>
+              </div>
+            </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">
-                Puntaje de salud tributaria
+                Salud tributaria
               </p>
-              <p className="text-4xl font-bold text-slate-800">{d.score}<span className="text-lg text-slate-400">/100</span></p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Nivel de riesgo</p>
-              <p className="text-2xl font-bold text-slate-800">{RIESGO_LABEL[d.nivelRiesgo]}</p>
+              <p className="text-lg font-bold" style={{ color: scoreColor }}>
+                {RIESGO_LABEL[d.nivelRiesgo]}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {d.hallazgos.length} hallazgo(s)
+              </p>
             </div>
           </div>
+
+          {/* KPIs */}
+          <Kpi
+            label={ultimoSire ? `Ventas ${etiquetaPeriodo(ultimoSire.periodo)}` : "Ventas del mes"}
+            value={fmtSoles(ventasUlt)}
+            tone="emerald"
+          />
+          <Kpi
+            label={ultimoSire ? `Compras ${etiquetaPeriodo(ultimoSire.periodo)}` : "Compras del mes"}
+            value={fmtSoles(comprasUlt)}
+            tone="blue"
+          />
         </section>
+
+        {/* Fila 2: KPIs secundarios */}
+        <section className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <KpiSmall label="IGV ventas" value={fmtSoles(igvVentasUlt)} />
+          <KpiSmall label="IGV compras" value={fmtSoles(igvComprasUlt)} />
+          <KpiSmall
+            label="IGV por pagar (aprox.)"
+            value={fmtSoles(Math.max(0, igvPorPagar))}
+            tone={igvPorPagar > 0 ? "amber" : "emerald"}
+          />
+          <KpiSmall
+            label="Deuda detectada (docs)"
+            value={fmtSoles(deudaTotal)}
+            tone={deudaTotal > 0 ? "red" : "slate"}
+          />
+        </section>
+
+        {/* Fila 3: gráficos */}
+        <section className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 p-4">
+            <h3 className="mb-1 text-sm font-semibold text-slate-700">
+              Ventas vs Compras por periodo
+            </h3>
+            <SireBarChart data={sireChartData} />
+          </div>
+          <div className="rounded-xl border border-slate-200 p-4">
+            <h3 className="mb-1 text-sm font-semibold text-slate-700">
+              Hallazgos por severidad
+            </h3>
+            <HallazgosDonut data={hallazgosData} />
+          </div>
+        </section>
+        {/* =================== FIN DASHBOARD =================== */}
 
         {/* Situación SUNAT */}
         <section className="mt-6">
@@ -235,5 +322,47 @@ function Row({ k, v }: { k: string; v: string }) {
       <td className="py-1.5 pr-4 text-slate-400">{k}</td>
       <td className="py-1.5 font-medium text-slate-700">{v}</td>
     </tr>
+  );
+}
+
+const TONE: Record<string, string> = {
+  emerald: "text-emerald-600",
+  blue: "text-blue-600",
+  amber: "text-amber-600",
+  red: "text-red-600",
+  slate: "text-slate-800",
+};
+
+function Kpi({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${TONE[tone]}`}>{value}</p>
+    </div>
+  );
+}
+
+function KpiSmall({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-3">
+      <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={`mt-1 text-base font-bold ${TONE[tone]}`}>{value}</p>
+    </div>
   );
 }
