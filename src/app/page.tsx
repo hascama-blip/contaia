@@ -7,6 +7,13 @@ import type { NivelRiesgo } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const MODO_LABEL: Record<string, string> = {
+  decolecta: "decolecta.com",
+  apisnet: "apis.net.pe",
+  oficial: "API oficial SOL",
+  mock: "modo simulado",
+};
+
 export default async function DashboardPage() {
   const clientes = await listClientes();
   const modo = sunatModo();
@@ -67,14 +74,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <span
-          className={`badge ${modo === "simulado" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}
+          className={`badge ${modo === "mock" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}
         >
-          SUNAT:{" "}
-          {modo === "oficial"
-            ? "API oficial SOL"
-            : modo === "externo"
-              ? "apis.net.pe"
-              : "modo simulado"}
+          SUNAT: {MODO_LABEL[modo]}
         </span>
       </div>
 

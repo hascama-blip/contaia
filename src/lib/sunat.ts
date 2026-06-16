@@ -18,7 +18,7 @@ import type { SunatInfo } from "./types";
 // Toda la app consume `consultarSunat()` sin saber el origen; el campo
 // `fuente` indica si el dato es "oficial" o "simulado".
 
-type Provider = "oficial" | "apisnet" | "mock";
+type Provider = "oficial" | "decolecta" | "apisnet" | "mock";
 
 interface SunatConfig {
   provider: string;
@@ -29,6 +29,8 @@ interface SunatConfig {
   solPass: string;
   tokenUrl: string;
   apiBase: string;
+  decolectaToken: string;
+  decolectaUrl: string;
   apisnetToken: string;
   apisnetUrl: string;
   forceMock: boolean;
@@ -37,7 +39,7 @@ interface SunatConfig {
 function getConfig(): SunatConfig {
   return {
     // "auto" (por defecto) elige la mejor fuente disponible según las credenciales.
-    // También puede forzarse: "apisnet" | "oficial" | "mock".
+    // También puede forzarse: "decolecta" | "apisnet" | "oficial" | "mock".
     provider: process.env.SUNAT_PROVIDER ?? "auto",
     clientId: process.env.SUNAT_CLIENT_ID ?? "",
     clientSecret: process.env.SUNAT_CLIENT_SECRET ?? "",
@@ -50,6 +52,10 @@ function getConfig(): SunatConfig {
     apiBase:
       process.env.SUNAT_API_BASE ??
       "https://api.sunat.gob.pe/v1/contribuyente/contribuyentes",
+    // Fuente externa decolecta.com (consulta RUC, endpoint extendido /full).
+    decolectaToken: process.env.DECOLECTA_TOKEN ?? "",
+    decolectaUrl:
+      process.env.DECOLECTA_URL ?? "https://api.decolecta.com/v1/sunat/ruc/full",
     // Fuente externa apis.net.pe (consulta RUC). Requiere token gratuito.
     apisnetToken: process.env.APISNET_TOKEN ?? "",
     apisnetUrl: process.env.APISNET_URL ?? "https://api.apis.net.pe/v2/sunat/ruc",
@@ -68,9 +74,11 @@ function resolverProvider(cfg: SunatConfig): Provider {
   if (cfg.forceMock) return "mock";
   const p = cfg.provider.toLowerCase();
   if (p === "mock") return "mock";
+  if (p === "decolecta") return cfg.decolectaToken ? "decolecta" : "mock";
   if (p === "apisnet") return cfg.apisnetToken ? "apisnet" : "mock";
   if (p === "oficial") return tieneCredenciales(cfg) ? "oficial" : "mock";
-  // auto: prioriza la fuente externa (apis.net.pe), luego la oficial SOL.
+  // auto: prioriza decolecta (datos extendidos), luego apis.net.pe, luego SOL.
+  if (cfg.decolectaToken) return "decolecta";
   if (cfg.apisnetToken) return "apisnet";
   if (tieneCredenciales(cfg)) return "oficial";
   return "mock";
@@ -143,6 +151,53 @@ async function consultarOficial(
     tributos: Array.isArray(d.tributos) ? d.tributos : [],
     comprobanteElectronico: Boolean(d.comprobanteElectronico ?? true),
     fuente: "oficial",
+    consultadoAt: new Date().toISOString(),
+  };
+}
+
+// ---- Fuente externa: decolecta.com -----------------------------------------
+
+async function consultarDecolecta(
+  ruc: string,
+  cfg: SunatConfig
+): Promise<SunatInfo> {
+  const sep = cfg.decolectaUrl.includes("?") ? "&" : "?";
+  const url = `${cfg.decolectaUrl}${sep}numero=${ruc}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${cfg.decolectaToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`decolecta error ${res.status}`);
+  }
+  const d = (await res.json()) as Record<string, any>;
+
+  // decolecta usa snake_case; mapeamos defensivamente.
+  const direccion =
+    d.direccion_completa ??
+    d.direccion ??
+    [d.direccion, d.distrito, d.provincia, d.departamento]
+      .filter(Boolean)
+      .join(", ");
+
+  // Aprovechamos indicadores extendidos del endpoint /full como "tributos".
+  const tributos: string[] = Array.isArray(d.tributos) ? [...d.tributos] : [];
+  if (d.es_agente_de_retencion) tributos.push("AGENTE DE RETENCIÓN");
+  if (d.es_buen_contribuyente) tributos.push("BUEN CONTRIBUYENTE");
+  if (d.tipo_contribuyente && !d.tipo) tributos.push(String(d.tipo_contribuyente));
+
+  return {
+    ruc,
+    razonSocial: d.razon_social ?? d.razonSocial ?? d.nombre ?? "",
+    estado: String(d.estado ?? "DESCONOCIDO").toUpperCase(),
+    condicion: String(d.condicion ?? "DESCONOCIDO").toUpperCase(),
+    tipoContribuyente: d.tipo_contribuyente ?? d.tipo ?? "",
+    direccion: direccion || "",
+    tributos,
+    comprobanteElectronico: true,
+    fuente: "externo",
     consultadoAt: new Date().toISOString(),
   };
 }
@@ -236,6 +291,7 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
   const provider = resolverProvider(cfg);
 
   try {
+    if (provider === "decolecta") return await consultarDecolecta(cleaned, cfg);
     if (provider === "apisnet") return await consultarApisNet(cleaned, cfg);
     if (provider === "oficial") return await consultarOficial(cleaned, cfg);
   } catch (err) {
@@ -246,9 +302,6 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
   return simular(cleaned);
 }
 
-export function sunatModo(): "oficial" | "externo" | "simulado" {
-  const provider = resolverProvider(getConfig());
-  if (provider === "apisnet") return "externo";
-  if (provider === "oficial") return "oficial";
-  return "simulado";
+export function sunatModo(): Provider {
+  return resolverProvider(getConfig());
 }
