@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { Cliente, Documento } from "@/lib/types";
 import SirePanel from "./SirePanel";
+import BuzonPanel from "./BuzonPanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -230,6 +231,9 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
 
           {/* Compras y Ventas (SIRE) */}
           <SirePanel clienteId={cliente.id} inicial={cliente.sire ?? []} />
+
+          {/* Buzón electrónico SUNAT */}
+          <BuzonPanel clienteId={cliente.id} />
         </div>
 
         {/* Columna derecha: diagnóstico */}

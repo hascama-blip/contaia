@@ -87,6 +87,23 @@ export interface SireBloque {
   importeTotal: number;
 }
 
+/** Mensaje del buzón electrónico SUNAT. */
+export interface BuzonMensaje {
+  id: string;
+  fecha: string;
+  asunto: string;
+  tipo: string;
+  /** true si es resolución de cobranza / valor (urgente). */
+  urgente: boolean;
+  leido: boolean;
+}
+
+export interface BuzonResultado {
+  mensajes: BuzonMensaje[];
+  urgentes: BuzonMensaje[];
+  diag?: { pasos: any[] };
+}
+
 /** Resumen mensual SIRE: cuánto compró y vendió en el periodo. */
 export interface SireResumen {
   /** Periodo tributario "YYYYMM". */
