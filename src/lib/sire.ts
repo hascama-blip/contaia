@@ -49,6 +49,7 @@ export interface SireDiag {
 
 interface SireConfig {
   tokenUrl: string;
+  scope: string;
   apiBase: string;
   exportVentasPath: string;
   exportComprasPath: string;
@@ -68,6 +69,7 @@ function getConfig(): SireConfig {
     tokenUrl:
       process.env.SUNAT_TOKEN_URL ??
       "https://api-seguridad.sunat.gob.pe/v1/clientessol",
+    scope: process.env.SIRE_SCOPE ?? "https://api-sire.sunat.gob.pe",
     apiBase:
       process.env.SIRE_API_BASE ??
       "https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros",
@@ -130,7 +132,7 @@ async function obtenerToken(
   const url = `${cfg.tokenUrl}/${clientId}/oauth2/token/`;
   const body = new URLSearchParams({
     grant_type: "password",
-    scope: "https://api-sire.sunat.gob.pe",
+    scope: cfg.scope,
     client_id: clientId,
     client_secret: clientSecret,
     username: `${ruc}${solUser}`,
@@ -153,10 +155,24 @@ async function obtenerToken(
     });
     throw new Error(`autenticación SUNAT (HTTP ${res.status})${detalle}`);
   }
-  const json = (await res.json()) as { access_token?: string };
-  diag.pasos.push({ paso: "auth", metodo: "POST", httpStatus: 200, ok: true });
+  const json = (await res.json()) as Record<string, any>;
+  // Mostramos en diagnóstico el scope/permiso concedido (NO el token) para
+  // verificar si el credencial está habilitado para SIRE.
+  const meta = {
+    scope_solicitado: cfg.scope,
+    scope_concedido: json.scope ?? "(no informado)",
+    token_type: json.token_type ?? "(no informado)",
+    expires_in: json.expires_in ?? "(no informado)",
+  };
+  diag.pasos.push({
+    paso: "auth",
+    metodo: "POST",
+    httpStatus: 200,
+    ok: true,
+    respuesta: JSON.stringify(meta),
+  });
   if (!json.access_token) throw new Error("autenticación SUNAT sin token");
-  return json.access_token;
+  return json.access_token as string;
 }
 
 // ---- Paso: solicitar reporte (devuelve ticket) -----------------------------
