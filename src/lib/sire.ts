@@ -108,7 +108,7 @@ export function periodoValido(periodo: string): boolean {
 async function leerDetalle(res: Response): Promise<string> {
   try {
     const txt = (await res.text()).trim();
-    return txt ? `: ${txt.slice(0, 300)}` : "";
+    return txt ? `: ${txt.slice(0, 600)}` : "";
   } catch {
     return "";
   }
@@ -117,6 +117,9 @@ async function leerDetalle(res: Response): Promise<string> {
 function trunc(s: string, n = 600): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
+
+// Marcador interno: periodo terminado pero sin comprobantes (mes sin movimiento).
+const VACIO = "__VACIO__";
 
 // ---- Autenticación oficial (OAuth2 password) -------------------------------
 
@@ -270,6 +273,9 @@ async function esperarArchivo(
     const estado = String(reg?.codEstadoProceso ?? det?.codEstadoEnvio ?? reg?.estado ?? "");
     const desc = String(reg?.desEstadoProceso ?? det?.desEstadoEnvio ?? "");
     const terminado = estado === "06" || /termin/i.test(desc);
+    // Nº de comprobantes informados en el periodo (0 = mes sin movimiento).
+    const comprobantes =
+      Number(det?.cntCPInformados ?? det?.cntFilasvalidada ?? reg?.cntCPInformados ?? 0) || 0;
     // El nombre del archivo viene en el arreglo archivoReporte[0].nomArchivoReporte
     // (un .zip que contiene el .txt indicado en nomArchivoContenido).
     const archRep = Array.isArray(reg?.archivoReporte)
@@ -283,6 +289,20 @@ async function esperarArchivo(
       reg?.nombreArchivo ??
       null;
 
+    if (terminado) {
+      diag.pasos.push({
+        paso: `estado-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: 200,
+        ok: true,
+        respuesta: trunc(txt, 2500),
+      });
+      // Mes sin movimiento: no hay archivo útil que descargar -> totales en 0.
+      if (comprobantes === 0) return VACIO;
+      if (nombre) return String(nombre);
+      throw new Error(`${etiqueta}: proceso terminado pero sin nombre de archivo`);
+    }
     if (nombre) {
       diag.pasos.push({
         paso: `estado-${etiqueta}`,
@@ -293,21 +313,6 @@ async function esperarArchivo(
         respuesta: trunc(txt, 2500),
       });
       return String(nombre);
-    }
-    if (terminado) {
-      // Proceso terminado pero sin nombre de archivo en los campos esperados:
-      // registramos la respuesta COMPLETA para localizar el campo correcto.
-      diag.pasos.push({
-        paso: `estado-${etiqueta}`,
-        url,
-        metodo: "GET",
-        httpStatus: 200,
-        ok: true,
-        respuesta: trunc(txt, 2500),
-      });
-      throw new Error(
-        `${etiqueta}: proceso terminado pero sin nomArchivoReporte (revisar respuesta del estado)`
-      );
     }
     if (/(09|error|fallo)/i.test(estado)) {
       throw new Error(`estado ${etiqueta}: proceso con error (${estado})`);
@@ -473,6 +478,8 @@ async function flujoOficial(
     try {
       const ticket = await solicitarTicket(cfg, token, periodo, pathTemplate, codLibro, etiqueta, diag);
       const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
+      // Mes sin movimiento: totales en cero, sin descargar.
+      if (nombre === VACIO) return "";
       return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
     } catch (err) {
       diag.pasos.push({
@@ -484,6 +491,7 @@ async function flujoOficial(
     }
   };
 
+  // "" = periodo válido sin movimiento; null = error.
   const fV = await intentar("ventas", cfg.exportVentasPath, cfg.codLibroVentas);
   const fC = await intentar("compras", cfg.exportComprasPath, cfg.codLibroCompras);
 
@@ -491,7 +499,7 @@ async function flujoOficial(
     return { diag };
   }
 
-  if (!fV && !fC) {
+  if (fV === null && fC === null) {
     throw new Error("no se pudo obtener ni ventas ni compras (usa modo diagnóstico)");
   }
   const ventas = fV ? parseTotales(fV) : bloqueCero();
