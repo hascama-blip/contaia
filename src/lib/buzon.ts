@@ -157,31 +157,39 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // Abrir el Buzón Electrónico desde el menú (establece la sesión del visor).
-    // Puede abrirse en la misma página o en una pestaña nueva (popup).
-    let buzonPage = page;
+    // Abrir el Buzón Electrónico desde el menú (carga el visor, normalmente
+    // dentro de un iframe en ww1.sunat.gob.pe).
     try {
       const [popup] = await Promise.all([
-        ctx.waitForEvent("page", { timeout: 15000 }).catch(() => null),
+        ctx.waitForEvent("page", { timeout: 8000 }).catch(() => null),
         clickAny(page, [
           'a:has-text("Buzón Electrónico")',
           'text=Buzón Electrónico',
           'a:has-text("Buzón")',
+          '#imgBuzon',
+          'img[alt*="Buz"]',
         ]),
       ]);
-      if (popup) buzonPage = popup;
-      await buzonPage.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-      await buzonPage.waitForTimeout(2500);
+      await page.waitForTimeout(6000);
+      if (popup) await popup.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
     } catch {}
-    pasos.push({
-      paso: "abrir-buzon",
-      url: buzonPage.url(),
-      title: await buzonPage.title().catch(() => ""),
-    });
 
-    // Llamar al endpoint interno de la lista (misma origin = sin CORS).
+    // Buscar el contexto (frame o pestaña) del visor en ww1.sunat.gob.pe.
+    const contextos: string[] = [];
+    let visor: any = null;
+    for (const pg of ctx.pages()) {
+      for (const fr of pg.frames()) {
+        const u = fr.url();
+        contextos.push(u);
+        if (!visor && /ol-ti-itvisornoti|ww1\.sunat\.gob\.pe/.test(u)) visor = fr;
+      }
+    }
+    pasos.push({ paso: "abrir-buzon", contextos, visorEncontrado: Boolean(visor) });
+
+    // Llamar al endpoint interno desde el contexto del visor (origin correcto).
+    const ejecutor = visor ?? page;
     const urlLista = `${LIST_URL}${LIST_URL.includes("?") ? "&" : "?"}_=${Date.now()}`;
-    const resp = (await buzonPage.evaluate(async (url: string) => {
+    const resp = (await ejecutor.evaluate(async (url: string) => {
       try {
         const r = await fetch(url, { credentials: "include" });
         return { status: r.status, body: (await r.text()).slice(0, 4000) };
