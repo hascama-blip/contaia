@@ -3,7 +3,7 @@ import { getCliente } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // Consulta el buzón electrónico SUNAT. La Clave SOL se usa solo para esta
 // llamada y NO se persiste.

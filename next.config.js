@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   // tesseract.js usa workers/node-fetch; lo dejamos como paquete externo del servidor
   experimental: {
-    serverComponentsExternalPackages: ["tesseract.js"],
+    serverComponentsExternalPackages: ["tesseract.js", "playwright-core"],
   },
 };
 

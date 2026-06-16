@@ -6,10 +6,12 @@
 services:
   - type: web
     name: contaia
-    runtime: node
-    plan: free            # gratis para probar. Cambia a "starter" para usar disco persistente.
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    # Docker: necesario para el navegador (Playwright) del buzón electrónico.
+    # El buzón requiere RAM -> usa plan "standard" (2 GB). El SIRE y lo demás
+    # funcionan también en planes menores.
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
     envVars:
       - key: NODE_VERSION
         value: "22"
