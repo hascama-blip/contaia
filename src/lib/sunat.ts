@@ -155,6 +155,16 @@ async function consultarOficial(
   };
 }
 
+/** Lee un fragmento del cuerpo de error (sin datos sensibles). */
+async function leerCuerpo(res: Response): Promise<string> {
+  try {
+    const txt = (await res.text()).trim();
+    return txt ? `: ${txt.slice(0, 200)}` : "";
+  } catch {
+    return "";
+  }
+}
+
 // ---- Fuente externa: decolecta.com -----------------------------------------
 
 async function consultarDecolecta(
@@ -170,7 +180,8 @@ async function consultarDecolecta(
     },
   });
   if (!res.ok) {
-    throw new Error(`decolecta error ${res.status}`);
+    const detalle = await leerCuerpo(res);
+    throw new Error(`decolecta HTTP ${res.status}${detalle}`);
   }
   const d = (await res.json()) as Record<string, any>;
 
@@ -216,7 +227,8 @@ async function consultarApisNet(
     },
   });
   if (!res.ok) {
-    throw new Error(`apis.net.pe error ${res.status}`);
+    const detalle = await leerCuerpo(res);
+    throw new Error(`apis.net.pe HTTP ${res.status}${detalle}`);
   }
   const d = (await res.json()) as Record<string, any>;
   // Mapeo defensivo: apis.net.pe ha usado distintos nombres de campo (v1/v2).
@@ -308,11 +320,10 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
     if (provider === "apisnet") return await consultarApisNet(cleaned, cfg);
     if (provider === "oficial") return await consultarOficial(cleaned, cfg);
   } catch (err) {
-    console.error(`[SUNAT] Falló fuente "${provider}":`, err);
+    const detalle = err instanceof Error ? err.message : String(err);
+    console.error(`[SUNAT] Falló fuente "${provider}":`, detalle);
     if (fuenteRealExigida) {
-      throw new Error(
-        "No se pudo obtener la información real de SUNAT en este momento. Verifica el token o intenta nuevamente."
-      );
+      throw new Error(`No se pudo obtener la información de SUNAT — ${detalle}`);
     }
     // En modo "auto" degradamos a simulado para no romper el flujo de desarrollo.
   }
