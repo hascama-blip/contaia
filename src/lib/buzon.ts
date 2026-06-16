@@ -157,33 +157,56 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // Abrir el Buzón Electrónico desde el menú (carga el visor, normalmente
-    // dentro de un iframe en ww1.sunat.gob.pe).
-    try {
-      const [popup] = await Promise.all([
-        ctx.waitForEvent("page", { timeout: 8000 }).catch(() => null),
-        clickAny(page, [
-          'a:has-text("Buzón Electrónico")',
-          'text=Buzón Electrónico',
-          'a:has-text("Buzón")',
-          '#imgBuzon',
-          'img[alt*="Buz"]',
-        ]),
-      ]);
-      await page.waitForTimeout(6000);
-      if (popup) await popup.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
-    } catch {}
-
-    // Buscar el contexto (frame o pestaña) del visor en ww1.sunat.gob.pe.
-    const contextos: string[] = [];
-    let visor: any = null;
-    for (const pg of ctx.pages()) {
-      for (const fr of pg.frames()) {
-        const u = fr.url();
-        contextos.push(u);
-        if (!visor && /ol-ti-itvisornoti|ww1\.sunat\.gob\.pe/.test(u)) visor = fr;
+    // 1) Cerrar la campaña "Actualiza tus datos" que SUNAT muestra al entrar
+    // (tapa el menú e impide abrir el buzón).
+    const cerrarCampania = [
+      'button:has-text("Continuar")',
+      'button:has-text("Omitir")',
+      'button:has-text("Más tarde")',
+      'button:has-text("Recordar")',
+      'button:has-text("Cerrar")',
+      'button:has-text("No, gracias")',
+      'button:has-text("Acepto")',
+      '[aria-label="Close"]',
+      ".modal .close",
+      "button.close",
+    ];
+    await clickAny(page, cerrarCampania);
+    for (const fr of page.frames()) {
+      if (/itadminforuc-modifdatos|campanha/i.test(fr.url())) {
+        for (const sel of cerrarCampania) {
+          try { await fr.click(sel, { timeout: 1500 }); break; } catch {}
+        }
       }
     }
+    await page.waitForTimeout(2000);
+
+    // 2) Abrir el Buzón Electrónico (carga el visor ol-ti-itvisornoti).
+    await clickAny(page, [
+      'a:has-text("Buzón Electrónico")',
+      'text=Buzón Electrónico',
+      'a[href*="visornoti"]',
+      'a:has-text("Buzón")',
+      'img[title*="Buz"]',
+      'img[alt*="Buz"]',
+      '#liBuzon a',
+    ]);
+
+    // 3) Esperar a que aparezca el iframe/pestaña del visor (hasta ~20s).
+    const buscarVisor = () => {
+      for (const pg of ctx.pages())
+        for (const fr of pg.frames())
+          if (/ol-ti-itvisornoti/.test(fr.url())) return fr;
+      return null;
+    };
+    let visor: any = null;
+    for (let i = 0; i < 10 && !visor; i++) {
+      await page.waitForTimeout(2000);
+      visor = buscarVisor();
+    }
+
+    const contextos: string[] = [];
+    for (const pg of ctx.pages()) for (const fr of pg.frames()) contextos.push(fr.url());
     pasos.push({ paso: "abrir-buzon", contextos, visorEncontrado: Boolean(visor) });
 
     // Llamar al endpoint interno desde el contexto del visor (origin correcto).
