@@ -73,6 +73,40 @@ async function clickAny(page: any, selectores: string[]): Promise<boolean> {
   return false;
 }
 
+/** Clic por texto/valor SOLO en elementos clicables (evita contenedores). */
+async function clickPorTextoEnContexto(
+  contexto: any,
+  textos: string[]
+): Promise<string | null> {
+  return await contexto
+    .evaluate((textos: string[]) => {
+      const clickables = Array.from(
+        document.querySelectorAll(
+          'button, a, input[type="button"], input[type="submit"], input[type="image"], [role="button"]'
+        )
+      ) as any[];
+      for (const t of textos) {
+        const tl = t.toLowerCase();
+        const el = clickables.find((e) => {
+          const partes = [
+            e.textContent || "",
+            e.value || "",
+            e.getAttribute ? e.getAttribute("value") || "" : "",
+            e.getAttribute ? e.getAttribute("title") || "" : "",
+            e.getAttribute ? e.getAttribute("alt") || "" : "",
+          ];
+          return partes.join(" ").toLowerCase().includes(tl);
+        });
+        if (el) {
+          (el as HTMLElement).click();
+          return t;
+        }
+      }
+      return null;
+    }, textos)
+    .catch(() => null);
+}
+
 function mapearMensajes(body: string): BuzonMensaje[] {
   let data: any;
   try {
@@ -158,40 +192,45 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // 1) Cerrar la campaña "VALIDA TUS DATOS DE CONTACTO": clic en "Finalizar"
-    // (popup Informativo) y luego "Continuar sin confirmar".
-    for (let intento = 0; intento < 4; intento++) {
+    // 1) Cerrar la campaña "VALIDA TUS DATOS DE CONTACTO" (clic JS dentro de su
+    // iframe en los botones reales: "Finalizar" y "Continuar sin confirmar").
+    let cerrarCampania = "";
+    for (let intento = 0; intento < 5; intento++) {
       const camp = page
         .frames()
         .find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
-      if (!camp) break;
-      for (const txt of ["Finalizar", "Continuar sin confirmar"]) {
-        try {
-          await camp.getByText(txt, { exact: false }).first().click({ timeout: 2500 });
-          await page.waitForTimeout(1800);
-        } catch {}
+      if (!camp) {
+        cerrarCampania = intento === 0 ? "no-aparecio" : "cerrada";
+        break;
       }
+      const c1 = await clickPorTextoEnContexto(camp, ["Finalizar"]);
       await page.waitForTimeout(1500);
+      const c2 = await clickPorTextoEnContexto(camp, [
+        "Continuar sin confirmar",
+        "Continuar",
+      ]);
+      await page.waitForTimeout(2200);
+      cerrarCampania = `${c1 ?? "-"}/${c2 ?? "-"}`;
     }
-    // Por si el "Finalizar" quedó a nivel de página.
-    try {
-      await page.getByText("Finalizar", { exact: false }).first().click({ timeout: 1500 });
-    } catch {}
-    await page.waitForTimeout(1500);
+    pasos.push({ paso: "cerrar-campania", resultado: cerrarCampania });
 
-    // 2) Abrir el Buzón Electrónico via JS (evita bloqueos del overlay).
+    // 2) Abrir el Buzón Electrónico — SOLO enlaces/botones (no contenedores).
     const clickBuzon = await page
       .evaluate(() => {
         const els = Array.from(
-          document.querySelectorAll("a, button, [onclick], img, span, div")
+          document.querySelectorAll('a, button, [role="button"]')
         ) as HTMLElement[];
-        const match = (e: HTMLElement) =>
-          /buz[oó]n\s*electr/i.test(e.textContent || "") ||
-          /buz[oó]n/i.test(e.getAttribute("title") || "") ||
-          /buz[oó]n/i.test(e.getAttribute("alt") || "") ||
-          /visornoti/i.test(e.getAttribute("href") || "") ||
-          /visornoti|buzon/i.test(e.getAttribute("onclick") || "");
-        const el = els.find(match);
+        const el = els.find((e) => {
+          const txt = (e.textContent || "").trim().toLowerCase();
+          const href = (e.getAttribute("href") || "").toLowerCase();
+          const onclick = (e.getAttribute("onclick") || "").toLowerCase();
+          return (
+            /^buz[oó]n\s*electr/.test(txt) ||
+            href.includes("visornoti") ||
+            onclick.includes("visornoti") ||
+            onclick.includes("buzon")
+          );
+        });
         if (el) {
           el.click();
           return (el.outerHTML || "").slice(0, 180);
