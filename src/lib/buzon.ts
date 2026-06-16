@@ -55,12 +55,13 @@ async function obtenerToken(
   solUser: string,
   solPass: string,
   clientId: string,
-  clientSecret: string
+  clientSecret: string,
+  scope?: string
 ): Promise<string> {
   const url = `${cfg.tokenUrl}/${clientId}/oauth2/token/`;
   const body = new URLSearchParams({
     grant_type: "password",
-    scope: cfg.scope,
+    scope: scope ?? cfg.scope,
     client_id: clientId,
     client_secret: clientSecret,
     username: `${ruc}${solUser}`,
@@ -143,50 +144,45 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
   const hasta = new Date();
   const desde = new Date(hasta.getTime() - dias * 24 * 60 * 60 * 1000);
 
-  const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret);
-  const diag: { pasos: any[] } = { pasos: [] };
-
-  // En diagnóstico: probar varios endpoints candidatos.
+  // En diagnóstico: probar combinaciones de host + scope (como el SIRE, que
+  // vive en api-sire con su propio scope).
   if (params.diagnostico) {
-    const q = "?numpag=1&perpag=20&page=1&perPage=20";
-    const candidatos = [
-      "",
-      "/mensajes",
-      "/listamensajes" + q,
-      "/consultamensajes" + q,
-      "/mensajes/listamensajes" + q,
-      "/mensajes/consultamensajes" + q,
-      "/mensajes/web/listamensajes" + q,
-      "/mensajes/masivo/listamensajes" + q,
-      "/mensaje/web/listamensajes" + q,
-      "/mensajeria/web/listamensajes" + q,
-      "/avisos/web/listaavisos" + q,
-      "/mensajes/web/consultamensajes" + q,
-      "/mensajes/listamensajenotificacion" + q,
-      "/notificaciones/web/listanotificaciones" + q,
-      "/mensajes/web/mensajes" + q,
+    const diag: { pasos: any[] } = { pasos: [] };
+    const combos = [
+      { scope: "https://api.sunat.gob.pe", base: "https://api.sunat.gob.pe/v1/contribuyente/controlmsg" },
+      { scope: "https://api-controlmsg.sunat.gob.pe", base: "https://api-controlmsg.sunat.gob.pe/v1/contribuyente/controlmsg" },
+      { scope: "https://api-mensajes.sunat.gob.pe", base: "https://api-mensajes.sunat.gob.pe/v1/contribuyente/controlmsg" },
+      { scope: "https://api-alertas.sunat.gob.pe", base: "https://api-alertas.sunat.gob.pe/v1/contribuyente/controlmsg" },
     ];
-    for (const path of candidatos) {
-      const url = `${cfg.apiBase}${path
-        .replace("{desde}", fechaISO(desde))
-        .replace("{hasta}", fechaISO(hasta))}`;
+    const paths = [
+      "/mensajes/listamensajes?page=1&perPage=20",
+      "/mensajes/web/listamensajes?page=1&perPage=20",
+      "/mensajes",
+    ];
+    for (const combo of combos) {
+      let token: string;
       try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        });
-        const txt = await res.text();
-        diag.pasos.push({
-          paso: `probe ${path}`,
-          httpStatus: res.status,
-          ok: res.ok,
-          respuesta: txt.slice(0, 350),
-        });
+        token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, combo.scope);
+        diag.pasos.push({ paso: `TOKEN scope=${combo.scope}`, ok: true, respuesta: "token OK" });
       } catch (e) {
-        diag.pasos.push({ paso: `probe ${path}`, ok: false, respuesta: String(e) });
+        diag.pasos.push({ paso: `TOKEN scope=${combo.scope}`, ok: false, respuesta: (e instanceof Error ? e.message : String(e)).slice(0, 200) });
+        continue;
+      }
+      for (const p of paths) {
+        const url = `${combo.base}${p}`;
+        try {
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+          const txt = await res.text();
+          diag.pasos.push({ paso: `${combo.base}${p}`, httpStatus: res.status, ok: res.ok, respuesta: txt.slice(0, 250) });
+        } catch (e) {
+          diag.pasos.push({ paso: url, ok: false, respuesta: (e instanceof Error ? e.message : String(e)).slice(0, 150) });
+        }
       }
     }
     return { mensajes: [], urgentes: [], diag };
   }
+
+  const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret);
 
   const url = `${cfg.apiBase}${cfg.listarPath
     .replace("{desde}", fechaISO(desde))
