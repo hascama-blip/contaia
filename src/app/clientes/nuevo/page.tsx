@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { SunatInfo } from "@/lib/types";
+import { CondicionBadge, EstadoBadge } from "@/components/ui";
 
 export default function NuevoClientePage() {
   const router = useRouter();
@@ -11,11 +13,45 @@ export default function NuevoClientePage() {
     email: "",
     telefono: "",
   });
+  const [sunat, setSunat] = useState<SunatInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [buscando, setBuscando] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function set(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setRuc(value: string) {
+    const limpio = value.replace(/\D/g, "").slice(0, 11);
+    set("ruc", limpio);
+    // Si cambian el RUC, invalidamos la consulta previa.
+    if (sunat && sunat.ruc !== limpio) setSunat(null);
+  }
+
+  async function buscarRuc() {
+    setError(null);
+    if (form.ruc.length !== 11) {
+      setError("Ingresa un RUC de 11 dígitos para buscar.");
+      return;
+    }
+    setBuscando(true);
+    try {
+      const res = await fetch(`/api/sunat/${form.ruc}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo consultar el RUC.");
+        return;
+      }
+      const info: SunatInfo = data.sunat;
+      setSunat(info);
+      // Autocompleta la razón social con la de SUNAT.
+      setForm((f) => ({ ...f, razonSocial: info.razonSocial }));
+    } catch {
+      setError("Error de red al consultar SUNAT.");
+    } finally {
+      setBuscando(false);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -26,7 +62,8 @@ export default function NuevoClientePage() {
       const res = await fetch("/api/clientes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        // Adjuntamos la info SUNAT consultada para guardarla con el cliente.
+        body: JSON.stringify({ ...form, sunat }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -46,27 +83,64 @@ export default function NuevoClientePage() {
       <h1 className="text-2xl font-bold text-slate-800">Nuevo cliente</h1>
       <form onSubmit={submit} className="card space-y-4 p-6">
         <div>
+          <label className="label">RUC *</label>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              value={form.ruc}
+              onChange={(e) => setRuc(e.target.value)}
+              placeholder="20123456789"
+              inputMode="numeric"
+              required
+            />
+            <button
+              type="button"
+              className="btn-ghost shrink-0"
+              onClick={buscarRuc}
+              disabled={buscando || form.ruc.length !== 11}
+            >
+              {buscando ? "Buscando…" : "🔎 Buscar"}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Escribe el RUC (11 dígitos) y pulsa <strong>Buscar</strong> para traer la
+            información desde SUNAT.
+          </p>
+        </div>
+
+        {sunat && (
+          <div className="rounded-lg border border-brand-100 bg-brand-50 p-3 text-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-semibold text-slate-700">Datos SUNAT</span>
+              <span className="text-xs text-slate-400">
+                fuente: {sunat.fuente}
+              </span>
+            </div>
+            <p className="font-medium text-slate-800">{sunat.razonSocial}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <EstadoBadge estado={sunat.estado} />
+              <CondicionBadge condicion={sunat.condicion} />
+              <span className="badge bg-white text-slate-600">
+                {sunat.tipoContribuyente}
+              </span>
+            </div>
+            {sunat.direccion && (
+              <p className="mt-2 text-xs text-slate-500">{sunat.direccion}</p>
+            )}
+          </div>
+        )}
+
+        <div>
           <label className="label">Razón social *</label>
           <input
             className="input"
             value={form.razonSocial}
             onChange={(e) => set("razonSocial", e.target.value)}
-            placeholder="EMPRESA EJEMPLO S.A.C."
+            placeholder="Se autocompleta al buscar el RUC"
             required
           />
         </div>
-        <div>
-          <label className="label">RUC *</label>
-          <input
-            className="input"
-            value={form.ruc}
-            onChange={(e) => set("ruc", e.target.value.replace(/\D/g, "").slice(0, 11))}
-            placeholder="20123456789"
-            inputMode="numeric"
-            required
-          />
-          <p className="mt-1 text-xs text-slate-400">11 dígitos.</p>
-        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Email</label>

@@ -54,6 +54,7 @@ export async function createCliente(data: {
   ruc: string;
   email: string;
   telefono: string;
+  sunat?: SunatInfo | null;
 }): Promise<Cliente> {
   const store = await readStore();
   const cliente: Cliente = {
@@ -63,7 +64,7 @@ export async function createCliente(data: {
     email: data.email.trim(),
     telefono: data.telefono.trim(),
     createdAt: new Date().toISOString(),
-    sunat: null,
+    sunat: data.sunat ?? null,
     documentos: [],
     diagnostico: null,
   };

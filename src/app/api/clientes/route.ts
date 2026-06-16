@@ -23,11 +23,18 @@ export async function POST(req: NextRequest) {
   if (!body.razonSocial.trim()) {
     return NextResponse.json({ error: "La razón social es obligatoria." }, { status: 400 });
   }
+  // Si el formulario adjunta la info SUNAT ya consultada, la guardamos
+  // siempre que el RUC coincida (evita inyectar datos de otro contribuyente).
+  const sunat =
+    body.sunat && typeof body.sunat === "object" && body.sunat.ruc === body.ruc.trim()
+      ? body.sunat
+      : null;
   const cliente = await createCliente({
     razonSocial: body.razonSocial,
     ruc: body.ruc,
     email: body.email ?? "",
     telefono: body.telefono ?? "",
+    sunat,
   });
   return NextResponse.json({ cliente }, { status: 201 });
 }
