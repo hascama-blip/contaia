@@ -304,8 +304,11 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       throw new Error(`No se pudo leer el buzón (estado ${primera.status}). Posible bloqueo o sesión.`);
     }
 
-    // Paginar hasta cubrir los últimos N días (la lista viene de más reciente a más antigua).
-    const cutoff = Date.now() - dias * 24 * 60 * 60 * 1000;
+    // Solo el MES EN CURSO: corte = el más reciente entre (hoy - N días) y el
+    // primer día del mes actual. Así no entran mensajes de meses anteriores.
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime();
+    const cutoff = Math.max(inicioMes, Date.now() - dias * 24 * 60 * 60 * 1000);
     const todas: BuzonMensaje[] = [];
     const agregar = (body: string) => {
       const ms = mapearMensajes(body);

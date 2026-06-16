@@ -7,6 +7,7 @@ import type {
   Diagnostico,
   SunatInfo,
   SireResumen,
+  BuzonResumen,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -31,9 +32,10 @@ async function readStore(): Promise<Store> {
   try {
     const raw = await fs.readFile(STORE_PATH, "utf-8");
     const store = JSON.parse(raw) as Store;
-    // Compatibilidad: clientes creados antes de SIRE no tienen el campo.
+    // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
+      if (c.buzon === undefined) c.buzon = null;
     }
     return store;
   } catch {
@@ -79,6 +81,7 @@ export async function createCliente(data: {
     documentos: [],
     diagnostico: null,
     sire: [],
+    buzon: null,
   };
   store.clientes.push(cliente);
   await writeStore(store);
@@ -157,6 +160,18 @@ export async function setSireResumen(
   cliente.sire = cliente.sire.filter((s) => s.periodo !== resumen.periodo);
   cliente.sire.push(resumen);
   cliente.sire.sort((a, b) => b.periodo.localeCompare(a.periodo));
+  await writeStore(store);
+  return cliente;
+}
+
+export async function setBuzon(
+  clienteId: string,
+  buzon: BuzonResumen
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.buzon = buzon;
   await writeStore(store);
   return cliente;
 }

@@ -51,7 +51,10 @@ export default function SunatPanel({
     return false;
   }
 
-  async function consultarSire(simulado: boolean): Promise<boolean> {
+  async function consultarSire(
+    simulado: boolean,
+    periodoOverride?: string
+  ): Promise<boolean> {
     setError(null);
     setDiag(null);
     if (!simulado && faltanCreds()) return false;
@@ -61,7 +64,7 @@ export default function SunatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          periodo,
+          periodo: periodoOverride ?? periodo,
           real: !simulado,
           solUser: simulado ? "" : solUser,
           solPass: simulado ? "" : solPass,
@@ -124,15 +127,21 @@ export default function SunatPanel({
   async function extraerTodo() {
     if (faltanCreds()) return;
     setBusy("todo");
-    const okSire = await consultarSire(false);
-    // Aunque el SIRE falle, intentamos el buzón con las mismas credenciales.
+    setError(null);
+    setDiag(null);
+    // SIRE de TODOS los meses del año en curso (enero -> mes actual).
+    const anioActual = hoy.getFullYear();
+    const mesActual = hoy.getMonth() + 1;
+    for (let m = 1; m <= mesActual; m++) {
+      const per = `${anioActual}${String(m).padStart(2, "0")}`;
+      await consultarSire(false, per);
+    }
+    // Buzón del mes presente (últimos 15 días).
     await consultarBuzon();
     setBusy(null);
-    if (okSire) {
-      // Limpiamos la clave solo al terminar todo el proceso.
-      setSolPass("");
-      setClientSecret("");
-    }
+    // Limpiamos la clave solo al terminar todo el proceso.
+    setSolPass("");
+    setClientSecret("");
   }
 
   const trabajando = busy !== null;

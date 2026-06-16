@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCliente } from "@/lib/db";
+import { getCliente, setBuzon } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
 
 export const runtime = "nodejs";
@@ -22,6 +22,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       dias: typeof body.dias === "number" ? body.dias : 15,
       diagnostico: body.diagnostico === true,
     });
+    // Persistir los urgentes para el informe (no en modo diagnóstico).
+    if (!resultado.diag) {
+      await setBuzon(cliente.id, {
+        urgentes: resultado.urgentes,
+        totalMensajes: resultado.mensajes.length,
+        consultadoAt: new Date().toISOString(),
+      });
+    }
     return NextResponse.json(resultado);
   } catch (err: any) {
     return NextResponse.json(

@@ -76,6 +76,8 @@ export interface Cliente {
   diagnostico: Diagnostico | null;
   /** Resúmenes SIRE (compras/ventas) por periodo. Las credenciales NO se guardan. */
   sire: SireResumen[];
+  /** Buzón electrónico (urgentes) del mes en curso. */
+  buzon: BuzonResumen | null;
 }
 
 /** Totales de un bloque del SIRE (ventas o compras) en un periodo. */
@@ -102,6 +104,13 @@ export interface BuzonResultado {
   mensajes: BuzonMensaje[];
   urgentes: BuzonMensaje[];
   diag?: { pasos: any[] };
+}
+
+/** Buzón persistido en el cliente (para el informe). */
+export interface BuzonResumen {
+  urgentes: BuzonMensaje[];
+  totalMensajes: number;
+  consultadoAt: string;
 }
 
 /** Resumen mensual SIRE: cuánto compró y vendió en el periodo. */

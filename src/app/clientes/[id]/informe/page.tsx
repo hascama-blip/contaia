@@ -68,6 +68,56 @@ export default async function InformePage({ params }: { params: { id: string } }
     d.score >= 85 ? "#10b981" : d.score >= 65 ? "#f59e0b" : d.score >= 40 ? "#f97316" : "#ef4444";
   const scoreDeg = (d.score / 100) * 360;
 
+  // --- Buzón y contingencias ---
+  const buzon = cliente.buzon;
+  const urgentes = buzon?.urgentes ?? [];
+  const cobranzas = urgentes.filter((m) => m.tipo === "Resolución de Cobranza");
+  const valores = urgentes.filter((m) => m.tipo === "Valor");
+
+  type Contingencia = { nivel: NivelRiesgo; titulo: string; detalle: string };
+  const contingencias: Contingencia[] = [];
+  if (cobranzas.length > 0)
+    contingencias.push({
+      nivel: "critico",
+      titulo: `${cobranzas.length} resolución(es) de cobranza coactiva notificada(s)`,
+      detalle:
+        "Riesgo inminente de embargo/medidas cautelares. Atender de inmediato (pago o fraccionamiento).",
+    });
+  if (valores.length > 0)
+    contingencias.push({
+      nivel: "alto",
+      titulo: `${valores.length} valor(es) notificado(s) (órdenes de pago, multas, determinaciones)`,
+      detalle: "Deuda exigible. Revisar y pagar o reclamar dentro del plazo legal.",
+    });
+  if (sunat && sunat.condicion.toUpperCase() !== "HABIDO")
+    contingencias.push({
+      nivel: "alto",
+      titulo: `Condición de domicilio: ${sunat.condicion}`,
+      detalle: "Restringe crédito fiscal y comprobantes; señal de riesgo ante fiscalización.",
+    });
+  if (sunat && sunat.estado.toUpperCase() !== "ACTIVO")
+    contingencias.push({
+      nivel: sunat.estado.toUpperCase().includes("BAJA") ? "critico" : "alto",
+      titulo: `Estado del contribuyente: ${sunat.estado}`,
+      detalle: "No permite operar/emitir con normalidad. Regularizar ante SUNAT.",
+    });
+  if (igvPorPagar > 0)
+    contingencias.push({
+      nivel: igvPorPagar > 10000 ? "alto" : "medio",
+      titulo: `IGV por pagar acumulado aprox. ${fmtSoles(igvPorPagar)}`,
+      detalle: "Verificar provisión y pago oportuno del IGV para evitar multas e intereses.",
+    });
+
+  const NIVEL_PESO: Record<NivelRiesgo, number> = { critico: 4, alto: 3, medio: 2, bajo: 1 };
+  contingencias.sort((a, b) => NIVEL_PESO[b.nivel] - NIVEL_PESO[a.nivel]);
+
+  const CONT_STYLE: Record<NivelRiesgo, string> = {
+    critico: "border-l-red-500 bg-red-50",
+    alto: "border-l-orange-500 bg-orange-50",
+    medio: "border-l-amber-500 bg-amber-50",
+    bajo: "border-l-emerald-500 bg-emerald-50",
+  };
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="no-print mb-4 flex items-center justify-between">
@@ -182,6 +232,71 @@ export default async function InformePage({ params }: { params: { id: string } }
           </div>
         </section>
         {/* =================== FIN DASHBOARD =================== */}
+
+        {/* Contingencias y alertas */}
+        <section className="mt-6">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Contingencias y alertas
+          </h3>
+          {contingencias.length === 0 ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              No se detectaron contingencias relevantes con la información disponible.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {contingencias.map((c, i) => (
+                <li key={i} className={`rounded-md border-l-4 p-3 ${CONT_STYLE[c.nivel]}`}>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {c.titulo}
+                    <span className="ml-2 text-xs font-normal uppercase text-slate-500">
+                      ({c.nivel})
+                    </span>
+                  </p>
+                  <p className="text-sm text-slate-600">{c.detalle}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Buzón electrónico SUNAT (urgentes del mes) */}
+        {buzon && (
+          <section className="mt-6">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Buzón electrónico SUNAT — urgentes del mes
+            </h3>
+            <p className="mb-2 text-xs text-slate-500">
+              {urgentes.length} mensaje(s) de cobranza/valores · {buzon.totalMensajes} mensaje(s) revisados ·
+              consultado {fmtFecha(buzon.consultadoAt)}
+            </p>
+            {urgentes.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin notificaciones de cobranza ni valores en el mes.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                    <th className="py-1.5">Fecha</th>
+                    <th className="py-1.5">Categoría</th>
+                    <th className="py-1.5">Asunto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {urgentes.map((m) => (
+                    <tr key={m.id}>
+                      <td className="py-1.5 pr-2 align-top text-slate-500 whitespace-nowrap">{m.fecha}</td>
+                      <td className="py-1.5 pr-2 align-top">
+                        <span className={`badge ${m.tipo === "Resolución de Cobranza" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
+                          {m.tipo || "—"}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-slate-700">{m.asunto}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
 
         {/* Situación SUNAT */}
         <section className="mt-6">
