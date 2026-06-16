@@ -421,37 +421,10 @@ async function flujoOficial(
   const { ruc, periodo, solUser, solPass, diagnostico } = params;
   const diag: SireDiag = { periodo, pasos: [] };
 
+  let token: string;
   try {
-    const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
-
-    // Ventas (RVIE) y Compras (RCE).
-    const tV = await solicitarTicket(cfg, token, periodo, cfg.exportVentasPath, cfg.codLibroVentas, "ventas", diag);
-    const tC = await solicitarTicket(cfg, token, periodo, cfg.exportComprasPath, cfg.codLibroCompras, "compras", diag);
-
-    const nV = await esperarArchivo(cfg, token, periodo, tV, "ventas", diag);
-    const nC = await esperarArchivo(cfg, token, periodo, tC, "compras", diag);
-
-    const fV = await descargarReporte(cfg, token, nV, cfg.codLibroVentas, "ventas", diag);
-    const fC = await descargarReporte(cfg, token, nC, cfg.codLibroCompras, "compras", diag);
-
-    if (diagnostico) {
-      return { diag };
-    }
-
-    const ventas = parseTotales(fV);
-    const compras = parseTotales(fC);
-    return {
-      resumen: {
-        periodo,
-        ventas,
-        compras,
-        fuente: "oficial",
-        consultadoAt: new Date().toISOString(),
-      },
-      diag,
-    };
+    token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
   } catch (err) {
-    // En diagnóstico devolvemos la traza con el paso que falló, sin lanzar error.
     if (diagnostico) {
       diag.pasos.push({
         paso: "error",
@@ -462,6 +435,54 @@ async function flujoOficial(
     }
     throw err;
   }
+
+  // Procesa cada registro de forma INDEPENDIENTE: un fallo en compras no
+  // impide ver el flujo completo de ventas (ticket -> estado -> descarga).
+  const intentar = async (
+    etiqueta: string,
+    pathTemplate: string,
+    codLibro: string
+  ): Promise<string | null> => {
+    try {
+      const ticket = await solicitarTicket(cfg, token, periodo, pathTemplate, codLibro, etiqueta, diag);
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
+      return await descargarReporte(cfg, token, nombre, codLibro, etiqueta, diag);
+    } catch (err) {
+      diag.pasos.push({
+        paso: `error-${etiqueta}`,
+        ok: false,
+        respuesta: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  };
+
+  const fV = await intentar("ventas", cfg.exportVentasPath, cfg.codLibroVentas);
+  const fC = await intentar("compras", cfg.exportComprasPath, cfg.codLibroCompras);
+
+  if (diagnostico) {
+    return { diag };
+  }
+
+  if (!fV && !fC) {
+    throw new Error("no se pudo obtener ni ventas ni compras (usa modo diagnóstico)");
+  }
+  const ventas = fV ? parseTotales(fV) : bloqueCero();
+  const compras = fC ? parseTotales(fC) : bloqueCero();
+  return {
+    resumen: {
+      periodo,
+      ventas,
+      compras,
+      fuente: "oficial",
+      consultadoAt: new Date().toISOString(),
+    },
+    diag,
+  };
+}
+
+function bloqueCero(): SireBloque {
+  return { comprobantes: 0, baseImponible: 0, igv: 0, inafectoExonerado: 0, importeTotal: 0 };
 }
 
 // ---- Modo simulado (determinista por RUC + periodo) ------------------------
