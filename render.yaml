@@ -6,12 +6,12 @@
 services:
   - type: web
     name: contaia
-    # Docker: necesario para el navegador (Playwright) del buzón electrónico.
-    # El buzón requiere RAM -> usa plan "standard" (2 GB). El SIRE y lo demás
-    # funcionan también en planes menores.
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: node
+    # El buzón usa un navegador headless (@sparticuz/chromium) que consume RAM:
+    # usa plan "standard" (2 GB). El SIRE y lo demás funcionan en planes menores.
     plan: standard
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
     envVars:
       - key: NODE_VERSION
         value: "22"

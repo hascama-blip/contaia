@@ -99,6 +99,21 @@ function mapearMensajes(body: string): BuzonMensaje[] {
 
 async function lanzarNavegador() {
   const { chromium } = await import("playwright-core");
+  // En Render (Node) usamos el Chromium de @sparticuz, que corre sin
+  // dependencias del sistema. En local usa el Chromium instalado.
+  try {
+    const sparticuz = (await import("@sparticuz/chromium")).default as any;
+    const executablePath = await sparticuz.executablePath();
+    if (executablePath) {
+      return chromium.launch({
+        headless: true,
+        executablePath,
+        args: [...(sparticuz.args ?? []), "--no-sandbox", "--disable-dev-shm-usage"],
+      });
+    }
+  } catch {
+    /* fallback al Chromium local */
+  }
   return chromium.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],

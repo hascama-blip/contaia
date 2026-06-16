@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^131.0.0",
     "fflate": "^0.8.2",
     "next": "14.2.5",
     "playwright-core": "^1.49.1",
