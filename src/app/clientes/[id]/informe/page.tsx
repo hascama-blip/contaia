@@ -40,12 +40,13 @@ export default async function InformePage({ params }: { params: { id: string } }
 
   // --- Datos para el dashboard del informe ---
   const sire = cliente.sire ?? [];
-  const ultimoSire = sire[0] ?? null; // sire viene ordenado desc por periodo
-  const ventasUlt = ultimoSire?.ventas.importeTotal ?? 0;
-  const comprasUlt = ultimoSire?.compras.importeTotal ?? 0;
-  const igvVentasUlt = ultimoSire?.ventas.igv ?? 0;
-  const igvComprasUlt = ultimoSire?.compras.igv ?? 0;
-  const igvPorPagar = igvVentasUlt - igvComprasUlt;
+  // Acumulados de TODOS los periodos consultados (ventas/compras SUNAT).
+  const ventasAcum = sire.reduce((a, s) => a + s.ventas.importeTotal, 0);
+  const comprasAcum = sire.reduce((a, s) => a + s.compras.importeTotal, 0);
+  const igvVentasAcum = sire.reduce((a, s) => a + s.ventas.igv, 0);
+  const igvComprasAcum = sire.reduce((a, s) => a + s.compras.igv, 0);
+  const igvPorPagar = igvVentasAcum - igvComprasAcum;
+  const nPeriodos = sire.length;
 
   // Serie de periodos (ascendente) para el gráfico de barras.
   const sireChartData = [...sire]
@@ -136,23 +137,23 @@ export default async function InformePage({ params }: { params: { id: string } }
             </div>
           </div>
 
-          {/* KPIs */}
+          {/* KPIs acumulados (suma de todos los periodos consultados) */}
           <Kpi
-            label={ultimoSire ? `Ventas ${etiquetaPeriodo(ultimoSire.periodo)}` : "Ventas del mes"}
-            value={fmtSoles(ventasUlt)}
+            label={nPeriodos ? `Ventas acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Ventas acumuladas"}
+            value={fmtSoles(ventasAcum)}
             tone="emerald"
           />
           <Kpi
-            label={ultimoSire ? `Compras ${etiquetaPeriodo(ultimoSire.periodo)}` : "Compras del mes"}
-            value={fmtSoles(comprasUlt)}
+            label={nPeriodos ? `Compras acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Compras acumuladas"}
+            value={fmtSoles(comprasAcum)}
             tone="blue"
           />
         </section>
 
         {/* Fila 2: KPIs secundarios */}
         <section className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KpiSmall label="IGV ventas" value={fmtSoles(igvVentasUlt)} />
-          <KpiSmall label="IGV compras" value={fmtSoles(igvComprasUlt)} />
+          <KpiSmall label="IGV ventas (acum.)" value={fmtSoles(igvVentasAcum)} />
+          <KpiSmall label="IGV compras (acum.)" value={fmtSoles(igvComprasAcum)} />
           <KpiSmall
             label="IGV por pagar (aprox.)"
             value={fmtSoles(Math.max(0, igvPorPagar))}

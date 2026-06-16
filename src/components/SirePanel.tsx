@@ -240,15 +240,47 @@ export default function SirePanel({
         </button>
       </div>
 
-      {/* Resultados */}
+      {/* Acumulado de todos los periodos consultados */}
+      {resultados.length > 0 && <Acumulado resultados={resultados} />}
+
+      {/* Resultados por periodo */}
       {resultados.length > 0 && (
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-4">
           {resultados.map((r) => (
             <ResumenCard key={r.periodo} r={r} />
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function Acumulado({ resultados }: { resultados: SireResumen[] }) {
+  const ventas = resultados.reduce((a, r) => a + r.ventas.importeTotal, 0);
+  const compras = resultados.reduce((a, r) => a + r.compras.importeTotal, 0);
+  const n = resultados.length;
+  return (
+    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Acumulado ({n} mes{n > 1 ? "es" : ""})
+      </p>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div>
+          <p className="text-xs text-slate-500">Ventas acumuladas</p>
+          <p className="text-xl font-bold text-emerald-600">{fmtSoles(ventas)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Compras acumuladas</p>
+          <p className="text-xl font-bold text-blue-600">{fmtSoles(compras)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Diferencia</p>
+          <p className={`text-xl font-bold ${ventas - compras >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {fmtSoles(ventas - compras)}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
