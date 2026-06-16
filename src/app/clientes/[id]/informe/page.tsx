@@ -132,15 +132,16 @@ export default async function InformePage({ params }: { params: { id: string } }
         <header className="flex items-start justify-between border-b border-slate-200 pb-5">
           <div>
             <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-                C
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-sm font-bold text-white">
+                A
               </span>
-              <span className="text-xl font-bold text-slate-800">
-                Conta<span className="text-brand-600">IA</span>
+              <span className="text-xl font-bold tracking-tight">
+                <span className="text-brand-700">ASENCO</span>
+                <span className="text-slate-900">IA</span>
               </span>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Informe de diagnóstico tributario
+              Informe de gerencia · Diagnóstico tributario
             </p>
           </div>
           <div className="text-right text-xs text-slate-500">
@@ -216,15 +217,15 @@ export default async function InformePage({ params }: { params: { id: string } }
           />
         </section>
 
-        {/* Fila 3: gráficos */}
-        <section className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 p-4">
+        {/* Fila 3: gráficos — en su propia hoja al imprimir, juntos */}
+        <section className="grafico-hoja mt-4 grid gap-4 md:grid-cols-2">
+          <div className="break-inside-avoid rounded-xl border border-slate-200 p-4">
             <h3 className="mb-1 text-sm font-semibold text-slate-700">
               Ventas vs Compras por periodo
             </h3>
             <SireBarChart data={sireChartData} />
           </div>
-          <div className="rounded-xl border border-slate-200 p-4">
+          <div className="break-inside-avoid rounded-xl border border-slate-200 p-4">
             <h3 className="mb-1 text-sm font-semibold text-slate-700">
               Hallazgos por severidad
             </h3>
@@ -422,7 +423,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
           <p>
-            Informe generado automáticamente por ContaIA a partir de la información de
+            Informe generado automáticamente por ASENCOIA a partir de la información de
             SUNAT y los documentos cargados. Debe ser validado por un contador o auditor
             colegiado antes de su uso formal.
           </p>

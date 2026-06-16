@@ -35,6 +35,10 @@ body {
 }
 
 /* Estilos de impresión para el informe del cliente */
+@page {
+  margin: 1.4cm;
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -45,5 +49,23 @@ body {
   .print-full {
     box-shadow: none !important;
     border: none !important;
+  }
+  /* Los gráficos (Ventas vs Compras + Hallazgos) van juntos en su propia hoja. */
+  .grafico-hoja {
+    break-before: page;
+    page-break-before: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* El resto fluye, pero sin cortar a la mitad ítems, filas ni separar títulos. */
+  .print-full li,
+  .print-full tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-full h2,
+  .print-full h3 {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 }
