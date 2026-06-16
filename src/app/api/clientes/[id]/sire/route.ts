@@ -3,7 +3,7 @@ import { getCliente, setSireResumen } from "@/lib/db";
 import { consultarResumenSire } from "@/lib/sire";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // Consulta el resumen SIRE (compras/ventas) de un periodo.
 // Recibe la Clave SOL del cliente SOLO para esta llamada; NO se persiste.

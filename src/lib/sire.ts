@@ -244,7 +244,8 @@ async function esperarArchivo(
   diag: SireDiag
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
-  const deadline = Date.now() + 40_000;
+  // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
+  const deadline = Date.now() + 95_000;
   let ultima = "";
   while (Date.now() < deadline) {
     const res = await fetch(url, {
@@ -319,7 +320,7 @@ async function esperarArchivo(
     if (/(09|error|fallo)/i.test(estado)) {
       throw new Error(`estado ${etiqueta}: proceso con error (${estado})`);
     }
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 4000));
   }
   diag.pasos.push({
     paso: `estado-${etiqueta}`,
@@ -328,7 +329,9 @@ async function esperarArchivo(
     ok: false,
     respuesta: trunc(ultima, 2500),
   });
-  throw new Error(`estado ${etiqueta}: tiempo de espera agotado`);
+  throw new Error(
+    `estado ${etiqueta}: SUNAT aún genera el reporte (En proceso). Espera unos segundos y vuelve a Consultar.`
+  );
 }
 
 // ---- Paso: descargar y parsear --------------------------------------------
