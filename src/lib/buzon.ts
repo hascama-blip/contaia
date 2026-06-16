@@ -157,42 +157,42 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // 1) Cerrar la campaña "Actualiza tus datos" que SUNAT muestra al entrar
-    // (tapa el menú e impide abrir el buzón).
-    const cerrarCampania = [
-      'button:has-text("Continuar")',
-      'button:has-text("Omitir")',
-      'button:has-text("Más tarde")',
-      'button:has-text("Recordar")',
-      'button:has-text("Cerrar")',
-      'button:has-text("No, gracias")',
-      'button:has-text("Acepto")',
-      '[aria-label="Close"]',
-      ".modal .close",
-      "button.close",
-    ];
-    await clickAny(page, cerrarCampania);
-    for (const fr of page.frames()) {
-      if (/itadminforuc-modifdatos|campanha/i.test(fr.url())) {
-        for (const sel of cerrarCampania) {
-          try { await fr.click(sel, { timeout: 1500 }); break; } catch {}
+    // 1) Quitar la campaña/overlay que tapa el menú (iframe + modales).
+    await page
+      .evaluate(() => {
+        document.querySelectorAll("iframe").forEach((f) => {
+          const s = (f as HTMLIFrameElement).src || "";
+          if (/campanha|modifdatos|itadminforuc/i.test(s)) f.remove();
+        });
+        document
+          .querySelectorAll('.modal, .modal-backdrop, [class*="overlay"], [class*="backdrop"]')
+          .forEach((e) => e.remove());
+      })
+      .catch(() => {});
+    await page.waitForTimeout(1000);
+
+    // 2) Abrir el Buzón Electrónico via JS (evita bloqueos del overlay).
+    const clickBuzon = await page
+      .evaluate(() => {
+        const els = Array.from(
+          document.querySelectorAll("a, button, [onclick], img, span, div")
+        ) as HTMLElement[];
+        const match = (e: HTMLElement) =>
+          /buz[oó]n\s*electr/i.test(e.textContent || "") ||
+          /buz[oó]n/i.test(e.getAttribute("title") || "") ||
+          /buz[oó]n/i.test(e.getAttribute("alt") || "") ||
+          /visornoti/i.test(e.getAttribute("href") || "") ||
+          /visornoti|buzon/i.test(e.getAttribute("onclick") || "");
+        const el = els.find(match);
+        if (el) {
+          el.click();
+          return (el.outerHTML || "").slice(0, 180);
         }
-      }
-    }
-    await page.waitForTimeout(2000);
+        return null;
+      })
+      .catch(() => null);
 
-    // 2) Abrir el Buzón Electrónico (carga el visor ol-ti-itvisornoti).
-    await clickAny(page, [
-      'a:has-text("Buzón Electrónico")',
-      'text=Buzón Electrónico',
-      'a[href*="visornoti"]',
-      'a:has-text("Buzón")',
-      'img[title*="Buz"]',
-      'img[alt*="Buz"]',
-      '#liBuzon a',
-    ]);
-
-    // 3) Esperar a que aparezca el iframe/pestaña del visor (hasta ~20s).
+    // 3) Esperar a que aparezca el iframe/pestaña del visor (hasta ~24s).
     const buscarVisor = () => {
       for (const pg of ctx.pages())
         for (const fr of pg.frames())
@@ -200,14 +200,14 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       return null;
     };
     let visor: any = null;
-    for (let i = 0; i < 10 && !visor; i++) {
+    for (let i = 0; i < 12 && !visor; i++) {
       await page.waitForTimeout(2000);
       visor = buscarVisor();
     }
 
     const contextos: string[] = [];
     for (const pg of ctx.pages()) for (const fr of pg.frames()) contextos.push(fr.url());
-    pasos.push({ paso: "abrir-buzon", contextos, visorEncontrado: Boolean(visor) });
+    pasos.push({ paso: "abrir-buzon", clickBuzon, contextos, visorEncontrado: Boolean(visor) });
 
     // Llamar al endpoint interno desde el contexto del visor (origin correcto).
     const ejecutor = visor ?? page;
