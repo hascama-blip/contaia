@@ -507,6 +507,38 @@ async function flujoOficial(
     throw err;
   }
 
+  // En diagnóstico: probar varios codTipoResumen (ventas) para hallar cuál
+  // tiene datos en el periodo, sin necesidad de varios despliegues.
+  if (diagnostico && (params as any).probe !== false) {
+    for (const ct of ["0", "1", "2", "3", "4", "5", "6"]) {
+      const url = buildUrl(cfg, cfg.exportVentasPath, {
+        periodo,
+        codTipoResumen: ct,
+        codTipoArchivo: cfg.codTipoArchivo,
+        codLibro: cfg.codLibroVentas,
+      });
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        const txt = await res.text();
+        diag.pasos.push({
+          paso: `probe-codTipoResumen=${ct}`,
+          httpStatus: res.status,
+          ok: res.ok,
+          respuesta: trunc(txt, 250),
+        });
+      } catch (e) {
+        diag.pasos.push({
+          paso: `probe-codTipoResumen=${ct}`,
+          ok: false,
+          respuesta: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    return { diag };
+  }
+
   // Procesa cada registro de forma INDEPENDIENTE: un fallo en compras no
   // impide ver el flujo completo de ventas (ticket -> estado -> descarga).
   const intentar = async (
