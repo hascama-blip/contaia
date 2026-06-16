@@ -23,6 +23,8 @@ export interface SireParams {
   solPass: string;
   clientId?: string;
   clientSecret?: string;
+  /** true = consulta REAL a SUNAT; false = ejemplo simulado. */
+  real?: boolean;
   /** Si true, no parsea: devuelve la traza cruda de cada paso. */
   diagnostico?: boolean;
 }
@@ -594,10 +596,17 @@ export async function consultarResumenSire(
   }
 
   const cfg = getConfig();
-  const quiereReal = Boolean(solUser && solPass) && !cfg.forceMock;
 
-  if (!quiereReal) {
+  // El ejemplo (real=false) o el modo forzado devuelven datos simulados.
+  if (params.real !== true || cfg.forceMock) {
     return { resumen: simular(ruc, periodo) };
+  }
+
+  // Consulta REAL: exige credenciales; NO cae a simulado para no confundir.
+  if (!solUser || !solPass) {
+    throw new Error(
+      "Para el dato real ingresa el Usuario SOL y la Clave SOL (se borran por seguridad tras cada consulta, vuelve a escribir la clave)."
+    );
   }
 
   const clientId = params.clientId || cfg.defClientId;

@@ -44,6 +44,11 @@ export default function SirePanel({
   async function consultar(simulado: boolean) {
     setError(null);
     setDiag(null);
+    // En consulta real exigimos las credenciales antes de enviar.
+    if (!simulado && (!solUser || !solPass)) {
+      setError("Ingresa el Usuario SOL y la Clave SOL para la consulta real.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire`, {
@@ -51,6 +56,7 @@ export default function SirePanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           periodo,
+          real: !simulado,
           // En modo simulado mandamos credenciales vacías a propósito.
           solUser: simulado ? "" : solUser,
           solPass: simulado ? "" : solPass,

@@ -26,6 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       clientId: typeof body.clientId === "string" ? body.clientId : undefined,
       clientSecret:
         typeof body.clientSecret === "string" ? body.clientSecret : undefined,
+      real: body.real === true,
       diagnostico: body.diagnostico === true,
     });
     // Modo diagnóstico: devuelve la traza cruda, sin persistir.
