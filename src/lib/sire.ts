@@ -86,7 +86,7 @@ function getConfig(): SireConfig {
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
     descargaPath:
       process.env.SIRE_DESCARGA_PATH ??
-      "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=01",
+      "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
     codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
     codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
     codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
@@ -270,13 +270,16 @@ async function esperarArchivo(
     const estado = String(reg?.codEstadoProceso ?? det?.codEstadoEnvio ?? reg?.estado ?? "");
     const desc = String(reg?.desEstadoProceso ?? det?.desEstadoEnvio ?? "");
     const terminado = estado === "06" || /termin/i.test(desc);
-    // El nombre del archivo puede venir en varios campos según el servicio.
+    // El nombre del archivo viene en el arreglo archivoReporte[0].nomArchivoReporte
+    // (un .zip que contiene el .txt indicado en nomArchivoContenido).
+    const archRep = Array.isArray(reg?.archivoReporte)
+      ? reg.archivoReporte[0]
+      : reg?.archivoReporte;
     const nombre =
+      archRep?.nomArchivoReporte ??
       det?.nomArchivoReporte ??
       reg?.nomArchivoReporte ??
-      det?.nomArchivoContenido ??
-      reg?.nomArchivoContenido ??
-      reg?.archivoReporte?.nomArchivoReporte ??
+      archRep?.nomArchivoContenido ??
       reg?.nombreArchivo ??
       null;
 
@@ -326,12 +329,13 @@ async function esperarArchivo(
 async function descargarReporte(
   cfg: SireConfig,
   token: string,
+  periodo: string,
   nombre: string,
   codLibro: string,
   etiqueta: string,
   diag: SireDiag
 ): Promise<string> {
-  const url = buildUrl(cfg, cfg.descargaPath, { nombre, codLibro });
+  const url = buildUrl(cfg, cfg.descargaPath, { nombre, periodo, codLibro });
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -469,7 +473,7 @@ async function flujoOficial(
     try {
       const ticket = await solicitarTicket(cfg, token, periodo, pathTemplate, codLibro, etiqueta, diag);
       const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
-      return await descargarReporte(cfg, token, nombre, codLibro, etiqueta, diag);
+      return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
     } catch (err) {
       diag.pasos.push({
         paso: `error-${etiqueta}`,
