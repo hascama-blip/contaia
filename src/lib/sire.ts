@@ -89,8 +89,9 @@ function getConfig(): SireConfig {
     descargaPath:
       process.env.SIRE_DESCARGA_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
-    codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
-    codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
+    // Confirmado empíricamente: 140000 = ventas (RVIE), 080000 = compras (RCE).
+    codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "140000",
+    codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "080000",
     // 1 dígito. 1 = resumen del registro (lo declarado, con datos por mes).
     codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
     codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
@@ -430,10 +431,12 @@ function parseTotales(texto: string): SireBloque {
     const header = lineas[0].split(delim).map((h) => h.trim().toLowerCase());
     const matchAll = (re: RegExp) =>
       header.map((h, i) => (re.test(h) ? i : -1)).filter((i) => i >= 0);
-    colsBase = matchAll(/^bi\s*gravado/);
+    // "gravad" cubre "BI Gravado" (compras) y "BI Gravada" (ventas).
+    colsBase = matchAll(/^bi\s*gravad/);
     colsIgv = matchAll(/^igv\s*\/?\s*ipm/);
     colTotal = header.findIndex((h) => /^total\s*cp/.test(h));
-    colInaf = header.findIndex((h) => /valor\s*adq.*ng/.test(h));
+    // Compras: "Valor Adq. NG"; ventas: exonerado/inafecto.
+    colInaf = header.findIndex((h) => /valor\s*adq.*ng|exonerado|inafecto/.test(h));
     colDocs = header.findIndex((h) => /total\s*documentos/.test(h));
     filas = lineas.slice(1);
   } else {
@@ -512,38 +515,6 @@ async function flujoOficial(
       return { diag };
     }
     throw err;
-  }
-
-  // En diagnóstico: probar varios codLibro y mostrar el total calculado de cada
-  // uno, para identificar cuál corresponde a ventas y cuál a compras.
-  if (diagnostico) {
-    for (const cl of ["080000", "140000"]) {
-      const url = buildUrl(cfg, cfg.exportVentasPath, {
-        periodo,
-        codTipoResumen: "1",
-        codTipoArchivo: cfg.codTipoArchivo,
-        codLibro: cl,
-      });
-      let resumenStr = "";
-      try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        });
-        const txt = await res.text();
-        if (res.ok) {
-          // Mostramos el CONTENIDO CRUDO para ver las columnas reales por libro.
-          resumenStr = `RAW: ${trunc(txt, 700)}`;
-        } else {
-          resumenStr = /1070|no se ha encontrado/i.test(txt)
-            ? "sin datos (1070)"
-            : `HTTP ${res.status}: ${trunc(txt, 120)}`;
-        }
-      } catch (e) {
-        resumenStr = e instanceof Error ? e.message : String(e);
-      }
-      diag.pasos.push({ paso: `probe-codLibro=${cl}`, ok: true, respuesta: resumenStr });
-    }
-    return { diag };
   }
 
   // El resumen suele devolver el CONTENIDO directo (HTTP 200 con el .txt).
