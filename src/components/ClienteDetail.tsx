@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { Cliente, Documento } from "@/lib/types";
-import SirePanel from "./SirePanel";
-import BuzonPanel from "./BuzonPanel";
+import SunatPanel from "./SunatPanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -229,11 +228,8 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             )}
           </section>
 
-          {/* Compras y Ventas (SIRE) */}
-          <SirePanel clienteId={cliente.id} inicial={cliente.sire ?? []} />
-
-          {/* Buzón electrónico SUNAT */}
-          <BuzonPanel clienteId={cliente.id} />
+          {/* Consulta SUNAT unificada: SIRE + Buzón con una sola credencial */}
+          <SunatPanel clienteId={cliente.id} inicialSire={cliente.sire ?? []} />
         </div>
 
         {/* Columna derecha: diagnóstico */}
