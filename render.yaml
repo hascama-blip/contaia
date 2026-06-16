@@ -1,0 +1,29 @@
+# ============================================================
+#  Render Blueprint para ContaIA
+#  Render lee este archivo y crea el servicio automáticamente.
+#  Doc: https://render.com/docs/blueprint-spec
+# ============================================================
+services:
+  - type: web
+    name: contaia
+    runtime: node
+    plan: free            # gratis para probar. Cambia a "starter" para usar disco persistente.
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # SUNAT en modo simulado por defecto. Para usar la API oficial,
+      # agrega estas variables en el panel de Render (Environment):
+      #   SUNAT_CLIENT_ID, SUNAT_CLIENT_SECRET, SUNAT_RUC,
+      #   SUNAT_SOL_USER, SUNAT_SOL_PASS
+      - key: SUNAT_FORCE_MOCK
+        value: "false"
+
+    # --- Almacenamiento persistente (opcional, requiere plan "starter") -------
+    # Descomenta este bloque para que los clientes y archivos NO se borren
+    # entre reinicios/despliegues. Requiere cambiar plan: free -> starter.
+    # disk:
+    #   name: contaia-data
+    #   mountPath: /opt/render/project/src/data
+    #   sizeGB: 1
