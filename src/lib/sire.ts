@@ -75,14 +75,14 @@ function getConfig(): SireConfig {
     apiBase:
       process.env.SIRE_API_BASE ??
       "https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros",
-    // Endpoints de PROPUESTA (los más documentados). {periodo} {codTipoArchivo}
-    // se reemplazan. Generan un ticket asíncrono igual que el resumen.
+    // Endpoint de RESUMEN (mismo para ventas/compras, distingue por codLibro).
+    // codTipoResumen: -1 = propuesta, -2 = preliminar/registro (lo declarado).
     exportVentasPath:
       process.env.SIRE_EXPORT_VENTAS_PATH ??
-      "/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo={codTipoArchivo}",
+      "/rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen}/{codTipoArchivo}/exporta?codLibro={codLibro}",
     exportComprasPath:
       process.env.SIRE_EXPORT_COMPRAS_PATH ??
-      "/rce/propuesta/web/propuestarce/{periodo}/exportapropuesta?codTipoArchivo={codTipoArchivo}",
+      "/rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen}/{codTipoArchivo}/exporta?codLibro={codLibro}",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -91,7 +91,8 @@ function getConfig(): SireConfig {
       "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
     codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
     codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
-    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
+    // -2 = Resumen de preliminar/registro (lo declarado, con datos por mes).
+    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "-2",
     codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
     defClientId: process.env.SUNAT_SIRE_CLIENT_ID ?? "",
     defClientSecret: process.env.SUNAT_SIRE_CLIENT_SECRET ?? "",
