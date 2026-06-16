@@ -148,35 +148,35 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
   // vive en api-sire con su propio scope).
   if (params.diagnostico) {
     const diag: { pasos: any[] } = { pasos: [] };
-    const combos = [
-      { scope: "https://api.sunat.gob.pe", base: "https://api.sunat.gob.pe/v1/contribuyente/controlmsg" },
-      { scope: "https://api-controlmsg.sunat.gob.pe", base: "https://api-controlmsg.sunat.gob.pe/v1/contribuyente/controlmsg" },
-      { scope: "https://api-mensajes.sunat.gob.pe", base: "https://api-mensajes.sunat.gob.pe/v1/contribuyente/controlmsg" },
-      { scope: "https://api-alertas.sunat.gob.pe", base: "https://api-alertas.sunat.gob.pe/v1/contribuyente/controlmsg" },
-    ];
+    const base = "https://api.sunat.gob.pe/v1/contribuyente/controlmsg";
+    const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret);
+    const anio = new Date().getFullYear();
     const paths = [
-      "/mensajes/listamensajes?page=1&perPage=20",
-      "/mensajes/web/listamensajes?page=1&perPage=20",
-      "/mensajes",
+      "/avisos",
+      "/alertas",
+      "/notificaciones",
+      "/buzon",
+      "/mensajeria",
+      "/mensajenotificacion",
+      "/mensajes/listamensajenotificacion",
+      "/mensaje/consultamensajes",
+      "/avisos/web/listaavisos",
+      "/mensajes/consultar",
+      "/mensajes/buscar",
+      "/listamensaje",
+      `/mensajes/anio/${anio}`,
+      "/mensajes/0",
+      `/${ruc}/mensajes`,
+      "/mensajeresumen",
     ];
-    for (const combo of combos) {
-      let token: string;
+    for (const p of paths) {
+      const url = `${base}${p}`;
       try {
-        token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, combo.scope);
-        diag.pasos.push({ paso: `TOKEN scope=${combo.scope}`, ok: true, respuesta: "token OK" });
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+        const txt = await res.text();
+        diag.pasos.push({ paso: p, httpStatus: res.status, ok: res.ok, respuesta: txt.slice(0, 250) });
       } catch (e) {
-        diag.pasos.push({ paso: `TOKEN scope=${combo.scope}`, ok: false, respuesta: (e instanceof Error ? e.message : String(e)).slice(0, 200) });
-        continue;
-      }
-      for (const p of paths) {
-        const url = `${combo.base}${p}`;
-        try {
-          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
-          const txt = await res.text();
-          diag.pasos.push({ paso: `${combo.base}${p}`, httpStatus: res.status, ok: res.ok, respuesta: txt.slice(0, 250) });
-        } catch (e) {
-          diag.pasos.push({ paso: url, ok: false, respuesta: (e instanceof Error ? e.message : String(e)).slice(0, 150) });
-        }
+        diag.pasos.push({ paso: p, ok: false, respuesta: (e instanceof Error ? e.message : String(e)).slice(0, 150) });
       }
     }
     return { mensajes: [], urgentes: [], diag };
