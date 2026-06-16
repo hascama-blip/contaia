@@ -514,6 +514,42 @@ async function flujoOficial(
     throw err;
   }
 
+  // En diagnóstico: probar varios codLibro y mostrar el total calculado de cada
+  // uno, para identificar cuál corresponde a ventas y cuál a compras.
+  if (diagnostico) {
+    for (const cl of ["080000", "140000", "080100", "140100", "140400", "080200", "140200"]) {
+      const url = buildUrl(cfg, cfg.exportVentasPath, {
+        periodo,
+        codTipoResumen: "1",
+        codTipoArchivo: cfg.codTipoArchivo,
+        codLibro: cl,
+      });
+      let resumenStr = "";
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        const txt = await res.text();
+        if (res.ok) {
+          try {
+            const bl = parseTotales(txt);
+            resumenStr = `OK comprobantes=${bl.comprobantes} total=${bl.importeTotal} base=${bl.baseImponible} igv=${bl.igv} valorAdqNG=${bl.inafectoExonerado}`;
+          } catch {
+            resumenStr = `OK (sin parsear): ${trunc(txt, 120)}`;
+          }
+        } else {
+          resumenStr = /1070|no se ha encontrado/i.test(txt)
+            ? "sin datos (1070)"
+            : `HTTP ${res.status}: ${trunc(txt, 120)}`;
+        }
+      } catch (e) {
+        resumenStr = e instanceof Error ? e.message : String(e);
+      }
+      diag.pasos.push({ paso: `probe-codLibro=${cl}`, ok: true, respuesta: resumenStr });
+    }
+    return { diag };
+  }
+
   // El resumen suele devolver el CONTENIDO directo (HTTP 200 con el .txt).
   // Si en cambio devuelve un ticket (JSON numTicket), se usa el flujo asíncrono.
   const fetchResumen = async (
