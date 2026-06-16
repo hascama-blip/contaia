@@ -162,7 +162,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
     for (let intento = 0; intento < 4; intento++) {
       const camp = page
         .frames()
-        .find((f) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+        .find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
       if (!camp) break;
       for (const txt of ["Finalizar", "Continuar sin confirmar"]) {
         try {
