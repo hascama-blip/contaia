@@ -148,13 +148,23 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
 
   // En diagnóstico: probar varios endpoints candidatos.
   if (params.diagnostico) {
+    const q = "?numpag=1&perpag=20&page=1&perPage=20";
     const candidatos = [
-      cfg.listarPath,
-      "/mensajes?page=1&perpage=50",
-      "/mensajes/listamensajes?page=1&perpage=50",
-      "/mensaje/listar?page=1&perpage=50",
-      "/notificaciones/listar?page=1&perpage=50",
-      "/mensajes/listar",
+      "",
+      "/mensajes",
+      "/listamensajes" + q,
+      "/consultamensajes" + q,
+      "/mensajes/listamensajes" + q,
+      "/mensajes/consultamensajes" + q,
+      "/mensajes/web/listamensajes" + q,
+      "/mensajes/masivo/listamensajes" + q,
+      "/mensaje/web/listamensajes" + q,
+      "/mensajeria/web/listamensajes" + q,
+      "/avisos/web/listaavisos" + q,
+      "/mensajes/web/consultamensajes" + q,
+      "/mensajes/listamensajenotificacion" + q,
+      "/notificaciones/web/listanotificaciones" + q,
+      "/mensajes/web/mensajes" + q,
     ];
     for (const path of candidatos) {
       const url = `${cfg.apiBase}${path
