@@ -50,7 +50,8 @@ export interface SireDiag {
 interface SireConfig {
   tokenUrl: string;
   apiBase: string;
-  exportPath: string;
+  exportVentasPath: string;
+  exportComprasPath: string;
   estadoPath: string;
   descargaPath: string;
   codLibroVentas: string;
@@ -70,10 +71,14 @@ function getConfig(): SireConfig {
     apiBase:
       process.env.SIRE_API_BASE ??
       "https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros",
-    // {periodo} {codTipoResumen} {codTipoArchivo} {codLibro} se reemplazan.
-    exportPath:
-      process.env.SIRE_EXPORT_PATH ??
-      "/rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen}/{codTipoArchivo}/exporta?codLibro={codLibro}",
+    // Endpoints de PROPUESTA (los más documentados). {periodo} {codTipoArchivo}
+    // se reemplazan. Generan un ticket asíncrono igual que el resumen.
+    exportVentasPath:
+      process.env.SIRE_EXPORT_VENTAS_PATH ??
+      "/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo={codTipoArchivo}",
+    exportComprasPath:
+      process.env.SIRE_EXPORT_COMPRAS_PATH ??
+      "/rce/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo={codTipoArchivo}",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perTributario={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -168,11 +173,12 @@ async function solicitarTicket(
   cfg: SireConfig,
   token: string,
   periodo: string,
+  pathTemplate: string,
   codLibro: string,
   etiqueta: string,
   diag: SireDiag
 ): Promise<string> {
-  const url = buildUrl(cfg, cfg.exportPath, {
+  const url = buildUrl(cfg, pathTemplate, {
     periodo,
     codTipoResumen: cfg.codTipoResumen,
     codTipoArchivo: cfg.codTipoArchivo,
@@ -403,8 +409,8 @@ async function flujoOficial(
     const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
 
     // Ventas (RVIE) y Compras (RCE).
-    const tV = await solicitarTicket(cfg, token, periodo, cfg.codLibroVentas, "ventas", diag);
-    const tC = await solicitarTicket(cfg, token, periodo, cfg.codLibroCompras, "compras", diag);
+    const tV = await solicitarTicket(cfg, token, periodo, cfg.exportVentasPath, cfg.codLibroVentas, "ventas", diag);
+    const tC = await solicitarTicket(cfg, token, periodo, cfg.exportComprasPath, cfg.codLibroCompras, "compras", diag);
 
     const nV = await esperarArchivo(cfg, token, periodo, tV, "ventas", diag);
     const nC = await esperarArchivo(cfg, token, periodo, tC, "compras", diag);
