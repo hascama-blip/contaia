@@ -266,12 +266,20 @@ async function esperarArchivo(
     }
     const registros: any[] = data.registros ?? data.registro ?? (Array.isArray(data) ? data : []);
     const reg = registros[0] ?? data;
-    const estado = String(reg?.codEstadoProceso ?? reg?.estado ?? "");
+    const det = reg?.detalleTicket ?? {};
+    const estado = String(reg?.codEstadoProceso ?? det?.codEstadoEnvio ?? reg?.estado ?? "");
+    const desc = String(reg?.desEstadoProceso ?? det?.desEstadoEnvio ?? "");
+    const terminado = estado === "06" || /termin/i.test(desc);
+    // El nombre del archivo puede venir en varios campos según el servicio.
     const nombre =
-      reg?.archivoReporte?.nomArchivoReporte ??
+      det?.nomArchivoReporte ??
       reg?.nomArchivoReporte ??
-      reg?.nombreArchivo;
-    // Estados típicos: "06"/"terminado" = listo. Si hay nombre de archivo, listo.
+      det?.nomArchivoContenido ??
+      reg?.nomArchivoContenido ??
+      reg?.archivoReporte?.nomArchivoReporte ??
+      reg?.nombreArchivo ??
+      null;
+
     if (nombre) {
       diag.pasos.push({
         paso: `estado-${etiqueta}`,
@@ -279,11 +287,26 @@ async function esperarArchivo(
         metodo: "GET",
         httpStatus: 200,
         ok: true,
-        respuesta: trunc(txt),
+        respuesta: trunc(txt, 2500),
       });
       return String(nombre);
     }
-    if (estado && /(09|error|fallo)/i.test(estado)) {
+    if (terminado) {
+      // Proceso terminado pero sin nombre de archivo en los campos esperados:
+      // registramos la respuesta COMPLETA para localizar el campo correcto.
+      diag.pasos.push({
+        paso: `estado-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: 200,
+        ok: true,
+        respuesta: trunc(txt, 2500),
+      });
+      throw new Error(
+        `${etiqueta}: proceso terminado pero sin nomArchivoReporte (revisar respuesta del estado)`
+      );
+    }
+    if (/(09|error|fallo)/i.test(estado)) {
       throw new Error(`estado ${etiqueta}: proceso con error (${estado})`);
     }
     await new Promise((r) => setTimeout(r, 3000));
@@ -293,7 +316,7 @@ async function esperarArchivo(
     url,
     metodo: "GET",
     ok: false,
-    respuesta: trunc(ultima),
+    respuesta: trunc(ultima, 2500),
   });
   throw new Error(`estado ${etiqueta}: tiempo de espera agotado`);
 }
