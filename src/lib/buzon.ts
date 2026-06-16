@@ -35,6 +35,7 @@ const LIST_URL =
 
 const URGENTES = [
   "cobranza coactiva", "ejecución coactiva", "ejecucion coactiva",
+  "resolución coactiva", "resolucion coactiva", "coactiv",
   "resolución de ejecución", "resolucion de ejecucion", "orden de pago",
   "resolución de determinación", "resolucion de determinacion",
   "resolución de multa", "resolucion de multa", "valor", "embargo",
