@@ -83,7 +83,7 @@ function getConfig(): SireConfig {
       "/rce/propuesta/web/propuestarce/{periodo}/exportapropuesta?codTipoArchivo={codTipoArchivo}",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
-      "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perTributario={periodo}&page=1&perPage=20&numTicket={ticket}",
+      "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
     descargaPath:
       process.env.SIRE_DESCARGA_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=01",
