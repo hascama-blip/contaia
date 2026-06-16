@@ -96,11 +96,23 @@ async function obtenerToken(
     body,
   });
   if (!res.ok) {
-    throw new Error(`SIRE auth error ${res.status}`);
+    const detalle = await leerDetalle(res);
+    throw new Error(`autenticación SUNAT (HTTP ${res.status})${detalle}`);
   }
   const json = (await res.json()) as { access_token: string };
-  if (!json.access_token) throw new Error("SIRE auth sin token");
+  if (!json.access_token) throw new Error("autenticación SUNAT sin token");
   return json.access_token;
+}
+
+/** Lee un fragmento del cuerpo de error de SUNAT (sin datos sensibles). */
+async function leerDetalle(res: Response): Promise<string> {
+  try {
+    const txt = (await res.text()).trim();
+    if (!txt) return "";
+    return `: ${txt.slice(0, 300)}`;
+  } catch {
+    return "";
+  }
 }
 
 async function fetchResumen(
@@ -109,12 +121,14 @@ async function fetchResumen(
   path: string,
   periodo: string
 ): Promise<SireBloque> {
-  const url = `${cfg.apiBase}${path.replace("{periodo}", periodo)}`;
+  const resolved = path.replace("{periodo}", periodo);
+  const url = `${cfg.apiBase}${resolved}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
   });
   if (!res.ok) {
-    throw new Error(`SIRE resumen error ${res.status} (${url})`);
+    const detalle = await leerDetalle(res);
+    throw new Error(`consulta SIRE (HTTP ${res.status}) en ${resolved}${detalle}`);
   }
   const data = (await res.json()) as any;
   return mapearBloque(data);
@@ -256,11 +270,9 @@ export async function consultarResumenSire(
       consultadoAt: new Date().toISOString(),
     };
   } catch (err) {
-    console.error("[SIRE] Falló consulta oficial:", err);
-    throw new Error(
-      "No se pudo obtener el SIRE real de SUNAT. Verifica la Clave SOL, las " +
-        "credenciales de la app SIRE y que el periodo esté disponible."
-    );
+    const detalle = err instanceof Error ? err.message : String(err);
+    console.error("[SIRE] Falló consulta oficial:", detalle);
+    throw new Error(`No se pudo obtener el SIRE real — ${detalle}`);
   }
 }
 
