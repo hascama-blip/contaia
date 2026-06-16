@@ -157,19 +157,26 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // 1) Quitar la campaña/overlay que tapa el menú (iframe + modales).
-    await page
-      .evaluate(() => {
-        document.querySelectorAll("iframe").forEach((f) => {
-          const s = (f as HTMLIFrameElement).src || "";
-          if (/campanha|modifdatos|itadminforuc/i.test(s)) f.remove();
-        });
-        document
-          .querySelectorAll('.modal, .modal-backdrop, [class*="overlay"], [class*="backdrop"]')
-          .forEach((e) => e.remove());
-      })
-      .catch(() => {});
-    await page.waitForTimeout(1000);
+    // 1) Cerrar la campaña "VALIDA TUS DATOS DE CONTACTO": clic en "Finalizar"
+    // (popup Informativo) y luego "Continuar sin confirmar".
+    for (let intento = 0; intento < 4; intento++) {
+      const camp = page
+        .frames()
+        .find((f) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+      if (!camp) break;
+      for (const txt of ["Finalizar", "Continuar sin confirmar"]) {
+        try {
+          await camp.getByText(txt, { exact: false }).first().click({ timeout: 2500 });
+          await page.waitForTimeout(1800);
+        } catch {}
+      }
+      await page.waitForTimeout(1500);
+    }
+    // Por si el "Finalizar" quedó a nivel de página.
+    try {
+      await page.getByText("Finalizar", { exact: false }).first().click({ timeout: 1500 });
+    } catch {}
+    await page.waitForTimeout(1500);
 
     // 2) Abrir el Buzón Electrónico via JS (evita bloqueos del overlay).
     const clickBuzon = await page
