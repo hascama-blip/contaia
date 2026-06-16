@@ -31,7 +31,7 @@ const VISOR_URL =
   "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/MenuVisorNotificacion.htm";
 const LIST_URL =
   process.env.BUZON_LIST_URL ??
-  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&numpag=1&perpag=50";
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&codCarpeta=00&codEtiqueta=&page=1&des_asunto=&codMensaje=&tipoOrden=NADA";
 
 const URGENTES = [
   "cobranza coactiva", "ejecución coactiva", "ejecucion coactiva",
@@ -180,6 +180,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
     });
 
     // Llamar al endpoint interno de la lista (misma origin = sin CORS).
+    const urlLista = `${LIST_URL}${LIST_URL.includes("?") ? "&" : "?"}_=${Date.now()}`;
     const resp = (await buzonPage.evaluate(async (url: string) => {
       try {
         const r = await fetch(url, { credentials: "include" });
@@ -187,7 +188,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       } catch (e) {
         return { status: 0, body: String(e) };
       }
-    }, LIST_URL)) as { status: number; body: string };
+    }, urlLista)) as { status: number; body: string };
     pasos.push({ paso: "listNotiMenPag", status: resp.status, respuesta: resp.body.slice(0, 800) });
 
     if (diagnostico) {
