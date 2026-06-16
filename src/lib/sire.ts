@@ -517,7 +517,7 @@ async function flujoOficial(
   // En diagnóstico: probar varios codLibro y mostrar el total calculado de cada
   // uno, para identificar cuál corresponde a ventas y cuál a compras.
   if (diagnostico) {
-    for (const cl of ["080000", "140000", "080100", "140100", "140400", "080200", "140200"]) {
+    for (const cl of ["080000", "140000"]) {
       const url = buildUrl(cfg, cfg.exportVentasPath, {
         periodo,
         codTipoResumen: "1",
@@ -531,12 +531,8 @@ async function flujoOficial(
         });
         const txt = await res.text();
         if (res.ok) {
-          try {
-            const bl = parseTotales(txt);
-            resumenStr = `OK comprobantes=${bl.comprobantes} total=${bl.importeTotal} base=${bl.baseImponible} igv=${bl.igv} valorAdqNG=${bl.inafectoExonerado}`;
-          } catch {
-            resumenStr = `OK (sin parsear): ${trunc(txt, 120)}`;
-          }
+          // Mostramos el CONTENIDO CRUDO para ver las columnas reales por libro.
+          resumenStr = `RAW: ${trunc(txt, 700)}`;
         } else {
           resumenStr = /1070|no se ha encontrado/i.test(txt)
             ? "sin datos (1070)"
