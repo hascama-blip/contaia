@@ -23,9 +23,9 @@ export default function SirePanel({
   inicial: SireResumen[];
 }) {
   const hoy = new Date();
-  // Por defecto, el mes anterior (suele ser el último declarado).
-  const refMes = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
-  const refAnio = hoy.getMonth() === 0 ? hoy.getFullYear() - 1 : hoy.getFullYear();
+  // Por defecto, el MES EN CURSO (la propuesta SUNAT corresponde al mes actual).
+  const refMes = hoy.getMonth() + 1;
+  const refAnio = hoy.getFullYear();
 
   const [mes, setMes] = useState(refMes);
   const [anio, setAnio] = useState(refAnio);
