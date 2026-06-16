@@ -383,7 +383,14 @@ function descomprimirSiHaceFalta(buf: Buffer): string {
   return buf.toString("utf-8");
 }
 
-/** Parsea los totales del reporte de resumen (formato a calibrar). */
+/**
+ * Parsea los totales del archivo de PROPUESTA SUNAT (RVIE/RCE).
+ * Formato real (separado por "|", con encabezado), columnas relevantes:
+ *   - "BI Gravado DG/DGNG/DNG"  -> base imponible gravada
+ *   - "IGV / IPM DG/DGNG/DNG"   -> IGV
+ *   - "Valor Adq. NG"           -> no gravado / inafecto-exonerado
+ *   - "Total CP"                -> importe total del comprobante
+ */
 function parseTotales(texto: string): SireBloque {
   const lineas = texto
     .split(/\r?\n/)
@@ -392,53 +399,79 @@ function parseTotales(texto: string): SireBloque {
   if (lineas.length === 0) {
     throw new Error("reporte vacío (usa modo diagnóstico)");
   }
-  // Detecta delimitador del archivo.
+
   const delim = ["|", ";", "\t", ","].find((d) => lineas[0].includes(d)) ?? "|";
-  const bloque: SireBloque = {
+  const num = (s: string) => {
+    const v = Number(String(s ?? "").replace(/[^\d.-]/g, ""));
+    return Number.isNaN(v) ? 0 : v;
+  };
+
+  const primera = lineas[0].toLowerCase();
+  const esEncabezado =
+    primera.includes("total cp") ||
+    primera.includes("bi gravado") ||
+    primera.startsWith("ruc");
+
+  let colsBase: number[];
+  let colsIgv: number[];
+  let colTotal: number;
+  let colInaf: number;
+  let filas: string[];
+
+  if (esEncabezado) {
+    const header = lineas[0].split(delim).map((h) => h.trim().toLowerCase());
+    const matchAll = (re: RegExp) =>
+      header.map((h, i) => (re.test(h) ? i : -1)).filter((i) => i >= 0);
+    colsBase = matchAll(/^bi\s*gravado/);
+    colsIgv = matchAll(/^igv\s*\/?\s*ipm/);
+    colTotal = header.findIndex((h) => /^total\s*cp/.test(h));
+    colInaf = header.findIndex((h) => /valor\s*adq.*ng/.test(h));
+    filas = lineas.slice(1);
+  } else {
+    // Respaldo: posiciones fijas del formato propuesta SUNAT.
+    colsBase = [14, 16, 18];
+    colsIgv = [15, 17, 19];
+    colTotal = 24;
+    colInaf = 20;
+    filas = lineas;
+  }
+
+  if (colsBase.length === 0 && colTotal < 0) {
+    throw new Error(
+      "formato de reporte no reconocido — ejecuta con 'Modo diagnóstico' y compártelo"
+    );
+  }
+
+  const b: SireBloque = {
     comprobantes: 0,
     baseImponible: 0,
     igv: 0,
     inafectoExonerado: 0,
     importeTotal: 0,
   };
-  const num = (s: string) => {
-    const v = Number(String(s).replace(/[^\d.-]/g, ""));
-    return Number.isNaN(v) ? 0 : v;
-  };
-  // Heurística: usa el encabezado para ubicar columnas por nombre.
-  const header = lineas[0].toLowerCase().split(delim);
-  const idx = (re: RegExp) => header.findIndex((h) => re.test(h));
-  const iBase = idx(/base|gravad|valor/);
-  const iIgv = idx(/igv|impuesto/);
-  const iTotal = idx(/total|importe/);
-  const iInaf = idx(/inafect|exoner/);
-  const hayHeader = iBase >= 0 || iIgv >= 0 || iTotal >= 0;
-
-  const filas = hayHeader ? lineas.slice(1) : lineas;
   for (const linea of filas) {
     const cols = linea.split(delim);
-    if (cols.length < 2) continue;
-    bloque.comprobantes += 1;
-    if (iBase >= 0) bloque.baseImponible += num(cols[iBase]);
-    if (iIgv >= 0) bloque.igv += num(cols[iIgv]);
-    if (iInaf >= 0) bloque.inafectoExonerado += num(cols[iInaf]);
-    if (iTotal >= 0) bloque.importeTotal += num(cols[iTotal]);
+    if (cols.length < 10) continue; // fila no válida
+    b.comprobantes += 1;
+    for (const c of colsBase) b.baseImponible += num(cols[c]);
+    for (const c of colsIgv) b.igv += num(cols[c]);
+    if (colInaf >= 0) b.inafectoExonerado += num(cols[colInaf]);
+    if (colTotal >= 0) b.importeTotal += num(cols[colTotal]);
   }
-  if (!hayHeader || (bloque.baseImponible === 0 && bloque.importeTotal === 0)) {
-    throw new Error(
-      "formato de reporte no reconocido — ejecuta con 'Modo diagnóstico' y compártelo"
-    );
-  }
-  if (bloque.importeTotal === 0) {
-    bloque.importeTotal = bloque.baseImponible + bloque.igv + bloque.inafectoExonerado;
+
+  // Sin filas de datos: periodo sin movimiento -> totales en cero.
+  if (b.comprobantes === 0) return b;
+
+  if (b.importeTotal === 0) {
+    b.importeTotal = b.baseImponible + b.igv + b.inafectoExonerado;
   }
   const r = (n: number) => Math.round(n * 100) / 100;
   return {
-    comprobantes: bloque.comprobantes,
-    baseImponible: r(bloque.baseImponible),
-    igv: r(bloque.igv),
-    inafectoExonerado: r(bloque.inafectoExonerado),
-    importeTotal: r(bloque.importeTotal),
+    comprobantes: b.comprobantes,
+    baseImponible: r(b.baseImponible),
+    igv: r(b.igv),
+    inafectoExonerado: r(b.inafectoExonerado),
+    importeTotal: r(b.importeTotal),
   };
 }
 
