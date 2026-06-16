@@ -91,8 +91,8 @@ function getConfig(): SireConfig {
       "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
     codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
     codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
-    // 1 dígito: 1 = propuesta, 2 = preliminar/registro (lo declarado por mes).
-    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "2",
+    // 1 dígito. 1 = resumen del registro (lo declarado, con datos por mes).
+    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
     codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
     defClientId: process.env.SUNAT_SIRE_CLIENT_ID ?? "",
     defClientSecret: process.env.SUNAT_SIRE_CLIENT_SECRET ?? "",
@@ -422,6 +422,8 @@ function parseTotales(texto: string): SireBloque {
   let colsIgv: number[];
   let colTotal: number;
   let colInaf: number;
+  // Columna "Total Documentos" del resumen (nº de comprobantes por tipo).
+  let colDocs = -1;
   let filas: string[];
 
   if (esEncabezado) {
@@ -432,9 +434,10 @@ function parseTotales(texto: string): SireBloque {
     colsIgv = matchAll(/^igv\s*\/?\s*ipm/);
     colTotal = header.findIndex((h) => /^total\s*cp/.test(h));
     colInaf = header.findIndex((h) => /valor\s*adq.*ng/.test(h));
+    colDocs = header.findIndex((h) => /total\s*documentos/.test(h));
     filas = lineas.slice(1);
   } else {
-    // Respaldo: posiciones fijas del formato propuesta SUNAT.
+    // Respaldo: posiciones fijas del formato propuesta SUNAT (línea por CP).
     colsBase = [14, 16, 18];
     colsIgv = [15, 17, 19];
     colTotal = 24;
@@ -457,8 +460,12 @@ function parseTotales(texto: string): SireBloque {
   };
   for (const linea of filas) {
     const cols = linea.split(delim);
-    if (cols.length < 10) continue; // fila no válida
-    b.comprobantes += 1;
+    if (cols.length < 4) continue; // fila no válida
+    const primera = (cols[0] ?? "").trim().toLowerCase();
+    // Saltar fila de totales del resumen (evita duplicar).
+    if (primera === "total" || primera === "") continue;
+    // Nº de comprobantes: por "Total Documentos" (resumen) o 1 por fila.
+    b.comprobantes += colDocs >= 0 ? num(cols[colDocs]) : 1;
     for (const c of colsBase) b.baseImponible += num(cols[c]);
     for (const c of colsIgv) b.igv += num(cols[c]);
     if (colInaf >= 0) b.inafectoExonerado += num(cols[colInaf]);
@@ -507,51 +514,51 @@ async function flujoOficial(
     throw err;
   }
 
-  // En diagnóstico: probar varios codTipoResumen (ventas) para hallar cuál
-  // tiene datos en el periodo, sin necesidad de varios despliegues.
-  if (diagnostico && (params as any).probe !== false) {
-    for (const ct of ["0", "1", "2", "3", "4", "5", "6"]) {
-      const url = buildUrl(cfg, cfg.exportVentasPath, {
-        periodo,
-        codTipoResumen: ct,
-        codTipoArchivo: cfg.codTipoArchivo,
-        codLibro: cfg.codLibroVentas,
-      });
-      try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        });
-        const txt = await res.text();
-        diag.pasos.push({
-          paso: `probe-codTipoResumen=${ct}`,
-          httpStatus: res.status,
-          ok: res.ok,
-          respuesta: trunc(txt, 250),
-        });
-      } catch (e) {
-        diag.pasos.push({
-          paso: `probe-codTipoResumen=${ct}`,
-          ok: false,
-          respuesta: e instanceof Error ? e.message : String(e),
-        });
-      }
-    }
-    return { diag };
-  }
-
-  // Procesa cada registro de forma INDEPENDIENTE: un fallo en compras no
-  // impide ver el flujo completo de ventas (ticket -> estado -> descarga).
-  const intentar = async (
+  // El resumen suele devolver el CONTENIDO directo (HTTP 200 con el .txt).
+  // Si en cambio devuelve un ticket (JSON numTicket), se usa el flujo asíncrono.
+  const fetchResumen = async (
     etiqueta: string,
     pathTemplate: string,
     codLibro: string
   ): Promise<string | null> => {
+    const url = buildUrl(cfg, pathTemplate, {
+      periodo,
+      codTipoResumen: cfg.codTipoResumen,
+      codTipoArchivo: cfg.codTipoArchivo,
+      codLibro,
+    });
     try {
-      const ticket = await solicitarTicket(cfg, token, periodo, pathTemplate, codLibro, etiqueta, diag);
-      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
-      // Mes sin movimiento: totales en cero, sin descargar.
-      if (nombre === VACIO) return "";
-      return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      const txt = await res.text();
+      diag.pasos.push({
+        paso: `solicitud-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: res.status,
+        ok: res.ok,
+        respuesta: trunc(txt, 900),
+      });
+      if (!res.ok) {
+        // 1070 = sin comprobantes en el periodo -> vacío (cero), no error.
+        if (/1070|no se ha encontrado/i.test(txt)) return "";
+        throw new Error(`${etiqueta} (HTTP ${res.status}): ${trunc(txt, 150)}`);
+      }
+      // ¿Ticket asíncrono o contenido directo?
+      let ticket = "";
+      try {
+        const j = JSON.parse(txt);
+        ticket = String(j.numTicket ?? j.numticket ?? j.ticket ?? "");
+      } catch {
+        /* no es JSON -> contenido directo del resumen */
+      }
+      if (ticket) {
+        const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
+        if (nombre === VACIO) return "";
+        return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
+      }
+      return txt;
     } catch (err) {
       diag.pasos.push({
         paso: `error-${etiqueta}`,
@@ -563,8 +570,8 @@ async function flujoOficial(
   };
 
   // "" = periodo válido sin movimiento; null = error.
-  const fV = await intentar("ventas", cfg.exportVentasPath, cfg.codLibroVentas);
-  const fC = await intentar("compras", cfg.exportComprasPath, cfg.codLibroCompras);
+  const fV = await fetchResumen("ventas", cfg.exportVentasPath, cfg.codLibroVentas);
+  const fC = await fetchResumen("compras", cfg.exportComprasPath, cfg.codLibroCompras);
 
   if (diagnostico) {
     return { diag };
