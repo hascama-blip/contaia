@@ -1,0 +1,77 @@
+// Tipos de dominio compartidos por la app ContaIA.
+
+export type NivelRiesgo = "bajo" | "medio" | "alto" | "critico";
+
+export interface SunatInfo {
+  ruc: string;
+  razonSocial: string;
+  /** Estado del contribuyente: ACTIVO, BAJA DE OFICIO, etc. */
+  estado: string;
+  /** Condición de domicilio: HABIDO, NO HABIDO, NO HALLADO. */
+  condicion: string;
+  tipoContribuyente: string;
+  direccion: string;
+  /** Regímenes / afectaciones tributarias declaradas. */
+  tributos: string[];
+  /** Indica si emite comprobantes electrónicos. */
+  comprobanteElectronico: boolean;
+  /** Fuente de los datos: "oficial" (API SUNAT) o "simulado". */
+  fuente: "oficial" | "simulado";
+  consultadoAt: string;
+}
+
+export interface ExtraccionDocumento {
+  /** RUC detectado en el documento, si aplica. */
+  ruc?: string;
+  /** Montos numéricos detectados (S/). */
+  montos: number[];
+  /** Posibles deudas / saldos detectados. */
+  deudas: number[];
+  /** Fechas detectadas (texto). */
+  fechas: string[];
+  /** Palabras clave tributarias encontradas. */
+  palabrasClave: string[];
+}
+
+export interface Documento {
+  id: string;
+  clienteId: string;
+  originalName: string;
+  storedName: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+  /** Texto crudo extraído por OCR. */
+  ocrText: string;
+  /** Estado del procesamiento OCR. */
+  ocrStatus: "pendiente" | "procesado" | "error";
+  extraccion: ExtraccionDocumento;
+}
+
+export interface Hallazgo {
+  tipo: "sunat" | "documento" | "consistencia";
+  severidad: NivelRiesgo;
+  titulo: string;
+  detalle: string;
+}
+
+export interface Diagnostico {
+  /** Puntaje 0-100, mayor = mejor salud tributaria. */
+  score: number;
+  nivelRiesgo: NivelRiesgo;
+  hallazgos: Hallazgo[];
+  recomendaciones: string[];
+  generatedAt: string;
+}
+
+export interface Cliente {
+  id: string;
+  razonSocial: string;
+  ruc: string;
+  email: string;
+  telefono: string;
+  createdAt: string;
+  sunat: SunatInfo | null;
+  documentos: Documento[];
+  diagnostico: Diagnostico | null;
+}
