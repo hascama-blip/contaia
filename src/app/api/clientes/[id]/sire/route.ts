@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const resumen = await consultarResumenSire({
+    const resultado = await consultarResumenSire({
       ruc: cliente.ruc,
       periodo: body.periodo,
       solUser: typeof body.solUser === "string" ? body.solUser : "",
@@ -26,9 +26,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       clientId: typeof body.clientId === "string" ? body.clientId : undefined,
       clientSecret:
         typeof body.clientSecret === "string" ? body.clientSecret : undefined,
+      diagnostico: body.diagnostico === true,
     });
-    const actualizado = await setSireResumen(cliente.id, resumen);
-    return NextResponse.json({ resumen, cliente: actualizado });
+    // Modo diagnóstico: devuelve la traza cruda, sin persistir.
+    if (!resultado.resumen) {
+      return NextResponse.json({ diag: resultado.diag });
+    }
+    const actualizado = await setSireResumen(cliente.id, resultado.resumen);
+    return NextResponse.json({
+      resumen: resultado.resumen,
+      cliente: actualizado,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "Error consultando SIRE" },

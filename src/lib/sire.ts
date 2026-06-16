@@ -1,41 +1,62 @@
 import crypto from "crypto";
+import { unzipSync, strFromU8 } from "fflate";
 import type { SireBloque, SireResumen } from "./types";
 
 // ============================================================
 //  Integración SIRE de SUNAT (RVIE ventas + RCE compras)
 // ============================================================
 //
-// El SIRE es información privada del contribuyente. Para obtenerla se
-// autentica con la Clave SOL del cliente contra la API oficial de SUNAT
-// (OAuth2, grant_type=password) y se consultan los resúmenes del periodo.
+// El SIRE oficial es ASÍNCRONO: token -> solicitar reporte (devuelve ticket)
+// -> consultar estado del ticket -> descargar archivo -> leer totales.
 //
-// Por seguridad, las credenciales se reciben en cada consulta y NO se
-// persisten. Solo se guardan los TOTALES resultantes (no sensibles).
+// Las credenciales (Clave SOL + client_id/secret) se reciben por consulta y
+// NO se persisten; solo se guardan los TOTALES resultantes.
 //
-// Filosofía estricta: si se ingresan credenciales reales y la consulta
-// falla, se lanza error (no se devuelven datos simulados que confundan).
-// Si NO se ingresan credenciales, se devuelve un resumen SIMULADO para
-// poder previsualizar la interfaz.
-//
-// NOTA: los endpoints oficiales del SIRE pueden variar según el plan/versión
-// habilitada para el contribuyente; por eso las URLs son configurables por
-// variables de entorno y el parseo de la respuesta es defensivo.
+// Como las rutas/códigos exactos dependen de la versión del manual SUNAT y no
+// se pueden probar a ciegas, todo es configurable por entorno y existe un
+// MODO DIAGNÓSTICO que devuelve la respuesta cruda de cada paso para calibrar.
 
 export interface SireParams {
   ruc: string;
   periodo: string; // "YYYYMM"
   solUser: string;
   solPass: string;
-  /** client_id / client_secret de la credencial SIRE del contribuyente. */
   clientId?: string;
   clientSecret?: string;
+  /** Si true, no parsea: devuelve la traza cruda de cada paso. */
+  diagnostico?: boolean;
+}
+
+export interface SireResultado {
+  resumen?: SireResumen;
+  diag?: SireDiag;
+}
+
+export interface SirePaso {
+  paso: string;
+  url?: string;
+  metodo?: string;
+  httpStatus?: number;
+  ok: boolean;
+  // Fragmento de la respuesta (truncado, sin credenciales).
+  respuesta?: string;
+}
+
+export interface SireDiag {
+  periodo: string;
+  pasos: SirePaso[];
 }
 
 interface SireConfig {
   tokenUrl: string;
   apiBase: string;
-  ventasPath: string;
-  comprasPath: string;
+  exportPath: string;
+  estadoPath: string;
+  descargaPath: string;
+  codLibroVentas: string;
+  codLibroCompras: string;
+  codTipoResumen: string;
+  codTipoArchivo: string;
   defClientId: string;
   defClientSecret: string;
   forceMock: boolean;
@@ -49,25 +70,45 @@ function getConfig(): SireConfig {
     apiBase:
       process.env.SIRE_API_BASE ??
       "https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros",
-    // Rutas de resumen (configurables). {periodo} se reemplaza por YYYYMM.
-    ventasPath:
-      process.env.SIRE_VENTAS_PATH ??
-      "/rvie/resumen/web/resumencomprobantes/{periodo}",
-    comprasPath:
-      process.env.SIRE_COMPRAS_PATH ??
-      "/rce/resumen/web/resumencomprobantes/{periodo}",
-    // Credencial SIRE a nivel plataforma (si todos usan la misma app registrada).
+    // {periodo} {codTipoResumen} {codTipoArchivo} {codLibro} se reemplazan.
+    exportPath:
+      process.env.SIRE_EXPORT_PATH ??
+      "/rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen}/{codTipoArchivo}/exporta?codLibro={codLibro}",
+    estadoPath:
+      process.env.SIRE_ESTADO_PATH ??
+      "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perTributario={periodo}&page=1&perPage=20&numTicket={ticket}",
+    descargaPath:
+      process.env.SIRE_DESCARGA_PATH ??
+      "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=01",
+    codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
+    codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
+    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
+    codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
     defClientId: process.env.SUNAT_SIRE_CLIENT_ID ?? "",
     defClientSecret: process.env.SUNAT_SIRE_CLIENT_SECRET ?? "",
     forceMock: (process.env.SIRE_FORCE_MOCK ?? "false") === "true",
   };
 }
 
-/** Valida un periodo tributario "YYYYMM". */
 export function periodoValido(periodo: string): boolean {
   if (!/^\d{6}$/.test(periodo)) return false;
   const mes = Number(periodo.slice(4, 6));
   return mes >= 1 && mes <= 12;
+}
+
+// ---- Utilidades -------------------------------------------------------------
+
+async function leerDetalle(res: Response): Promise<string> {
+  try {
+    const txt = (await res.text()).trim();
+    return txt ? `: ${txt.slice(0, 300)}` : "";
+  } catch {
+    return "";
+  }
+}
+
+function trunc(s: string, n = 600): string {
+  return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
 // ---- Autenticación oficial (OAuth2 password) -------------------------------
@@ -78,7 +119,8 @@ async function obtenerToken(
   solUser: string,
   solPass: string,
   clientId: string,
-  clientSecret: string
+  clientSecret: string,
+  diag: SireDiag
 ): Promise<string> {
   const url = `${cfg.tokenUrl}/${clientId}/oauth2/token/`;
   const body = new URLSearchParams({
@@ -86,7 +128,6 @@ async function obtenerToken(
     scope: "https://api-sire.sunat.gob.pe",
     client_id: clientId,
     client_secret: clientSecret,
-    // SUNAT espera el usuario como RUC + usuario SOL.
     username: `${ruc}${solUser}`,
     password: solPass,
   });
@@ -97,55 +138,208 @@ async function obtenerToken(
   });
   if (!res.ok) {
     const detalle = await leerDetalle(res);
+    diag.pasos.push({
+      paso: "auth",
+      url: `${cfg.tokenUrl}/***/oauth2/token/`,
+      metodo: "POST",
+      httpStatus: res.status,
+      ok: false,
+      respuesta: trunc(detalle),
+    });
     throw new Error(`autenticación SUNAT (HTTP ${res.status})${detalle}`);
   }
-  const json = (await res.json()) as { access_token: string };
+  const json = (await res.json()) as { access_token?: string };
+  diag.pasos.push({ paso: "auth", metodo: "POST", httpStatus: 200, ok: true });
   if (!json.access_token) throw new Error("autenticación SUNAT sin token");
   return json.access_token;
 }
 
-/** Lee un fragmento del cuerpo de error de SUNAT (sin datos sensibles). */
-async function leerDetalle(res: Response): Promise<string> {
-  try {
-    const txt = (await res.text()).trim();
-    if (!txt) return "";
-    return `: ${txt.slice(0, 300)}`;
-  } catch {
-    return "";
+// ---- Paso: solicitar reporte (devuelve ticket) -----------------------------
+
+function buildUrl(cfg: SireConfig, path: string, repl: Record<string, string>): string {
+  let p = path;
+  for (const [k, v] of Object.entries(repl)) {
+    p = p.replaceAll(`{${k}}`, encodeURIComponent(v));
   }
+  return `${cfg.apiBase}${p}`;
 }
 
-async function fetchResumen(
+async function solicitarTicket(
   cfg: SireConfig,
   token: string,
-  path: string,
-  periodo: string
-): Promise<SireBloque> {
-  const resolved = path.replace("{periodo}", periodo);
-  const url = `${cfg.apiBase}${resolved}`;
+  periodo: string,
+  codLibro: string,
+  etiqueta: string,
+  diag: SireDiag
+): Promise<string> {
+  const url = buildUrl(cfg, cfg.exportPath, {
+    periodo,
+    codTipoResumen: cfg.codTipoResumen,
+    codTipoArchivo: cfg.codTipoArchivo,
+    codLibro,
+  });
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
   });
+  const txt = await res.text();
+  diag.pasos.push({
+    paso: `ticket-${etiqueta}`,
+    url,
+    metodo: "GET",
+    httpStatus: res.status,
+    ok: res.ok,
+    respuesta: trunc(txt),
+  });
   if (!res.ok) {
-    const detalle = await leerDetalle(res);
-    throw new Error(`consulta SIRE (HTTP ${res.status}) en ${resolved}${detalle}`);
+    throw new Error(`solicitud ${etiqueta} (HTTP ${res.status}): ${trunc(txt, 200)}`);
   }
-  const data = (await res.json()) as any;
-  return mapearBloque(data);
+  let data: any = {};
+  try {
+    data = JSON.parse(txt);
+  } catch {
+    /* respuesta no-JSON; queda en diag */
+  }
+  const ticket = data.numTicket ?? data.numticket ?? data.ticket;
+  if (!ticket) {
+    throw new Error(`solicitud ${etiqueta} sin numTicket (ver diagnóstico)`);
+  }
+  return String(ticket);
 }
 
-/** Mapeo defensivo: el resumen SIRE agrupa por tipo; sumamos los totales. */
-function mapearBloque(data: any): SireBloque {
-  const filas: any[] = Array.isArray(data)
-    ? data
-    : Array.isArray(data?.registros)
-      ? data.registros
-      : Array.isArray(data?.detalle)
-        ? data.detalle
-        : data
-          ? [data]
-          : [];
+// ---- Paso: esperar ticket y obtener nombre de archivo ----------------------
 
+async function esperarArchivo(
+  cfg: SireConfig,
+  token: string,
+  periodo: string,
+  ticket: string,
+  etiqueta: string,
+  diag: SireDiag
+): Promise<string> {
+  const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
+  const deadline = Date.now() + 40_000;
+  let ultima = "";
+  while (Date.now() < deadline) {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    const txt = await res.text();
+    ultima = txt;
+    if (!res.ok) {
+      diag.pasos.push({
+        paso: `estado-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: res.status,
+        ok: false,
+        respuesta: trunc(txt),
+      });
+      throw new Error(`estado ${etiqueta} (HTTP ${res.status})`);
+    }
+    let data: any = {};
+    try {
+      data = JSON.parse(txt);
+    } catch {
+      /* ignore */
+    }
+    const registros: any[] = data.registros ?? data.registro ?? (Array.isArray(data) ? data : []);
+    const reg = registros[0] ?? data;
+    const estado = String(reg?.codEstadoProceso ?? reg?.estado ?? "");
+    const nombre =
+      reg?.archivoReporte?.nomArchivoReporte ??
+      reg?.nomArchivoReporte ??
+      reg?.nombreArchivo;
+    // Estados típicos: "06"/"terminado" = listo. Si hay nombre de archivo, listo.
+    if (nombre) {
+      diag.pasos.push({
+        paso: `estado-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: 200,
+        ok: true,
+        respuesta: trunc(txt),
+      });
+      return String(nombre);
+    }
+    if (estado && /(09|error|fallo)/i.test(estado)) {
+      throw new Error(`estado ${etiqueta}: proceso con error (${estado})`);
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  diag.pasos.push({
+    paso: `estado-${etiqueta}`,
+    url,
+    metodo: "GET",
+    ok: false,
+    respuesta: trunc(ultima),
+  });
+  throw new Error(`estado ${etiqueta}: tiempo de espera agotado`);
+}
+
+// ---- Paso: descargar y parsear --------------------------------------------
+
+async function descargarReporte(
+  cfg: SireConfig,
+  token: string,
+  nombre: string,
+  codLibro: string,
+  etiqueta: string,
+  diag: SireDiag
+): Promise<string> {
+  const url = buildUrl(cfg, cfg.descargaPath, { nombre, codLibro });
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const detalle = await leerDetalle(res);
+    diag.pasos.push({
+      paso: `descarga-${etiqueta}`,
+      url,
+      metodo: "GET",
+      httpStatus: res.status,
+      ok: false,
+      respuesta: trunc(detalle),
+    });
+    throw new Error(`descarga ${etiqueta} (HTTP ${res.status})`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const texto = descomprimirSiHaceFalta(buf);
+  diag.pasos.push({
+    paso: `descarga-${etiqueta}`,
+    url,
+    metodo: "GET",
+    httpStatus: 200,
+    ok: true,
+    respuesta: trunc(texto, 1200),
+  });
+  return texto;
+}
+
+function descomprimirSiHaceFalta(buf: Buffer): string {
+  // ZIP empieza con "PK" (0x50 0x4B).
+  if (buf[0] === 0x50 && buf[1] === 0x4b) {
+    try {
+      const files = unzipSync(new Uint8Array(buf));
+      const primero = Object.values(files)[0];
+      return primero ? strFromU8(primero) : "";
+    } catch {
+      return "";
+    }
+  }
+  return buf.toString("utf-8");
+}
+
+/** Parsea los totales del reporte de resumen (formato a calibrar). */
+function parseTotales(texto: string): SireBloque {
+  const lineas = texto
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lineas.length === 0) {
+    throw new Error("reporte vacío (usa modo diagnóstico)");
+  }
+  // Detecta delimitador del archivo.
+  const delim = ["|", ";", "\t", ","].find((d) => lineas[0].includes(d)) ?? "|";
   const bloque: SireBloque = {
     comprobantes: 0,
     baseImponible: 0,
@@ -153,44 +347,99 @@ function mapearBloque(data: any): SireBloque {
     inafectoExonerado: 0,
     importeTotal: 0,
   };
-
-  const num = (...keys: string[]) => (row: any): number => {
-    for (const k of keys) {
-      const v = row[k];
-      if (v != null && !Number.isNaN(Number(v))) return Number(v);
-    }
-    return 0;
+  const num = (s: string) => {
+    const v = Number(String(s).replace(/[^\d.-]/g, ""));
+    return Number.isNaN(v) ? 0 : v;
   };
-  const getComprobantes = num("totalCpe", "cantCp", "cantidad", "numDoc", "totalComprobantes");
-  const getBase = num("mtoBIGravadaDG", "valorAdqNG", "baseImponible", "mtoBaseImponible", "mtoImporteTotal");
-  const getIgv = num("mtoIGV", "mtoIgvIpm", "igv", "mtoIGVIPM");
-  const getInaf = num("mtoExonerado", "mtoInafecto", "inafectoExonerado", "mtoExoneradoInafecto");
-  const getTotal = num("mtoImporteTotal", "importeTotal", "mtoTotalCP", "total");
+  // Heurística: usa el encabezado para ubicar columnas por nombre.
+  const header = lineas[0].toLowerCase().split(delim);
+  const idx = (re: RegExp) => header.findIndex((h) => re.test(h));
+  const iBase = idx(/base|gravad|valor/);
+  const iIgv = idx(/igv|impuesto/);
+  const iTotal = idx(/total|importe/);
+  const iInaf = idx(/inafect|exoner/);
+  const hayHeader = iBase >= 0 || iIgv >= 0 || iTotal >= 0;
 
-  for (const row of filas) {
-    bloque.comprobantes += getComprobantes(row);
-    bloque.baseImponible += getBase(row);
-    bloque.igv += getIgv(row);
-    bloque.inafectoExonerado += getInaf(row);
-    bloque.importeTotal += getTotal(row);
+  const filas = hayHeader ? lineas.slice(1) : lineas;
+  for (const linea of filas) {
+    const cols = linea.split(delim);
+    if (cols.length < 2) continue;
+    bloque.comprobantes += 1;
+    if (iBase >= 0) bloque.baseImponible += num(cols[iBase]);
+    if (iIgv >= 0) bloque.igv += num(cols[iIgv]);
+    if (iInaf >= 0) bloque.inafectoExonerado += num(cols[iInaf]);
+    if (iTotal >= 0) bloque.importeTotal += num(cols[iTotal]);
   }
-  // Si la API no trae total explícito, lo derivamos.
+  if (!hayHeader || (bloque.baseImponible === 0 && bloque.importeTotal === 0)) {
+    throw new Error(
+      "formato de reporte no reconocido — ejecuta con 'Modo diagnóstico' y compártelo"
+    );
+  }
   if (bloque.importeTotal === 0) {
-    bloque.importeTotal =
-      bloque.baseImponible + bloque.igv + bloque.inafectoExonerado;
+    bloque.importeTotal = bloque.baseImponible + bloque.igv + bloque.inafectoExonerado;
   }
-  return redondear(bloque);
-}
-
-function redondear(b: SireBloque): SireBloque {
   const r = (n: number) => Math.round(n * 100) / 100;
   return {
-    comprobantes: Math.round(b.comprobantes),
-    baseImponible: r(b.baseImponible),
-    igv: r(b.igv),
-    inafectoExonerado: r(b.inafectoExonerado),
-    importeTotal: r(b.importeTotal),
+    comprobantes: bloque.comprobantes,
+    baseImponible: r(bloque.baseImponible),
+    igv: r(bloque.igv),
+    inafectoExonerado: r(bloque.inafectoExonerado),
+    importeTotal: r(bloque.importeTotal),
   };
+}
+
+// ---- Orquestación oficial --------------------------------------------------
+
+async function flujoOficial(
+  params: SireParams,
+  cfg: SireConfig,
+  clientId: string,
+  clientSecret: string
+): Promise<SireResultado> {
+  const { ruc, periodo, solUser, solPass, diagnostico } = params;
+  const diag: SireDiag = { periodo, pasos: [] };
+
+  try {
+    const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
+
+    // Ventas (RVIE) y Compras (RCE).
+    const tV = await solicitarTicket(cfg, token, periodo, cfg.codLibroVentas, "ventas", diag);
+    const tC = await solicitarTicket(cfg, token, periodo, cfg.codLibroCompras, "compras", diag);
+
+    const nV = await esperarArchivo(cfg, token, periodo, tV, "ventas", diag);
+    const nC = await esperarArchivo(cfg, token, periodo, tC, "compras", diag);
+
+    const fV = await descargarReporte(cfg, token, nV, cfg.codLibroVentas, "ventas", diag);
+    const fC = await descargarReporte(cfg, token, nC, cfg.codLibroCompras, "compras", diag);
+
+    if (diagnostico) {
+      return { diag };
+    }
+
+    const ventas = parseTotales(fV);
+    const compras = parseTotales(fC);
+    return {
+      resumen: {
+        periodo,
+        ventas,
+        compras,
+        fuente: "oficial",
+        consultadoAt: new Date().toISOString(),
+      },
+      diag,
+    };
+  } catch (err) {
+    // En diagnóstico devolvemos la traza con el paso que falló, sin lanzar error.
+    if (diagnostico) {
+      diag.pasos.push({
+        paso: "error",
+        ok: false,
+        respuesta: err instanceof Error ? err.message : String(err),
+      });
+      return { diag };
+    }
+    throw err;
+  }
 }
 
 // ---- Modo simulado (determinista por RUC + periodo) ------------------------
@@ -226,7 +475,7 @@ function simular(ruc: string, periodo: string): SireResumen {
 
 export async function consultarResumenSire(
   params: SireParams
-): Promise<SireResumen> {
+): Promise<SireResultado> {
   const { ruc, periodo, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
   if (!periodoValido(periodo)) {
@@ -237,7 +486,7 @@ export async function consultarResumenSire(
   const quiereReal = Boolean(solUser && solPass) && !cfg.forceMock;
 
   if (!quiereReal) {
-    return simular(ruc, periodo);
+    return { resumen: simular(ruc, periodo) };
   }
 
   const clientId = params.clientId || cfg.defClientId;
@@ -250,25 +499,7 @@ export async function consultarResumenSire(
   }
 
   try {
-    const token = await obtenerToken(
-      cfg,
-      ruc,
-      solUser,
-      solPass,
-      clientId,
-      clientSecret
-    );
-    const [ventas, compras] = await Promise.all([
-      fetchResumen(cfg, token, cfg.ventasPath, periodo),
-      fetchResumen(cfg, token, cfg.comprasPath, periodo),
-    ]);
-    return {
-      periodo,
-      ventas,
-      compras,
-      fuente: "oficial",
-      consultadoAt: new Date().toISOString(),
-    };
+    return await flujoOficial(params, cfg, clientId, clientSecret);
   } catch (err) {
     const detalle = err instanceof Error ? err.message : String(err);
     console.error("[SIRE] Falló consulta oficial:", detalle);
@@ -276,7 +507,6 @@ export async function consultarResumenSire(
   }
 }
 
-/** Etiqueta legible de un periodo "YYYYMM" -> "Junio 2026". */
 export function etiquetaPeriodo(periodo: string): string {
   if (!periodoValido(periodo)) return periodo;
   const meses = [

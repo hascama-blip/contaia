@@ -33,6 +33,8 @@ export default function SirePanel({
   const [solPass, setSolPass] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [diagModo, setDiagModo] = useState(false);
+  const [diag, setDiag] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultados, setResultados] = useState<SireResumen[]>(inicial ?? []);
@@ -41,6 +43,7 @@ export default function SirePanel({
 
   async function consultar(simulado: boolean) {
     setError(null);
+    setDiag(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire`, {
@@ -53,11 +56,19 @@ export default function SirePanel({
           solPass: simulado ? "" : solPass,
           clientId: simulado ? "" : clientId,
           clientSecret: simulado ? "" : clientSecret,
+          diagnostico: !simulado && diagModo,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "No se pudo consultar el SIRE.");
+        return;
+      }
+      if (data.diag) {
+        // Modo diagnóstico: mostramos la traza para calibrar la integración.
+        setDiag(JSON.stringify(data.diag, null, 2));
+        setSolPass("");
+        setClientSecret("");
         return;
       }
       const r: SireResumen = data.resumen;
@@ -169,9 +180,39 @@ export default function SirePanel({
         </p>
       </div>
 
+      <label className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+        <input
+          type="checkbox"
+          checked={diagModo}
+          onChange={(e) => setDiagModo(e.target.checked)}
+        />
+        Modo diagnóstico (para soporte): muestra la respuesta cruda de SUNAT en
+        cada paso, sin guardar nada.
+      </label>
+
       {error && (
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
           {error}
+        </div>
+      )}
+
+      {diag && (
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-600">
+              Diagnóstico (cópialo y compártelo con soporte)
+            </span>
+            <button
+              type="button"
+              className="text-xs text-brand-600 hover:underline"
+              onClick={() => navigator.clipboard?.writeText(diag)}
+            >
+              Copiar
+            </button>
+          </div>
+          <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100">
+            {diag}
+          </pre>
         </div>
       )}
 
