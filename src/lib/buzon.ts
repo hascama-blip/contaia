@@ -157,13 +157,30 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
-    // Abrir el visor de notificaciones para establecer su sesión.
-    await page.goto(VISOR_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-    pasos.push({ paso: "visor", url: page.url(), title: await page.title().catch(() => "") });
+    // Abrir el Buzón Electrónico desde el menú (establece la sesión del visor).
+    // Puede abrirse en la misma página o en una pestaña nueva (popup).
+    let buzonPage = page;
+    try {
+      const [popup] = await Promise.all([
+        ctx.waitForEvent("page", { timeout: 15000 }).catch(() => null),
+        clickAny(page, [
+          'a:has-text("Buzón Electrónico")',
+          'text=Buzón Electrónico',
+          'a:has-text("Buzón")',
+        ]),
+      ]);
+      if (popup) buzonPage = popup;
+      await buzonPage.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+      await buzonPage.waitForTimeout(2500);
+    } catch {}
+    pasos.push({
+      paso: "abrir-buzon",
+      url: buzonPage.url(),
+      title: await buzonPage.title().catch(() => ""),
+    });
 
     // Llamar al endpoint interno de la lista (misma origin = sin CORS).
-    const resp = (await page.evaluate(async (url: string) => {
+    const resp = (await buzonPage.evaluate(async (url: string) => {
       try {
         const r = await fetch(url, { credentials: "include" });
         return { status: r.status, body: (await r.text()).slice(0, 4000) };
