@@ -91,8 +91,8 @@ function getConfig(): SireConfig {
       "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
     codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "080000",
     codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "140000",
-    // -2 = Resumen de preliminar/registro (lo declarado, con datos por mes).
-    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "-2",
+    // 1 dígito: 1 = propuesta, 2 = preliminar/registro (lo declarado por mes).
+    codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "2",
     codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
     defClientId: process.env.SUNAT_SIRE_CLIENT_ID ?? "",
     defClientSecret: process.env.SUNAT_SIRE_CLIENT_SECRET ?? "",
