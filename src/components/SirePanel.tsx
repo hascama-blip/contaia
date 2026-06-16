@@ -33,7 +33,6 @@ export default function SirePanel({
   const [solPass, setSolPass] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultados, setResultados] = useState<SireResumen[]>(inicial ?? []);
@@ -132,14 +131,15 @@ export default function SirePanel({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="mt-2 text-xs text-brand-600 hover:underline"
-        onClick={() => setShowAdvanced((v) => !v)}
-      >
-        {showAdvanced ? "Ocultar" : "Opciones avanzadas (credencial app SIRE)"}
-      </button>
-      {showAdvanced && (
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+        <p className="text-xs font-medium text-amber-800">
+          Credencial de aplicación SIRE (requerida para datos reales)
+        </p>
+        <p className="mt-1 text-xs text-amber-700">
+          SUNAT exige, además de la Clave SOL, un <strong>client_id</strong> y{" "}
+          <strong>client_secret</strong> que el contribuyente genera una sola vez en
+          SUNAT SOL. Si solo quieres ver un ejemplo, usa “Ver ejemplo (simulado)”.
+        </p>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="label">client_id</label>
@@ -147,6 +147,7 @@ export default function SirePanel({
               className="input"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              placeholder="requerido para datos reales"
               autoComplete="off"
             />
           </div>
@@ -157,15 +158,16 @@ export default function SirePanel({
               type="password"
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}
+              placeholder="requerido para datos reales"
               autoComplete="new-password"
             />
           </div>
-          <p className="text-xs text-slate-400 sm:col-span-2">
-            Si tu plataforma ya tiene una credencial SIRE configurada, deja estos
-            campos vacíos.
-          </p>
         </div>
-      )}
+        <p className="mt-2 text-xs text-amber-700">
+          Si tu plataforma ya tiene una credencial SIRE configurada (a nivel servidor),
+          deja estos campos vacíos.
+        </p>
+      </div>
 
       {error && (
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
