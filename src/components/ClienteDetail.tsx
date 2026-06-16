@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { Cliente, Documento } from "@/lib/types";
+import SirePanel from "./SirePanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -226,6 +227,9 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
               </ul>
             )}
           </section>
+
+          {/* Compras y Ventas (SIRE) */}
+          <SirePanel clienteId={cliente.id} inicial={cliente.sire ?? []} />
         </div>
 
         {/* Columna derecha: diagnóstico */}

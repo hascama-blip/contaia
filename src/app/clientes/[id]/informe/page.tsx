@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCliente } from "@/lib/db";
 import { generarDiagnostico } from "@/lib/diagnostico";
+import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo } from "@/lib/types";
@@ -163,6 +164,44 @@ export default async function InformePage({ params }: { params: { id: string } }
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {/* Compras y Ventas (SIRE) */}
+        {cliente.sire && cliente.sire.length > 0 && (
+          <section className="mt-6">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Compras y Ventas (SIRE)
+            </h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <th className="py-1.5">Periodo</th>
+                  <th className="py-1.5 text-right">Ventas</th>
+                  <th className="py-1.5 text-right">Compras</th>
+                  <th className="py-1.5 text-right">Diferencia</th>
+                  <th className="py-1.5 text-right">Origen</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cliente.sire.map((s) => {
+                  const dif = s.ventas.importeTotal - s.compras.importeTotal;
+                  return (
+                    <tr key={s.periodo}>
+                      <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
+                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.ventas.importeTotal)}</td>
+                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.compras.importeTotal)}</td>
+                      <td className={`py-1.5 text-right font-medium ${dif >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {fmtSoles(dif)}
+                      </td>
+                      <td className="py-1.5 text-right text-xs text-slate-400">
+                        {s.fuente === "oficial" ? "SUNAT" : "simulado"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </section>
         )}
 

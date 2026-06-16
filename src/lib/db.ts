@@ -1,7 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
-import type { Cliente, Documento, Diagnostico, SunatInfo } from "./types";
+import type {
+  Cliente,
+  Documento,
+  Diagnostico,
+  SunatInfo,
+  SireResumen,
+} from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
 // Suficiente para un MVP de un solo proceso; sustituible por una BD real
@@ -24,7 +30,12 @@ async function readStore(): Promise<Store> {
   await ensureDirs();
   try {
     const raw = await fs.readFile(STORE_PATH, "utf-8");
-    return JSON.parse(raw) as Store;
+    const store = JSON.parse(raw) as Store;
+    // Compatibilidad: clientes creados antes de SIRE no tienen el campo.
+    for (const c of store.clientes) {
+      if (!Array.isArray(c.sire)) c.sire = [];
+    }
+    return store;
   } catch {
     return { clientes: [] };
   }
@@ -67,6 +78,7 @@ export async function createCliente(data: {
     sunat: data.sunat ?? null,
     documentos: [],
     diagnostico: null,
+    sire: [],
   };
   store.clientes.push(cliente);
   await writeStore(store);
@@ -131,6 +143,22 @@ export async function updateDocumento(
   Object.assign(doc, patch);
   await writeStore(store);
   return doc;
+}
+
+export async function setSireResumen(
+  clienteId: string,
+  resumen: SireResumen
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  if (!Array.isArray(cliente.sire)) cliente.sire = [];
+  // Reemplaza el resumen del mismo periodo si ya existía.
+  cliente.sire = cliente.sire.filter((s) => s.periodo !== resumen.periodo);
+  cliente.sire.push(resumen);
+  cliente.sire.sort((a, b) => b.periodo.localeCompare(a.periodo));
+  await writeStore(store);
+  return cliente;
 }
 
 export async function setDiagnostico(

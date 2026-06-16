@@ -74,4 +74,26 @@ export interface Cliente {
   sunat: SunatInfo | null;
   documentos: Documento[];
   diagnostico: Diagnostico | null;
+  /** Resúmenes SIRE (compras/ventas) por periodo. Las credenciales NO se guardan. */
+  sire: SireResumen[];
+}
+
+/** Totales de un bloque del SIRE (ventas o compras) en un periodo. */
+export interface SireBloque {
+  comprobantes: number;
+  baseImponible: number;
+  igv: number;
+  inafectoExonerado: number;
+  importeTotal: number;
+}
+
+/** Resumen mensual SIRE: cuánto compró y vendió en el periodo. */
+export interface SireResumen {
+  /** Periodo tributario "YYYYMM". */
+  periodo: string;
+  ventas: SireBloque;
+  compras: SireBloque;
+  /** Origen: "oficial" (API SIRE de SUNAT) o "simulado". */
+  fuente: "oficial" | "simulado";
+  consultadoAt: string;
 }
