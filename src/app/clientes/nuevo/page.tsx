@@ -31,25 +31,42 @@ export default function NuevoClientePage() {
 
   async function buscarRuc() {
     setError(null);
+    setSunat(null);
     if (form.ruc.length !== 11) {
       setError("Ingresa un RUC de 11 dígitos para buscar.");
       return;
     }
     setBuscando(true);
+    // En el primer uso, Render (plan gratis) puede tardar en "despertar";
+    // damos hasta 70s y avisamos si se agota el tiempo.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 70_000);
     try {
-      const res = await fetch(`/api/sunat/${form.ruc}`);
-      const data = await res.json();
+      const res = await fetch(`/api/sunat/${form.ruc}`, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "No se pudo consultar el RUC.");
+        setError(
+          data.error ?? `No se pudo consultar el RUC (código ${res.status}).`
+        );
         return;
       }
       const info: SunatInfo = data.sunat;
       setSunat(info);
       // Autocompleta la razón social con la de SUNAT.
       setForm((f) => ({ ...f, razonSocial: info.razonSocial }));
-    } catch {
-      setError("Error de red al consultar SUNAT.");
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        setError(
+          "La consulta tardó demasiado (el servidor pudo estar dormido). Intenta de nuevo."
+        );
+      } else {
+        setError("Error de red al consultar SUNAT. Revisa tu conexión e intenta otra vez.");
+      }
     } finally {
+      clearTimeout(timeout);
       setBuscando(false);
     }
   }
@@ -89,6 +106,12 @@ export default function NuevoClientePage() {
               className="input"
               value={form.ruc}
               onChange={(e) => setRuc(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  buscarRuc();
+                }
+              }}
               placeholder="20123456789"
               inputMode="numeric"
               required
@@ -97,7 +120,7 @@ export default function NuevoClientePage() {
               type="button"
               className="btn-ghost shrink-0"
               onClick={buscarRuc}
-              disabled={buscando || form.ruc.length !== 11}
+              disabled={buscando}
             >
               {buscando ? "Buscando…" : "🔎 Buscar"}
             </button>
