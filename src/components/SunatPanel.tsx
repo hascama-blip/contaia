@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { BuzonMensaje, SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
 
@@ -22,6 +23,7 @@ export default function SunatPanel({
   clienteId: string;
   inicialSire: SireResumen[];
 }) {
+  const router = useRouter();
   const hoy = new Date();
   // Credenciales (se ingresan UNA vez para todo).
   const [solUser, setSolUser] = useState("");
@@ -176,6 +178,27 @@ export default function SunatPanel({
     setClientSecret("");
   }
 
+  async function limpiarSire() {
+    if (sire.length === 0) return;
+    if (!confirm("¿Borrar el SIRE descargado de este cliente para bajar otro?")) return;
+    setBusy("limpiar");
+    setError(null);
+    setDiag(null);
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/sire`, { method: "DELETE" });
+      if (!res.ok) {
+        setError("No se pudo limpiar el SIRE.");
+        return;
+      }
+      setSire([]);
+      router.refresh();
+    } catch {
+      setError("Error de red al limpiar el SIRE.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const trabajando = busy !== null;
 
   return (
@@ -285,7 +308,17 @@ export default function SunatPanel({
       {/* Resultados SIRE */}
       {sire.length > 0 && (
         <div className="mt-5">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">Compras y Ventas (SIRE)</h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">Compras y Ventas (SIRE)</h3>
+            <button
+              className="text-xs text-slate-400 hover:text-red-600"
+              onClick={limpiarSire}
+              disabled={trabajando}
+              title="Borrar el SIRE descargado para bajar otro"
+            >
+              {busy === "limpiar" ? "Limpiando…" : "🧹 Limpiar SIRE"}
+            </button>
+          </div>
           <Acumulado resultados={sire} />
           <div className="mt-3 space-y-3">
             {sire.map((r) => (

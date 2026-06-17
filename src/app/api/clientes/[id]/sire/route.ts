@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCliente, setSireResumen } from "@/lib/db";
+import { clearSire, getCliente, setSireResumen } from "@/lib/db";
 import { consultarResumenSire } from "@/lib/sire";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+// Limpia (borra) todos los resúmenes SIRE guardados del cliente, para volver a
+// descargar otro rango/periodo desde cero.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const cliente = await getCliente(params.id);
+  if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  const actualizado = await clearSire(cliente.id);
+  return NextResponse.json({ cliente: actualizado });
+}
 
 // Consulta el resumen SIRE (compras/ventas) de un periodo.
 // Recibe la Clave SOL del cliente SOLO para esta llamada; NO se persiste.

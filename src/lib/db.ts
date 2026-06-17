@@ -200,6 +200,15 @@ export async function deleteDeclaracion(
   return cliente;
 }
 
+export async function clearSire(clienteId: string): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.sire = [];
+  await writeStore(store);
+  return cliente;
+}
+
 export async function setBuzon(
   clienteId: string,
   buzon: BuzonResumen
