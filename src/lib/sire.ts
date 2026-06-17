@@ -588,6 +588,11 @@ async function flujoOficial(
   const fV = await fetchResumen("ventas", cfg.exportVentasPath, cfg.codLibroVentas);
   const fC = await fetchResumen("compras", cfg.exportComprasPath, cfg.codLibroCompras);
 
+  // Estado REAL de presentación (endpoint omisos/periodos). Se consulta también
+  // en modo diagnóstico para capturar la respuesta cruda y calibrar.
+  const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo, "ventas", diag);
+  const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo, "compras", diag);
+
   if (diagnostico) {
     return { diag };
   }
@@ -597,9 +602,6 @@ async function flujoOficial(
   }
   const ventas = fV ? parseTotales(fV) : bloqueCero();
   const compras = fC ? parseTotales(fC) : bloqueCero();
-  // Estado REAL de presentación (endpoint omisos/periodos).
-  const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo);
-  const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo);
   return {
     resumen: {
       periodo,
@@ -621,29 +623,73 @@ function bloqueCero(): SireBloque {
 // ---- Estado de presentación del registro por periodo -----------------------
 
 /** Devuelve si el registro del periodo fue presentado (true), no presentado
- * (false) o desconocido (null). Endpoint: .../omisos/{codLibro}/periodos. */
+ * (false) o desconocido (null). Endpoint: .../omisos/{codLibro}/periodos.
+ * Captura la respuesta cruda en el diagnóstico para poder calibrar. */
 async function estadoPresentado(
   cfg: SireConfig,
   token: string,
   codLibro: string,
-  periodo: string
+  periodo: string,
+  etiqueta: string,
+  diag?: SireDiag
 ): Promise<boolean | null> {
+  const url = `${cfg.apiBase}${cfg.omisosPath.replace("{codLibro}", codLibro)}`;
   try {
-    const url = `${cfg.apiBase}${cfg.omisosPath.replace("{codLibro}", codLibro)}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
-    if (!res.ok) return null;
-    const data: any = await res.json().catch(() => null);
-    if (!data) return null;
-    const arr: any[] = data.registros ?? data.lista ?? data.periodos ?? (Array.isArray(data) ? data : []);
-    const reg = arr.find((p) => String(p.perTributario ?? p.periodo ?? "") === periodo);
-    if (!reg) return null;
-    const des = String(reg.desEstado ?? "").toLowerCase();
-    if (!des) return null;
-    // "No Presentado" -> false ; "Presentado" -> true
-    return des.includes("presentado") && !des.includes("no presentado");
-  } catch {
+    const txt = await res.text();
+    let data: any = null;
+    try {
+      data = JSON.parse(txt);
+    } catch {
+      /* respuesta no-JSON; queda en diagnóstico */
+    }
+
+    let estado: boolean | null = null;
+    let detalle = "sin coincidencia";
+    if (data) {
+      const arr: any[] =
+        data.registros ??
+        data.lista ??
+        data.periodos ??
+        data.listaPeriodos ??
+        data.detalle ??
+        (Array.isArray(data) ? data : []);
+      const soloDigitos = (v: any) => String(v ?? "").replace(/\D/g, "");
+      const reg = Array.isArray(arr)
+        ? arr.find((p) => {
+            const n = soloDigitos(
+              p?.perTributario ?? p?.periodo ?? p?.perPeriodo ?? p?.perTrib ?? p?.numPeriodo
+            );
+            return n === periodo || n.slice(0, 6) === periodo;
+          })
+        : null;
+      if (reg) {
+        const des = String(
+          reg.desEstado ?? reg.descEstado ?? reg.estado ?? reg.desEstadoProceso ?? ""
+        ).toLowerCase();
+        detalle = `desEstado="${des}"`;
+        if (des) estado = des.includes("presentado") && !des.includes("no presentado");
+      }
+    }
+
+    diag?.pasos.push({
+      paso: `presentacion-${etiqueta}`,
+      url,
+      metodo: "GET",
+      httpStatus: res.status,
+      ok: res.ok,
+      respuesta: trunc(`[periodo=${periodo} → ${estado} (${detalle})] ${txt}`, 1800),
+    });
+    return estado;
+  } catch (e) {
+    diag?.pasos.push({
+      paso: `presentacion-${etiqueta}`,
+      url,
+      ok: false,
+      respuesta: e instanceof Error ? e.message : String(e),
+    });
     return null;
   }
 }
