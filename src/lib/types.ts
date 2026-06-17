@@ -78,6 +78,57 @@ export interface Cliente {
   sire: SireResumen[];
   /** Buzón electrónico (urgentes) del mes en curso. */
   buzon: BuzonResumen | null;
+  /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */
+  declaraciones: DeclaracionMensual[];
+}
+
+/** Una casilla (código → monto) detectada en la declaración. */
+export interface CasillaDeclaracion {
+  codigo: string;
+  etiqueta?: string;
+  monto: number;
+}
+
+/**
+ * Declaración mensual (Formulario Virtual 621 IGV-Renta u otra) leída de un
+ * PDF con capa de texto (sin OCR) o ingresada manualmente. Sirve para comparar
+ * lo DECLARADO contra lo registrado en el SIRE del mismo periodo.
+ */
+export interface DeclaracionMensual {
+  id: string;
+  /** Periodo tributario "YYYYMM". */
+  periodo: string;
+  ruc?: string;
+  /** Nº de formulario detectado (p.ej. "621"). */
+  formulario?: string;
+  /** Montos declarados (editables/confirmados por el contador). */
+  ventasBase: number;
+  ventasIgv: number;
+  comprasBase: number;
+  comprasIgv: number;
+  /** Todas las casillas detectadas en el PDF (para calibrar/auditar). */
+  casillas: CasillaDeclaracion[];
+  /** "pdf" = leída de un archivo; "manual" = ingresada a mano. */
+  fuente: "pdf" | "manual";
+  archivoNombre?: string;
+  cargadoAt: string;
+}
+
+/** Una fila del comparativo declaración vs SIRE. */
+export interface ComparativoFila {
+  concepto: string;
+  declarado: number;
+  sire: number;
+  /** declarado − sire. */
+  diferencia: number;
+  estado: "ok" | "alerta" | "sin-sire";
+}
+
+/** Comparativo de un periodo: declaración vs SIRE. */
+export interface ComparativoPeriodo {
+  periodo: string;
+  filas: ComparativoFila[];
+  hayDiferencias: boolean;
 }
 
 /** Totales de un bloque del SIRE (ventas o compras) en un periodo. */

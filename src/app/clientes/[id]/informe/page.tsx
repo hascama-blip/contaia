@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCliente } from "@/lib/db";
 import { generarDiagnostico } from "@/lib/diagnostico";
+import { compararDeclaracionSire } from "@/lib/declaracion";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
@@ -32,14 +33,17 @@ export default async function InformePage({ params }: { params: { id: string } }
   const d = cliente.diagnostico ?? generarDiagnostico(cliente);
   const sunat = cliente.sunat;
 
-  const totalDocs = cliente.documentos.length;
-  const deudaTotal = cliente.documentos.reduce(
-    (acc, doc) => acc + doc.extraccion.deudas.reduce((a, b) => a + b, 0),
-    0
-  );
-
   // --- Datos para el dashboard del informe ---
   const sire = cliente.sire ?? [];
+
+  // Comparativo declaración mensual vs SIRE (por periodo con declaración cargada).
+  const declaraciones = cliente.declaraciones ?? [];
+  const sirePorPeriodo = new Map(sire.map((s) => [s.periodo, s]));
+  const comparativos = declaraciones.map((dec) =>
+    compararDeclaracionSire(dec, sirePorPeriodo.get(dec.periodo) ?? null)
+  );
+  const totalDeclaraciones = declaraciones.length;
+  const periodosConDiferencia = comparativos.filter((c) => c.hayDiferencias).length;
   // Acumulados de TODOS los periodos consultados (ventas/compras SUNAT).
   const ventasAcum = sire.reduce((a, s) => a + s.ventas.importeTotal, 0);
   const comprasAcum = sire.reduce((a, s) => a + s.compras.importeTotal, 0);
@@ -187,7 +191,7 @@ export default async function InformePage({ params }: { params: { id: string } }
             <p><span className="text-slate-400">RUC:</span> {cliente.ruc}</p>
             <p><span className="text-slate-400">Email:</span> {cliente.email || "—"}</p>
             <p><span className="text-slate-400">Teléfono:</span> {cliente.telefono || "—"}</p>
-            <p><span className="text-slate-400">Documentos analizados:</span> {totalDocs}</p>
+            <p><span className="text-slate-400">Declaraciones comparadas:</span> {totalDeclaraciones}</p>
           </div>
         </section>
 
@@ -241,9 +245,9 @@ export default async function InformePage({ params }: { params: { id: string } }
             tone={igvPorPagar > 0 ? "amber" : "emerald"}
           />
           <KpiSmall
-            label="Deuda detectada (docs)"
-            value={fmtSoles(deudaTotal)}
-            tone={deudaTotal > 0 ? "red" : "slate"}
+            label="Declaraciones c/ diferencias"
+            value={`${periodosConDiferencia} / ${totalDeclaraciones}`}
+            tone={periodosConDiferencia > 0 ? "red" : "emerald"}
           />
         </section>
 
@@ -370,30 +374,68 @@ export default async function InformePage({ params }: { params: { id: string } }
           </ul>
         </section>
 
-        {/* Documentos / deuda */}
-        {totalDocs > 0 && (
-          <section className="mt-6">
+        {/* Comparativo Declaración mensual vs SIRE */}
+        {totalDeclaraciones > 0 && (
+          <section className="mt-6 print-full">
             <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
-              Evidencia documental
+              Declaración mensual vs SIRE
             </h3>
-            <p className="text-sm text-slate-600">
-              Se analizaron {totalDocs} documento(s).
-              {deudaTotal > 0 && (
-                <> Deuda estimada detectada por OCR: <strong>{fmtSoles(deudaTotal)}</strong>.</>
+            <p className="mb-3 text-sm text-slate-600">
+              Se compararon {totalDeclaraciones} declaración(es) contra el registro SIRE.
+              {periodosConDiferencia > 0 ? (
+                <> <strong className="text-red-600">{periodosConDiferencia} periodo(s) con diferencias</strong> que requieren conciliación.</>
+              ) : (
+                <> Sin diferencias relevantes: lo declarado cuadra con el SIRE.</>
               )}
             </p>
-            <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
-              {cliente.documentos.map((doc) => (
-                <li key={doc.id}>
-                  {doc.originalName}
-                  {doc.extraccion.palabrasClave.length > 0 && (
-                    <span className="text-slate-400">
-                      {" "}— {doc.extraccion.palabrasClave.join(", ")}
-                    </span>
-                  )}
-                </li>
+            <div className="space-y-4">
+              {comparativos.map((comp, idx) => (
+                <div key={comp.periodo + idx} className="rounded-lg border border-slate-200 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {etiquetaPeriodo(comp.periodo)}
+                    </p>
+                    {comp.hayDiferencias ? (
+                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                        Con diferencias
+                      </span>
+                    ) : (
+                      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        Cuadra
+                      </span>
+                    )}
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase text-slate-400">
+                        <th className="py-1">Concepto</th>
+                        <th className="py-1 text-right">Declarado</th>
+                        <th className="py-1 text-right">SIRE</th>
+                        <th className="py-1 text-right">Diferencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comp.filas.map((f) => (
+                        <tr key={f.concepto} className="border-t border-slate-100">
+                          <td className="py-1 text-slate-600">{f.concepto}</td>
+                          <td className="py-1 text-right">{fmtSoles(f.declarado)}</td>
+                          <td className="py-1 text-right">
+                            {f.estado === "sin-sire" ? "—" : fmtSoles(f.sire)}
+                          </td>
+                          <td
+                            className={`py-1 text-right font-medium ${
+                              f.estado === "alerta" ? "text-red-600" : "text-slate-600"
+                            }`}
+                          >
+                            {f.estado === "sin-sire" ? "—" : fmtSoles(f.diferencia)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ))}
-            </ul>
+            </div>
           </section>
         )}
 

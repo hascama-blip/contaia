@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import type { Cliente, Documento } from "@/lib/types";
+import { useState } from "react";
+import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
+import DeclaracionesPanel from "./DeclaracionesPanel";
 import {
   CondicionBadge,
   EstadoBadge,
   RiesgoBadge,
   fmtFecha,
-  fmtSoles,
 } from "./ui";
 
 const SEV_STYLE: Record<string, string> = {
@@ -25,7 +25,6 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
   const [cliente, setCliente] = useState<Cliente>(inicial);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   function notify(type: "ok" | "err", text: string) {
     setMsg({ type, text });
@@ -52,29 +51,6 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
       router.refresh();
     } finally {
       setBusy(null);
-    }
-  }
-
-  async function subirArchivos(files: FileList) {
-    setBusy("upload");
-    try {
-      for (const file of Array.from(files)) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch(`/api/clientes/${cliente.id}/documentos`, {
-          method: "POST",
-          body: fd,
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          notify("err", `${file.name}: ${data.error ?? "error"}`);
-        }
-      }
-      await refresh();
-      notify("ok", "Documentos procesados.");
-    } finally {
-      setBusy(null);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -189,47 +165,15 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             )}
           </section>
 
-          {/* Documentos */}
-          <section className="card p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-800">
-                Documentos ({cliente.documentos.length})
-              </h2>
-              <div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp,application/pdf"
-                  className="hidden"
-                  onChange={(e) => e.target.files && subirArchivos(e.target.files)}
-                />
-                <button
-                  className="btn-ghost"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={busy === "upload"}
-                >
-                  {busy === "upload" ? "Procesando…" : "⬆ Subir documentos"}
-                </button>
-              </div>
-            </div>
-            <p className="mb-3 text-xs text-slate-400">
-              Fotos o PDF de comprobantes, declaraciones o notificaciones. Las imágenes
-              se procesan con OCR para extraer RUC, montos y deudas.
-            </p>
-            {cliente.documentos.length === 0 ? (
-              <p className="py-4 text-sm text-slate-400">Sin documentos.</p>
-            ) : (
-              <ul className="space-y-3">
-                {cliente.documentos.map((doc) => (
-                  <DocumentoItem key={doc.id} clienteId={cliente.id} doc={doc} />
-                ))}
-              </ul>
-            )}
-          </section>
-
           {/* Consulta SUNAT unificada: SIRE + Buzón con una sola credencial */}
           <SunatPanel clienteId={cliente.id} inicialSire={cliente.sire ?? []} />
+
+          {/* Declaraciones mensuales (PDF) comparadas contra el SIRE */}
+          <DeclaracionesPanel
+            clienteId={cliente.id}
+            inicialDeclaraciones={cliente.declaraciones ?? []}
+            inicialSire={cliente.sire ?? []}
+          />
         </div>
 
         {/* Columna derecha: diagnóstico */}
@@ -310,54 +254,6 @@ function Field({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase text-slate-400">{label}</p>
       <p className="text-sm text-slate-700">{value || "—"}</p>
     </div>
-  );
-}
-
-function DocumentoItem({ clienteId, doc }: { clienteId: string; doc: Documento }) {
-  const statusStyle =
-    doc.ocrStatus === "procesado"
-      ? "bg-emerald-100 text-emerald-700"
-      : doc.ocrStatus === "pendiente"
-        ? "bg-slate-100 text-slate-600"
-        : "bg-amber-100 text-amber-700";
-  const statusLabel =
-    doc.ocrStatus === "procesado"
-      ? "OCR ok"
-      : doc.ocrStatus === "pendiente"
-        ? "PDF (sin OCR)"
-        : "OCR sin texto";
-
-  return (
-    <li className="rounded-lg border border-slate-200 p-3">
-      <div className="flex items-center justify-between">
-        <a
-          href={`/api/clientes/${clienteId}/documentos/${doc.id}/file`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-brand-600 hover:underline"
-        >
-          {doc.originalName}
-        </a>
-        <span className={`badge ${statusStyle}`}>{statusLabel}</span>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        {doc.extraccion.ruc && (
-          <span className="badge bg-slate-100 text-slate-600">
-            RUC: {doc.extraccion.ruc}
-          </span>
-        )}
-        {doc.extraccion.montos.slice(0, 3).map((m, i) => (
-          <span key={i} className="badge bg-blue-50 text-blue-700">
-            {fmtSoles(m)}
-          </span>
-        ))}
-        {doc.extraccion.palabrasClave.map((p) => (
-          <span key={p} className="badge bg-red-50 text-red-600">
-            {p}
-          </span>
-        ))}
-      </div>
-    </li>
   );
 }
 

@@ -8,6 +8,7 @@ import type {
   SunatInfo,
   SireResumen,
   BuzonResumen,
+  DeclaracionMensual,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -36,6 +37,7 @@ async function readStore(): Promise<Store> {
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
       if (c.buzon === undefined) c.buzon = null;
+      if (!Array.isArray(c.declaraciones)) c.declaraciones = [];
     }
     return store;
   } catch {
@@ -82,6 +84,7 @@ export async function createCliente(data: {
     diagnostico: null,
     sire: [],
     buzon: null,
+    declaraciones: [],
   };
   store.clientes.push(cliente);
   await writeStore(store);
@@ -160,6 +163,34 @@ export async function setSireResumen(
   cliente.sire = cliente.sire.filter((s) => s.periodo !== resumen.periodo);
   cliente.sire.push(resumen);
   cliente.sire.sort((a, b) => b.periodo.localeCompare(a.periodo));
+  await writeStore(store);
+  return cliente;
+}
+
+export async function addDeclaracion(
+  clienteId: string,
+  decl: DeclaracionMensual
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  if (!Array.isArray(cliente.declaraciones)) cliente.declaraciones = [];
+  // Reemplaza la declaración del mismo periodo si ya existía.
+  cliente.declaraciones = cliente.declaraciones.filter((d) => d.periodo !== decl.periodo);
+  cliente.declaraciones.push(decl);
+  cliente.declaraciones.sort((a, b) => b.periodo.localeCompare(a.periodo));
+  await writeStore(store);
+  return cliente;
+}
+
+export async function deleteDeclaracion(
+  clienteId: string,
+  declId: string
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.declaraciones = (cliente.declaraciones ?? []).filter((d) => d.id !== declId);
   await writeStore(store);
   return cliente;
 }

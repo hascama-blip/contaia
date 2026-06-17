@@ -4,6 +4,17 @@ import type {
   Hallazgo,
   NivelRiesgo,
 } from "./types";
+import { compararDeclaracionSire } from "./declaracion";
+
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function etiquetaPeriodo(periodo: string): string {
+  if (!/^\d{6}$/.test(periodo)) return periodo;
+  return `${MESES[Number(periodo.slice(4, 6)) - 1] ?? "?"} ${periodo.slice(0, 4)}`;
+}
 
 // ============================================================
 //  Motor de diagnóstico tributario
@@ -88,79 +99,54 @@ export function generarDiagnostico(cliente: Cliente): Diagnostico {
     }
   }
 
-  // ---- Análisis de documentos ----------------------------------------------
-  const procesados = cliente.documentos.filter((d) => d.ocrStatus === "procesado");
-  if (cliente.documentos.length === 0) {
+  // ---- Consistencia declaración vs SIRE ------------------------------------
+  const declaraciones = cliente.declaraciones ?? [];
+  const sirePorPeriodo = new Map(cliente.sire.map((s) => [s.periodo, s]));
+
+  if (declaraciones.length === 0) {
     hallazgos.push({
       tipo: "documento",
       severidad: "bajo",
-      titulo: "Sin documentos adjuntos",
-      detalle: "No se han cargado documentos para análisis.",
-    });
-    recomendaciones.push(
-      "Adjuntar comprobantes, declaraciones o notificaciones para enriquecer el diagnóstico."
-    );
-  }
-
-  const palabrasDeuda = new Set<string>();
-  let totalDeudaDetectada = 0;
-  for (const doc of procesados) {
-    for (const p of doc.extraccion.palabrasClave) palabrasDeuda.add(p);
-    for (const d of doc.extraccion.deudas) totalDeudaDetectada += d;
-  }
-
-  const senalesCriticas = ["COACTIVO", "COACTIVA", "EMBARGO"].filter((k) =>
-    palabrasDeuda.has(k)
-  );
-  if (senalesCriticas.length > 0) {
-    hallazgos.push({
-      tipo: "documento",
-      severidad: "critico",
-      titulo: "Indicios de cobranza coactiva / embargo",
-      detalle: `Los documentos mencionan: ${senalesCriticas.join(", ")}. Requiere atención inmediata.`,
-    });
-    recomendaciones.push(
-      "Revisar el expediente coactivo y evaluar fraccionamiento o pago para levantar medidas."
-    );
-  }
-
-  if (palabrasDeuda.has("MULTA") || palabrasDeuda.has("INFRACCION")) {
-    hallazgos.push({
-      tipo: "documento",
-      severidad: "alto",
-      titulo: "Multas / infracciones detectadas",
-      detalle: "Se detectaron referencias a multas o infracciones en los documentos.",
-    });
-    recomendaciones.push(
-      "Evaluar gradualidad / subsanación de infracciones para reducir multas."
-    );
-  }
-
-  if (totalDeudaDetectada > 0) {
-    hallazgos.push({
-      tipo: "documento",
-      severidad: totalDeudaDetectada > 10000 ? "alto" : "medio",
-      titulo: `Deuda estimada en documentos: S/ ${totalDeudaDetectada.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`,
+      titulo: "Sin declaraciones cargadas",
       detalle:
-        "Monto agregado de posibles deudas detectadas por OCR. Verificar contra el buzón SOL.",
+        "Sube las declaraciones mensuales (PDF) para comparar lo declarado contra el SIRE.",
     });
+    recomendaciones.push(
+      "Cargar las declaraciones mensuales (Formulario 621) para cruzarlas con el SIRE."
+    );
   }
 
-  // ---- Consistencia RUC ----------------------------------------------------
-  const rucsDocs = procesados
-    .map((d) => d.extraccion.ruc)
-    .filter((r): r is string => Boolean(r));
-  if (sunat && rucsDocs.length > 0) {
-    const inconsistente = rucsDocs.some((r) => r !== sunat.ruc);
-    if (inconsistente) {
+  for (const dec of declaraciones) {
+    const sire = sirePorPeriodo.get(dec.periodo) ?? null;
+    if (!sire) continue;
+    const comp = compararDeclaracionSire(dec, sire);
+    const alertas = comp.filas.filter((f) => f.estado === "alerta");
+    if (alertas.length > 0) {
+      const detalle = alertas
+        .map(
+          (f) =>
+            `${f.concepto}: declarado S/ ${f.declarado.toLocaleString("es-PE", { minimumFractionDigits: 2 })} vs SIRE S/ ${f.sire.toLocaleString("es-PE", { minimumFractionDigits: 2 })} (dif S/ ${f.diferencia.toLocaleString("es-PE", { minimumFractionDigits: 2 })})`
+        )
+        .join("; ");
+      hallazgos.push({
+        tipo: "consistencia",
+        severidad: "alto",
+        titulo: `Diferencias declaración vs SIRE — ${etiquetaPeriodo(dec.periodo)}`,
+        detalle,
+      });
+      recomendaciones.push(
+        `Revisar y conciliar la declaración de ${etiquetaPeriodo(dec.periodo)} con el SIRE (posible declaración sustitutoria/rectificatoria).`
+      );
+    }
+
+    if (sunat && dec.ruc && dec.ruc !== sunat.ruc) {
       hallazgos.push({
         tipo: "consistencia",
         severidad: "medio",
-        titulo: "RUC en documentos no coincide",
+        titulo: `RUC de la declaración no coincide — ${etiquetaPeriodo(dec.periodo)}`,
         detalle:
-          "Algún documento contiene un RUC distinto al del cliente. Verificar que los comprobantes correspondan al contribuyente.",
+          "La declaración cargada tiene un RUC distinto al del cliente. Verificar que corresponda al contribuyente.",
       });
-      recomendaciones.push("Validar que los documentos cargados pertenezcan al cliente correcto.");
     }
   }
 

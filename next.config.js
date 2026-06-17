@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // tesseract.js usa workers/node-fetch; lo dejamos como paquete externo del servidor
+  // Paquetes que deben quedar como externos del servidor (usan binarios/ESM
+  // pesados): unpdf (pdf.js) para leer PDFs, y el navegador headless del buzón.
   experimental: {
-    serverComponentsExternalPackages: ["tesseract.js", "playwright-core", "@sparticuz/chromium"],
+    serverComponentsExternalPackages: ["unpdf", "playwright-core", "@sparticuz/chromium"],
   },
 };
 

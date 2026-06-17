@@ -5,7 +5,8 @@ Contexto de proyecto para Claude Code. **Leer esto primero** al retomar el traba
 ## Qué es
 App web (Next.js 14 App Router + TypeScript + Tailwind) para un estudio contable.
 Por cada cliente: consulta estado SUNAT (RUC), SIRE (compras/ventas), buzón
-electrónico, OCR de documentos, diagnóstico, dashboard e **informe de gerencia** (PDF).
+electrónico, lectura de declaraciones (PDF) y comparativo vs SIRE, diagnóstico, dashboard
+e **informe de gerencia** (PDF).
 
 Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 
@@ -19,17 +20,30 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Commits terminan con `Co-Authored-By` y `Claude-Session` (ver git log).
 
 ## Arquitectura
-- `src/lib/db.ts` — store JSON. Entidad `Cliente` con: sunat, documentos, diagnostico,
-  sire[], buzon. Setters: setSunatInfo, addDocumento, setSireResumen, setBuzon, setDiagnostico.
+- `src/lib/db.ts` — store JSON. Entidad `Cliente` con: sunat, documentos (legacy), diagnostico,
+  sire[], buzon, declaraciones[]. Setters: setSunatInfo, setSireResumen, setBuzon,
+  setDiagnostico, addDeclaracion, deleteDeclaracion.
 - `src/lib/types.ts` — tipos de dominio.
 - `src/lib/sunat.ts` — consulta RUC. Proveedores: decolecta (default, token), apisnet, oficial SOL, mock. `SUNAT_PROVIDER=auto`.
 - `src/lib/sire.ts` — SIRE (OAuth2). Ver detalle abajo.
 - `src/lib/buzon.ts` — buzón vía **Playwright** (scraping del portal SOL). Ver abajo.
-- `src/lib/ocr.ts` — tesseract.js + extracción.
-- `src/lib/diagnostico.ts` — motor de hallazgos/score.
+- `src/lib/declaracion.ts` — lee PDF de declaración mensual (**unpdf**, sin OCR) y la
+  **compara con el SIRE** del mismo periodo. (Reemplazó al OCR/tesseract, ya eliminado.)
+- `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - `src/components/SunatPanel.tsx` — panel unificado (credenciales 1 vez): SIRE + buzón, "Extraer todo".
-- `src/app/clientes/[id]/informe/page.tsx` — informe imprimible (dashboard, contingencias, buzón, SIRE).
-- API: `src/app/api/clientes/[id]/{sire,buzon,sunat,documentos,diagnostico}/route.ts`.
+- `src/components/DeclaracionesPanel.tsx` — subir PDF de declaración → confirmar montos → comparar vs SIRE.
+- `src/app/clientes/[id]/informe/page.tsx` — informe imprimible (dashboard, contingencias, buzón, SIRE, declaración vs SIRE).
+- API: `src/app/api/clientes/[id]/{sire,buzon,sunat,declaraciones,diagnostico}/route.ts`.
+
+### Declaraciones mensuales vs SIRE (`declaracion.ts`)
+- **unpdf** (pdf.js serverless) extrae el texto del PDF — solo sirve si el PDF trae capa de
+  texto (constancia/Formulario 621). Si es escaneo/imagen, no hay texto → ingreso manual.
+- Parser detecta periodo, RUC, formulario y **casillas** (código 3 dígitos → monto).
+- `MAPA_CASILLAS` (en el archivo) mapea casillas → ventasBase/ventasIgv/comprasBase/comprasIgv.
+  ⚠️ **AJUSTABLE**: calibrar con una constancia real usando **Modo diagnóstico** (devuelve
+  texto crudo + casillas detectadas), igual que se hizo con SIRE/buzón.
+- UI deja los 4 montos **editables** antes de guardar (el contador confirma/corrige), y
+  permite **ingreso manual** sin PDF. `compararDeclaracionSire` marca alerta si |declarado−SIRE| > S/1.
 
 ## SUNAT — integraciones (lo más valioso, descubierto a pulso)
 
@@ -72,7 +86,7 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 
 ## Hecho
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·
-buzón (más peligroso aparte) · OCR docs · diagnóstico · dashboard · informe de gerencia
+buzón (más peligroso aparte) · declaraciones PDF vs SIRE · diagnóstico · dashboard · informe de gerencia
 (contingencias, buzón, SIRE, gráficos juntos en una hoja al imprimir) · "Extraer todo"
 (SIRE todos los meses del año + buzón mes actual).
 
