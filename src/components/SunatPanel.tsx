@@ -311,6 +311,14 @@ function Acumulado({ resultados }: { resultados: SireResumen[] }) {
   );
 }
 
+function PresentadoBadge({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <span className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+      {label}: {ok ? "✓ Presentado" : "✕ No presentado"}
+    </span>
+  );
+}
+
 function ResumenCard({ r }: { r: SireResumen }) {
   const ventas = r.ventas.importeTotal;
   const compras = r.compras.importeTotal;
@@ -323,6 +331,10 @@ function ResumenCard({ r }: { r: SireResumen }) {
         <span className={`badge ${r.fuente === "oficial" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
           {r.fuente === "oficial" ? "SUNAT (real)" : "simulado"}
         </span>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
+        <PresentadoBadge label="Ventas (RVIE)" ok={r.presentadoVentas} />
+        <PresentadoBadge label="Compras (RCE)" ok={r.presentadoCompras} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Bloque titulo="Ventas (RVIE)" color="bg-emerald-500" total={ventas} pct={(ventas / max) * 100} igv={r.ventas.igv} base={r.ventas.baseImponible} comprobantes={r.ventas.comprobantes} />

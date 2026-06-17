@@ -59,6 +59,7 @@ interface SireConfig {
   descargaPath: string;
   codLibroVentas: string;
   codLibroCompras: string;
+  omisosPath: string;
   codTipoResumen: string;
   codTipoArchivo: string;
   defClientId: string;
@@ -92,6 +93,9 @@ function getConfig(): SireConfig {
     // Confirmado empíricamente: 140000 = ventas (RVIE), 080000 = compras (RCE).
     codLibroVentas: process.env.SIRE_COD_LIBRO_VENTAS ?? "140000",
     codLibroCompras: process.env.SIRE_COD_LIBRO_COMPRAS ?? "080000",
+    // Estado de presentación por periodo: .../omisos/{codLibro}/periodos
+    omisosPath:
+      process.env.SIRE_OMISOS_PATH ?? "/rvierce/padron/web/omisos/{codLibro}/periodos",
     // 1 dígito. 1 = resumen del registro (lo declarado, con datos por mes).
     codTipoResumen: process.env.SIRE_COD_TIPO_RESUMEN ?? "1",
     codTipoArchivo: process.env.SIRE_COD_TIPO_ARCHIVO ?? "0",
@@ -585,14 +589,16 @@ async function flujoOficial(
   }
   const ventas = fV ? parseTotales(fV) : bloqueCero();
   const compras = fC ? parseTotales(fC) : bloqueCero();
+  // Estado REAL de presentación (endpoint omisos/periodos).
+  const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo);
+  const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo);
   return {
     resumen: {
       periodo,
       ventas,
       compras,
-      // Hay registro (presentado) si SUNAT devolvió contenido (no 1070 ni error).
-      presentadoVentas: typeof fV === "string" && fV.length > 0,
-      presentadoCompras: typeof fC === "string" && fC.length > 0,
+      presentadoVentas: presV ?? false,
+      presentadoCompras: presC ?? false,
       fuente: "oficial",
       consultadoAt: new Date().toISOString(),
     },
@@ -602,6 +608,36 @@ async function flujoOficial(
 
 function bloqueCero(): SireBloque {
   return { comprobantes: 0, baseImponible: 0, igv: 0, inafectoExonerado: 0, importeTotal: 0 };
+}
+
+// ---- Estado de presentación del registro por periodo -----------------------
+
+/** Devuelve si el registro del periodo fue presentado (true), no presentado
+ * (false) o desconocido (null). Endpoint: .../omisos/{codLibro}/periodos. */
+async function estadoPresentado(
+  cfg: SireConfig,
+  token: string,
+  codLibro: string,
+  periodo: string
+): Promise<boolean | null> {
+  try {
+    const url = `${cfg.apiBase}${cfg.omisosPath.replace("{codLibro}", codLibro)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json().catch(() => null);
+    if (!data) return null;
+    const arr: any[] = data.registros ?? data.lista ?? data.periodos ?? (Array.isArray(data) ? data : []);
+    const reg = arr.find((p) => String(p.perTributario ?? p.periodo ?? "") === periodo);
+    if (!reg) return null;
+    const des = String(reg.desEstado ?? "").toLowerCase();
+    if (!des) return null;
+    // "No Presentado" -> false ; "Presentado" -> true
+    return des.includes("presentado") && !des.includes("no presentado");
+  } catch {
+    return null;
+  }
 }
 
 // ---- Modo simulado (determinista por RUC + periodo) ------------------------
