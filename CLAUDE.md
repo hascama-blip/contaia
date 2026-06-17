@@ -67,7 +67,9 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   - `1070`/"No se ha encontrado información" = sin movimiento → 0.
   - Ventas suelen estar en USD; el resumen suma "Total CP" tal cual (no convertir).
 - **Estado presentado/no presentado por periodo**:
-  `GET .../rvierce/padron/web/omisos/{codLibro}/periodos` → lista `{perTributario, desEstado:"Presentado"/"No Presentado", mes}`.
+  `GET .../rvierce/padron/web/omisos/{codLibro}/periodos` → **array por ejercicio**:
+  `[{ numEjercicio, desEstado, lisPeriodos:[{ perTributario:"YYYYMM", codEstado, desEstado:"Presentado"/"No Presentado" }] }]`.
+  Hay que **aplanar `lisPeriodos`** y buscar el `perTributario`; `codEstado 02`=Presentado, `03/04`=No Presentado.
 - Endpoints de propuesta/ticket (legacy, ya no usados por defecto): `/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta`,
   estado `consultaestadotickets?perIni=&perFin=&numTicket=`, descarga `archivoreporte`.
 

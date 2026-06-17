@@ -649,22 +649,24 @@ async function estadoPresentado(
     let estado: boolean | null = null;
     let detalle = "sin coincidencia";
     if (data) {
-      const arr: any[] =
-        data.registros ??
-        data.lista ??
-        data.periodos ??
-        data.listaPeriodos ??
-        data.detalle ??
-        (Array.isArray(data) ? data : []);
+      // La respuesta agrupa por ejercicio: array de años, y cada uno trae
+      // lisPeriodos[] con {perTributario, codEstado, desEstado} por mes.
+      const top: any[] = Array.isArray(data)
+        ? data
+        : data.registros ?? data.lista ?? data.periodos ?? data.listaPeriodos ?? data.detalle ?? [];
+      const flat: any[] = [];
+      for (const item of Array.isArray(top) ? top : []) {
+        if (Array.isArray(item?.lisPeriodos)) flat.push(...item.lisPeriodos);
+        else if (Array.isArray(item?.periodos)) flat.push(...item.periodos);
+        else flat.push(item);
+      }
       const soloDigitos = (v: any) => String(v ?? "").replace(/\D/g, "");
-      const reg = Array.isArray(arr)
-        ? arr.find((p) => {
-            const n = soloDigitos(
-              p?.perTributario ?? p?.periodo ?? p?.perPeriodo ?? p?.perTrib ?? p?.numPeriodo
-            );
-            return n === periodo || n.slice(0, 6) === periodo;
-          })
-        : null;
+      const reg = flat.find((p) => {
+        const n = soloDigitos(
+          p?.perTributario ?? p?.periodo ?? p?.perPeriodo ?? p?.perTrib ?? p?.numPeriodo
+        );
+        return n === periodo;
+      });
       if (reg) {
         const des = String(
           reg.desEstado ?? reg.descEstado ?? reg.estado ?? reg.desEstadoProceso ?? ""
