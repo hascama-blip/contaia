@@ -15,7 +15,12 @@ import type {
 // Suficiente para un MVP de un solo proceso; sustituible por una BD real
 // (Postgres/SQLite) implementando la misma interfaz.
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// Directorio de datos. En producción se monta un DISCO PERSISTENTE de Render
+// y se apunta aquí con la variable DATA_DIR (p. ej. /var/data) para que los
+// clientes NO se borren en cada despliegue. En local cae a ./data.
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 

@@ -23,11 +23,15 @@ services:
       # pestaña Environment). Sin este token la consulta mostrará error.
       - key: DECOLECTA_TOKEN
         sync: false
+      # Carpeta de datos = disco persistente montado abajo. Así los clientes,
+      # el SIRE y las declaraciones NO se borran en cada despliegue.
+      - key: DATA_DIR
+        value: /var/data
 
-    # --- Almacenamiento persistente (opcional, requiere plan "starter") -------
-    # Descomenta este bloque para que los clientes y archivos NO se borren
-    # entre reinicios/despliegues. Requiere cambiar plan: free -> starter.
-    # disk:
-    #   name: contaia-data
-    #   mountPath: /opt/render/project/src/data
-    #   sizeGB: 1
+    # --- Almacenamiento persistente ------------------------------------------
+    # Disco que sobrevive a reinicios y despliegues (incluido en plan standard).
+    # 1 GB alcanza de sobra para cientos de clientes en JSON.
+    disk:
+      name: contaia-data
+      mountPath: /var/data
+      sizeGB: 1
