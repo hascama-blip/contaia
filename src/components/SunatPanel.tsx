@@ -28,11 +28,14 @@ export default function SunatPanel({
   const [solPass, setSolPass] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  // Periodo SIRE.
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [anio, setAnio] = useState(hoy.getFullYear());
+  // Rango de periodos SIRE: Desde (mes/año) -> Hasta (mes/año).
+  const [mesDesde, setMesDesde] = useState(1);
+  const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
+  const [mesHasta, setMesHasta] = useState(hoy.getMonth() + 1);
+  const [anioHasta, setAnioHasta] = useState(hoy.getFullYear());
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [progreso, setProgreso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
@@ -42,7 +45,28 @@ export default function SunatPanel({
   const [peligrosos, setPeligrosos] = useState<BuzonMensaje[]>([]);
   const [urgentes, setUrgentes] = useState<BuzonMensaje[]>([]);
 
-  const periodo = `${anio}${String(mes).padStart(2, "0")}`;
+  const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
+  const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
+
+  /** Lista de periodos "YYYYMM" entre desde y hasta (inclusive, ascendente). */
+  function rangoPeriodos(desde: string, hasta: string): string[] {
+    const out: string[] = [];
+    let y = Number(desde.slice(0, 4));
+    let m = Number(desde.slice(4, 6));
+    const yH = Number(hasta.slice(0, 4));
+    const mH = Number(hasta.slice(4, 6));
+    let guard = 0;
+    while ((y < yH || (y === yH && m <= mH)) && guard < 240) {
+      out.push(`${y}${String(m).padStart(2, "0")}`);
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
+      guard++;
+    }
+    return out;
+  }
 
   function faltanCreds(): boolean {
     if (!solUser || !solPass) {
@@ -65,7 +89,7 @@ export default function SunatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          periodo: periodoOverride ?? periodo,
+          periodo: periodoOverride ?? periodoHasta,
           real: !simulado,
           solUser: simulado ? "" : solUser,
           solPass: simulado ? "" : solPass,
@@ -126,20 +150,26 @@ export default function SunatPanel({
     }
   }
 
-  async function extraerTodo() {
+  /** Recorre el rango Desde→Hasta extrayendo el SIRE de cada mes. */
+  async function recorrerRango(conBuzon: boolean) {
     if (faltanCreds()) return;
+    if (periodoDesde > periodoHasta) {
+      setError("El periodo 'Desde' no puede ser mayor que 'Hasta'.");
+      return;
+    }
     setBusy("todo");
     setError(null);
     setDiag(null);
-    // SIRE de TODOS los meses del año en curso (enero -> mes actual).
-    const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth() + 1;
-    for (let m = 1; m <= mesActual; m++) {
-      const per = `${anioActual}${String(m).padStart(2, "0")}`;
-      await consultarSire(false, per);
+    const periodos = rangoPeriodos(periodoDesde, periodoHasta);
+    for (let i = 0; i < periodos.length; i++) {
+      setProgreso(`SIRE ${etiqueta(periodos[i])} (${i + 1}/${periodos.length})`);
+      await consultarSire(false, periodos[i]);
     }
-    // Buzón del mes presente (últimos 15 días).
-    await consultarBuzon();
+    if (conBuzon) {
+      setProgreso("Buzón (mes en curso)…");
+      await consultarBuzon();
+    }
+    setProgreso(null);
     setBusy(null);
     // Limpiamos la clave solo al terminar todo el proceso.
     setSolPass("");
@@ -185,20 +215,40 @@ export default function SunatPanel({
         </div>
       </div>
 
-      {/* Periodo SIRE */}
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div>
-          <label className="label">Mes (SIRE)</label>
-          <select className="input" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
-            {MESES.map((m, i) => (
-              <option key={m} value={i + 1}>{m}</option>
-            ))}
-          </select>
+      {/* Rango de periodos SIRE: Desde -> Hasta */}
+      <div className="mt-3 rounded-lg border border-slate-200 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Rango SIRE (desde → hasta)
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className="label">Mes desde</label>
+            <select className="input" value={mesDesde} onChange={(e) => setMesDesde(Number(e.target.value))}>
+              {MESES.map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Año desde</label>
+            <input className="input" type="number" value={anioDesde} min={2018} max={hoy.getFullYear()} onChange={(e) => setAnioDesde(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Mes hasta</label>
+            <select className="input" value={mesHasta} onChange={(e) => setMesHasta(Number(e.target.value))}>
+              {MESES.map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Año hasta</label>
+            <input className="input" type="number" value={anioHasta} min={2018} max={hoy.getFullYear()} onChange={(e) => setAnioHasta(Number(e.target.value))} />
+          </div>
         </div>
-        <div>
-          <label className="label">Año</label>
-          <input className="input" type="number" value={anio} min={2018} max={hoy.getFullYear()} onChange={(e) => setAnio(Number(e.target.value))} />
-        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Ej.: Enero 2025 → Diciembre 2025 · Enero 2026 → Junio 2026 · Enero → Marzo 2026.
+        </p>
       </div>
 
       <label className="mt-3 flex items-center gap-2 text-xs text-slate-500">
@@ -207,18 +257,23 @@ export default function SunatPanel({
       </label>
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+      {progreso && (
+        <div className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
+          Extrayendo… {progreso}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={extraerTodo} disabled={trabajando}>
-          {busy === "todo" ? "Extrayendo…" : "⚡ Extraer todo de SUNAT"}
+        <button className="btn-primary" onClick={() => recorrerRango(true)} disabled={trabajando}>
+          {busy === "todo" ? "Extrayendo…" : "⚡ Extraer rango (SIRE + buzón)"}
         </button>
-        <button className="btn-ghost" onClick={() => consultarSire(false)} disabled={trabajando}>
-          {busy === "sire" ? "SIRE…" : `Solo SIRE ${etiqueta(periodo)}`}
+        <button className="btn-ghost" onClick={() => recorrerRango(false)} disabled={trabajando}>
+          Solo SIRE del rango
         </button>
         <button className="btn-ghost" onClick={consultarBuzon} disabled={trabajando}>
           {busy === "buzon" ? "Buzón…" : "Solo buzón"}
         </button>
-        <button className="btn-ghost" onClick={() => consultarSire(true)} disabled={trabajando} title="Ejemplo SIRE sin Clave SOL">
+        <button className="btn-ghost" onClick={() => consultarSire(true, periodoHasta)} disabled={trabajando} title="Ejemplo SIRE sin Clave SOL">
           Ver ejemplo
         </button>
       </div>
