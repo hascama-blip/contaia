@@ -107,6 +107,19 @@ export default async function InformePage({ params }: { params: { id: string } }
       titulo: `IGV por pagar acumulado aprox. ${fmtSoles(igvPorPagar)}`,
       detalle: "Verificar provisión y pago oportuno del IGV para evitar multas e intereses.",
     });
+  // Periodos pasados con registro no presentado (omiso).
+  const hoyPer = new Date();
+  const periodoActual = `${hoyPer.getFullYear()}${String(hoyPer.getMonth() + 1).padStart(2, "0")}`;
+  const omisos = sire.filter(
+    (s) => s.periodo < periodoActual && (!s.presentadoVentas || !s.presentadoCompras)
+  );
+  if (omisos.length > 0)
+    contingencias.push({
+      nivel: "alto",
+      titulo: `${omisos.length} periodo(s) con registro SIRE no presentado`,
+      detalle:
+        "Riesgo de infracción por no generar/presentar el RVIE/RCE en el plazo. Regularizar.",
+    });
 
   const NIVEL_PESO: Record<NivelRiesgo, number> = { critico: 4, alto: 3, medio: 2, bajo: 1 };
   contingencias.sort((a, b) => NIVEL_PESO[b.nivel] - NIVEL_PESO[a.nivel]);
@@ -384,7 +397,8 @@ export default async function InformePage({ params }: { params: { id: string } }
                   <th className="py-1.5 text-right">Ventas</th>
                   <th className="py-1.5 text-right">Compras</th>
                   <th className="py-1.5 text-right">Diferencia</th>
-                  <th className="py-1.5 text-right">Origen</th>
+                  <th className="py-1.5 text-center">Ventas (RVIE)</th>
+                  <th className="py-1.5 text-center">Compras (RCE)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -398,8 +412,11 @@ export default async function InformePage({ params }: { params: { id: string } }
                       <td className={`py-1.5 text-right font-medium ${dif >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                         {fmtSoles(dif)}
                       </td>
-                      <td className="py-1.5 text-right text-xs text-slate-400">
-                        {s.fuente === "oficial" ? "SUNAT" : "simulado"}
+                      <td className="py-1.5 text-center">
+                        <EstadoPresentacion ok={s.presentadoVentas} />
+                      </td>
+                      <td className="py-1.5 text-center">
+                        <EstadoPresentacion ok={s.presentadoCompras} />
                       </td>
                     </tr>
                   );
@@ -430,6 +447,16 @@ export default async function InformePage({ params }: { params: { id: string } }
         </footer>
       </article>
     </div>
+  );
+}
+
+function EstadoPresentacion({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
+    >
+      {ok ? "Presentado" : "No presentado"}
+    </span>
   );
 }
 

@@ -590,6 +590,9 @@ async function flujoOficial(
       periodo,
       ventas,
       compras,
+      // Hay registro (presentado) si SUNAT devolvió contenido (no 1070 ni error).
+      presentadoVentas: typeof fV === "string" && fV.length > 0,
+      presentadoCompras: typeof fC === "string" && fC.length > 0,
       fuente: "oficial",
       consultadoAt: new Date().toISOString(),
     },
@@ -625,6 +628,8 @@ function simular(ruc: string, periodo: string): SireResumen {
     periodo,
     ventas: simularBloque(hV, 1),
     compras: simularBloque(hC, 0.7),
+    presentadoVentas: true,
+    presentadoCompras: true,
     fuente: "simulado",
     consultadoAt: new Date().toISOString(),
   };

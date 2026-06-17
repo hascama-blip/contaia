@@ -119,6 +119,9 @@ export interface SireResumen {
   periodo: string;
   ventas: SireBloque;
   compras: SireBloque;
+  /** Si el registro del periodo fue presentado/generado en SUNAT. */
+  presentadoVentas: boolean;
+  presentadoCompras: boolean;
   /** Origen: "oficial" (API SIRE de SUNAT) o "simulado". */
   fuente: "oficial" | "simulado";
   consultadoAt: string;
