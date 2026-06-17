@@ -121,6 +121,8 @@ export interface ComparativoFila {
   sire: number;
   /** declarado − sire. */
   diferencia: number;
+  /** Diferencia relativa al SIRE, en % (0 si no hay base). */
+  porcentaje: number;
   estado: "ok" | "alerta" | "sin-sire";
 }
 

@@ -412,6 +412,7 @@ export default async function InformePage({ params }: { params: { id: string } }
                         <th className="py-1 text-right">Declarado</th>
                         <th className="py-1 text-right">SIRE</th>
                         <th className="py-1 text-right">Diferencia</th>
+                        <th className="py-1 text-right">%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -428,6 +429,13 @@ export default async function InformePage({ params }: { params: { id: string } }
                             }`}
                           >
                             {f.estado === "sin-sire" ? "—" : fmtSoles(f.diferencia)}
+                          </td>
+                          <td
+                            className={`py-1 text-right ${
+                              f.estado === "alerta" ? "text-red-600" : "text-slate-500"
+                            }`}
+                          >
+                            {f.estado === "sin-sire" ? "—" : `${f.porcentaje.toFixed(1)}%`}
                           </td>
                         </tr>
                       ))}

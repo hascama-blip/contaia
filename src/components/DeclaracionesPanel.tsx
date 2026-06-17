@@ -354,6 +354,7 @@ function ComparativoCard({
   eliminando: boolean;
 }) {
   const comp = compararDeclaracionSire(decl, sire);
+  const inconsistencias = comp.filas.filter((f) => f.estado === "alerta");
   return (
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -388,6 +389,7 @@ function ComparativoCard({
             <th className="py-1 text-right">Declarado</th>
             <th className="py-1 text-right">SIRE</th>
             <th className="py-1 text-right">Diferencia</th>
+            <th className="py-1 text-right">%</th>
           </tr>
         </thead>
         <tbody>
@@ -409,10 +411,25 @@ function ComparativoCard({
               >
                 {f.estado === "sin-sire" ? "—" : fmtSoles(f.diferencia)}
               </td>
+              <td
+                className={`py-1 text-right tabular-nums ${
+                  f.estado === "alerta" ? "text-red-600" : "text-slate-400"
+                }`}
+              >
+                {f.estado === "sin-sire" ? "—" : `${f.porcentaje.toFixed(1)}%`}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {sire && inconsistencias.length > 0 && (
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span className="font-semibold">Inconsistencias:</span>{" "}
+          {inconsistencias
+            .map((f) => `${f.concepto} (${f.diferencia > 0 ? "+" : ""}${fmtSoles(f.diferencia)})`)
+            .join(" · ")}
+        </div>
+      )}
     </div>
   );
 }

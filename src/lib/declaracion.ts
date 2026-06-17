@@ -133,23 +133,25 @@ export function compararDeclaracionSire(
 
   function fila(concepto: string, declarado: number, sireVal: number | null) {
     if (sireVal === null) {
-      filas.push({ concepto, declarado, sire: 0, diferencia: 0, estado: "sin-sire" });
+      filas.push({ concepto, declarado, sire: 0, diferencia: 0, porcentaje: 0, estado: "sin-sire" });
       return;
     }
     const diferencia = Math.round((declarado - sireVal) * 100) / 100;
+    const porcentaje = sireVal !== 0 ? Math.round((diferencia / sireVal) * 10000) / 100 : 0;
     filas.push({
       concepto,
       declarado,
       sire: sireVal,
       diferencia,
+      porcentaje,
       estado: Math.abs(diferencia) > UMBRAL_DIFERENCIA ? "alerta" : "ok",
     });
   }
 
-  fila("Ventas · Base imponible", dec.ventasBase, sire ? sire.ventas.baseImponible : null);
-  fila("Ventas · IGV", dec.ventasIgv, sire ? sire.ventas.igv : null);
-  fila("Compras · Base imponible", dec.comprasBase, sire ? sire.compras.baseImponible : null);
-  fila("Compras · IGV", dec.comprasIgv, sire ? sire.compras.igv : null);
+  fila("Ventas netas (base imponible)", dec.ventasBase, sire ? sire.ventas.baseImponible : null);
+  fila("IGV ventas (débito fiscal)", dec.ventasIgv, sire ? sire.ventas.igv : null);
+  fila("Compras netas (base imponible)", dec.comprasBase, sire ? sire.compras.baseImponible : null);
+  fila("IGV compras (crédito fiscal)", dec.comprasIgv, sire ? sire.compras.igv : null);
 
   return {
     periodo: dec.periodo,
