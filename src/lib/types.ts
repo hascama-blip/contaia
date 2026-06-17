@@ -95,19 +95,24 @@ export interface BuzonMensaje {
   fecha: string;
   asunto: string;
   tipo: string;
-  /** true si es resolución de cobranza / valor (urgente). */
+  /** "peligroso" (fiscalización/no contenciosas), "urgente" (cobranza/valores), "otro". */
+  nivel: "peligroso" | "urgente" | "otro";
   urgente: boolean;
   leido: boolean;
 }
 
 export interface BuzonResultado {
   mensajes: BuzonMensaje[];
+  /** Fiscalización y no contenciosas (lo más peligroso). */
+  peligrosos: BuzonMensaje[];
+  /** Cobranza y valores. */
   urgentes: BuzonMensaje[];
   diag?: { pasos: any[] };
 }
 
 /** Buzón persistido en el cliente (para el informe). */
 export interface BuzonResumen {
+  peligrosos: BuzonMensaje[];
   urgentes: BuzonMensaje[];
   totalMensajes: number;
   consultadoAt: string;

@@ -6,7 +6,7 @@ import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
 import { fmtFecha, fmtSoles } from "@/components/ui";
-import type { NivelRiesgo } from "@/lib/types";
+import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -70,12 +70,29 @@ export default async function InformePage({ params }: { params: { id: string } }
 
   // --- Buzón y contingencias ---
   const buzon = cliente.buzon;
+  const peligrosos = buzon?.peligrosos ?? [];
   const urgentes = buzon?.urgentes ?? [];
   const cobranzas = urgentes.filter((m) => m.tipo === "Resolución de Cobranza");
   const valores = urgentes.filter((m) => m.tipo === "Valor");
+  const fiscalizacion = peligrosos.filter((m) => m.tipo === "Fiscalización");
+  const noContenciosas = peligrosos.filter((m) => m.tipo === "No Contenciosa");
 
   type Contingencia = { nivel: NivelRiesgo; titulo: string; detalle: string };
   const contingencias: Contingencia[] = [];
+  if (fiscalizacion.length > 0)
+    contingencias.push({
+      nivel: "critico",
+      titulo: `${fiscalizacion.length} notificación(es) de FISCALIZACIÓN`,
+      detalle:
+        "Procedimiento de fiscalización en curso. Máxima prioridad: responder requerimientos en plazo para evitar reparos y multas.",
+    });
+  if (noContenciosas.length > 0)
+    contingencias.push({
+      nivel: "critico",
+      titulo: `${noContenciosas.length} resolución(es) NO CONTENCIOSA(S)`,
+      detalle:
+        "Incluye ingreso como recaudación de detracciones, devoluciones, etc. Atender con urgencia para no perder fondos/derechos.",
+    });
   if (cobranzas.length > 0)
     contingencias.push({
       nivel: "critico",
@@ -106,19 +123,6 @@ export default async function InformePage({ params }: { params: { id: string } }
       nivel: igvPorPagar > 10000 ? "alto" : "medio",
       titulo: `IGV por pagar acumulado aprox. ${fmtSoles(igvPorPagar)}`,
       detalle: "Verificar provisión y pago oportuno del IGV para evitar multas e intereses.",
-    });
-  // Periodos pasados con registro no presentado (omiso).
-  const hoyPer = new Date();
-  const periodoActual = `${hoyPer.getFullYear()}${String(hoyPer.getMonth() + 1).padStart(2, "0")}`;
-  const omisos = sire.filter(
-    (s) => s.periodo < periodoActual && (!s.presentadoVentas || !s.presentadoCompras)
-  );
-  if (omisos.length > 0)
-    contingencias.push({
-      nivel: "alto",
-      titulo: `${omisos.length} periodo(s) con registro SIRE no presentado`,
-      detalle:
-        "Riesgo de infracción por no generar/presentar el RVIE/RCE en el plazo. Regularizar.",
     });
 
   const NIVEL_PESO: Record<NivelRiesgo, number> = { critico: 4, alto: 3, medio: 2, bajo: 1 };
@@ -273,41 +277,37 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* Buzón electrónico SUNAT (urgentes del mes) */}
+        {/* Buzón electrónico SUNAT (mes en curso) */}
         {buzon && (
           <section className="mt-6">
             <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
-              Buzón electrónico SUNAT — urgentes del mes
+              Buzón electrónico SUNAT — mes en curso
             </h3>
-            <p className="mb-2 text-xs text-slate-500">
-              {urgentes.length} mensaje(s) de cobranza/valores · {buzon.totalMensajes} mensaje(s) revisados ·
-              consultado {fmtFecha(buzon.consultadoAt)}
+            <p className="mb-3 text-xs text-slate-500">
+              {peligrosos.length} más peligroso(s) · {urgentes.length} urgente(s) ·{" "}
+              {buzon.totalMensajes} mensaje(s) revisados · consultado {fmtFecha(buzon.consultadoAt)}
             </p>
-            {urgentes.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin notificaciones de cobranza ni valores en el mes.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
-                    <th className="py-1.5">Fecha</th>
-                    <th className="py-1.5">Categoría</th>
-                    <th className="py-1.5">Asunto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {urgentes.map((m) => (
-                    <tr key={m.id}>
-                      <td className="py-1.5 pr-2 align-top text-slate-500 whitespace-nowrap">{m.fecha}</td>
-                      <td className="py-1.5 pr-2 align-top">
-                        <span className={`badge ${m.tipo === "Resolución de Cobranza" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
-                          {m.tipo || "—"}
-                        </span>
-                      </td>
-                      <td className="py-1.5 text-slate-700">{m.asunto}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {peligrosos.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-bold uppercase text-red-700">
+                  🚨 Más peligroso — fiscalización / no contenciosas
+                </p>
+                <BuzonTabla mensajes={peligrosos} />
+              </div>
+            )}
+            {urgentes.length > 0 && (
+              <div className="mb-1">
+                <p className="mb-1 text-xs font-bold uppercase text-orange-700">
+                  ⚠ Urgente — cobranza / valores
+                </p>
+                <BuzonTabla mensajes={urgentes} />
+              </div>
+            )}
+            {peligrosos.length === 0 && urgentes.length === 0 && (
+              <p className="text-sm text-slate-400">
+                Sin notificaciones de riesgo en el mes en curso.
+              </p>
             )}
           </section>
         )}
@@ -397,8 +397,7 @@ export default async function InformePage({ params }: { params: { id: string } }
                   <th className="py-1.5 text-right">Ventas</th>
                   <th className="py-1.5 text-right">Compras</th>
                   <th className="py-1.5 text-right">Diferencia</th>
-                  <th className="py-1.5 text-center">Ventas (RVIE)</th>
-                  <th className="py-1.5 text-center">Compras (RCE)</th>
+                  <th className="py-1.5 text-right">Origen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -412,11 +411,8 @@ export default async function InformePage({ params }: { params: { id: string } }
                       <td className={`py-1.5 text-right font-medium ${dif >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                         {fmtSoles(dif)}
                       </td>
-                      <td className="py-1.5 text-center">
-                        <EstadoPresentacion ok={s.presentadoVentas} />
-                      </td>
-                      <td className="py-1.5 text-center">
-                        <EstadoPresentacion ok={s.presentadoCompras} />
+                      <td className="py-1.5 text-right text-xs text-slate-400">
+                        {s.fuente === "oficial" ? "SUNAT" : "simulado"}
                       </td>
                     </tr>
                   );
@@ -450,13 +446,32 @@ export default async function InformePage({ params }: { params: { id: string } }
   );
 }
 
-function EstadoPresentacion({ ok }: { ok: boolean }) {
+function BuzonTabla({ mensajes }: { mensajes: BuzonMensaje[] }) {
   return (
-    <span
-      className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
-    >
-      {ok ? "Presentado" : "No presentado"}
-    </span>
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+          <th className="py-1.5">Fecha</th>
+          <th className="py-1.5">Categoría</th>
+          <th className="py-1.5">Asunto</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {mensajes.map((m) => (
+          <tr key={m.id}>
+            <td className="py-1.5 pr-2 align-top whitespace-nowrap text-slate-500">{m.fecha}</td>
+            <td className="py-1.5 pr-2 align-top">
+              <span
+                className={`badge ${m.nivel === "peligroso" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}
+              >
+                {m.tipo || "—"}
+              </span>
+            </td>
+            <td className="py-1.5 text-slate-700">{m.asunto}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

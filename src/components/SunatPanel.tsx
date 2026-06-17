@@ -39,6 +39,7 @@ export default function SunatPanel({
 
   const [sire, setSire] = useState<SireResumen[]>(inicialSire ?? []);
   const [buzon, setBuzon] = useState<BuzonMensaje[] | null>(null);
+  const [peligrosos, setPeligrosos] = useState<BuzonMensaje[]>([]);
   const [urgentes, setUrgentes] = useState<BuzonMensaje[]>([]);
 
   const periodo = `${anio}${String(mes).padStart(2, "0")}`;
@@ -114,6 +115,7 @@ export default function SunatPanel({
         return false;
       }
       setBuzon(data.mensajes ?? []);
+      setPeligrosos(data.peligrosos ?? []);
       setUrgentes(data.urgentes ?? []);
       return true;
     } catch {
@@ -242,11 +244,21 @@ export default function SunatPanel({
       {buzon && (
         <div className="mt-6">
           <h3 className="mb-2 text-sm font-semibold text-slate-700">
-            Buzón electrónico (últimos 15 días)
+            Buzón electrónico (mes en curso)
           </h3>
+          {peligrosos.length > 0 && (
+            <div className="mb-3 rounded-lg border-2 border-red-300 bg-red-50 p-3">
+              <p className="mb-2 text-sm font-bold text-red-700">
+                🚨 {peligrosos.length} MÁS PELIGROSO(S) — fiscalización / no contenciosas
+              </p>
+              <ul className="space-y-2">
+                {peligrosos.map((m) => <MensajeItem key={m.id} m={m} />)}
+              </ul>
+            </div>
+          )}
           {urgentes.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="mb-2 text-sm font-semibold text-red-700">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <p className="mb-2 text-sm font-semibold text-orange-700">
                 ⚠ {urgentes.length} urgente(s) — cobranza / valores
               </p>
               <ul className="space-y-2">
@@ -299,14 +311,6 @@ function Acumulado({ resultados }: { resultados: SireResumen[] }) {
   );
 }
 
-function PresentadoBadge({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <span className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-      {label}: {ok ? "✓ Presentado" : "✕ No presentado"}
-    </span>
-  );
-}
-
 function ResumenCard({ r }: { r: SireResumen }) {
   const ventas = r.ventas.importeTotal;
   const compras = r.compras.importeTotal;
@@ -319,11 +323,6 @@ function ResumenCard({ r }: { r: SireResumen }) {
         <span className={`badge ${r.fuente === "oficial" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
           {r.fuente === "oficial" ? "SUNAT (real)" : "simulado"}
         </span>
-      </div>
-      {/* Estado de presentación del registro por mes */}
-      <div className="mb-3 flex flex-wrap gap-2 text-xs">
-        <PresentadoBadge label="Ventas (RVIE)" ok={r.presentadoVentas} />
-        <PresentadoBadge label="Compras (RCE)" ok={r.presentadoCompras} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Bloque titulo="Ventas (RVIE)" color="bg-emerald-500" total={ventas} pct={(ventas / max) * 100} igv={r.ventas.igv} base={r.ventas.baseImponible} comprobantes={r.ventas.comprobantes} />
@@ -358,13 +357,19 @@ function Bloque({ titulo, color, total, pct, igv, base, comprobantes }: { titulo
 }
 
 function MensajeItem({ m }: { m: BuzonMensaje }) {
+  const badge =
+    m.nivel === "peligroso"
+      ? "bg-red-100 text-red-700"
+      : m.nivel === "urgente"
+        ? "bg-orange-100 text-orange-700"
+        : "bg-slate-100 text-slate-500";
   return (
-    <li className={`rounded-md border p-2 text-sm ${m.urgente ? "border-red-200 bg-white" : "border-slate-200"}`}>
+    <li className="rounded-md border border-slate-200 bg-white p-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-slate-800">{m.asunto || "(sin asunto)"}</span>
-        {m.urgente && <span className="badge shrink-0 bg-red-100 text-red-700">urgente</span>}
+        {m.tipo && <span className={`badge shrink-0 ${badge}`}>{m.tipo}</span>}
       </div>
-      <p className="text-xs text-slate-500">{m.fecha}{m.tipo && <> · {m.tipo}</>}</p>
+      <p className="text-xs text-slate-500">{m.fecha}</p>
     </li>
   );
 }

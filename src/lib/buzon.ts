@@ -47,14 +47,20 @@ function esUrgente(texto: string): boolean {
   return URGENTES.some((k) => t.includes(k));
 }
 
-/** Clasifica el asunto en la categoría urgente que interesa. */
-function categoriaDe(asunto: string): string {
+/** Clasifica el asunto en categoría y nivel de riesgo. */
+function clasificar(asunto: string): { tipo: string; nivel: "peligroso" | "urgente" | "otro" } {
   const t = (asunto || "").toLowerCase();
+  // MÁS PELIGROSO: fiscalización y no contenciosas.
+  if (/fiscalizaci[oó]n|requerimiento|esquela|carta inductiva|carta n|auditor[ií]a|verificaci[oó]n/.test(t))
+    return { tipo: "Fiscalización", nivel: "peligroso" };
+  if (/no contenciosa|ingreso como recaudaci[oó]n|recaudaci[oó]n.*detracci|\brca\b|devoluci[oó]n|reintegro/.test(t))
+    return { tipo: "No Contenciosa", nivel: "peligroso" };
+  // URGENTE: cobranza y valores.
   if (/coactiv|ejecuci[oó]n|cobranza|embargo|medida cautelar/.test(t))
-    return "Resolución de Cobranza";
-  if (/orden de pago|resoluci[oó]n de determinaci[oó]n|resoluci[oó]n de multa|valor|esquela/.test(t))
-    return "Valor";
-  return "";
+    return { tipo: "Resolución de Cobranza", nivel: "urgente" };
+  if (/orden de pago|resoluci[oó]n de determinaci[oó]n|resoluci[oó]n de multa|valor/.test(t))
+    return { tipo: "Valor", nivel: "urgente" };
+  return { tipo: "", nivel: "otro" };
 }
 
 /** Parsea "dd/mm/yyyy [hh:mm:ss]" a Date. */
@@ -140,13 +146,14 @@ function mapearMensajes(body: string): BuzonMensaje[] {
       .trim();
     // fecPublica/fecEnvio son la fecha de notificación; fecVigencia es a futuro.
     const fecha = String(m.fecPublica ?? m.fecEnvio ?? m.fecha ?? "");
-    const categoria = categoriaDe(asunto);
+    const { tipo, nivel } = clasificar(asunto);
     return {
       id: String(m.codMensaje ?? m.numMensaje ?? m.id ?? i),
       fecha,
       asunto,
-      tipo: categoria,
-      urgente: categoria !== "" || esUrgente(asunto),
+      tipo,
+      nivel,
+      urgente: nivel !== "otro",
       leido: false,
     };
   });
@@ -298,7 +305,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
     const primera = await fetchPagina(1);
     pasos.push({ paso: "listNotiMenPag", status: primera.status, respuesta: primera.body.slice(0, 800) });
     if (diagnostico) {
-      return { mensajes: [], urgentes: [], diag: { pasos } };
+      return { mensajes: [], peligrosos: [], urgentes: [], diag: { pasos } };
     }
     if (primera.status !== 200) {
       throw new Error(`No se pudo leer el buzón (estado ${primera.status}). Posible bloqueo o sesión.`);
@@ -327,12 +334,13 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       r = agregar(p.body);
     }
 
-    const urgentes = todas.filter((m) => m.urgente);
-    return { mensajes: todas, urgentes };
+    const peligrosos = todas.filter((m) => m.nivel === "peligroso");
+    const urgentes = todas.filter((m) => m.nivel === "urgente");
+    return { mensajes: todas, peligrosos, urgentes };
   } catch (err) {
     if (diagnostico) {
       pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
-      return { mensajes: [], urgentes: [], diag: { pasos } };
+      return { mensajes: [], peligrosos: [], urgentes: [], diag: { pasos } };
     }
     throw new Error(
       `Buzón: ${err instanceof Error ? err.message : String(err)} (usa Modo diagnóstico para más detalle)`

@@ -25,6 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Persistir los urgentes para el informe (no en modo diagnóstico).
     if (!resultado.diag) {
       await setBuzon(cliente.id, {
+        peligrosos: resultado.peligrosos,
         urgentes: resultado.urgentes,
         totalMensajes: resultado.mensajes.length,
         consultadoAt: new Date().toISOString(),
