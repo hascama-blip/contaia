@@ -16,15 +16,18 @@ import type {
 // completa los montos a mano).
 
 /**
- * Mapa de casillas → concepto. Son los códigos del Formulario 621.
- * ⚠️ AJUSTABLE: confirmar con una constancia real (Modo diagnóstico muestra
- * todas las casillas detectadas). Cuando una concepto agrupa varias casillas
- * (p.ej. compras con distinto destino), se SUMAN.
+ * Mapa de casillas → concepto (Formulario Virtual / PDT 621 IGV-Renta).
+ * Calibrado con constancias reales. Cuando un concepto agrupa varias casillas
+ * (compras con distinto destino), se SUMAN. Si necesitas ajustar, usa el
+ * Modo diagnóstico (muestra todas las casillas detectadas).
+ *   100 = Ventas netas gravadas (base)      · 131 = Total débito fiscal (IGV ventas)
+ *   107/110/113 = Compras nac. gravadas (base por destino)
+ *   108/111/114 = IGV de esas compras (crédito fiscal)
  */
 export const MAPA_CASILLAS = {
-  // Ventas — base imponible gravada y débito fiscal (IGV).
+  // Ventas — base imponible gravada y débito fiscal total (IGV).
   ventasBase: ["100"],
-  ventasIgv: ["101"],
+  ventasIgv: ["131"],
   // Compras — base imponible gravada (varios destinos) y crédito fiscal (IGV).
   comprasBase: ["107", "110", "113"],
   comprasIgv: ["108", "111", "114"],
