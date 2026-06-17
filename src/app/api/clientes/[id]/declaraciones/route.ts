@@ -47,37 +47,96 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ cliente: actualizado, declaracion: decl }, { status: 201 });
   }
 
-  // ---- Leer PDF (multipart) -> borrador ------------------------------------
+  // ---- Leer PDF(s) (multipart) ---------------------------------------------
+  // Acepta uno o varios `file`. Con `autoguardar=true` parsea y GUARDA cada DJ
+  // cuyo periodo se haya detectado (carga en bloque); las que no se detectan se
+  // devuelven como borrador para completar el periodo a mano.
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido" }, { status: 400 });
-  const file = form.get("file");
-  if (!(file instanceof File)) {
+  const files = form.getAll("file").filter((f): f is File => f instanceof File);
+  if (files.length === 0) {
     return NextResponse.json({ error: "Adjunta el PDF de la declaración." }, { status: 400 });
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "El archivo supera 15 MB" }, { status: 400 });
-  }
   const diagnostico = form.get("diagnostico") === "true";
+  const autoguardar = form.get("autoguardar") === "true";
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const texto = await extraerTextoPdf(buffer);
-  if (!texto.trim()) {
+  // Modo revisión (1 archivo, sin autoguardar): devuelve el borrador editable.
+  if (!autoguardar && files.length === 1) {
+    const file = files[0];
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ error: "El archivo supera 15 MB" }, { status: 400 });
+    }
+    const texto = await extraerTextoPdf(Buffer.from(await file.arrayBuffer()));
+    if (!texto.trim()) {
+      return NextResponse.json({
+        borrador: vacio(file.name),
+        sinTexto: true,
+        mensaje:
+          "El PDF no tiene capa de texto (parece un escaneo/imagen). Ingresa los montos a mano.",
+      });
+    }
+    const parsed = parseDeclaracion(texto);
     return NextResponse.json({
-      borrador: vacio(file.name),
-      sinTexto: true,
-      mensaje:
-        "El PDF no tiene capa de texto (parece un escaneo/imagen). Ingresa los montos a mano.",
+      borrador: { ...parsed, fuente: "pdf" as const, archivoNombre: file.name },
+      ...(diagnostico
+        ? { diag: { texto: texto.slice(0, 8000), casillas: parsed.casillas } }
+        : {}),
     });
   }
 
-  const parsed = parseDeclaracion(texto);
-  const borrador = { ...parsed, fuente: "pdf" as const, archivoNombre: file.name };
+  // Carga en bloque (autoguardar): procesa cada PDF.
+  const resultados: any[] = [];
+  let primerDiag: any = null;
+  for (const file of files) {
+    if (file.size > MAX_SIZE) {
+      resultados.push({ archivo: file.name, ok: false, motivo: "Supera 15 MB" });
+      continue;
+    }
+    const texto = await extraerTextoPdf(Buffer.from(await file.arrayBuffer()));
+    if (!texto.trim()) {
+      resultados.push({
+        archivo: file.name,
+        ok: false,
+        motivo: "PDF sin texto (escaneo). Ingrésala manual.",
+        borrador: vacio(file.name),
+      });
+      continue;
+    }
+    const parsed = parseDeclaracion(texto);
+    if (diagnostico && !primerDiag) {
+      primerDiag = { archivo: file.name, texto: texto.slice(0, 8000), casillas: parsed.casillas };
+    }
+    if (!/^\d{6}$/.test(parsed.periodo)) {
+      resultados.push({
+        archivo: file.name,
+        ok: false,
+        motivo: "No se detectó el periodo. Complétalo a mano.",
+        borrador: { ...parsed, fuente: "pdf" as const, archivoNombre: file.name },
+      });
+      continue;
+    }
+    const decl: DeclaracionMensual = {
+      id: newId(),
+      periodo: parsed.periodo,
+      ruc: parsed.ruc,
+      formulario: parsed.formulario,
+      ventasBase: parsed.ventasBase,
+      ventasIgv: parsed.ventasIgv,
+      comprasBase: parsed.comprasBase,
+      comprasIgv: parsed.comprasIgv,
+      casillas: parsed.casillas,
+      fuente: "pdf",
+      archivoNombre: file.name,
+      cargadoAt: new Date().toISOString(),
+    };
+    await addDeclaracion(cliente.id, decl);
+    resultados.push({ archivo: file.name, ok: true, declaracion: decl });
+  }
 
   return NextResponse.json({
-    borrador,
-    ...(diagnostico
-      ? { diag: { texto: texto.slice(0, 8000), casillas: parsed.casillas } }
-      : {}),
+    resultados,
+    guardadas: resultados.filter((r) => r.ok).length,
+    ...(primerDiag ? { diag: primerDiag } : {}),
   });
 }
 

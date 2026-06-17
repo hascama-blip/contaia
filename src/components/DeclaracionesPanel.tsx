@@ -18,7 +18,7 @@ function etiqueta(periodo: string): string {
   return `${MESES[mes - 1] ?? "?"} ${anio}`;
 }
 
-/** Borrador editable de una declaración (antes de guardar). */
+/** Borrador editable (DJ sin periodo detectado o ingreso manual). */
 interface Borrador {
   periodo: string;
   ruc?: string;
@@ -57,24 +57,33 @@ export default function DeclaracionesPanel({
   );
   const sire = inicialSire ?? [];
 
-  const [borrador, setBorrador] = useState<Borrador | null>(null);
+  // DJ subidas a las que no se les detectó el periodo (o ingreso manual): se
+  // completan a mano antes de guardar.
+  const [pendientes, setPendientes] = useState<Borrador[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [nota, setNota] = useState<string | null>(null);
+  const [resumen, setResumen] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const sirePorPeriodo = new Map(sire.map((s) => [s.periodo, s]));
 
-  async function subirPdf(file: File) {
+  function mergeDeclaracion(prev: DeclaracionMensual[], d: DeclaracionMensual) {
+    return [d, ...prev.filter((x) => x.periodo !== d.periodo)].sort((a, b) =>
+      b.periodo.localeCompare(a.periodo)
+    );
+  }
+
+  async function subirArchivos(lista: FileList) {
     setBusy("upload");
     setError(null);
-    setNota(null);
+    setResumen(null);
     setDiag(null);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      Array.from(lista).forEach((f) => fd.append("file", f));
+      fd.append("autoguardar", "true");
       if (diagModo) fd.append("diagnostico", "true");
       const res = await fetch(`/api/clientes/${clienteId}/declaraciones`, {
         method: "POST",
@@ -82,24 +91,48 @@ export default function DeclaracionesPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "No se pudo leer el PDF.");
+        setError(data.error ?? "No se pudieron leer los PDF.");
         return;
       }
       if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-      if (data.sinTexto) setNota(data.mensaje);
-      setBorrador({ ...BORRADOR_VACIO, ...data.borrador });
+
+      const resultados: any[] = data.resultados ?? [];
+      let guardadas = 0;
+      const nuevasPend: Borrador[] = [];
+      const errores: string[] = [];
+      setDeclaraciones((prev) => {
+        let acc = prev;
+        for (const r of resultados) {
+          if (r.ok && r.declaracion) {
+            acc = mergeDeclaracion(acc, r.declaracion);
+            guardadas++;
+          } else if (r.borrador) {
+            nuevasPend.push({ ...BORRADOR_VACIO, ...r.borrador });
+          } else {
+            errores.push(`${r.archivo}: ${r.motivo ?? "error"}`);
+          }
+        }
+        return acc;
+      });
+      setPendientes((prev) => [...prev, ...nuevasPend]);
+
+      const partes = [`✅ ${guardadas} guardada(s)`];
+      if (nuevasPend.length) partes.push(`⚠ ${nuevasPend.length} sin periodo (complétalas)`);
+      if (errores.length) partes.push(`⛔ ${errores.length} con error`);
+      setResumen(partes.join(" · "));
+      if (errores.length) setError(errores.join(" | "));
+      router.refresh();
     } catch {
-      setError("Error de red al subir el PDF.");
+      setError("Error de red al subir los PDF.");
     } finally {
       setBusy(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
 
-  async function guardar() {
-    if (!borrador) return;
-    if (!/^\d{6}$/.test(borrador.periodo)) {
-      setError("Indica el periodo (mes y año) de la declaración.");
+  async function guardarPendiente(idx: number, b: Borrador) {
+    if (!/^\d{6}$/.test(b.periodo)) {
+      setError("Indica el mes y año de esa declaración.");
       return;
     }
     setBusy("save");
@@ -108,18 +141,15 @@ export default function DeclaracionesPanel({
       const res = await fetch(`/api/clientes/${clienteId}/declaraciones`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ declaracion: borrador }),
+        body: JSON.stringify({ declaracion: b }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "No se pudo guardar.");
         return;
       }
-      const d: DeclaracionMensual = data.declaracion;
-      setDeclaraciones((prev) => [d, ...prev.filter((x) => x.periodo !== d.periodo)]);
-      setBorrador(null);
-      setDiag(null);
-      setNota(null);
+      setDeclaraciones((prev) => mergeDeclaracion(prev, data.declaracion));
+      setPendientes((prev) => prev.filter((_, i) => i !== idx));
       router.refresh();
     } finally {
       setBusy(null);
@@ -141,6 +171,9 @@ export default function DeclaracionesPanel({
   }
 
   const trabajando = busy !== null;
+  const conDiferencias = declaraciones.filter((d) =>
+    compararDeclaracionSire(d, sirePorPeriodo.get(d.periodo) ?? null).hayDiferencias
+  ).length;
 
   return (
     <section className="card p-5">
@@ -149,9 +182,9 @@ export default function DeclaracionesPanel({
         <span className="badge bg-slate-100 text-slate-500">PDF · Formulario 621</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Sube el <strong>PDF de la declaración mensual</strong> (con capa de texto, no foto):
-        se lee directo —sin OCR— y se <strong>compara contra el SIRE</strong> del mismo
-        periodo. Confirma los montos antes de guardar.
+        Sube <strong>una o varias DJ</strong> (PDF con capa de texto). Cada una detecta
+        su <strong>periodo</strong> sola, se guarda y se <strong>compara contra el SIRE</strong>
+        {" "}del mismo mes. No necesitas elegir mes ni subirlas de a una.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -159,23 +192,22 @@ export default function DeclaracionesPanel({
           ref={fileRef}
           type="file"
           accept="application/pdf"
+          multiple
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && subirPdf(e.target.files[0])}
+          onChange={(e) => e.target.files?.length && subirArchivos(e.target.files)}
         />
         <button
           className="btn-primary"
           onClick={() => fileRef.current?.click()}
           disabled={trabajando}
         >
-          {busy === "upload" ? "Leyendo…" : "⬆ Subir PDF de declaración"}
+          {busy === "upload" ? "Leyendo…" : "⬆ Subir DJ (una o varias)"}
         </button>
         <button
           className="btn-ghost"
           onClick={() => {
-            setBorrador({ ...BORRADOR_VACIO });
+            setPendientes((prev) => [...prev, { ...BORRADOR_VACIO }]);
             setError(null);
-            setNota(null);
-            setDiag(null);
           }}
           disabled={trabajando}
         >
@@ -191,23 +223,26 @@ export default function DeclaracionesPanel({
         </label>
       </div>
 
+      {resumen && (
+        <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{resumen}</div>
+      )}
       {error && (
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
       )}
-      {nota && (
-        <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{nota}</div>
-      )}
 
-      {/* Borrador editable */}
-      {borrador && (
+      {/* Pendientes: completar periodo (solo si no se detectó) */}
+      {pendientes.map((b, i) => (
         <BorradorForm
-          borrador={borrador}
-          setBorrador={setBorrador}
-          onGuardar={guardar}
-          onCancelar={() => setBorrador(null)}
+          key={i}
+          borrador={b}
+          onChange={(nb) =>
+            setPendientes((prev) => prev.map((x, j) => (j === i ? nb : x)))
+          }
+          onGuardar={() => guardarPendiente(i, b)}
+          onDescartar={() => setPendientes((prev) => prev.filter((_, j) => j !== i))}
           guardando={busy === "save"}
         />
-      )}
+      ))}
 
       {diag && (
         <details className="mt-3" open>
@@ -223,9 +258,18 @@ export default function DeclaracionesPanel({
       {/* Declaraciones guardadas + comparativo */}
       {declaraciones.length > 0 && (
         <div className="mt-5 space-y-3">
-          <h3 className="text-sm font-semibold text-slate-700">
-            Comparativo por periodo ({declaraciones.length})
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">
+              Comparativo por periodo ({declaraciones.length})
+            </h3>
+            {conDiferencias > 0 ? (
+              <span className="badge bg-red-100 text-red-700">
+                {conDiferencias} con diferencias
+              </span>
+            ) : (
+              <span className="badge bg-emerald-100 text-emerald-700">Todo cuadra</span>
+            )}
+          </div>
           {declaraciones.map((d) => (
             <ComparativoCard
               key={d.id}
@@ -243,32 +287,35 @@ export default function DeclaracionesPanel({
 
 function BorradorForm({
   borrador,
-  setBorrador,
+  onChange,
   onGuardar,
-  onCancelar,
+  onDescartar,
   guardando,
 }: {
   borrador: Borrador;
-  setBorrador: (b: Borrador) => void;
+  onChange: (b: Borrador) => void;
   onGuardar: () => void;
-  onCancelar: () => void;
+  onDescartar: () => void;
   guardando: boolean;
 }) {
   const hoy = new Date();
-  const anio = borrador.periodo ? Number(borrador.periodo.slice(0, 4)) : hoy.getFullYear();
-  const mes = borrador.periodo ? Number(borrador.periodo.slice(4, 6)) : hoy.getMonth() + 1;
+  const tienePeriodo = /^\d{6}$/.test(borrador.periodo);
+  const anio = tienePeriodo ? Number(borrador.periodo.slice(0, 4)) : hoy.getFullYear();
+  const mes = tienePeriodo ? Number(borrador.periodo.slice(4, 6)) : hoy.getMonth() + 1;
 
   function setPeriodo(m: number, a: number) {
-    setBorrador({ ...borrador, periodo: `${a}${String(m).padStart(2, "0")}` });
+    onChange({ ...borrador, periodo: `${a}${String(m).padStart(2, "0")}` });
   }
   function setNum(campo: keyof Borrador, v: string) {
-    setBorrador({ ...borrador, [campo]: Number(v) || 0 } as Borrador);
+    onChange({ ...borrador, [campo]: Number(v) || 0 } as Borrador);
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50/40 p-4">
+    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {borrador.fuente === "pdf" ? "Leído del PDF — confirma los montos" : "Ingreso manual"}
+        {borrador.fuente === "pdf"
+          ? `${borrador.archivoNombre ?? "PDF"} — indica el periodo`
+          : "Ingreso manual"}
         {borrador.formulario && <> · Formulario {borrador.formulario}</>}
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -302,17 +349,12 @@ function BorradorForm({
         <NumField label="Compras · Base" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
         <NumField label="Compras · IGV" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
       </div>
-      {borrador.casillas.length > 0 && (
-        <p className="mt-2 text-xs text-slate-400">
-          Casillas detectadas: {borrador.casillas.map((c) => c.codigo).join(", ")}
-        </p>
-      )}
       <div className="mt-3 flex gap-2">
         <button className="btn-primary" onClick={onGuardar} disabled={guardando}>
           {guardando ? "Guardando…" : "Guardar declaración"}
         </button>
-        <button className="btn-ghost" onClick={onCancelar} disabled={guardando}>
-          Cancelar
+        <button className="btn-ghost" onClick={onDescartar} disabled={guardando}>
+          Descartar
         </button>
       </div>
     </div>
