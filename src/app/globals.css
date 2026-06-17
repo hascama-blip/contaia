@@ -63,6 +63,13 @@ body {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  /* Cada cuadro/tarjeta se mantiene ENTERO: nunca el encabezado en una hoja y
+     el cuerpo en otra. Cubre las tarjetas de comparativo, KPIs y hallazgos. */
+  .print-full .rounded-lg,
+  .print-full .rounded-xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .print-full h2,
   .print-full h3 {
     break-after: avoid;
