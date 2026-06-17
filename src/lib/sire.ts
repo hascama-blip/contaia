@@ -433,14 +433,22 @@ function parseTotales(texto: string): SireBloque {
 
   if (esEncabezado) {
     const header = lineas[0].split(delim).map((h) => h.trim().toLowerCase());
-    const matchAll = (re: RegExp) =>
-      header.map((h, i) => (re.test(h) ? i : -1)).filter((i) => i >= 0);
-    // "gravad" cubre "BI Gravado" (compras) y "BI Gravada" (ventas).
-    colsBase = matchAll(/^bi\s*gravad/);
-    colsIgv = matchAll(/^igv\s*\/?\s*ipm/);
-    colTotal = header.findIndex((h) => /^total\s*cp/.test(h));
+    // No deben contar como BASE GRAVADA: no gravadas, exonerado, inafecto,
+    // exportación, ni "Valor Adq. NG" (compras no gravadas).
+    const noGravable = /no\s*gravad|exoner|inafect|export|adq\.?\s*ng/;
+    // Base imponible gravada: cualquier columna con "gravad"/"gravada" que NO
+    // sea IGV ni una categoría no gravable. Cubre "BI Gravado DG" (compras),
+    // "BI Gravada" / "Base Imponible Gravada" (ventas), DG/DGNG/DNG, etc.
+    colsBase = header
+      .map((h, i) => (/gravad/.test(h) && !/igv|ipm/.test(h) && !noGravable.test(h) ? i : -1))
+      .filter((i) => i >= 0);
+    // IGV: toda columna que mencione IGV o IPM.
+    colsIgv = header
+      .map((h, i) => (/igv|ipm/.test(h) ? i : -1))
+      .filter((i) => i >= 0);
+    colTotal = header.findIndex((h) => /total\s*cp|importe\s*total/.test(h));
     // Compras: "Valor Adq. NG"; ventas: exonerado/inafecto.
-    colInaf = header.findIndex((h) => /valor\s*adq.*ng|exonerado|inafecto/.test(h));
+    colInaf = header.findIndex((h) => /valor\s*adq.*ng|exonerad|inafect/.test(h));
     colDocs = header.findIndex((h) => /total\s*documentos/.test(h));
     filas = lineas.slice(1);
   } else {
