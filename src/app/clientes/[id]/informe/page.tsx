@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCliente } from "@/lib/db";
 import { generarDiagnostico } from "@/lib/diagnostico";
 import { compararDeclaracionSire } from "@/lib/declaracion";
+import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
@@ -44,6 +45,10 @@ export default async function InformePage({ params }: { params: { id: string } }
   );
   const totalDeclaraciones = declaraciones.length;
   const periodosConDiferencia = comparativos.filter((c) => c.hayDiferencias).length;
+
+  // Comparativo de DJ anuales (Formulario 710), año vs año.
+  const declAnuales = cliente.declaracionesAnuales ?? [];
+  const compAnual = declAnuales.length >= 2 ? compararAnual(declAnuales) : null;
   // Acumulados de TODOS los periodos consultados (ventas/compras SUNAT).
   const ventasAcum = sire.reduce((a, s) => a + s.ventas.importeTotal, 0);
   const comprasAcum = sire.reduce((a, s) => a + s.compras.importeTotal, 0);
@@ -447,6 +452,56 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
+        {/* DJ Anual — comparativo año vs año (Formulario 710) */}
+        {compAnual && (
+          <section className="mt-6 print-full">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              DJ Anual — comparativo año vs año
+            </h3>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {compAnual.cuadre.map((c) => (
+                <span
+                  key={c.ejercicio}
+                  className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                    c.cuadra ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {c.ejercicio}: {c.cuadra ? "Balance cuadra" : `No cuadra (dif. ${fmtInt(c.diferencia)})`}
+                </span>
+              ))}
+            </div>
+
+            {compAnual.observaciones.length > 0 && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="mb-1 text-xs font-bold uppercase text-amber-700">Observaciones — variaciones importantes</p>
+                <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-700">
+                  {compAnual.observaciones.map((o, i) => (
+                    <li key={i}>{o}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Estados Financieros</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <MiniTablaInforme titulo="Activo" filas={compAnual.activo} ejercicios={compAnual.ejercicios} />
+              <div className="space-y-3">
+                <MiniTablaInforme titulo="Pasivo" filas={compAnual.pasivo} ejercicios={compAnual.ejercicios} />
+                <MiniTablaInforme titulo="Patrimonio" filas={compAnual.patrimonio} ejercicios={compAnual.ejercicios} />
+              </div>
+            </div>
+
+            <p className="mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">Estado de Resultados</p>
+            {compAnual.resultadosVacio ? (
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No se registraron movimientos: no hubo operaciones en el año.
+              </p>
+            ) : (
+              <MiniTablaInforme titulo="" filas={compAnual.resultados} ejercicios={compAnual.ejercicios} />
+            )}
+          </section>
+        )}
+
         {/* Compras y Ventas (SIRE) */}
         {cliente.sire && cliente.sire.length > 0 && (
           <section className="mt-6">
@@ -509,6 +564,71 @@ export default async function InformePage({ params }: { params: { id: string } }
           </p>
         </footer>
       </article>
+    </div>
+  );
+}
+
+function fmtInt(n: number): string {
+  const abs = Math.abs(Math.round(n)).toLocaleString("es-PE");
+  return n < 0 ? `(${abs})` : abs;
+}
+
+function MiniTablaInforme({
+  titulo,
+  filas,
+  ejercicios,
+}: {
+  titulo: string;
+  filas: import("@/lib/declaracionAnual").FilaAnual[];
+  ejercicios: string[];
+}) {
+  if (filas.length === 0) return null;
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200">
+      {titulo && (
+        <div className="bg-brand-700 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+          {titulo}
+        </div>
+      )}
+      <table className="w-full text-[10px]">
+        <thead>
+          <tr className="bg-slate-50 text-right text-[9px] uppercase text-slate-400">
+            <th className="px-2 py-1 text-left">Concepto</th>
+            {ejercicios.map((y) => (
+              <th key={y} className="px-2 py-1">{y}</th>
+            ))}
+            <th className="px-2 py-1">Var.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr
+              key={f.codigo}
+              className={`border-t border-slate-100 ${
+                f.esTotal ? "bg-brand-50 font-bold text-brand-900" : f.resaltar ? "bg-amber-50" : ""
+              }`}
+            >
+              <td className="px-2 py-1 text-left text-slate-600">
+                {f.resaltar && !f.esTotal && "🔶 "}
+                {f.etiqueta}
+              </td>
+              {ejercicios.map((y) => (
+                <td key={y} className="px-2 py-1 text-right tabular-nums text-slate-700">
+                  {fmtInt(f.valores[y] ?? 0)}
+                </td>
+              ))}
+              <td
+                className={`px-2 py-1 text-right tabular-nums ${
+                  f.variacion > 0 ? "text-emerald-600" : f.variacion < 0 ? "text-red-600" : "text-slate-300"
+                }`}
+              >
+                {f.variacion > 0 ? "+" : ""}
+                {fmtInt(f.variacion)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
