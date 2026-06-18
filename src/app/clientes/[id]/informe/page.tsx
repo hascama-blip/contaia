@@ -531,36 +531,43 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
-        {/* Deudas tributarias */}
+        {/* Deudas tributarias (agrupadas por sección F36) */}
         {deudas.length > 0 && (
           <section className="mt-6 print-full">
             <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
               Deudas tributarias
             </h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase text-slate-400">
-                  <th className="py-1">Tipo</th>
-                  <th className="py-1">Detalle</th>
-                  <th className="py-1">Periodo</th>
-                  <th className="py-1 text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deudas.map((x) => (
-                  <tr key={x.id} className="border-t border-slate-100">
-                    <td className="py-1 font-medium text-slate-700">{x.tipo}</td>
-                    <td className="py-1 text-slate-600">{x.descripcion || "—"}{x.entidad ? ` · ${x.entidad}` : ""}</td>
-                    <td className="py-1 text-slate-500">{x.periodo || "—"}</td>
-                    <td className="py-1 text-right font-semibold text-red-600">{fmtSoles(x.monto)}</td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-slate-200 font-bold">
-                  <td className="py-1" colSpan={3}>TOTAL DEUDA</td>
-                  <td className="py-1 text-right text-red-700">{fmtSoles(totalDeuda)}</td>
-                </tr>
-              </tbody>
-            </table>
+            {Array.from(
+              deudas.reduce((map, d) => {
+                const k = d.seccion || "Sin sección";
+                if (!map.has(k)) map.set(k, [] as typeof deudas);
+                map.get(k)!.push(d);
+                return map;
+              }, new Map<string, typeof deudas>())
+            ).map(([seccion, lista]) => {
+              const sub = lista.reduce((a, x) => a + x.monto, 0);
+              return (
+                <div key={seccion} className="mb-3 overflow-hidden rounded-lg border border-slate-200">
+                  <div className="flex items-center justify-between bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">
+                    <span>{seccion}</span>
+                    <span>{fmtSoles(sub)}</span>
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {lista.map((x) => (
+                        <tr key={x.id} className="border-t border-slate-100">
+                          <td className="px-3 py-1 font-medium text-slate-700">{x.tipo}</td>
+                          <td className="px-3 py-1 text-slate-500">{x.periodo || "—"}</td>
+                          <td className="px-3 py-1 text-slate-400">{x.numero || ""}</td>
+                          <td className="px-3 py-1 text-right font-semibold text-red-600">{fmtSoles(x.monto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+            <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA: {fmtSoles(totalDeuda)}</p>
           </section>
         )}
 

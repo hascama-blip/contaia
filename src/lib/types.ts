@@ -89,8 +89,14 @@ export interface Cliente {
 /** Deuda tributaria detectada/indicada (foto con OCR o ingreso manual). */
 export interface Deuda {
   id: string;
-  /** Tipo: "Cobranza coactiva", "Multa", "IGV", "Renta", etc. */
+  /** Tipo / concepto: "Renta - Regulariz. Pers. Jur.", "Multa", etc. */
   tipo: string;
+  /** Sección del F36: Valores, Autoliquidadas, Otras deudas, No acogibles. */
+  seccion?: string;
+  /** Código de tributo (p. ej. 3081, 3121). */
+  codigoTributo?: string;
+  /** N° de valor / orden / documento. */
+  numero?: string;
   descripcion: string;
   monto: number;
   /** Periodo libre, p. ej. "03/2024" o "2023". */

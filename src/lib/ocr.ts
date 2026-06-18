@@ -20,6 +20,84 @@ export async function ocrImagen(buffer: Buffer, mimeType: string): Promise<strin
   }
 }
 
+/** OCR de varias imágenes reutilizando un solo worker (más rápido). */
+export async function ocrVarias(buffers: Buffer[]): Promise<string[]> {
+  try {
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("spa");
+    const out: string[] = [];
+    for (const b of buffers) {
+      try {
+        const { data } = await worker.recognize(b);
+        out.push(data.text ?? "");
+      } catch {
+        out.push("");
+      }
+    }
+    await worker.terminate();
+    return out;
+  } catch (err) {
+    console.error("[OCR] Error en lote:", err);
+    return buffers.map(() => "");
+  }
+}
+
+/** Una fila de deuda extraída de una tabla del F36. */
+export interface FilaDeudaOCR {
+  seccion: string;
+  tipo: string;
+  codigoTributo?: string;
+  numero?: string;
+  periodo?: string;
+  monto: number;
+}
+
+/**
+ * Detecta a qué pestaña/sección del F36 pertenece la captura, por columnas
+ * exclusivas (no por el rótulo de la pestaña, que aparece en todas).
+ */
+export function detectarSeccionF36(texto: string): string {
+  const u = texto.toUpperCase();
+  if (/MOTIVO|NO\s*ACOGIBLE/.test(u) && /MOTIVO/.test(u)) return "Deudas no acogibles";
+  if (/TRIBUTO\s*ADEUDADO/.test(u)) return "Otras deudas";
+  if (/SUSTENTATORIO|RELIQUIDAD/.test(u)) return "Deudas autoliquidadas/reliquidadas";
+  if (/N[UÚ]MERO\s*DE\s*VALOR|DEUDA\s*A\s*ACOGERSE/.test(u)) return "Valores";
+  return "";
+}
+
+/**
+ * Parsea las FILAS de la tabla del F36: cada fila trae el periodo y el monto en
+ * la misma línea. Devuelve una deuda por fila, clasificada por sección.
+ */
+export function parseFilasDeudaF36(texto: string): FilaDeudaOCR[] {
+  const seccion = detectarSeccionF36(texto);
+  const filas: FilaDeudaOCR[] = [];
+  for (const raw of texto.split(/\r?\n/)) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    if (!line) continue;
+    const per = line.match(/\b(\d{1,2}\/\d{4})\b/); // periodo MM/AAAA (incl. 13/AAAA)
+    const montos = [...line.matchAll(/\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\b/g)].map((m) => m[0]);
+    if (!per || montos.length === 0) continue;
+    const monto = normalizarMonto(montos[montos.length - 1]);
+    if (!(monto > 0)) continue;
+    const cod = line.match(/\b(\d{4})\b/); // código tributario
+    const num = line.match(/\b(\d{9,})\b/); // N° de valor / orden / documento
+    let desc = line.replace(per[0], "");
+    if (num) desc = desc.replace(num[0], "");
+    for (const mm of montos) desc = desc.replace(mm, "");
+    desc = desc.replace(/\s+/g, " ").replace(/^[-|.\s]+|[-|.\s]+$/g, "").trim();
+    filas.push({
+      seccion,
+      tipo: desc.slice(0, 90) || "Deuda",
+      codigoTributo: cod?.[1],
+      numero: num?.[1],
+      periodo: per[1],
+      monto,
+    });
+  }
+  return filas;
+}
+
 export interface ExtraccionDeuda {
   /** Montos detectados (mayor a menor). */
   montos: number[];
