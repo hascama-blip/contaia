@@ -66,9 +66,35 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Héroe corporativo */}
+      <section className="hero-gradient relative overflow-hidden rounded-3xl p-7 text-white shadow-lg">
+        <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
+        <div className="absolute -bottom-16 left-1/3 h-48 w-48 rounded-full bg-white/10" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
+              Plataforma de diagnóstico tributario SUNAT
+            </span>
+            <h1 className="mt-3 text-3xl font-bold leading-tight">
+              Hola, controla la salud tributaria de tu cartera
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-white/85">
+              Consulta RUC, SIRE, buzón y declaraciones, y genera el informe de
+              gerencia de cada cliente en minutos.
+            </p>
+          </div>
+          <Link
+            href="/clientes/nuevo"
+            className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-md transition hover:bg-brand-50"
+          >
+            + Nuevo cliente
+          </Link>
+        </div>
+      </section>
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+          <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
           <p className="text-sm text-slate-500">
             Estado tributario de tu cartera de clientes.
           </p>
@@ -79,6 +105,14 @@ export default async function DashboardPage() {
           SUNAT: {MODO_LABEL[modo]}
         </span>
       </div>
+
+      {total === 0 && (
+        <section className="grid gap-3 sm:grid-cols-3">
+          <PasoHome n="1" titulo="Crea el cliente" detalle="Ingresa el RUC y trae sus datos de SUNAT al instante." />
+          <PasoHome n="2" titulo="Extrae su información" detalle="SIRE (compras/ventas), buzón y declaraciones mensuales." />
+          <PasoHome n="3" titulo="Genera el informe" detalle="Diagnóstico, contingencias e informe de gerencia en PDF." />
+        </section>
+      )}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Stat label="Clientes" value={total} />
@@ -140,6 +174,18 @@ export default async function DashboardPage() {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function PasoHome({ n, titulo, detalle }: { n: string; titulo: string; detalle: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="step-num">{n}</span>
+        <p className="font-semibold text-slate-800">{titulo}</p>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{detalle}</p>
     </div>
   );
 }

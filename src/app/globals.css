@@ -18,7 +18,10 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700;
+  }
+  .btn-accent {
+    @apply btn bg-accent-500 text-white shadow-sm hover:bg-accent-600;
   }
   .btn-ghost {
     @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
@@ -31,6 +34,18 @@ body {
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  /* Fondo corporativo con degradado azul → cian para héroes y cabeceras. */
+  .hero-gradient {
+    @apply bg-gradient-to-br from-brand-800 via-brand-600 to-accent-500;
+  }
+  /* Texto con degradado (títulos llamativos). */
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-700 to-accent-500 bg-clip-text text-transparent;
+  }
+  /* Número de paso en el "cómo funciona". */
+  .step-num {
+    @apply grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-accent-500 text-base font-bold text-white shadow-md;
   }
 }
 

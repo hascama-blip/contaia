@@ -96,14 +96,40 @@ export default function NuevoClientePage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
-      <h1 className="text-2xl font-bold text-slate-800">Nuevo cliente</h1>
-      <form onSubmit={submit} className="card space-y-4 p-6">
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Héroe corporativo */}
+      <section className="hero-gradient relative overflow-hidden rounded-3xl p-7 text-white shadow-lg">
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+        <div className="absolute -bottom-12 -left-6 h-40 w-40 rounded-full bg-white/10" />
+        <div className="relative">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
+            🔎 Consulta SUNAT en segundos
+          </span>
+          <h1 className="mt-3 text-3xl font-bold leading-tight">
+            Diagnóstico tributario de tu cliente
+          </h1>
+          <p className="mt-2 max-w-lg text-sm text-white/85">
+            Escribe el <strong>RUC</strong> y la plataforma trae los datos de SUNAT,
+            su SIRE, buzón y declaraciones para darte un diagnóstico claro.
+          </p>
+        </div>
+      </section>
+
+      {/* Cómo funciona: 3 pasos simples */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Paso n="1" titulo="Ingresa el RUC" detalle="Trae razón social y estado SUNAT automáticamente." />
+        <Paso n="2" titulo="Extrae su info" detalle="SIRE (compras/ventas), buzón y declaraciones." />
+        <Paso n="3" titulo="Obtén el informe" detalle="Diagnóstico, contingencias e informe de gerencia." />
+      </section>
+
+      <form onSubmit={submit} className="card space-y-4 p-6 shadow-md">
         <div>
-          <label className="label">RUC *</label>
+          <label className="label text-base font-semibold text-slate-700">
+            RUC del cliente
+          </label>
           <div className="flex gap-2">
             <input
-              className="input"
+              className="input flex-1 rounded-xl border-2 border-brand-100 py-3 text-lg font-semibold tracking-wide focus:border-brand-500"
               value={form.ruc}
               onChange={(e) => setRuc(e.target.value)}
               onKeyDown={(e) => {
@@ -118,7 +144,7 @@ export default function NuevoClientePage() {
             />
             <button
               type="button"
-              className="btn-ghost shrink-0"
+              className="btn-accent shrink-0 px-5 text-base"
               onClick={buscarRuc}
               disabled={buscando}
             >
@@ -199,11 +225,23 @@ export default function NuevoClientePage() {
           >
             Cancelar
           </button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "Guardando…" : "Crear cliente"}
+          <button type="submit" className="btn-primary px-6" disabled={loading}>
+            {loading ? "Guardando…" : "Crear cliente →"}
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function Paso({ n, titulo, detalle }: { n: string; titulo: string; detalle: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-200 hover:shadow-md">
+      <div className="flex items-center gap-3">
+        <span className="step-num">{n}</span>
+        <p className="font-semibold text-slate-800">{titulo}</p>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{detalle}</p>
     </div>
   );
 }
