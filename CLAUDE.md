@@ -35,7 +35,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   montos pegados al código tipo `78736359`). Detecta ejercicio (RENTA ANUAL YYYY / periodo
   YYYY13), RUC y razón social; resalta variaciones grandes como observaciones y avisa si el
   RUC del PDF ≠ el del cliente (posible cruce). `MAPA CASILLAS_710` (en el archivo) es ajustable.
+- `src/lib/ocr.ts` — **OCR (tesseract.js)** para fotos de **deudas tributarias**: extrae texto,
+  montos, claves y sugiere tipo de deuda. Panel `DeudasPanel.tsx`, ruta `deudas/route.ts`,
+  entidad `Deuda` en types/db. (El OCR se reintrodujo solo para deudas; las DJ siguen por unpdf.)
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
+- El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
+  buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
 - `src/components/SunatPanel.tsx` — panel unificado (credenciales 1 vez): SIRE + buzón, "Extraer todo".
 - `src/components/DeclaracionesPanel.tsx` — subir PDF de declaración → confirmar montos → comparar vs SIRE.
 - `src/app/clientes/[id]/informe/page.tsx` — informe imprimible (dashboard, contingencias, buzón, SIRE, declaración vs SIRE).

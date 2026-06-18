@@ -4,7 +4,7 @@ const nextConfig = {
   // Paquetes que deben quedar como externos del servidor (usan binarios/ESM
   // pesados): unpdf (pdf.js) para leer PDFs, y el navegador headless del buzón.
   experimental: {
-    serverComponentsExternalPackages: ["unpdf", "playwright-core", "@sparticuz/chromium"],
+    serverComponentsExternalPackages: ["unpdf", "tesseract.js", "playwright-core", "@sparticuz/chromium"],
   },
 };
 

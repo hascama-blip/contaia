@@ -82,6 +82,25 @@ export interface Cliente {
   declaraciones: DeclaracionMensual[];
   /** Declaraciones juradas ANUALES (Formulario 710) para comparar año vs año. */
   declaracionesAnuales: DeclaracionAnual[];
+  /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
+  deudas: Deuda[];
+}
+
+/** Deuda tributaria detectada/indicada (foto con OCR o ingreso manual). */
+export interface Deuda {
+  id: string;
+  /** Tipo: "Cobranza coactiva", "Multa", "IGV", "Renta", etc. */
+  tipo: string;
+  descripcion: string;
+  monto: number;
+  /** Periodo libre, p. ej. "03/2024" o "2023". */
+  periodo?: string;
+  /** Entidad acreedora (SUNAT, EsSalud…). */
+  entidad?: string;
+  fuente: "ocr" | "manual";
+  /** Texto crudo del OCR (para referencia). */
+  ocrTexto?: string;
+  creadoAt: string;
 }
 
 /**

@@ -10,6 +10,7 @@ import type {
   BuzonResumen,
   DeclaracionMensual,
   DeclaracionAnual,
+  Deuda,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -45,6 +46,7 @@ async function readStore(): Promise<Store> {
       if (c.buzon === undefined) c.buzon = null;
       if (!Array.isArray(c.declaraciones)) c.declaraciones = [];
       if (!Array.isArray(c.declaracionesAnuales)) c.declaracionesAnuales = [];
+      if (!Array.isArray(c.deudas)) c.deudas = [];
     }
     return store;
   } catch {
@@ -93,6 +95,7 @@ export async function createCliente(data: {
     buzon: null,
     declaraciones: [],
     declaracionesAnuales: [],
+    deudas: [],
   };
   store.clientes.push(cliente);
   await writeStore(store);
@@ -231,6 +234,25 @@ export async function deleteDeclaracionAnual(
   cliente.declaracionesAnuales = (cliente.declaracionesAnuales ?? []).filter(
     (d) => d.id !== declId
   );
+  await writeStore(store);
+  return cliente;
+}
+
+export async function addDeuda(clienteId: string, deuda: Deuda): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  if (!Array.isArray(cliente.deudas)) cliente.deudas = [];
+  cliente.deudas.unshift(deuda);
+  await writeStore(store);
+  return cliente;
+}
+
+export async function deleteDeuda(clienteId: string, deudaId: string): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.deudas = (cliente.deudas ?? []).filter((d) => d.id !== deudaId);
   await writeStore(store);
   return cliente;
 }

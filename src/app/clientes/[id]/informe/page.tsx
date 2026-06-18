@@ -49,6 +49,35 @@ export default async function InformePage({ params }: { params: { id: string } }
   // Comparativo de DJ anuales (Formulario 710), año vs año.
   const declAnuales = cliente.declaracionesAnuales ?? [];
   const compAnual = declAnuales.length >= 2 ? compararAnual(declAnuales) : null;
+
+  // Deudas tributarias (fotos OCR / manual).
+  const deudas = cliente.deudas ?? [];
+  const totalDeuda = deudas.reduce((a, x) => a + x.monto, 0);
+  const nPeligrosos = cliente.buzon?.peligrosos?.length ?? 0;
+  const nUrgentes = cliente.buzon?.urgentes?.length ?? 0;
+
+  // Detalle de observaciones para la toma de decisiones (consolidado).
+  const observacionesFinal: { texto: string; nivel: "alto" | "medio" | "info" }[] = [];
+  if (sunat && sunat.estado.toUpperCase() !== "ACTIVO")
+    observacionesFinal.push({ nivel: "alto", texto: `Contribuyente no ACTIVO en SUNAT (${sunat.estado}). Regularizar el RUC.` });
+  if (sunat && sunat.condicion.toUpperCase() !== "HABIDO")
+    observacionesFinal.push({ nivel: "alto", texto: `Condición de domicilio: ${sunat.condicion}. Actualizar para volver a HABIDO.` });
+  if (totalDeuda > 0)
+    observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias registradas por ${fmtSoles(totalDeuda)} (${deudas.length} concepto(s)). Evaluar pago o fraccionamiento.` });
+  if (nPeligrosos > 0)
+    observacionesFinal.push({ nivel: "alto", texto: `Buzón SOL: ${nPeligrosos} mensaje(s) de fiscalización / procedimientos no contenciosos. Atención inmediata.` });
+  if (nUrgentes > 0)
+    observacionesFinal.push({ nivel: "medio", texto: `Buzón SOL: ${nUrgentes} mensaje(s) de cobranza / valores. Revisar y responder.` });
+  if (periodosConDiferencia > 0)
+    observacionesFinal.push({ nivel: "medio", texto: `${periodosConDiferencia} periodo(s) con diferencias entre la declaración mensual y el SIRE. Conciliar.` });
+  if (compAnual) {
+    for (const c of compAnual.cuadre.filter((c) => !c.cuadra))
+      observacionesFinal.push({ nivel: "medio", texto: `Balance ${c.ejercicio}: no cuadra (dif. ${fmtSoles(c.diferencia)}). Revisar Estados Financieros.` });
+    for (const o of compAnual.observaciones.slice(0, 4))
+      observacionesFinal.push({ nivel: "info", texto: `DJ anual — ${o}` });
+  }
+  for (const h of d.hallazgos.filter((h) => h.severidad === "alto" || h.severidad === "critico"))
+    observacionesFinal.push({ nivel: "alto", texto: h.titulo });
   // Acumulados de TODOS los periodos consultados (ventas/compras SUNAT).
   const ventasAcum = sire.reduce((a, s) => a + s.ventas.importeTotal, 0);
   const comprasAcum = sire.reduce((a, s) => a + s.compras.importeTotal, 0);
@@ -502,6 +531,39 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
+        {/* Deudas tributarias */}
+        {deudas.length > 0 && (
+          <section className="mt-6 print-full">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Deudas tributarias
+            </h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase text-slate-400">
+                  <th className="py-1">Tipo</th>
+                  <th className="py-1">Detalle</th>
+                  <th className="py-1">Periodo</th>
+                  <th className="py-1 text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deudas.map((x) => (
+                  <tr key={x.id} className="border-t border-slate-100">
+                    <td className="py-1 font-medium text-slate-700">{x.tipo}</td>
+                    <td className="py-1 text-slate-600">{x.descripcion || "—"}{x.entidad ? ` · ${x.entidad}` : ""}</td>
+                    <td className="py-1 text-slate-500">{x.periodo || "—"}</td>
+                    <td className="py-1 text-right font-semibold text-red-600">{fmtSoles(x.monto)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-slate-200 font-bold">
+                  <td className="py-1" colSpan={3}>TOTAL DEUDA</td>
+                  <td className="py-1 text-right text-red-700">{fmtSoles(totalDeuda)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
+
         {/* Compras y Ventas (SIRE) */}
         {cliente.sire && cliente.sire.length > 0 && (
           <section className="mt-6">
@@ -554,6 +616,41 @@ export default async function InformePage({ params }: { params: { id: string } }
               <li key={i}>{r}</li>
             ))}
           </ol>
+        </section>
+
+        {/* Detalle de observaciones para la toma de decisiones */}
+        <section className="mt-6 print-full">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">
+            Observaciones para la toma de decisiones
+          </h3>
+          {observacionesFinal.length === 0 ? (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
+              No se detectaron observaciones críticas. Mantener al día declaraciones y pagos.
+            </p>
+          ) : (
+            <ol className="space-y-2">
+              {observacionesFinal.map((o, i) => (
+                <li
+                  key={i}
+                  className={`flex gap-3 rounded-lg border-l-4 p-3 text-sm ${
+                    o.nivel === "alto"
+                      ? "border-l-red-500 bg-red-50 text-slate-700"
+                      : o.nivel === "medio"
+                        ? "border-l-amber-500 bg-amber-50 text-slate-700"
+                        : "border-l-brand-400 bg-brand-50 text-slate-700"
+                  }`}
+                >
+                  <span className="font-bold text-slate-400">{i + 1}.</span>
+                  <span>
+                    {o.texto}
+                    <span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">
+                      [{o.nivel === "alto" ? "prioridad alta" : o.nivel === "medio" ? "prioridad media" : "informativo"}]
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">

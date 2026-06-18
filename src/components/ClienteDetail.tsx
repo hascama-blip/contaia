@@ -7,6 +7,7 @@ import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
+import DeudasPanel from "./DeudasPanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -182,6 +183,9 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             clienteRuc={cliente.ruc}
             inicial={cliente.declaracionesAnuales ?? []}
           />
+
+          {/* Deudas tributarias (foto con OCR o ingreso manual) */}
+          <DeudasPanel clienteId={cliente.id} inicial={cliente.deudas ?? []} />
         </div>
 
         {/* Columna derecha: diagnóstico */}
