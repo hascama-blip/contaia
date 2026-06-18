@@ -47,6 +47,10 @@ body {
   .step-num {
     @apply grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-accent-300 to-accent-500 text-base font-bold text-brand-900 shadow-md;
   }
+  /* Título de sección del informe: azul marino con barra dorada. */
+  .sec-h {
+    @apply mb-2 flex items-center gap-2 border-l-4 border-accent-400 pl-2 text-sm font-bold uppercase tracking-wide text-brand-700;
+  }
 }
 
 /* Estilos de impresión para el informe del cliente */
@@ -55,6 +59,13 @@ body {
 }
 
 @media print {
+  /* Imprime los fondos/colores de marca (por defecto el navegador los quita). */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   .no-print {
     display: none !important;
   }
@@ -72,21 +83,19 @@ body {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  /* El resto fluye, pero sin cortar a la mitad ítems, filas ni separar títulos. */
+  /* Bloques pequeños no se parten; las tablas grandes FLUYEN por filas (sin
+     dejar hojas en blanco). */
   .print-full li,
-  .print-full tr {
+  .print-full tr,
+  .evitar-corte {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  /* Cada cuadro/tarjeta se mantiene ENTERO: nunca el encabezado en una hoja y
-     el cuerpo en otra. Cubre las tarjetas de comparativo, KPIs y hallazgos. */
-  .print-full .rounded-lg,
-  .print-full .rounded-xl {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  /* Ningún título queda solo al final de una hoja: se queda con su contenido. */
   .print-full h2,
-  .print-full h3 {
+  .print-full h3,
+  .sec-h,
+  .rompe-no {
     break-after: avoid;
     page-break-after: avoid;
   }

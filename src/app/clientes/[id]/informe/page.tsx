@@ -195,32 +195,34 @@ export default async function InformePage({ params }: { params: { id: string } }
         <PrintButton />
       </div>
 
-      <article className="card print-full p-8">
-        {/* Cabecera */}
-        <header className="flex items-start justify-between border-b border-slate-200 pb-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-700 text-sm font-bold text-white">
+      <article className="card print-full overflow-hidden p-0">
+        {/* Membrete corporativo */}
+        <header className="evitar-corte">
+          <div className="hero-gradient flex items-start justify-between p-6 text-white">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-lg font-bold text-white ring-1 ring-white/30">
                 A
               </span>
-              <span className="text-xl font-bold tracking-tight">
-                <span className="text-brand-700">ASENCO</span>
-                <span className="text-slate-900">IA</span>
-              </span>
+              <div>
+                <p className="text-xl font-bold tracking-tight">
+                  <span className="text-white">ASENCO</span>
+                  <span className="text-accent-300">IA</span>
+                </p>
+                <p className="text-xs text-white/80">Informe de gerencia · Diagnóstico tributario SUNAT</p>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Informe de gerencia · Diagnóstico tributario
-            </p>
+            <div className="text-right text-xs text-white/80">
+              <p>Emitido: {fmtFecha(d.generatedAt)}</p>
+              <p>Documento confidencial</p>
+            </div>
           </div>
-          <div className="text-right text-xs text-slate-500">
-            <p>Emitido: {fmtFecha(d.generatedAt)}</p>
-            <p>Documento confidencial</p>
-          </div>
+          <div className="h-1.5 bg-accent-400" />
         </header>
 
+        <div className="p-8 pt-6">
         {/* Datos del cliente */}
-        <section className="mt-6">
-          <h2 className="text-lg font-bold text-slate-800">{cliente.razonSocial}</h2>
+        <section className="evitar-corte rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h2 className="text-lg font-bold text-brand-800">{cliente.razonSocial}</h2>
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-slate-600">
             <p><span className="text-slate-400">RUC:</span> {cliente.ruc}</p>
             <p><span className="text-slate-400">Email:</span> {cliente.email || "—"}</p>
@@ -304,7 +306,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Contingencias y alertas */}
         <section className="mt-6">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+          <h3 className="sec-h">
             Contingencias y alertas
           </h3>
           {contingencias.length === 0 ? (
@@ -331,7 +333,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* Buzón electrónico SUNAT (mes en curso) */}
         {buzon && (
           <section className="mt-6">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="sec-h">
               Buzón electrónico SUNAT — mes en curso
             </h3>
             <p className="mb-3 text-xs text-slate-500">
@@ -365,7 +367,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Situación SUNAT */}
         <section className="mt-6">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+          <h3 className="sec-h">
             Situación registral SUNAT
           </h3>
           {sunat ? (
@@ -387,7 +389,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Hallazgos */}
         <section className="mt-6">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+          <h3 className="sec-h">
             Hallazgos del análisis
           </h3>
           <ul className="space-y-2">
@@ -411,7 +413,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* Comparativo Declaración mensual vs SIRE */}
         {totalDeclaraciones > 0 && (
           <section className="mt-6 print-full">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="sec-h">
               Declaración mensual vs SIRE
             </h3>
             <p className="mb-3 text-sm text-slate-600">
@@ -424,7 +426,7 @@ export default async function InformePage({ params }: { params: { id: string } }
             </p>
             <div className="space-y-4">
               {comparativos.map((comp, idx) => (
-                <div key={comp.periodo + idx} className="rounded-lg border border-slate-200 p-3">
+                <div key={comp.periodo + idx} className="evitar-corte rounded-lg border border-slate-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-700">
                       {etiquetaPeriodo(comp.periodo)}
@@ -484,7 +486,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* DJ Anual — comparativo año vs año (Formulario 710) */}
         {compAnual && (
           <section className="mt-6 print-full">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="sec-h">
               DJ Anual — comparativo año vs año
             </h3>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -511,7 +513,7 @@ export default async function InformePage({ params }: { params: { id: string } }
               </div>
             )}
 
-            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Estados Financieros</p>
+            <p className="rompe-no mb-1 text-xs font-bold uppercase tracking-wide text-brand-700">Estados Financieros</p>
             <div className="grid gap-3 md:grid-cols-2">
               <MiniTablaInforme titulo="Activo" filas={compAnual.activo} ejercicios={compAnual.ejercicios} />
               <div className="space-y-3">
@@ -520,7 +522,7 @@ export default async function InformePage({ params }: { params: { id: string } }
               </div>
             </div>
 
-            <p className="mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">Estado de Resultados</p>
+            <p className="rompe-no mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-brand-700">Estado de Resultados</p>
             {compAnual.resultadosVacio ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                 No se registraron movimientos: no hubo operaciones en el año.
@@ -534,7 +536,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* Deudas tributarias (agrupadas por sección F36) */}
         {deudas.length > 0 && (
           <section className="mt-6 print-full">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="sec-h">
               Deudas tributarias
             </h3>
             {Array.from(
@@ -574,7 +576,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* Compras y Ventas (SIRE) */}
         {cliente.sire && cliente.sire.length > 0 && (
           <section className="mt-6">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="sec-h">
               Compras y Ventas (SIRE)
             </h3>
             <table className="w-full text-sm">
@@ -615,7 +617,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Recomendaciones */}
         <section className="mt-6">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+          <h3 className="sec-h">
             Recomendaciones
           </h3>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
@@ -627,7 +629,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Detalle de observaciones para la toma de decisiones */}
         <section className="mt-6 print-full">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">
+          <h3 className="sec-h">
             Observaciones para la toma de decisiones
           </h3>
           {observacionesFinal.length === 0 ? (
@@ -667,6 +669,7 @@ export default async function InformePage({ params }: { params: { id: string } }
             colegiado antes de su uso formal.
           </p>
         </footer>
+        </div>
       </article>
     </div>
   );
