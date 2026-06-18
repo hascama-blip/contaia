@@ -9,6 +9,7 @@ import type {
   SireResumen,
   BuzonResumen,
   DeclaracionMensual,
+  DeclaracionAnual,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -43,6 +44,7 @@ async function readStore(): Promise<Store> {
       if (!Array.isArray(c.sire)) c.sire = [];
       if (c.buzon === undefined) c.buzon = null;
       if (!Array.isArray(c.declaraciones)) c.declaraciones = [];
+      if (!Array.isArray(c.declaracionesAnuales)) c.declaracionesAnuales = [];
     }
     return store;
   } catch {
@@ -90,6 +92,7 @@ export async function createCliente(data: {
     sire: [],
     buzon: null,
     declaraciones: [],
+    declaracionesAnuales: [],
   };
   store.clientes.push(cliente);
   await writeStore(store);
@@ -196,6 +199,38 @@ export async function deleteDeclaracion(
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.declaraciones = (cliente.declaraciones ?? []).filter((d) => d.id !== declId);
+  await writeStore(store);
+  return cliente;
+}
+
+export async function addDeclaracionAnual(
+  clienteId: string,
+  decl: DeclaracionAnual
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  if (!Array.isArray(cliente.declaracionesAnuales)) cliente.declaracionesAnuales = [];
+  // Reemplaza la del mismo ejercicio si ya existía.
+  cliente.declaracionesAnuales = cliente.declaracionesAnuales.filter(
+    (d) => d.ejercicio !== decl.ejercicio
+  );
+  cliente.declaracionesAnuales.push(decl);
+  cliente.declaracionesAnuales.sort((a, b) => a.ejercicio.localeCompare(b.ejercicio));
+  await writeStore(store);
+  return cliente;
+}
+
+export async function deleteDeclaracionAnual(
+  clienteId: string,
+  declId: string
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.declaracionesAnuales = (cliente.declaracionesAnuales ?? []).filter(
+    (d) => d.id !== declId
+  );
   await writeStore(store);
   return cliente;
 }

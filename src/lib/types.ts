@@ -80,6 +80,27 @@ export interface Cliente {
   buzon: BuzonResumen | null;
   /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */
   declaraciones: DeclaracionMensual[];
+  /** Declaraciones juradas ANUALES (Formulario 710) para comparar año vs año. */
+  declaracionesAnuales: DeclaracionAnual[];
+}
+
+/**
+ * Declaración Jurada ANUAL (Formulario 710 Renta Anual 3ra categoría) leída de
+ * un PDF. Guarda los montos por casilla del Balance (Estados Financieros) y del
+ * Estado de Resultados para comparar un ejercicio contra otro.
+ */
+export interface DeclaracionAnual {
+  id: string;
+  /** Ejercicio fiscal "YYYY" detectado del PDF. */
+  ejercicio: string;
+  ruc?: string;
+  razonSocial?: string;
+  formulario?: string;
+  /** Monto por casilla detectada (código de 3 dígitos → monto). */
+  valores: Record<string, number>;
+  fuente: "pdf" | "manual";
+  archivoNombre?: string;
+  cargadoAt: string;
 }
 
 /** Una casilla (código → monto) detectada en la declaración. */

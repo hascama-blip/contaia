@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
+import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -173,6 +174,13 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             clienteId={cliente.id}
             inicialDeclaraciones={cliente.declaraciones ?? []}
             inicialSire={cliente.sire ?? []}
+          />
+
+          {/* DJ anual (Formulario 710): comparativo año vs año */}
+          <DeclaracionesAnualesPanel
+            clienteId={cliente.id}
+            clienteRuc={cliente.ruc}
+            inicial={cliente.declaracionesAnuales ?? []}
           />
         </div>
 
