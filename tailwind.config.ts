@@ -5,31 +5,31 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Azul corporativo ASENCO (primario).
+        // Azul marino corporativo ASENCO (primario) — tomado de asencoauditores.com.
         brand: {
-          50: "#eef6ff",
-          100: "#d9eaff",
-          200: "#bcd9ff",
-          300: "#8ec0ff",
-          400: "#599cff",
-          500: "#3377ff",
-          600: "#1f56f5",
-          700: "#1842e1",
-          800: "#1a37b6",
-          900: "#1b338f",
+          50: "#eef3fa",
+          100: "#d3e0f0",
+          200: "#a7c0e0",
+          300: "#6f98c9",
+          400: "#3f6ca8",
+          500: "#234d82",
+          600: "#173a66",
+          700: "#102b4d",
+          800: "#0b2140",
+          900: "#081a33",
         },
-        // Acento cian/turquesa (innovador) para gradientes y CTAs secundarios.
+        // Dorado / oro (acento de la marca) para CTAs y detalles llamativos.
         accent: {
-          50: "#ecfeff",
-          100: "#cffafe",
-          200: "#a5f3fc",
-          300: "#67e8f9",
-          400: "#22d3ee",
-          500: "#06b6d4",
-          600: "#0891b2",
-          700: "#0e7490",
-          800: "#155e75",
-          900: "#164e63",
+          50: "#fdf8e7",
+          100: "#fbedbf",
+          200: "#f6db84",
+          300: "#f1c945",
+          400: "#edb91e",
+          500: "#dca200",
+          600: "#b98600",
+          700: "#946708",
+          800: "#7a5410",
+          900: "#674612",
         },
       },
     },
