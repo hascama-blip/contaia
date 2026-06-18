@@ -4,12 +4,11 @@ import type { DeclaracionAnual } from "./types";
 //  Declaración Jurada ANUAL (Formulario 710) — lectura PDF + comparativo
 // ============================================================
 // El 710 trae Estados Financieros (Balance) y Estado de Resultados con cada
-// línea identificada por una casilla de 3 dígitos. El texto extraído del PDF
-// mezcla códigos y montos, así que el parser va "dirigido por casilla": para
-// cada código conocido busca su monto vecino (incluye montos pegados al código,
-// p. ej. "78736359" = monto 78736 + casilla 359).
+// línea identificada por una casilla de 3 dígitos. El texto plano del PDF viene
+// MUY desordenado, así que leemos por COORDENADAS: reconstruimos las filas
+// reales (agrupando ítems con y similar) y emparejamos cada casilla con su
+// monto vecino, igual que se ve en el PDF. Así los totales cuadran.
 
-/** Etiquetas de las casillas del 710 (Balance y Estado de Resultados). */
 export const CASILLAS_710: Record<string, string> = {
   // ----- Estados Financieros · ACTIVO -----
   "359": "Efectivo y equivalentes de efectivo",
@@ -59,18 +58,18 @@ export const CASILLAS_710: Record<string, string> = {
   "412": "TOTAL PASIVO",
   // ----- Estados Financieros · PATRIMONIO -----
   "414": "Capital",
-  "415": "Capital adicional positivo",
-  "416": "Capital adicional negativo",
-  "417": "Resultados no realizados",
-  "418": "Excedente de revaluación",
-  "419": "Reservas",
-  "420": "Resultados acumulados positivos",
-  "421": "Resultados acumulados negativos",
-  "422": "Acciones de inversión",
+  "415": "Acciones de inversión",
+  "416": "Capital adicional positivo",
+  "417": "Capital adicional negativo",
+  "418": "Resultados no realizados",
+  "419": "Excedentes de evaluación",
+  "420": "Reservas",
+  "421": "Resultados acumulados positivos",
+  "422": "Resultados acumulados negativos",
   "423": "Utilidad del ejercicio",
   "424": "Pérdida del ejercicio",
   "425": "TOTAL PATRIMONIO",
-  "426": "TOTAL PASIVO Y PATRIMONIO",
+  "426": "TOTAL PATRIMONIO Y PASIVO",
   // ----- Estado de Resultados -----
   "461": "Ventas netas o ingresos por servicios",
   "462": "Descuentos, rebajas y bonif. concedidas",
@@ -101,18 +100,22 @@ export const CASILLAS_710: Record<string, string> = {
 };
 
 const CODIGOS = new Set(Object.keys(CASILLAS_710));
+/** Casillas que son TOTALES (se resaltan y sirven para el cuadre). */
+export const CASILLAS_TOTAL = new Set(["390", "412", "425", "426"]);
 
-/** Sección a la que pertenece una casilla por su rango numérico. */
-export function seccionDe(codigo: string): "balance" | "resultados" | "otro" {
+export function grupoBalance(codigo: string): "activo" | "pasivo" | "patrimonio" | null {
   const n = Number(codigo);
-  if (n >= 359 && n <= 426) return "balance";
-  if (n >= 461 && n <= 499) return "resultados";
-  return "otro";
+  if (n >= 359 && n <= 390) return "activo";
+  if (n >= 401 && n <= 412) return "pasivo";
+  if (n >= 414 && n <= 426) return "patrimonio";
+  return null;
+}
+function esResultados(codigo: string): boolean {
+  const n = Number(codigo);
+  return n >= 461 && n <= 499;
 }
 
-/** Reexporta el lector de PDF (mismo de las DJ mensuales). */
-export { extraerTextoPdf } from "./declaracion";
-
+const ES_MONTO = /^\(?-?[\d,]+\)?$/;
 function aMonto(s: string): number {
   const neg = /^\(.*\)$/.test(s.trim());
   const n = Number(s.replace(/[(),\s]/g, ""));
@@ -120,9 +123,44 @@ function aMonto(s: string): number {
   return neg ? -n : n;
 }
 
-const ES_MONTO = /^\(?-?[\d,]+\)?$/;
+/**
+ * Lee el PDF por coordenadas y devuelve las FILAS reales (cada fila = lista de
+ * tokens ordenados de izquierda a derecha). Agrupa ítems con `y` similar
+ * (el código y su monto vienen en líneas separadas por ~1px).
+ */
+export async function extraerFilasPdf(buffer: Buffer): Promise<string[][]> {
+  try {
+    const { getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const filas: string[][] = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const items = (tc.items as any[])
+        .map((it) => ({ x: it.transform[4], y: it.transform[5], s: String(it.str ?? "").trim() }))
+        .filter((o) => o.s);
+      items.sort((a, b) => b.y - a.y);
+      let cur: { y: number; items: typeof items } | null = null;
+      const rows: { y: number; items: typeof items }[] = [];
+      for (const it of items) {
+        if (cur && Math.abs(it.y - cur.y) <= 2.5) cur.items.push(it);
+        else {
+          cur = { y: it.y, items: [it] };
+          rows.push(cur);
+        }
+      }
+      for (const r of rows) {
+        r.items.sort((a, b) => a.x - b.x);
+        filas.push(r.items.flatMap((o) => o.s.split(/\s+/)));
+      }
+    }
+    return filas;
+  } catch (err) {
+    console.error("[declaracionAnual] No se pudo leer el PDF:", err);
+    return [];
+  }
+}
 
-/** Detecta el ejercicio "YYYY" del 710. */
 function detectarEjercicio(t: string): string {
   const m1 = t.match(/renta\s+anual\s+(\d{4})/i);
   if (m1) return m1[1];
@@ -132,51 +170,42 @@ function detectarEjercicio(t: string): string {
   if (m3) return m3[1];
   return "";
 }
-
 function detectarRazonSocial(t: string): string | undefined {
-  const m = t.match(/(?:nombre o )?raz[oó]n social\s*:?\s*([A-Za-zÑñÁÉÍÓÚáéíóú0-9 .,&'-]{3,60}?)\s*(?:n[uú]mero|per[ií]odo|ruc|tipo|\d{6}|:)/i);
-  if (m) return m[1].replace(/\s+/g, " ").trim();
-  return undefined;
+  const m = t.match(
+    /(?:nombre o )?raz[oó]n social\s*:?\s*([A-Za-zÑñÁÉÍÓÚáéíóú0-9 .,&'-]{3,60}?)\s*(?:n[uú]mero|per[ií]odo|ruc|tipo|\d{6}|:)/i
+  );
+  return m ? m[1].replace(/\s+/g, " ").trim() : undefined;
 }
 
-/** Parsea un 710 a un borrador (sin id ni persistir). */
+/** Parsea un 710 (a partir de sus filas) a un borrador sin id ni persistir. */
 export function parseAnual(
-  texto: string
+  filas: string[][]
 ): Omit<DeclaracionAnual, "id" | "cargadoAt" | "fuente" | "archivoNombre"> {
-  const t = texto.replace(/ /g, " ");
-
-  // Tokeniza y separa montos pegados a un código conocido (p. ej. "78736359").
-  const tokens: string[] = [];
-  for (const raw of t.split(/\s+/)) {
-    const m = raw.match(/^(\(?-?[\d,]+\)?)(\d{3})$/);
-    if (m && CODIGOS.has(m[2]) && m[1] !== "") {
-      tokens.push(m[1], m[2]);
-    } else {
-      tokens.push(raw);
+  const valores: Record<string, number> = {};
+  for (const row of filas) {
+    for (let i = 0; i < row.length; i++) {
+      const tk = row[i];
+      if (!CODIGOS.has(tk) || tk in valores) continue;
+      for (let j = i + 1; j < row.length; j++) {
+        if (CODIGOS.has(row[j])) break; // empieza la siguiente casilla
+        if (ES_MONTO.test(row[j])) {
+          const val = aMonto(row[j]);
+          if (!Number.isNaN(val)) valores[tk] = val;
+          i = j;
+          break;
+        }
+      }
     }
   }
 
-  const valores: Record<string, number> = {};
-  for (let i = 0; i < tokens.length; i++) {
-    const tk = tokens[i];
-    if (!CODIGOS.has(tk) || tk in valores) continue;
-    // Toma el monto vecino: primero el siguiente, luego el anterior, evitando
-    // que el "monto" sea en realidad otro código de casilla.
-    const next = tokens[i + 1];
-    const prev = tokens[i - 1];
-    let val: number | null = null;
-    if (next && ES_MONTO.test(next) && !CODIGOS.has(next)) val = aMonto(next);
-    else if (prev && ES_MONTO.test(prev) && !CODIGOS.has(prev)) val = aMonto(prev);
-    if (val !== null && !Number.isNaN(val)) valores[tk] = val;
-  }
-
-  const rucMatch = t.match(/\b((?:10|15|16|17|20)\d{9})\b/);
-  const formMatch = t.match(/formulario\D{0,12}?(\d{3,4})/i) || t.match(/\b(0?710)\b/);
+  const texto = filas.map((r) => r.join(" ")).join(" ");
+  const rucMatch = texto.match(/\b((?:10|15|16|17|20)\d{9})\b/);
+  const formMatch = texto.match(/formulario\D{0,12}?(\d{3,4})/i) || texto.match(/\b(0?710)\b/);
 
   return {
-    ejercicio: detectarEjercicio(t),
+    ejercicio: detectarEjercicio(texto),
     ruc: rucMatch?.[1],
-    razonSocial: detectarRazonSocial(t),
+    razonSocial: detectarRazonSocial(texto),
     formulario: formMatch?.[1],
     valores,
   };
@@ -187,52 +216,45 @@ export function parseAnual(
 export interface FilaAnual {
   codigo: string;
   etiqueta: string;
-  /** Monto por ejercicio. */
   valores: Record<string, number>;
-  /** Variación del último ejercicio vs el anterior. */
   variacion: number;
   porcentaje: number;
-  /** true = variación grande (a resaltar). */
   resaltar: boolean;
+  esTotal: boolean;
 }
 
-export interface SeccionAnual {
-  titulo: string;
-  filas: FilaAnual[];
+export interface CuadreAnual {
+  ejercicio: string;
+  activoNeto: number;
+  patrimonioYPasivo: number;
+  diferencia: number;
+  cuadra: boolean;
 }
 
 export interface ComparativoAnual {
   ejercicios: string[];
-  secciones: SeccionAnual[];
+  /** Balance agrupado como en el PDF. */
+  activo: FilaAnual[];
+  pasivo: FilaAnual[];
+  patrimonio: FilaAnual[];
+  resultados: FilaAnual[];
+  /** true = el Estado de Resultados está completamente en cero. */
+  resultadosVacio: boolean;
+  cuadre: CuadreAnual[];
   observaciones: string[];
 }
 
-const TITULO_SECCION: Record<string, string> = {
-  balance: "ESTADOS FINANCIEROS",
-  resultados: "ESTADO DE RESULTADOS",
-};
+function fmt(n: number): string {
+  return `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+}
 
-/** Construye el comparativo año vs año a partir de las DJ anuales cargadas. */
 export function compararAnual(declaraciones: DeclaracionAnual[]): ComparativoAnual {
   const decls = [...declaraciones].sort((a, b) => a.ejercicio.localeCompare(b.ejercicio));
   const ejercicios = decls.map((d) => d.ejercicio);
   const ultimo = ejercicios[ejercicios.length - 1];
   const previo = ejercicios[ejercicios.length - 2];
 
-  // Casillas presentes (con valor en algún ejercicio) dentro de las 2 secciones.
-  const codigos = new Set<string>();
-  for (const d of decls) {
-    for (const cod of Object.keys(d.valores)) {
-      const s = seccionDe(cod);
-      if (s === "balance" || s === "resultados") codigos.add(cod);
-    }
-  }
-
-  const filasPorSeccion: Record<string, FilaAnual[]> = { balance: [], resultados: [] };
-  const observaciones: string[] = [];
-
-  for (const cod of Array.from(codigos).sort((a, b) => Number(a) - Number(b))) {
-    const seccion = seccionDe(cod);
+  function construirFila(cod: string): FilaAnual {
     const valores: Record<string, number> = {};
     for (const d of decls) valores[d.ejercicio] = d.valores[cod] ?? 0;
     const vUlt = ultimo ? valores[ultimo] ?? 0 : 0;
@@ -240,41 +262,63 @@ export function compararAnual(declaraciones: DeclaracionAnual[]): ComparativoAnu
     const variacion = Math.round((vUlt - vPrev) * 100) / 100;
     const base = Math.abs(vPrev);
     const porcentaje = base !== 0 ? Math.round((variacion / base) * 10000) / 100 : vUlt !== 0 ? 100 : 0;
-    filasPorSeccion[seccion].push({
+    return {
       codigo: cod,
       etiqueta: CASILLAS_710[cod] ?? `Casilla ${cod}`,
       valores,
       variacion,
       porcentaje,
       resaltar: false,
-    });
+      esTotal: CASILLAS_TOTAL.has(cod),
+    };
   }
 
-  // Resaltar las variaciones más grandes (en monto) y volcarlas a observaciones.
+  // Casillas presentes en alguna DJ (más los totales).
+  const presentes = new Set<string>();
+  for (const d of decls) for (const cod of Object.keys(d.valores)) presentes.add(cod);
+  for (const t of CASILLAS_TOTAL) presentes.add(t);
+
+  const activo: FilaAnual[] = [];
+  const pasivo: FilaAnual[] = [];
+  const patrimonio: FilaAnual[] = [];
+  const resultados: FilaAnual[] = [];
+  for (const cod of Array.from(presentes).sort((a, b) => Number(a) - Number(b))) {
+    const g = grupoBalance(cod);
+    if (g === "activo") activo.push(construirFila(cod));
+    else if (g === "pasivo") pasivo.push(construirFila(cod));
+    else if (g === "patrimonio") patrimonio.push(construirFila(cod));
+    else if (esResultados(cod)) resultados.push(construirFila(cod));
+  }
+
+  // Resaltar y observar las variaciones más grandes (excluyendo totales).
+  const observaciones: string[] = [];
   if (previo) {
-    for (const seccion of ["balance", "resultados"] as const) {
-      const filas = filasPorSeccion[seccion];
-      const grandes = [...filas]
-        .filter((f) => Math.abs(f.variacion) > 0)
-        .sort((a, b) => Math.abs(b.variacion) - Math.abs(a.variacion))
-        .slice(0, 3);
-      for (const f of grandes) {
+    const candidatas = [...activo, ...pasivo, ...patrimonio, ...resultados].filter(
+      (f) => !f.esTotal && Math.abs(f.variacion) > 0
+    );
+    candidatas
+      .sort((a, b) => Math.abs(b.variacion) - Math.abs(a.variacion))
+      .slice(0, 5)
+      .forEach((f) => {
         f.resaltar = true;
         const signo = f.variacion > 0 ? "▲ subió" : "▼ bajó";
         observaciones.push(
-          `${TITULO_SECCION[seccion]} · ${f.etiqueta}: ${signo} ${fmt(Math.abs(f.variacion))} (${f.porcentaje > 0 ? "+" : ""}${f.porcentaje.toFixed(0)}%) entre ${previo} y ${ultimo}.`
+          `${f.etiqueta}: ${signo} ${fmt(Math.abs(f.variacion))} (${f.porcentaje > 0 ? "+" : ""}${f.porcentaje.toFixed(0)}%) entre ${previo} y ${ultimo}.`
         );
-      }
-    }
+      });
   }
 
-  const secciones: SeccionAnual[] = (["balance", "resultados"] as const)
-    .filter((s) => filasPorSeccion[s].length > 0)
-    .map((s) => ({ titulo: TITULO_SECCION[s], filas: filasPorSeccion[s] }));
+  // Cuadre del balance por ejercicio: TOTAL ACTIVO NETO − TOTAL PATRIMONIO Y PASIVO.
+  const cuadre: CuadreAnual[] = decls.map((d) => {
+    const activoNeto = d.valores["390"] ?? 0;
+    const patrimonioYPasivo = d.valores["426"] ?? 0;
+    const diferencia = Math.round((activoNeto - patrimonioYPasivo) * 100) / 100;
+    return { ejercicio: d.ejercicio, activoNeto, patrimonioYPasivo, diferencia, cuadra: Math.abs(diferencia) < 1 };
+  });
 
-  return { ejercicios, secciones, observaciones };
-}
+  const resultadosVacio = resultados.every((f) =>
+    ejercicios.every((y) => (f.valores[y] ?? 0) === 0)
+  );
 
-function fmt(n: number): string {
-  return `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+  return { ejercicios, activo, pasivo, patrimonio, resultados, resultadosVacio, cuadre, observaciones };
 }

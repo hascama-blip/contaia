@@ -5,7 +5,7 @@ import {
   getCliente,
   newId,
 } from "@/lib/db";
-import { extraerTextoPdf, parseAnual } from "@/lib/declaracionAnual";
+import { extraerFilasPdf, parseAnual } from "@/lib/declaracionAnual";
 import type { DeclaracionAnual } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       resultados.push({ archivo: file.name, ok: false, motivo: "Supera 15 MB" });
       continue;
     }
-    const texto = await extraerTextoPdf(Buffer.from(await file.arrayBuffer()));
-    if (!texto.trim()) {
+    const filas = await extraerFilasPdf(Buffer.from(await file.arrayBuffer()));
+    if (filas.length === 0) {
       resultados.push({
         archivo: file.name,
         ok: false,
@@ -45,14 +45,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       });
       continue;
     }
-    const parsed = parseAnual(texto);
+    const parsed = parseAnual(filas);
     if (diagnostico && !primerDiag) {
       primerDiag = {
         archivo: file.name,
         ejercicio: parsed.ejercicio,
         ruc: parsed.ruc,
         valores: parsed.valores,
-        texto: texto.slice(0, 6000),
       };
     }
     if (!/^\d{4}$/.test(parsed.ejercicio)) {
