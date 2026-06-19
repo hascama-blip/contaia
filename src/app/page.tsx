@@ -21,11 +21,19 @@ const OPCIONES: Opcion[] = [
     destacado: true,
   },
   {
-    href: "/herramientas/procesar-compras",
+    href: "/herramientas/cruce-sire",
     icono: "🔀",
-    titulo: "Cruce SIRE + Glosa + Cuenta → Contasis",
+    titulo: "Comparativo SIRE vs sistema contable",
     detalle:
-      "Cruza el SIRE vs contabilidad (saca reporte), sube los XML para la glosa de cada factura, clasifica por cuenta y descarga el masivo para subir a Contasis.",
+      "Cruza el SIRE con Contasis comprobante por comprobante y descarga el reporte de diferencias en Excel.",
+    destacado: true,
+  },
+  {
+    href: "/herramientas/procesar-compras",
+    icono: "📥",
+    titulo: "Masivo SIRE → Contabilidad (Contasis)",
+    detalle:
+      "Sube el SIRE de compras y ventas, agrega los XML (glosa, opcional), reclasifica las cuentas y genera el masivo para importar a Contasis.",
     destacado: true,
   },
 ];
@@ -59,7 +67,7 @@ export default async function MenuPage() {
       </section>
 
       {/* Menú de tarjetas */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {OPCIONES.map((o) => (
           <Link
             key={o.titulo}
