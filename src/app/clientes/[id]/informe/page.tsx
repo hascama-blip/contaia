@@ -6,6 +6,7 @@ import { compararDeclaracionSire } from "@/lib/declaracion";
 import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
+import { LogoAsenco } from "@/components/Logo";
 import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
@@ -200,15 +201,10 @@ export default async function InformePage({ params }: { params: { id: string } }
         <header className="evitar-corte">
           <div className="hero-gradient flex items-start justify-between p-6 text-white">
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-lg font-bold text-white ring-1 ring-white/30">
-                A
-              </span>
-              <div>
-                <p className="text-xl font-bold tracking-tight">
-                  <span className="text-white">ASENCO</span>
-                  <span className="text-accent-300">IA</span>
-                </p>
-                <p className="text-xs text-white/80">Informe de gerencia · Diagnóstico tributario SUNAT</p>
+              <LogoAsenco dark />
+              <div className="border-l border-white/25 pl-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-accent-300">Informe de gerencia</p>
+                <p className="text-xs text-white/80">Diagnóstico tributario SUNAT</p>
               </div>
             </div>
             <div className="text-right text-xs text-white/80">
