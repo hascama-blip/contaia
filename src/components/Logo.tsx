@@ -11,6 +11,7 @@ export function LogoAsenco({
   const main = dark ? "text-white" : "text-brand-800";
   const sub = dark ? "text-white/70" : "text-slate-400";
   const gold = dark ? "text-accent-300" : "text-accent-600";
+  const azul = dark ? "text-brand-200" : "text-brand-600";
   const strokeMain = dark ? "stroke-white" : "stroke-brand-700";
   const fillGold = dark ? "fill-accent-300" : "fill-accent-500";
 
@@ -30,7 +31,7 @@ export function LogoAsenco({
           <span className={gold}>TRIBUTARIO</span>
         </span>
         <span className={`mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${sub}`}>
-          by asenco
+          by <span className={`font-bold ${azul}`}>asenco</span>
         </span>
       </span>
     </span>
