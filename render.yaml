@@ -9,7 +9,9 @@ services:
     runtime: node
     # El buzón usa un navegador headless (@sparticuz/chromium) que consume RAM:
     # usa plan "standard" (2 GB). El SIRE y lo demás funcionan en planes menores.
-    plan: standard
+    # Plan FREE para pruebas (2–5 usuarios). El buzón (Chromium) y el OCR
+    # necesitan más RAM: para eso, cambia a "standard" y descomenta el disco.
+    plan: free
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -23,15 +25,13 @@ services:
       # pestaña Environment). Sin este token la consulta mostrará error.
       - key: DECOLECTA_TOKEN
         sync: false
-      # Carpeta de datos = disco persistente montado abajo. Así los clientes,
-      # el SIRE y las declaraciones NO se borran en cada despliegue.
-      - key: DATA_DIR
-        value: /var/data
+      # En FREE no hay disco persistente: los datos viven en ./data (efímeros).
+      # Al pasar a un plan con disco, descomenta DATA_DIR y el bloque "disk".
+      # - key: DATA_DIR
+      #   value: /var/data
 
-    # --- Almacenamiento persistente ------------------------------------------
-    # Disco que sobrevive a reinicios y despliegues (incluido en plan standard).
-    # 1 GB alcanza de sobra para cientos de clientes en JSON.
-    disk:
-      name: contaia-data
-      mountPath: /var/data
-      sizeGB: 1
+    # --- Almacenamiento persistente (requiere plan de pago, no FREE) ----------
+    # disk:
+    #   name: contaia-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
