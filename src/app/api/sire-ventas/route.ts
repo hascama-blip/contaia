@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZip, extraerDeZip } from "@/lib/zip";
-import { parseSireVentas } from "@/lib/cruceSire";
+import { parseSireExcel } from "@/lib/sireExcel";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,13 +29,13 @@ export async function POST(req: NextRequest) {
     if (esZip(buf)) {
       for (const it of extraerDeZip(buf, [".xlsx", ".xls"])) {
         try {
-          comps.push(...parseSireVentas(await leerFilas(it.data)).comprobantes);
+          comps.push(...parseSireExcel(await leerFilas(it.data)));
         } catch {
           /* archivo del zip que no es el detalle */
         }
       }
     } else {
-      comps = parseSireVentas(await leerFilas(buf)).comprobantes;
+      comps = parseSireExcel(await leerFilas(buf));
     }
   } catch (e) {
     return NextResponse.json(
@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
     base: c.baseGravada,
     igv: c.igv,
     total: c.total,
-    cuenta: CUENTA_VENTAS_DEFECTO,
+    cuenta: c.cuentaArchivo || CUENTA_VENTAS_DEFECTO,
+    glosa: c.glosaArchivo || "",
   }));
 
   return NextResponse.json({ comprobantes, cuentaDefecto: CUENTA_VENTAS_DEFECTO, total: comprobantes.length });
