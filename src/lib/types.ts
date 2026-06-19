@@ -135,6 +135,14 @@ export interface CasillaDeclaracion {
   monto: number;
 }
 
+/** Un concepto de compras del 621 (cada destino), con su base e IGV. */
+export interface ConceptoCompra {
+  codigo: string;
+  etiqueta: string;
+  base: number;
+  igv: number;
+}
+
 /**
  * Declaración mensual (Formulario Virtual 621 IGV-Renta u otra) leída de un
  * PDF con capa de texto (sin OCR) o ingresada manualmente. Sirve para comparar
@@ -152,6 +160,8 @@ export interface DeclaracionMensual {
   ventasIgv: number;
   comprasBase: number;
   comprasIgv: number;
+  /** Desglose de compras por concepto (no neteado): cada destino con su monto. */
+  comprasDetalle?: ConceptoCompra[];
   /** Todas las casillas detectadas en el PDF (para calibrar/auditar). */
   casillas: CasillaDeclaracion[];
   /** "pdf" = leída de un archivo; "manual" = ingresada a mano. */

@@ -2,6 +2,7 @@ import type {
   CasillaDeclaracion,
   ComparativoFila,
   ComparativoPeriodo,
+  ConceptoCompra,
   DeclaracionMensual,
   SireResumen,
 } from "./types";
@@ -28,10 +29,24 @@ export const MAPA_CASILLAS = {
   // Ventas — base imponible gravada y débito fiscal total (IGV).
   ventasBase: ["100"],
   ventasIgv: ["131"],
-  // Compras — base imponible gravada (varios destinos) y crédito fiscal (IGV).
-  comprasBase: ["107", "110", "113"],
-  comprasIgv: ["108", "111", "114"],
 };
+
+/**
+ * Conceptos de COMPRAS del 621 (cada destino), con su casilla de BASE y de IGV
+ * (tributo). Se listan TODOS (no se netean): nacionales, importadas, tasa 10%
+ * Ley 31556 y las no gravadas. El total de compras es la suma de todas.
+ */
+export const COMPRAS_CONCEPTOS: { base: string; igv: string | null; etiqueta: string }[] = [
+  { base: "107", igv: "108", etiqueta: "Gravadas → ventas gravadas (nacional)" },
+  { base: "156", igv: "157", etiqueta: "Tasa 10% Ley 31556 → ventas gravadas (nacional)" },
+  { base: "110", igv: "111", etiqueta: "Gravadas → ventas gravadas y no gravadas (nacional)" },
+  { base: "113", igv: null, etiqueta: "Gravadas → ventas no gravadas (nacional)" },
+  { base: "114", igv: "115", etiqueta: "Gravadas → ventas gravadas (importadas)" },
+  { base: "116", igv: "117", etiqueta: "Gravadas → ventas gravadas y no gravadas (importadas)" },
+  { base: "119", igv: null, etiqueta: "Gravadas → ventas no gravadas (importadas)" },
+  { base: "120", igv: null, etiqueta: "Compras internas no gravadas" },
+  { base: "122", igv: null, etiqueta: "Compras importadas no gravadas" },
+];
 
 /** Umbral (S/) para marcar una diferencia como alerta (tolera redondeos). */
 const UMBRAL_DIFERENCIA = 1;
@@ -105,12 +120,29 @@ function sumarCasillas(casillas: CasillaDeclaracion[], codigos: string[]): numbe
     .reduce((acc, c) => acc + c.monto, 0);
 }
 
+function montoCasilla(casillas: CasillaDeclaracion[], codigo: string | null): number {
+  if (!codigo) return 0;
+  const c = casillas.find((x) => x.codigo === codigo);
+  return c ? c.monto : 0;
+}
+
+/** Construye el desglose de compras por concepto (solo los que tienen monto). */
+export function detalleCompras(casillas: CasillaDeclaracion[]): ConceptoCompra[] {
+  return COMPRAS_CONCEPTOS.map((c) => ({
+    codigo: c.base,
+    etiqueta: c.etiqueta,
+    base: montoCasilla(casillas, c.base),
+    igv: montoCasilla(casillas, c.igv),
+  })).filter((c) => c.base !== 0 || c.igv !== 0);
+}
+
 /** Parsea el texto de una declaración a un borrador (sin id ni persistir). */
 export function parseDeclaracion(
   texto: string
 ): Omit<DeclaracionMensual, "id" | "cargadoAt" | "fuente" | "archivoNombre"> {
   const t = texto.replace(/ /g, " ");
   const casillas = detectarCasillas(t);
+  const comprasDet = detalleCompras(casillas);
 
   const rucMatch = t.match(/\b((?:10|15|16|17|20)\d{9})\b/);
   const formMatch = t.match(/formulario\D{0,12}?(\d{3,4})/i) || t.match(/\b(621)\b/);
@@ -121,8 +153,10 @@ export function parseDeclaracion(
     formulario: formMatch?.[1],
     ventasBase: sumarCasillas(casillas, MAPA_CASILLAS.ventasBase),
     ventasIgv: sumarCasillas(casillas, MAPA_CASILLAS.ventasIgv),
-    comprasBase: sumarCasillas(casillas, MAPA_CASILLAS.comprasBase),
-    comprasIgv: sumarCasillas(casillas, MAPA_CASILLAS.comprasIgv),
+    // Total de compras = suma de TODOS los conceptos (no se netea).
+    comprasBase: comprasDet.reduce((a, c) => a + c.base, 0),
+    comprasIgv: comprasDet.reduce((a, c) => a + c.igv, 0),
+    comprasDetalle: comprasDet,
     casillas,
   };
 }
@@ -153,7 +187,13 @@ export function compararDeclaracionSire(
 
   fila("Ventas netas (base imponible)", dec.ventasBase, sire ? sire.ventas.baseImponible : null);
   fila("IGV ventas (débito fiscal)", dec.ventasIgv, sire ? sire.ventas.igv : null);
-  fila("Compras netas (base imponible)", dec.comprasBase, sire ? sire.compras.baseImponible : null);
+  // Compras: total declarado (todos los conceptos) vs total SIRE (gravadas +
+  // no gravadas), para comparar total contra total.
+  fila(
+    "Compras (base total)",
+    dec.comprasBase,
+    sire ? sire.compras.baseImponible + sire.compras.inafectoExonerado : null
+  );
   fila("IGV compras (crédito fiscal)", dec.comprasIgv, sire ? sire.compras.igv : null);
 
   return {

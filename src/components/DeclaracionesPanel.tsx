@@ -27,6 +27,7 @@ interface Borrador {
   ventasIgv: number;
   comprasBase: number;
   comprasIgv: number;
+  comprasDetalle?: { codigo: string; etiqueta: string; base: number; igv: number }[];
   casillas: { codigo: string; monto: number }[];
   fuente: "pdf" | "manual";
   archivoNombre?: string;
@@ -346,9 +347,12 @@ function BorradorForm({
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <NumField label="Ventas · Base" value={borrador.ventasBase} onChange={(v) => setNum("ventasBase", v)} />
         <NumField label="Ventas · IGV" value={borrador.ventasIgv} onChange={(v) => setNum("ventasIgv", v)} />
-        <NumField label="Compras · Base" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
-        <NumField label="Compras · IGV" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
+        <NumField label="Compras · Base (total)" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
+        <NumField label="Compras · IGV (total)" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
       </div>
+
+      <DetalleCompras detalle={borrador.comprasDetalle} totalBase={borrador.comprasBase} totalIgv={borrador.comprasIgv} />
+
       <div className="mt-3 flex gap-2">
         <button className="btn-primary" onClick={onGuardar} disabled={guardando}>
           {guardando ? "Guardando…" : "Guardar declaración"}
@@ -357,6 +361,50 @@ function BorradorForm({
           Descartar
         </button>
       </div>
+    </div>
+  );
+}
+
+function DetalleCompras({
+  detalle,
+  totalBase,
+  totalIgv,
+}: {
+  detalle?: { codigo: string; etiqueta: string; base: number; igv: number }[];
+  totalBase: number;
+  totalIgv: number;
+}) {
+  if (!detalle || detalle.length === 0) return null;
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        Detalle de compras (cada concepto, sin netear)
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-[10px] uppercase text-slate-400">
+            <th className="px-3 py-1">Concepto</th>
+            <th className="px-3 py-1 text-right">Base</th>
+            <th className="px-3 py-1 text-right">IGV</th>
+          </tr>
+        </thead>
+        <tbody>
+          {detalle.map((c) => (
+            <tr key={c.codigo} className="border-t border-slate-100">
+              <td className="px-3 py-1 text-slate-600">
+                {c.etiqueta} <span className="text-slate-300">[{c.codigo}]</span>
+              </td>
+              <td className="px-3 py-1 text-right tabular-nums text-slate-700">{fmtSoles(c.base)}</td>
+              <td className="px-3 py-1 text-right tabular-nums text-slate-700">{fmtSoles(c.igv)}</td>
+            </tr>
+          ))}
+          <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold text-slate-800">
+            <td className="px-3 py-1">TOTAL COMPRAS</td>
+            <td className="px-3 py-1 text-right tabular-nums">{fmtSoles(totalBase)}</td>
+            <td className="px-3 py-1 text-right tabular-nums">{fmtSoles(totalIgv)}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -472,6 +520,12 @@ function ComparativoCard({
             .join(" · ")}
         </div>
       )}
+
+      <DetalleCompras
+        detalle={decl.comprasDetalle}
+        totalBase={decl.comprasBase}
+        totalIgv={decl.comprasIgv}
+      />
     </div>
   );
 }
