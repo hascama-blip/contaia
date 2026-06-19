@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { parseSireCompras } from "@/lib/cruceSire";
-import { getCuentasProveedor, setCuentasProveedor } from "@/lib/db";
+import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
 import { clasificar } from "@/lib/clasificacion";
 import type { ProveedorCuenta } from "@/lib/types";
@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
   }
 
   const memoria = await getCuentasProveedor();
+  const rubrosCache = await getRubros();
+  const nuevosRubros: Record<string, { razonSocial: string; actividad: string }> = {};
 
   // Agrupa por proveedor (RUC), con su razón social y montos.
   const porRuc = new Map<string, { ruc: string; razonSocial: string; comprobantes: number; monto: number }>();
@@ -75,15 +77,21 @@ export async function POST(req: NextRequest) {
       proveedores.push({ ...previo, razonSocial: previo.razonSocial || g.razonSocial, nuevo: false, comprobantes: g.comprobantes, monto: g.monto });
       continue;
     }
-    // Proveedor NUEVO: rubro por decolecta (con tope) + sugerencia de cuenta.
+    // Proveedor NUEVO: rubro desde el CACHÉ (sin gastar decolecta) o, si no
+    // está, una sola consulta a decolecta (con tope) que se guarda en caché.
     let rubro = "";
     let razonSocial = g.razonSocial;
-    if (lookups < MAX_LOOKUPS && /^\d{11}$/.test(g.ruc)) {
+    const cacheado = rubrosCache[g.ruc];
+    if (cacheado) {
+      rubro = cacheado.actividad;
+      if (cacheado.razonSocial) razonSocial = cacheado.razonSocial;
+    } else if (lookups < MAX_LOOKUPS && /^\d{11}$/.test(g.ruc)) {
       lookups++;
       const info = await consultarActividad(g.ruc);
       if (info) {
         rubro = info.actividad;
         if (info.razonSocial) razonSocial = info.razonSocial;
+        nuevosRubros[g.ruc] = { razonSocial: info.razonSocial || g.razonSocial, actividad: info.actividad };
       }
     }
     const sug = clasificar(rubro, razonSocial);
@@ -100,6 +108,9 @@ export async function POST(req: NextRequest) {
       monto: g.monto,
     });
   }
+  // Guarda en caché los rubros recién consultados (1 consulta por RUC, para siempre).
+  await mergeRubros(nuevosRubros);
+
   proveedores.sort((a, b) => Number(b.nuevo) - Number(a.nuevo) || b.monto - a.monto);
 
   const cuentaPorRuc = new Map(proveedores.map((p) => [p.ruc, p.cuenta]));

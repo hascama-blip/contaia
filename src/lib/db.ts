@@ -32,6 +32,8 @@ interface Store {
   clientes: Cliente[];
   /** Memoria del estudio: RUC del proveedor → cuenta contable. */
   cuentasProveedor?: Record<string, ProveedorCuenta>;
+  /** Caché de rubro por RUC (para consultar decolecta 1 sola vez por RUC). */
+  rubrosProveedor?: Record<string, { razonSocial: string; actividad: string; at: string }>;
 }
 
 async function ensureDirs() {
@@ -45,6 +47,7 @@ async function readStore(): Promise<Store> {
     const raw = await fs.readFile(STORE_PATH, "utf-8");
     const store = JSON.parse(raw) as Store;
     if (!store.cuentasProveedor) store.cuentasProveedor = {};
+    if (!store.rubrosProveedor) store.rubrosProveedor = {};
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
@@ -56,8 +59,29 @@ async function readStore(): Promise<Store> {
     }
     return store;
   } catch {
-    return { clientes: [], cuentasProveedor: {} };
+    return { clientes: [], cuentasProveedor: {}, rubrosProveedor: {} };
   }
+}
+
+/** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */
+export async function getRubros(): Promise<
+  Record<string, { razonSocial: string; actividad: string; at: string }>
+> {
+  const store = await readStore();
+  return store.rubrosProveedor ?? {};
+}
+
+export async function mergeRubros(
+  entradas: Record<string, { razonSocial: string; actividad: string }>
+): Promise<void> {
+  const keys = Object.keys(entradas);
+  if (keys.length === 0) return;
+  const store = await readStore();
+  if (!store.rubrosProveedor) store.rubrosProveedor = {};
+  for (const ruc of keys) {
+    store.rubrosProveedor[ruc] = { ...entradas[ruc], at: new Date().toISOString() };
+  }
+  await writeStore(store);
 }
 
 export async function getCuentasProveedor(): Promise<Record<string, ProveedorCuenta>> {
