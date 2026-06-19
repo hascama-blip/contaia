@@ -19,6 +19,15 @@ export type TipoLibro = "compras" | "ventas";
 /** Tolerancia en soles para considerar dos montos iguales (redondeos). */
 export const TOLERANCIA = 1;
 
+/** Tolerancia para considerar dos tipos de cambio iguales. */
+export const TOLERANCIA_TC = 0.001;
+
+/** ¿La moneda es extranjera (dólares u otra distinta de soles)? */
+export function esMonedaExtranjera(moneda: string): boolean {
+  const m = (moneda || "").toUpperCase();
+  return m !== "" && m !== "PEN" && m !== "SOL" && m !== "SOLES" && m !== "S/";
+}
+
 /** Comprobante ya normalizado, venga del SIRE o del sistema contable. */
 export interface CompNorm {
   /** Llave canónica para emparejar: `tipo|serie|numero|ruc`. */
@@ -35,6 +44,10 @@ export interface CompNorm {
   /** No gravadas: exonerado + inafecto + exportación (ventas) / adq. no grav. (compras). */
   noGravado: number;
   total: number;
+  /** Moneda del comprobante ("PEN", "USD", …). */
+  moneda: string;
+  /** Tipo de cambio aplicado (1 o 0 si es soles). */
+  tipoCambio: number;
 }
 
 export type EstadoFila =
@@ -66,6 +79,12 @@ export interface FilaCruce {
   totalSire: number;
   totalContable: number;
   difTotal: number;
+  /** Moneda y tipo de cambio de cada lado (para compras/ventas en dólares). */
+  monedaSire: string;
+  monedaContable: string;
+  tcSire: number;
+  tcContable: number;
+  difTc: number;
   estado: EstadoFila;
   /** Descripción legible de cada diferencia encontrada. */
   observaciones: string[];
@@ -247,6 +266,8 @@ export function parseSireCompras(rows: unknown[][]): ParseSalida {
   const cBase = idxsSire(h, (x) => x.startsWith("bi gravado"));
   const cIgv = idxsSire(h, (x) => x.startsWith("igv / ipm") || x.startsWith("igv/ipm"));
   const cTotal = idxSire(h, (x) => x.startsWith("total cp") || x.includes("importe total"));
+  const cMoneda = idxSire(h, (x) => x === "moneda");
+  const cTc = idxSire(h, (x) => x.startsWith("tipo de cambio"));
   const cRazon = cRuc >= 0 ? cRuc + 1 : -1;
   const cPeriodo = idxSire(h, (x) => x === "periodo");
 
@@ -279,6 +300,8 @@ export function parseSireCompras(rows: unknown[][]): ParseSalida {
       igv,
       noGravado: noGravadasDe(total, baseGravada, igv),
       total,
+      moneda: String(valor(row, cMoneda) ?? "").trim().toUpperCase(),
+      tipoCambio: num(valor(row, cTc)),
     });
   }
   return { comprobantes: out, periodo, ruc, razonSocial };
@@ -296,6 +319,8 @@ export function parseSireVentas(rows: unknown[][]): ParseSalida {
   const cBase = idxSire(h, (x) => x === "bi gravada");
   const cIgv = idxSire(h, (x) => x === "igv / ipm" || x === "igv/ipm");
   const cTotal = idxSire(h, (x) => x.startsWith("total cp") || x.includes("importe total"));
+  const cMoneda = idxSire(h, (x) => x === "moneda");
+  const cTc = idxSire(h, (x) => x.startsWith("tipo de cambio"));
   const cRazon = cRuc >= 0 ? cRuc + 1 : -1;
   const cPeriodo = idxSire(h, (x) => x === "periodo");
 
@@ -328,6 +353,8 @@ export function parseSireVentas(rows: unknown[][]): ParseSalida {
       igv,
       noGravado: noGravadasDe(total, baseGravada, igv),
       total,
+      moneda: String(valor(row, cMoneda) ?? "").trim().toUpperCase(),
+      tipoCambio: num(valor(row, cTc)),
     });
   }
   return { comprobantes: out, periodo, ruc, razonSocial };
@@ -361,6 +388,11 @@ function parseContasis(rows: unknown[][], _libro: TipoLibro): ParseSalida {
     .map((n) => idxContasis(h, n))
     .filter((i) => i >= 0);
   const cTotal = idxContasis(h, "ntots");
+  // Tipo de cambio (ntc) e importe en dólares (ndolar): Contasis no trae una
+  // columna "moneda", así que se infiere USD cuando hay importe en dólares o el
+  // TC no es 1.
+  const cTc = idxContasis(h, "ntc");
+  const cDolar = idxContasis(h, "ndolar");
 
   const out: CompNorm[] = [];
   for (const row of rows.slice(1)) {
@@ -372,6 +404,9 @@ function parseContasis(rows: unknown[][], _libro: TipoLibro): ParseSalida {
     const baseGravada = suma(row, cBase);
     const igv = suma(row, cIgv);
     const total = num(valor(row, cTotal));
+    const tc = num(valor(row, cTc));
+    const dolar = num(valor(row, cDolar));
+    const moneda = dolar > 0 || tc > 1.01 ? "USD" : "PEN";
     out.push({
       clave: claveDe(tipoDoc, serie, numero, rucC),
       tipoDoc,
@@ -384,6 +419,8 @@ function parseContasis(rows: unknown[][], _libro: TipoLibro): ParseSalida {
       igv,
       noGravado: noGravadasDe(total, baseGravada, igv),
       total,
+      moneda,
+      tipoCambio: tc,
     });
   }
   return { comprobantes: out };
@@ -413,6 +450,8 @@ function agrupar(comps: CompNorm[]): Map<string, CompNorm> {
       prev.total = Math.round((prev.total + c.total) * 100) / 100;
       if (!prev.fecha) prev.fecha = c.fecha;
       if (!prev.razonSocial) prev.razonSocial = c.razonSocial;
+      if (!prev.moneda || prev.moneda === "PEN") prev.moneda = c.moneda || prev.moneda;
+      if (!prev.tipoCambio) prev.tipoCambio = c.tipoCambio;
     }
   }
   return m;
@@ -506,6 +545,13 @@ export function cruzarLibro(
       const difF = s!.fecha && c!.fecha && s!.fecha !== c!.fecha;
       if (difF) obs.push(`Fecha: SIRE ${s!.fecha} vs contable ${c!.fecha}`);
 
+      // Tipo de cambio (solo si el comprobante es en moneda extranjera).
+      const enDolares = esMonedaExtranjera(s!.moneda) || esMonedaExtranjera(c!.moneda);
+      if (enDolares && s!.tipoCambio > 0 && c!.tipoCambio > 0 &&
+          Math.abs(s!.tipoCambio - c!.tipoCambio) > TOLERANCIA_TC) {
+        obs.push(`Tipo de cambio: SIRE ${s!.tipoCambio} vs contable ${c!.tipoCambio}`);
+      }
+
       if (hayDifMonto) {
         estado = "dif-monto";
         difMonto++;
@@ -539,6 +585,11 @@ export function cruzarLibro(
       totalSire: totS,
       totalContable: totC,
       difTotal: r(totS - totC),
+      monedaSire: s?.moneda ?? "",
+      monedaContable: c?.moneda ?? "",
+      tcSire: s?.tipoCambio ?? 0,
+      tcContable: c?.tipoCambio ?? 0,
+      difTc: r((s?.tipoCambio ?? 0) - (c?.tipoCambio ?? 0)),
       estado,
       observaciones: obs,
     });

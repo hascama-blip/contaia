@@ -3,6 +3,7 @@
 // ============================================================
 import ExcelJS from "exceljs";
 import type { CruceLibro, FilaCruce, ResultadoCruce, EstadoFila } from "./cruceSire";
+import { esMonedaExtranjera, TOLERANCIA_TC } from "./cruceSire";
 
 /** Lee la primera hoja de un .xlsx a una matriz de filas (fila 0 = encabezados). */
 export async function leerFilas(buf: Buffer): Promise<unknown[][]> {
@@ -66,6 +67,7 @@ export async function construirExcelCruce(res: ResultadoCruce): Promise<Buffer> 
 
   hojaResumen(wb, res);
   hojaFaltantes(wb, res);
+  hojaTipoCambio(wb, res);
   if (res.compras) hojaLibro(wb, "Compras", res.compras);
   if (res.ventas) hojaLibro(wb, "Ventas", res.ventas);
 
@@ -226,6 +228,103 @@ function hojaFaltantes(wb: ExcelJS.Workbook, res: ResultadoCruce) {
   const tot = ws.addRow(["", "", "", "", "", `TOTAL (${filas.length})`, "", r2(totBase), r2(totIgv), r2(totNg), r2(totTot), ""]);
   tot.font = { bold: true };
   [8, 9, 10, 11].forEach((i) => (tot.getCell(i).numFmt = "#,##0.00"));
+}
+
+// ---- Hoja "Tipo de cambio" --------------------------------------------------
+// Comprobantes en moneda extranjera (dólares): compara el TC del SIRE con el del
+// sistema contable. Si difieren, los importes en soles no cuadran.
+
+const COL_TC: { header: string; width: number; money?: boolean; tc?: boolean }[] = [
+  { header: "Libro", width: 10 },
+  { header: "Tipo", width: 6 },
+  { header: "Serie", width: 10 },
+  { header: "Número", width: 12 },
+  { header: "RUC contraparte", width: 16 },
+  { header: "Razón social", width: 34 },
+  { header: "Moneda", width: 9 },
+  { header: "TC SIRE", width: 11, tc: true },
+  { header: "TC contable", width: 12, tc: true },
+  { header: "Dif. TC", width: 10, tc: true },
+  { header: "Total SIRE", width: 13, money: true },
+  { header: "Total contable", width: 13, money: true },
+  { header: "Observación", width: 40 },
+];
+
+function hojaTipoCambio(wb: ExcelJS.Workbook, res: ResultadoCruce) {
+  const ws = wb.addWorksheet("Tipo de cambio");
+  ws.columns = COL_TC.map((c) => ({ width: c.width }));
+
+  tituloCelda(ws, "Comparativo de tipo de cambio (comprobantes en dólares)");
+  ws.addRow([
+    "Operaciones en moneda extranjera: se compara el TC del SIRE con el del sistema contable. Si difieren, revisar el importe en soles.",
+  ]).font = { italic: true, color: { argb: "FF475569" } };
+  ws.addRow([]);
+
+  const header = ws.addRow(COL_TC.map((c) => c.header));
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.eachCell((c) => {
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+    c.alignment = { vertical: "middle", wrapText: true };
+  });
+  const headerRow = header.number;
+  ws.views = [{ state: "frozen", ySplit: headerRow }];
+  ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow, column: COL_TC.length } };
+
+  const enDolares = (f: FilaCruce) =>
+    esMonedaExtranjera(f.monedaSire) || esMonedaExtranjera(f.monedaContable);
+
+  const recolectar = (libro: CruceLibro | undefined, nombre: string) =>
+    (libro?.filas ?? []).filter(enDolares).map((f) => {
+      const ambos = f.tcSire > 0 && f.tcContable > 0;
+      const difiere = ambos && Math.abs(f.tcSire - f.tcContable) > TOLERANCIA_TC;
+      const obs = !ambos
+        ? "Solo en un lado (no se puede comparar el TC)."
+        : difiere
+        ? `TC distinto (dif ${f.difTc.toFixed(3)}) → revisar importe en soles.`
+        : "TC coincide.";
+      return {
+        difiere,
+        valores: [
+          nombre,
+          f.tipoDoc,
+          f.serie,
+          f.numero,
+          f.rucContraparte,
+          f.razonSocial,
+          f.monedaSire || f.monedaContable || "USD",
+          f.tcSire || "",
+          f.tcContable || "",
+          ambos ? f.difTc : "",
+          f.totalSire,
+          f.totalContable,
+          obs,
+        ] as (string | number)[],
+      };
+    });
+
+  const filas = [
+    ...recolectar(res.compras, "Compras"),
+    ...recolectar(res.ventas, "Ventas"),
+  ];
+
+  if (filas.length === 0) {
+    const r = ws.addRow(["No hay comprobantes en moneda extranjera en este periodo."]);
+    r.font = { color: { argb: "FF475569" } };
+    return;
+  }
+
+  for (const { valores, difiere } of filas) {
+    const row = ws.addRow(valores);
+    COL_TC.forEach((col, i) => {
+      if (col.money) row.getCell(i + 1).numFmt = "#,##0.00";
+      if (col.tc) row.getCell(i + 1).numFmt = "0.000";
+    });
+    if (difiere) {
+      row.eachCell((c) => {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE2E2" } }; // rojo claro
+      });
+    }
+  }
 }
 
 const COLUMNAS: { header: string; key: keyof FilaCruce; width: number; money?: boolean }[] = [
