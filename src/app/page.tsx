@@ -14,41 +14,19 @@ interface Opcion {
 const OPCIONES: Opcion[] = [
   {
     href: "/clientes",
-    icono: "🏢",
-    titulo: "Clientes",
-    detalle: "RUC, estado SUNAT, SIRE, buzón, declaraciones y deudas de cada cliente.",
-  },
-  {
-    href: "/clientes",
     icono: "📑",
-    titulo: "Reporte de auditoría",
-    detalle: "Genera el informe de gerencia de un cliente. Entra al cliente y pulsa “Generar informe”.",
+    titulo: "Reporte analítico de auditoría",
+    detalle:
+      "Consulta el RUC, registra los accesos a la API y ejecuta todos los procedimientos (SIRE, buzón, declaraciones, deudas) hasta el informe de gerencia.",
     destacado: true,
   },
   {
-    href: "/herramientas/cruce-sire",
+    href: "/herramientas/procesar-compras",
     icono: "🔀",
-    titulo: "Comparativo SIRE vs Contabilidad",
-    detalle: "Cruza el SIRE con Contasis comprobante por comprobante y baja las diferencias en Excel.",
+    titulo: "Cruce SIRE + Glosa + Cuenta → Contasis",
+    detalle:
+      "Cruza el SIRE vs contabilidad (saca reporte), sube los XML para la glosa de cada factura, clasifica por cuenta y descarga el masivo para subir a Contasis.",
     destacado: true,
-  },
-  {
-    href: "/herramientas/clasificacion",
-    icono: "🏷️",
-    titulo: "Clasificación de compras",
-    detalle: "Sube el SIRE de compras y asigna la cuenta contable por rubro del proveedor (aprende).",
-  },
-  {
-    href: "/herramientas/facturas-xml",
-    icono: "📄",
-    titulo: "Facturas XML → detalle + cuenta",
-    detalle: "Lee los XML: descripción (glosa), montos y cuenta automática, listo para Contasis.",
-  },
-  {
-    href: "/dashboard",
-    icono: "📊",
-    titulo: "Dashboard",
-    detalle: "Panorama de tu cartera: riesgos, estado SUNAT y clientes que requieren atención.",
   },
 ];
 
@@ -81,7 +59,7 @@ export default async function MenuPage() {
       </section>
 
       {/* Menú de tarjetas */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {OPCIONES.map((o) => (
           <Link
             key={o.titulo}
