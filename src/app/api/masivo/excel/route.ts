@@ -59,6 +59,27 @@ function ccoddoc(serie: string): string {
   return "01"; // factura
 }
 
+const pad = (x: any) => String(x).padStart(2, "0");
+const fmtD = (d: Date) => `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+
+/** Normaliza cualquier fecha a texto dd/mm/aaaa (formato que pide Contasis). */
+function aFechaDDMMAAAA(v: any): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (v instanceof Date && !isNaN(v.getTime())) return fmtD(v);
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); // dd/mm/yyyy
+  if (m) return `${pad(m[1])}/${pad(m[2])}/${m[3]}`;
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); // yyyy-mm-dd
+  if (m) return `${pad(m[3])}/${pad(m[2])}/${m[1]}`;
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    // Número de serie de Excel.
+    const n = Number(s);
+    if (n > 59 && n < 90000) return fmtD(new Date(Date.UTC(1899, 11, 30) + n * 86400000));
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : fmtD(d);
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const rows: any[] = Array.isArray(body?.filas) ? body.filas : [];
@@ -82,8 +103,9 @@ export async function POST(req: NextRequest) {
   rows.forEach((d, idx) => {
     const row = ws.getRow(3 + idx);
     const set = (col: number, v: any) => (row.getCell(col).value = v);
-    set(2, d.fecha ?? "");           // ffechadoc
-    set(3, d.fecha ?? "");           // ffechaven
+    const fecha = aFechaDDMMAAAA(d.fecha);
+    set(2, fecha);                   // ffechadoc (dd/mm/aaaa)
+    set(3, fecha);                   // ffechaven
     set(4, ccoddoc(d.serie));        // ccoddoc
     set(7, d.serie ?? "");           // cserie
     set(8, d.numero ?? "");          // cnumero
@@ -99,7 +121,7 @@ export async function POST(req: NextRequest) {
     set(25, Number(d.total) || 0);   // ntots
     set(29, 1);                      // ntc
     set(34, C.cmreg);                // cmreg
-    set(36, d.fecha ?? "");          // ffechaven2
+    set(36, fecha);                  // ffechaven2
     set(37, C.ccond);                // ccond
     set(38, d.cuenta ?? "");         // cctabase ← cuenta clasificada
     set(41, C.cctatot);              // cctatot
