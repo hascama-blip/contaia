@@ -155,7 +155,8 @@ export default function ProcesarComprasFlow() {
     try {
       const filas = comps.map((c) => ({
         fecha: c.fecha,
-        serieNumero: `${c.serie}-${c.numero}`,
+        serie: c.serie,
+        numero: c.numero,
         ruc: c.ruc,
         razonSocial: c.razonSocial,
         glosa: c.glosa ?? "",
