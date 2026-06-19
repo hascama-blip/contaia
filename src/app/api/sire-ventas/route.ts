@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
     base: c.baseGravada,
     igv: c.igv,
     total: c.total,
-    cuenta: c.cuentaArchivo || CUENTA_VENTAS_DEFECTO,
-    glosa: c.glosaArchivo || "",
+    cuenta: CUENTA_VENTAS_DEFECTO,
+    glosa: "",
   }));
 
   return NextResponse.json({ comprobantes, cuentaDefecto: CUENTA_VENTAS_DEFECTO, total: comprobantes.length });

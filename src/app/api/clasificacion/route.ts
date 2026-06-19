@@ -79,16 +79,14 @@ export async function POST(req: NextRequest) {
   const rubrosCache = await getRubros();
   const nuevosRubros: Record<string, { razonSocial: string; actividad: string }> = {};
 
-  // Agrupa por proveedor (RUC), con su razón social, montos y la cuenta del
-  // archivo (si la trae la columna "Cuenta Contable").
-  const porRuc = new Map<string, { ruc: string; razonSocial: string; comprobantes: number; monto: number; cuentaArchivo?: string }>();
+  // Agrupa por proveedor (RUC), con su razón social y montos.
+  const porRuc = new Map<string, { ruc: string; razonSocial: string; comprobantes: number; monto: number }>();
   for (const c of comps) {
     const ruc = c.rucContraparte || "";
-    const g = porRuc.get(ruc) ?? { ruc, razonSocial: c.razonSocial || "", comprobantes: 0, monto: 0, cuentaArchivo: undefined as string | undefined };
+    const g = porRuc.get(ruc) ?? { ruc, razonSocial: c.razonSocial || "", comprobantes: 0, monto: 0 };
     g.comprobantes += 1;
     g.monto += c.total || 0;
     if (!g.razonSocial && c.razonSocial) g.razonSocial = c.razonSocial;
-    if (!g.cuentaArchivo && c.cuentaArchivo) g.cuentaArchivo = c.cuentaArchivo;
     porRuc.set(ruc, g);
   }
 
@@ -99,15 +97,6 @@ export async function POST(req: NextRequest) {
     const previo = memoria[g.ruc];
     if (previo) {
       proveedores.push({ ...previo, razonSocial: previo.razonSocial || g.razonSocial, nuevo: false, comprobantes: g.comprobantes, monto: g.monto });
-      continue;
-    }
-    // Si el propio Excel trae la cuenta, se usa esa (no gasta decolecta).
-    if (g.cuentaArchivo) {
-      proveedores.push({
-        ruc: g.ruc, razonSocial: g.razonSocial, rubro: "(del archivo)", cuenta: g.cuentaArchivo,
-        nombreCuenta: "Cuenta del Excel", fuente: "sugerido", actualizadoAt: new Date().toISOString(),
-        nuevo: false, comprobantes: g.comprobantes, monto: g.monto,
-      });
       continue;
     }
     // Proveedor NUEVO: rubro desde el CACHÉ (sin gastar decolecta) o, si no
@@ -156,8 +145,8 @@ export async function POST(req: NextRequest) {
     base: c.baseGravada,
     igv: c.igv,
     total: c.total,
-    cuenta: c.cuentaArchivo || cuentaPorRuc.get(c.rucContraparte) || "",
-    glosa: c.glosaArchivo || "",
+    cuenta: cuentaPorRuc.get(c.rucContraparte) || "",
+    glosa: "",
   }));
 
   return NextResponse.json({

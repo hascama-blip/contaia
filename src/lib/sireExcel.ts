@@ -13,8 +13,6 @@ export interface CompSire {
   igv: number;
   total: number;
   tipo?: string;
-  cuentaArchivo?: string;
-  glosaArchivo?: string;
 }
 
 function txt(v: any): string {
@@ -83,8 +81,6 @@ export function analizarSireExcel(filas: unknown[][]): SireExcelResult {
   const colsBase = findAll(/^bi\s*gravad/);
   const colsIgv = findAll(/igv\s*\/?\s*ipm/);
   const iTotal = find(/total\s*cp|importe\s*total/);
-  const iCuenta = find(/cuenta\s*contable/);
-  const iGlosa = find(/^glosa/);
 
   if (iSerie < 0 || iRuc < 0 || iTotal < 0) {
     const faltan = [
@@ -116,8 +112,6 @@ export function analizarSireExcel(filas: unknown[][]): SireExcelResult {
       igv: colsIgv.reduce((a, c) => a + n(row[c]), 0),
       total: n(row[iTotal]),
       tipo: iTipo >= 0 ? txt(row[iTipo]) : undefined,
-      cuentaArchivo: iCuenta >= 0 ? txt(row[iCuenta]) || undefined : undefined,
-      glosaArchivo: iGlosa >= 0 ? txt(row[iGlosa]) || undefined : undefined,
     });
   }
   if (out.length === 0) {
