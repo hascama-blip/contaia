@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCliente } from "@/lib/db";
+import { getClienteDeUsuario } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { generarDiagnostico } from "@/lib/diagnostico";
 import { compararDeclaracionSire } from "@/lib/declaracion";
 import { compararAnual } from "@/lib/declaracionAnual";
@@ -28,7 +29,8 @@ const SEV_DOT: Record<NivelRiesgo, string> = {
 };
 
 export default async function InformePage({ params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const user = await requireUser();
+  const cliente = await getClienteDeUsuario(params.id, user.id);
   if (!cliente) notFound();
 
   // Usa el diagnóstico guardado, o lo genera al vuelo para el informe.

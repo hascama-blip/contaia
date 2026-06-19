@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { CondicionBadge, EstadoBadge, RiesgoBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
-  const clientes = await listClientes();
+  const user = await requireUser();
+  const clientes = await listClientes(user.id);
 
   return (
     <div className="space-y-5">

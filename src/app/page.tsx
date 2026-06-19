@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,8 @@ const OPCIONES: Opcion[] = [
 ];
 
 export default async function MenuPage() {
-  const clientes = await listClientes();
+  const user = await requireUser();
+  const clientes = await listClientes(user.id);
 
   return (
     <div className="space-y-6">

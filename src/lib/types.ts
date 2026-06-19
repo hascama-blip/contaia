@@ -64,8 +64,19 @@ export interface Diagnostico {
   generatedAt: string;
 }
 
+/** Usuario que inicia sesión. La contraseña se guarda solo como hash (scrypt). */
+export interface Usuario {
+  id: string;
+  nombre: string;
+  email: string;
+  passHash: string;
+  createdAt: string;
+}
+
 export interface Cliente {
   id: string;
+  /** Dueño (usuario) de esta empresa: cada usuario ve solo lo suyo. */
+  ownerId?: string;
   razonSocial: string;
   ruc: string;
   email: string;

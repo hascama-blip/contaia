@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCliente, setBuzon } from "@/lib/db";
+import { setBuzon } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { consultarBuzon } from "@/lib/buzon";
 
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ export const maxDuration = 120;
 // Consulta el buzón electrónico SUNAT. La Clave SOL se usa solo para esta
 // llamada y NO se persiste.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCliente } from "@/lib/db";
+import { getClienteDeUsuario } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { PrintButton } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
 import { fmtFecha } from "@/components/ui";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 // Recicla el mismo procedimiento del informe analítico: membrete corporativo +
 // botón "Imprimir / Guardar PDF" (window.print) + estilos de impresión.
 export default async function BuzonPdfPage({ params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const user = await requireUser();
+  const cliente = await getClienteDeUsuario(params.id, user.id);
   if (!cliente) notFound();
 
   const buzon = cliente.buzon;

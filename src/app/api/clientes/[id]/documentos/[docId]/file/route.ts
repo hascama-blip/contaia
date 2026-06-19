@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { getCliente, UPLOADS_DIR } from "@/lib/db";
+import { UPLOADS_DIR } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string; docId: string } }
 ) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const doc = cliente.documentos.find((d) => d.id === params.docId);
   if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });

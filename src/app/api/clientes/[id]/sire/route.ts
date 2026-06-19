@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearSire, getCliente, setSireResumen, setCredSire } from "@/lib/db";
+import { clearSire, setSireResumen, setCredSire } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { consultarResumenSire } from "@/lib/sire";
 
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ export const maxDuration = 120;
 // Limpia (borra) todos los resúmenes SIRE guardados del cliente, para volver a
 // descargar otro rango/periodo desde cero.
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const actualizado = await clearSire(cliente.id);
   return NextResponse.json({ cliente: actualizado });
@@ -18,7 +19,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 // Recibe la Clave SOL del cliente SOLO para esta llamada; NO se persiste.
 // Se guardan únicamente los totales resultantes.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

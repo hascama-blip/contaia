@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addDeclaracionAnual,
   deleteDeclaracionAnual,
-  getCliente,
   newId,
 } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { extraerFilasPdf, parseAnual } from "@/lib/declaracionAnual";
 import type { DeclaracionAnual } from "@/lib/types";
 
@@ -17,7 +17,7 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 // ejercicio y guarda cada uno (reemplaza el mismo año). Devuelve resultados +
 // diagnóstico opcional.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const declId = new URL(req.url).searchParams.get("declId");
   if (!declId) return NextResponse.json({ error: "Falta declId" }, { status: 400 });

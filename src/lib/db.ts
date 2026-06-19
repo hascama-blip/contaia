@@ -13,6 +13,7 @@ import type {
   Deuda,
   CredencialesSire,
   ProveedorCuenta,
+  Usuario,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -30,6 +31,8 @@ export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 
 interface Store {
   clientes: Cliente[];
+  /** Usuarios que inician sesión (cada uno ve solo sus empresas). */
+  users?: Usuario[];
   /** Memoria del estudio: RUC del proveedor → cuenta contable. */
   cuentasProveedor?: Record<string, ProveedorCuenta>;
   /** Caché de rubro por RUC (para consultar decolecta 1 sola vez por RUC). */
@@ -48,6 +51,7 @@ async function readStore(): Promise<Store> {
     const store = JSON.parse(raw) as Store;
     if (!store.cuentasProveedor) store.cuentasProveedor = {};
     if (!store.rubrosProveedor) store.rubrosProveedor = {};
+    if (!Array.isArray(store.users)) store.users = [];
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
@@ -59,8 +63,40 @@ async function readStore(): Promise<Store> {
     }
     return store;
   } catch {
-    return { clientes: [], cuentasProveedor: {}, rubrosProveedor: {} };
+    return { clientes: [], users: [], cuentasProveedor: {}, rubrosProveedor: {} };
   }
+}
+
+// ---- Usuarios --------------------------------------------------------------
+
+export async function getUserById(id: string): Promise<Usuario | null> {
+  const store = await readStore();
+  return store.users?.find((u) => u.id === id) ?? null;
+}
+
+export async function getUserByEmail(email: string): Promise<Usuario | null> {
+  const store = await readStore();
+  const e = email.trim().toLowerCase();
+  return store.users?.find((u) => u.email.toLowerCase() === e) ?? null;
+}
+
+export async function createUser(data: {
+  nombre: string;
+  email: string;
+  passHash: string;
+}): Promise<Usuario> {
+  const store = await readStore();
+  if (!store.users) store.users = [];
+  const user: Usuario = {
+    id: newId(),
+    nombre: data.nombre.trim(),
+    email: data.email.trim().toLowerCase(),
+    passHash: data.passHash,
+    createdAt: new Date().toISOString(),
+  };
+  store.users.push(user);
+  await writeStore(store);
+  return user;
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */
@@ -112,9 +148,13 @@ export function newId(): string {
   return crypto.randomUUID();
 }
 
-export async function listClientes(): Promise<Cliente[]> {
+/** Lista las empresas del usuario (o todas si no se pasa ownerId). */
+export async function listClientes(ownerId?: string): Promise<Cliente[]> {
   const store = await readStore();
-  return store.clientes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const lista = ownerId
+    ? store.clientes.filter((c) => c.ownerId === ownerId)
+    : store.clientes;
+  return lista.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getCliente(id: string): Promise<Cliente | null> {
@@ -122,11 +162,27 @@ export async function getCliente(id: string): Promise<Cliente | null> {
   return store.clientes.find((c) => c.id === id) ?? null;
 }
 
-/** Busca un cliente por RUC (para evitar duplicados). */
-export async function getClienteByRuc(ruc: string): Promise<Cliente | null> {
+/** Empresa por id PERO solo si pertenece al usuario (aislamiento por usuario). */
+export async function getClienteDeUsuario(
+  id: string,
+  ownerId: string
+): Promise<Cliente | null> {
+  const c = await getCliente(id);
+  return c && c.ownerId === ownerId ? c : null;
+}
+
+/** Busca un cliente por RUC dentro del espacio del usuario (evitar duplicados). */
+export async function getClienteByRuc(
+  ruc: string,
+  ownerId?: string
+): Promise<Cliente | null> {
   const store = await readStore();
   const r = ruc.trim();
-  return store.clientes.find((c) => c.ruc === r) ?? null;
+  return (
+    store.clientes.find(
+      (c) => c.ruc === r && (ownerId ? c.ownerId === ownerId : true)
+    ) ?? null
+  );
 }
 
 /** Guarda las credenciales SIRE del cliente (sin la Clave SOL). */
@@ -148,10 +204,12 @@ export async function createCliente(data: {
   email: string;
   telefono: string;
   sunat?: SunatInfo | null;
+  ownerId?: string;
 }): Promise<Cliente> {
   const store = await readStore();
   const cliente: Cliente = {
     id: newId(),
+    ownerId: data.ownerId,
     razonSocial: data.razonSocial.trim(),
     ruc: data.ruc.trim(),
     email: data.email.trim(),

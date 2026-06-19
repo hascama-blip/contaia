@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addDeuda, getCliente, deleteDeuda, newId } from "@/lib/db";
+import { addDeuda, deleteDeuda, newId } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { ocrVarias, parseFilasDeudaF36, detectarSeccionF36, extraerDeuda } from "@/lib/ocr";
 import type { Deuda } from "@/lib/types";
 
@@ -29,7 +30,7 @@ function aDeuda(d: any): Deuda {
 //   (pestaña del F36) y extrae las filas (periodo + monto) como borradores.
 // POST JSON { deudas:[...] } o { deuda:{...} }: guarda las deudas confirmadas.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const contentType = req.headers.get("content-type") ?? "";
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const deudaId = new URL(req.url).searchParams.get("deudaId");
   if (!deudaId) return NextResponse.json({ error: "Falta deudaId" }, { status: 400 });

@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCliente, getClienteByRuc, listClientes } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const clientes = await listClientes();
+  const user = await requireUser();
+  const clientes = await listClientes(user.id);
   return NextResponse.json({ clientes });
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requireUser();
   const body = await req.json().catch(() => null);
   if (!body || typeof body.razonSocial !== "string" || typeof body.ruc !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
@@ -23,8 +26,8 @@ export async function POST(req: NextRequest) {
   if (!body.razonSocial.trim()) {
     return NextResponse.json({ error: "La razón social es obligatoria." }, { status: 400 });
   }
-  // Un solo cliente por RUC: si ya existe, no se crea otro (evita duplicados).
-  const existente = await getClienteByRuc(body.ruc);
+  // Un solo cliente por RUC EN EL ESPACIO DEL USUARIO (evita duplicados).
+  const existente = await getClienteByRuc(body.ruc, user.id);
   if (existente) {
     return NextResponse.json(
       {
@@ -46,6 +49,7 @@ export async function POST(req: NextRequest) {
     email: body.email ?? "",
     telefono: body.telefono ?? "",
     sunat,
+    ownerId: user.id,
   });
   return NextResponse.json({ cliente }, { status: 201 });
 }

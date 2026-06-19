@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addDeclaracion, deleteDeclaracion, getCliente, newId } from "@/lib/db";
+import { addDeclaracion, deleteDeclaracion, newId } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { extraerTextoPdf, parseDeclaracion } from "@/lib/declaracion";
 import type { DeclaracionMensual } from "@/lib/types";
 
@@ -14,7 +15,7 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 // POST con JSON { declaracion }:
 //   -> guarda/actualiza la declaración del periodo.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const contentType = req.headers.get("content-type") ?? "";
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const declId = new URL(req.url).searchParams.get("declId");
   if (!declId) return NextResponse.json({ error: "Falta declId" }, { status: 400 });

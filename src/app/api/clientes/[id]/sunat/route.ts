@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCliente, setSunatInfo } from "@/lib/db";
+import { setSunatInfo } from "@/lib/db";
+import { getClienteAutorizado } from "@/lib/auth";
 import { consultarSunat } from "@/lib/sunat";
 
 export const runtime = "nodejs";
 
 // Consulta el estado tributario del cliente en SUNAT y lo persiste.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const cliente = await getCliente(params.id);
+  const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   try {
