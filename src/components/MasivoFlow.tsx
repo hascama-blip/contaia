@@ -55,9 +55,10 @@ export default function MasivoFlow() {
       const res = await fetch("/api/clasificacion", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return setError(data.error ?? "No se pudo procesar el SIRE de compras.");
-      setCompras(data.comprobantes ?? []);
+      // La glosa arranca VACÍA: solo se llena con el XML (detalle exacto).
+      setCompras((data.comprobantes ?? []).map((c: Comp) => ({ ...c, glosa: "" })));
       setProvs(data.proveedores ?? []);
-      setInfo(`Compras ✓ ${data.comprobantes?.length ?? 0} comprobantes · ${data.nuevos} nuevo(s).`);
+      setInfo(`Compras ✓ ${data.comprobantes?.length ?? 0} comprobantes · ${data.nuevos} nuevo(s). La glosa se llenará con los XML.`);
     } finally { setBusy(null); if (refSC.current) refSC.current.value = ""; }
   }
 
@@ -68,8 +69,9 @@ export default function MasivoFlow() {
       const res = await fetch("/api/sire-ventas", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return setError(data.error ?? "No se pudo procesar el SIRE de ventas.");
-      setVentas((data.comprobantes ?? []).map((c: Comp) => ({ ...c, cuenta: cuentaVentas })));
-      setInfo(`Ventas ✓ ${data.comprobantes?.length ?? 0} comprobantes.`);
+      // La glosa arranca VACÍA: solo se llena con el XML (detalle exacto).
+      setVentas((data.comprobantes ?? []).map((c: Comp) => ({ ...c, cuenta: cuentaVentas, glosa: "" })));
+      setInfo(`Ventas ✓ ${data.comprobantes?.length ?? 0} comprobantes. La glosa se llenará con los XML.`);
     } finally { setBusy(null); if (refSV.current) refSV.current.value = ""; }
   }
 
@@ -254,14 +256,36 @@ export default function MasivoFlow() {
 
       {/* Generar masivos */}
       {haySire && (
-        <section className="card flex flex-wrap items-center gap-3 p-5">
-          <h2 className="font-bold text-slate-800">Generar masivo para Contasis:</h2>
-          <button className="btn-primary" onClick={() => generar("compras")} disabled={trabajando || compras.length === 0}>
-            {busy === "compras" ? "Generando…" : "⬇ Masivo Compras"}
-          </button>
-          <button className="btn-primary" onClick={() => generar("ventas")} disabled={trabajando || ventas.length === 0}>
-            {busy === "ventas" ? "Generando…" : "⬇ Masivo Ventas"}
-          </button>
+        <section className="card space-y-3 p-5">
+          <h2 className="font-bold text-slate-800">Generar masivo para Contasis</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn-primary" onClick={() => generar("compras")} disabled={trabajando || compras.length === 0}>
+              {busy === "compras" ? "Generando…" : "⬇ Masivo Compras"}
+            </button>
+            <button className="btn-primary" onClick={() => generar("ventas")} disabled={trabajando || ventas.length === 0}>
+              {busy === "ventas" ? "Generando…" : "⬇ Masivo Ventas"}
+            </button>
+          </div>
+          {compras.length > 0 && (() => {
+            const con = compras.filter((c) => (c.glosa ?? "").trim()).length;
+            const falt = compras.length - con;
+            return (
+              <p className={`text-sm ${falt ? "text-amber-600" : "text-emerald-600"}`}>
+                Compras — glosa: <b>{con}/{compras.length}</b> con detalle.
+                {falt ? ` Faltan ${falt} sin glosa (sube sus XML para que sea exacto).` : " Todas con glosa ✓"}
+              </p>
+            );
+          })()}
+          {ventas.length > 0 && (() => {
+            const con = ventas.filter((c) => (c.glosa ?? "").trim()).length;
+            const falt = ventas.length - con;
+            return (
+              <p className={`text-sm ${falt ? "text-amber-600" : "text-emerald-600"}`}>
+                Ventas — glosa: <b>{con}/{ventas.length}</b> con detalle.
+                {falt ? ` Faltan ${falt} sin glosa (sube sus XML).` : " Todas con glosa ✓"}
+              </p>
+            );
+          })()}
         </section>
       )}
     </div>
