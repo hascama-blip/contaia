@@ -4,6 +4,7 @@ import { sunatModo } from "@/lib/sunat";
 import { EstadoBars, RiesgoPie } from "@/components/DashboardCharts";
 import CruceSirePanel from "@/components/CruceSirePanel";
 import ClasificacionPanel from "@/components/ClasificacionPanel";
+import FacturasXmlPanel from "@/components/FacturasXmlPanel";
 import { RiesgoBadge } from "@/components/ui";
 import type { NivelRiesgo } from "@/lib/types";
 
@@ -149,6 +150,18 @@ export default async function DashboardPage() {
           </p>
         </div>
         <ClasificacionPanel />
+      </section>
+
+      {/* Herramienta suelta: lectura de XML de facturas (detalle + cuenta) */}
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Facturas XML → detalle + cuenta</h2>
+          <p className="text-sm text-slate-500">
+            Sube los XML de las facturas y obtén la <strong>descripción (glosa)</strong>, montos y
+            la cuenta automática — listo para registrar en Contasis.
+          </p>
+        </div>
+        <FacturasXmlPanel />
       </section>
 
       {/* Herramienta suelta: Cruce SIRE vs Contabilidad (Contasis) */}
