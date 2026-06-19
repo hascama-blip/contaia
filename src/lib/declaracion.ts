@@ -26,10 +26,22 @@ import type {
  *   108/111/114 = IGV de esas compras (crédito fiscal)
  */
 export const MAPA_CASILLAS = {
-  // Ventas — base imponible gravada y débito fiscal total (IGV).
-  ventasBase: ["100"],
+  // Ventas — débito fiscal total (IGV). La base sale del desglose de conceptos.
   ventasIgv: ["131"],
 };
+
+/**
+ * Conceptos de VENTAS del 621 (cada tipo), con su casilla de BASE y de IGV.
+ * Se listan TODOS (no se netean): gravadas, exportaciones y no gravadas.
+ * El IGV total de ventas es la casilla 131 (débito fiscal).
+ */
+export const VENTAS_CONCEPTOS: { base: string; igv: string | null; etiqueta: string }[] = [
+  { base: "100", igv: "101", etiqueta: "Ventas netas gravadas" },
+  { base: "127", igv: null, etiqueta: "Exportaciones facturadas en el período" },
+  { base: "105", igv: null, etiqueta: "Ventas no gravadas (sin exportaciones)" },
+  { base: "109", igv: null, etiqueta: "Ventas no gravadas (sin efecto en ratio)" },
+  { base: "112", igv: null, etiqueta: "Otras ventas" },
+];
 
 /**
  * Conceptos de COMPRAS del 621 (cada destino), con su casilla de BASE y de IGV
@@ -136,6 +148,18 @@ export function detalleCompras(casillas: CasillaDeclaracion[]): ConceptoCompra[]
   })).filter((c) => c.base !== 0 || c.igv !== 0);
 }
 
+/** Construye el desglose de ventas por concepto (solo los que tienen monto). */
+export function detalleVentas(casillas: CasillaDeclaracion[]): ConceptoCompra[] {
+  const totalDebito = montoCasilla(casillas, "131");
+  return VENTAS_CONCEPTOS.map((c) => {
+    let igv = montoCasilla(casillas, c.igv);
+    // El IGV de ventas gravadas (101) a veces no queda adyacente en el PDF;
+    // si falta, usamos el total débito (131).
+    if (c.base === "100" && igv === 0 && totalDebito !== 0) igv = totalDebito;
+    return { codigo: c.base, etiqueta: c.etiqueta, base: montoCasilla(casillas, c.base), igv };
+  }).filter((c) => c.base !== 0 || c.igv !== 0);
+}
+
 /** Parsea el texto de una declaración a un borrador (sin id ni persistir). */
 export function parseDeclaracion(
   texto: string
@@ -143,6 +167,7 @@ export function parseDeclaracion(
   const t = texto.replace(/ /g, " ");
   const casillas = detectarCasillas(t);
   const comprasDet = detalleCompras(casillas);
+  const ventasDet = detalleVentas(casillas);
 
   const rucMatch = t.match(/\b((?:10|15|16|17|20)\d{9})\b/);
   const formMatch = t.match(/formulario\D{0,12}?(\d{3,4})/i) || t.match(/\b(621)\b/);
@@ -151,8 +176,10 @@ export function parseDeclaracion(
     periodo: detectarPeriodo(t) ?? "",
     ruc: rucMatch?.[1],
     formulario: formMatch?.[1],
-    ventasBase: sumarCasillas(casillas, MAPA_CASILLAS.ventasBase),
+    // Total de ventas = suma de TODOS los conceptos (no se netea). IGV = 131.
+    ventasBase: ventasDet.reduce((a, c) => a + c.base, 0),
     ventasIgv: sumarCasillas(casillas, MAPA_CASILLAS.ventasIgv),
+    ventasDetalle: ventasDet,
     // Total de compras = suma de TODOS los conceptos (no se netea).
     comprasBase: comprasDet.reduce((a, c) => a + c.base, 0),
     comprasIgv: comprasDet.reduce((a, c) => a + c.igv, 0),
@@ -185,7 +212,11 @@ export function compararDeclaracionSire(
     });
   }
 
-  fila("Ventas netas (base imponible)", dec.ventasBase, sire ? sire.ventas.baseImponible : null);
+  fila(
+    "Ventas (base total)",
+    dec.ventasBase,
+    sire ? sire.ventas.baseImponible + sire.ventas.inafectoExonerado : null
+  );
   fila("IGV ventas (débito fiscal)", dec.ventasIgv, sire ? sire.ventas.igv : null);
   // Compras: total declarado (todos los conceptos) vs total SIRE (gravadas +
   // no gravadas), para comparar total contra total.

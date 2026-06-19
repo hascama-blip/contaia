@@ -158,6 +158,8 @@ export interface DeclaracionMensual {
   /** Montos declarados (editables/confirmados por el contador). */
   ventasBase: number;
   ventasIgv: number;
+  /** Desglose de ventas por concepto (no neteado): cada tipo con su monto. */
+  ventasDetalle?: ConceptoCompra[];
   comprasBase: number;
   comprasIgv: number;
   /** Desglose de compras por concepto (no neteado): cada destino con su monto. */

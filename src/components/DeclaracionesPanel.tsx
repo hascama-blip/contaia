@@ -25,6 +25,7 @@ interface Borrador {
   formulario?: string;
   ventasBase: number;
   ventasIgv: number;
+  ventasDetalle?: { codigo: string; etiqueta: string; base: number; igv: number }[];
   comprasBase: number;
   comprasIgv: number;
   comprasDetalle?: { codigo: string; etiqueta: string; base: number; igv: number }[];
@@ -345,13 +346,26 @@ function BorradorForm({
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <NumField label="Ventas · Base" value={borrador.ventasBase} onChange={(v) => setNum("ventasBase", v)} />
-        <NumField label="Ventas · IGV" value={borrador.ventasIgv} onChange={(v) => setNum("ventasIgv", v)} />
+        <NumField label="Ventas · Base (total)" value={borrador.ventasBase} onChange={(v) => setNum("ventasBase", v)} />
+        <NumField label="Ventas · IGV (total)" value={borrador.ventasIgv} onChange={(v) => setNum("ventasIgv", v)} />
         <NumField label="Compras · Base (total)" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
         <NumField label="Compras · IGV (total)" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
       </div>
 
-      <DetalleCompras detalle={borrador.comprasDetalle} totalBase={borrador.comprasBase} totalIgv={borrador.comprasIgv} />
+      <DetalleConceptos
+        titulo="Detalle de ventas (cada concepto, sin netear)"
+        detalle={borrador.ventasDetalle}
+        totalBase={borrador.ventasBase}
+        totalIgv={borrador.ventasIgv}
+        totalLabel="TOTAL VENTAS"
+      />
+      <DetalleConceptos
+        titulo="Detalle de compras (cada concepto, sin netear)"
+        detalle={borrador.comprasDetalle}
+        totalBase={borrador.comprasBase}
+        totalIgv={borrador.comprasIgv}
+        totalLabel="TOTAL COMPRAS"
+      />
 
       <div className="mt-3 flex gap-2">
         <button className="btn-primary" onClick={onGuardar} disabled={guardando}>
@@ -365,20 +379,24 @@ function BorradorForm({
   );
 }
 
-function DetalleCompras({
+function DetalleConceptos({
+  titulo,
   detalle,
   totalBase,
   totalIgv,
+  totalLabel,
 }: {
+  titulo: string;
   detalle?: { codigo: string; etiqueta: string; base: number; igv: number }[];
   totalBase: number;
   totalIgv: number;
+  totalLabel: string;
 }) {
   if (!detalle || detalle.length === 0) return null;
   return (
     <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        Detalle de compras (cada concepto, sin netear)
+        {titulo}
       </div>
       <table className="w-full text-xs">
         <thead>
@@ -399,7 +417,7 @@ function DetalleCompras({
             </tr>
           ))}
           <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold text-slate-800">
-            <td className="px-3 py-1">TOTAL COMPRAS</td>
+            <td className="px-3 py-1">{totalLabel}</td>
             <td className="px-3 py-1 text-right tabular-nums">{fmtSoles(totalBase)}</td>
             <td className="px-3 py-1 text-right tabular-nums">{fmtSoles(totalIgv)}</td>
           </tr>
@@ -521,10 +539,19 @@ function ComparativoCard({
         </div>
       )}
 
-      <DetalleCompras
+      <DetalleConceptos
+        titulo="Detalle de ventas (cada concepto, sin netear)"
+        detalle={decl.ventasDetalle}
+        totalBase={decl.ventasBase}
+        totalIgv={decl.ventasIgv}
+        totalLabel="TOTAL VENTAS"
+      />
+      <DetalleConceptos
+        titulo="Detalle de compras (cada concepto, sin netear)"
         detalle={decl.comprasDetalle}
         totalBase={decl.comprasBase}
         totalIgv={decl.comprasIgv}
+        totalLabel="TOTAL COMPRAS"
       />
     </div>
   );
