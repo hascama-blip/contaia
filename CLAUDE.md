@@ -42,13 +42,18 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - `src/lib/ocr.ts` — **OCR (tesseract.js)** para fotos de **deudas tributarias**: extrae texto,
   montos, claves y sugiere tipo de deuda. Panel `DeudasPanel.tsx`, ruta `deudas/route.ts`,
   entidad `Deuda` en types/db. (El OCR se reintrodujo solo para deudas; las DJ siguen por unpdf.)
+- `src/lib/cruceSire.ts` — **cruce SIRE vs sistema contable (Contasis)** comprobante por comprobante.
+  Parser de los 4 Excel (SIRE RCE/RVIE + libros Contasis), llave de emparejamiento y comparación.
+- `src/lib/xlsxIO.ts` — lectura/escritura de Excel con **exceljs** (lee los libros subidos y genera el comparativo).
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
 - `src/components/SunatPanel.tsx` — panel unificado (credenciales 1 vez): SIRE + buzón, "Extraer todo".
 - `src/components/DeclaracionesPanel.tsx` — subir PDF de declaración → confirmar montos → comparar vs SIRE.
+- `src/components/CruceSirePanel.tsx` — subir SIRE + libro Contasis (compras/ventas) → cruzar → descargar Excel de diferencias.
 - `src/app/clientes/[id]/informe/page.tsx` — informe imprimible (dashboard, contingencias, buzón, SIRE, declaración vs SIRE).
-- API: `src/app/api/clientes/[id]/{sire,buzon,sunat,declaraciones,diagnostico}/route.ts`.
+- API: `src/app/api/clientes/[id]/{sire,buzon,sunat,declaraciones,diagnostico,cruce-sire}/route.ts`
+  (`cruce-sire/excel/route.ts` genera el Excel del comparativo).
 
 ### Declaraciones mensuales vs SIRE (`declaracion.ts`)
 - **unpdf** (pdf.js serverless) extrae el texto del PDF — solo sirve si el PDF trae capa de
@@ -59,6 +64,23 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   texto crudo + casillas detectadas), igual que se hizo con SIRE/buzón.
 - UI deja los 4 montos **editables** antes de guardar (el contador confirma/corrige), y
   permite **ingreso manual** sin PDF. `compararDeclaracionSire` marca alerta si |declarado−SIRE| > S/1.
+
+### Cruce SIRE vs sistema contable (`cruceSire.ts` + `xlsxIO.ts`)
+- Cruce **comprobante por comprobante** entre el detalle del **SIRE** (RCE compras / RVIE ventas,
+  exportado de SUNAT) y el **libro de Contasis** (compras/ventas). Por ahora se **suben los 4 Excel**
+  (no se descarga el SIRE solo todavía); panel en la ficha del cliente, sin persistir.
+- **Llave de emparejamiento**: `tipo | serie | número | RUC contraparte`, todos normalizados
+  (serie a mayúsculas y sin ceros a la izq. → `00E001`=`E001`; tipo/número sin ceros → `01`=`1`).
+  Las **notas de crédito (tipo 7)** vienen en negativo en ambos lados (restan).
+- **Montos comparados**: base gravada, IGV, total y **no gravadas = Total − Base − IGV** (definición
+  idéntica en ambos lados; evita falsos positivos por cómo cada sistema clasifica exonerado/inafecto/ISC/
+  ICBPER/otros cargos). Tolerancia **S/1** (`TOLERANCIA`, ajustable). Fechas: serial Excel → `YYYY-MM-DD`.
+- **Mapeo de columnas** por encabezado: SIRE por texto descriptivo ("BI Gravado DG", "Total CP", …);
+  Contasis por nombre técnico (`cserie`, `cnumero`, `ccodruc`, `nbase1/2/3`, `nigv1/2/3`, `ntots`; ⚠️ `nigv`
+  sin dígito es la **tasa %**, no el monto). Calibrado con PROCESADORA CALLAO, marzo 2026 (cuadre exacto).
+- **Salida**: Excel con hoja **Resumen** (totales SIRE vs contable + conteos) y hojas **Compras/Ventas**
+  con cada comprobante, sus diferencias y estado (coincide / dif-monto / dif-fecha / solo-SIRE / solo-contable),
+  filas resaltadas. Estados: en SIRE y no en contable, en contable y no en SIRE, o montos distintos.
 
 ## SUNAT — integraciones (lo más valioso, descubierto a pulso)
 
@@ -105,7 +127,8 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·
 buzón (más peligroso aparte) · declaraciones PDF vs SIRE · diagnóstico · dashboard · informe de gerencia
 (contingencias, buzón, SIRE, gráficos juntos en una hoja al imprimir) · "Extraer todo"
-(SIRE todos los meses del año + buzón mes actual).
+(SIRE todos los meses del año + buzón mes actual) · cruce SIRE vs sistema contable (Contasis)
+comprobante por comprobante con Excel de diferencias descargable.
 
 ## Pendiente / ideas
 - Buzón: clasificar por `codEtiqueta` exacto (capturar endpoint de etiquetas).

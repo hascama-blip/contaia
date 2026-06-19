@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
+import CruceSirePanel from "./CruceSirePanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import DeudasPanel from "./DeudasPanel";
@@ -173,6 +174,9 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             inicialSire={cliente.sire ?? []}
             inicialCred={cliente.credSire ?? null}
           />
+
+          {/* Cruce SIRE (SUNAT) vs libro de Contasis, comprobante por comprobante */}
+          <CruceSirePanel clienteId={cliente.id} />
 
           {/* Declaraciones mensuales (PDF) comparadas contra el SIRE */}
           <DeclaracionesPanel
