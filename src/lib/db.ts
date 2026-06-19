@@ -11,6 +11,7 @@ import type {
   DeclaracionMensual,
   DeclaracionAnual,
   Deuda,
+  CredencialesSire,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -47,6 +48,7 @@ async function readStore(): Promise<Store> {
       if (!Array.isArray(c.declaraciones)) c.declaraciones = [];
       if (!Array.isArray(c.declaracionesAnuales)) c.declaracionesAnuales = [];
       if (!Array.isArray(c.deudas)) c.deudas = [];
+      if (c.credSire === undefined) c.credSire = null;
     }
     return store;
   } catch {
@@ -73,6 +75,26 @@ export async function getCliente(id: string): Promise<Cliente | null> {
   return store.clientes.find((c) => c.id === id) ?? null;
 }
 
+/** Busca un cliente por RUC (para evitar duplicados). */
+export async function getClienteByRuc(ruc: string): Promise<Cliente | null> {
+  const store = await readStore();
+  const r = ruc.trim();
+  return store.clientes.find((c) => c.ruc === r) ?? null;
+}
+
+/** Guarda las credenciales SIRE del cliente (sin la Clave SOL). */
+export async function setCredSire(
+  clienteId: string,
+  cred: CredencialesSire
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.credSire = cred;
+  await writeStore(store);
+  return cliente;
+}
+
 export async function createCliente(data: {
   razonSocial: string;
   ruc: string;
@@ -96,6 +118,7 @@ export async function createCliente(data: {
     declaraciones: [],
     declaracionesAnuales: [],
     deudas: [],
+    credSire: null,
   };
   store.clientes.push(cliente);
   await writeStore(store);

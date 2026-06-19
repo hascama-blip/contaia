@@ -15,8 +15,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Branch de trabajo y `main` se mantienen iguales (push a ambos).
 - Datos en `data/store.json` (JSON local). En Render **sin disco persistente los datos
   se borran en cada deploy** → al probar, recrear el cliente. (Activar disco = plan con disco.)
-- Variables clave (Render → Environment): `DECOLECTA_TOKEN`. Resto de SUNAT se ingresan
-  por consulta (Clave SOL + client_id/secret) y **no se guardan**.
+- Variables clave (Render → Environment): `DECOLECTA_TOKEN`. El **usuario SOL + API
+  (client_id/secret)** se **guardan por cliente** (`Cliente.credSire`, setter `setCredSire`)
+  y se prellenan; la **Clave SOL NUNCA se guarda** (se escribe en cada consulta).
+- **RUC único**: no se permite crear dos clientes con el mismo RUC (chequeo en
+  `POST /api/clientes` con `getClienteByRuc`, responde 409). La razón social verificada por
+  SUNAT queda **bloqueada** (read-only) en el alta. Export de contactos: `GET /api/clientes/export` (CSV).
 - Commits terminan con `Co-Authored-By` y `Claude-Session` (ver git log).
 
 ## Arquitectura

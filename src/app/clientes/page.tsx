@@ -11,9 +11,16 @@ export default async function ClientesPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
-        <Link href="/clientes/nuevo" className="btn-primary">
-          + Nuevo cliente
-        </Link>
+        <div className="flex items-center gap-2">
+          {clientes.length > 0 && (
+            <a href="/api/clientes/export" className="btn-ghost" download>
+              ⬇ Descargar contactos (CSV)
+            </a>
+          )}
+          <Link href="/clientes/nuevo" className="btn-primary">
+            + Nuevo cliente
+          </Link>
+        </div>
       </div>
 
       {clientes.length === 0 ? (

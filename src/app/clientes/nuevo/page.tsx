@@ -180,12 +180,18 @@ export default function NuevoClientePage() {
         )}
 
         <div>
-          <label className="label">Razón social *</label>
+          <label className="label">
+            Razón social *
+            {sunat && (
+              <span className="ml-2 text-xs font-normal text-emerald-600">🔒 Verificada con SUNAT (no editable)</span>
+            )}
+          </label>
           <input
-            className="input"
+            className={`input ${sunat ? "cursor-not-allowed bg-slate-100 text-slate-600" : ""}`}
             value={form.razonSocial}
             onChange={(e) => set("razonSocial", e.target.value)}
             placeholder="Se autocompleta al buscar el RUC"
+            readOnly={!!sunat}
             required
           />
         </div>

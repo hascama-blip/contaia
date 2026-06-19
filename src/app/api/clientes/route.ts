@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCliente, listClientes } from "@/lib/db";
+import { createCliente, getClienteByRuc, listClientes } from "@/lib/db";
 import { rucValido } from "@/lib/sunat";
 
 export const runtime = "nodejs";
@@ -22,6 +22,17 @@ export async function POST(req: NextRequest) {
   }
   if (!body.razonSocial.trim()) {
     return NextResponse.json({ error: "La razón social es obligatoria." }, { status: 400 });
+  }
+  // Un solo cliente por RUC: si ya existe, no se crea otro (evita duplicados).
+  const existente = await getClienteByRuc(body.ruc);
+  if (existente) {
+    return NextResponse.json(
+      {
+        error: `Ya existe un cliente con el RUC ${body.ruc.trim()} (${existente.razonSocial}).`,
+        clienteId: existente.id,
+      },
+      { status: 409 }
+    );
   }
   // Si el formulario adjunta la info SUNAT ya consultada, la guardamos
   // siempre que el RUC coincida (evita inyectar datos de otro contribuyente).

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearSire, getCliente, setSireResumen } from "@/lib/db";
+import { clearSire, getCliente, setSireResumen, setCredSire } from "@/lib/db";
 import { consultarResumenSire } from "@/lib/sire";
 
 export const runtime = "nodejs";
@@ -38,6 +38,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       real: body.real === true,
       diagnostico: body.diagnostico === true,
     });
+    // Guarda las credenciales de la API (sin la Clave SOL) para reutilizarlas.
+    if (
+      body.real === true &&
+      typeof body.clientId === "string" && body.clientId.trim() &&
+      typeof body.clientSecret === "string" && body.clientSecret.trim()
+    ) {
+      await setCredSire(cliente.id, {
+        solUser: typeof body.solUser === "string" ? body.solUser.trim() : "",
+        clientId: body.clientId.trim(),
+        clientSecret: body.clientSecret.trim(),
+        guardadoAt: new Date().toISOString(),
+      });
+    }
     // Modo diagnóstico: devuelve la traza cruda, sin persistir.
     if (!resultado.resumen) {
       return NextResponse.json({ diag: resultado.diag });

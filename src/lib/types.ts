@@ -84,6 +84,16 @@ export interface Cliente {
   declaracionesAnuales: DeclaracionAnual[];
   /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
   deudas: Deuda[];
+  /** Credenciales de la API SIRE guardadas (la Clave SOL NO se guarda). */
+  credSire?: CredencialesSire | null;
+}
+
+/** Credenciales SIRE persistidas (sin la Clave SOL, que es efímera). */
+export interface CredencialesSire {
+  solUser: string;
+  clientId: string;
+  clientSecret: string;
+  guardadoAt: string;
 }
 
 /** Deuda tributaria detectada/indicada (foto con OCR o ingreso manual). */

@@ -168,7 +168,11 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
           </section>
 
           {/* Consulta SUNAT unificada: SIRE + Buzón con una sola credencial */}
-          <SunatPanel clienteId={cliente.id} inicialSire={cliente.sire ?? []} />
+          <SunatPanel
+            clienteId={cliente.id}
+            inicialSire={cliente.sire ?? []}
+            inicialCred={cliente.credSire ?? null}
+          />
 
           {/* Declaraciones mensuales (PDF) comparadas contra el SIRE */}
           <DeclaracionesPanel

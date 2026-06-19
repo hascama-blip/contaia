@@ -19,17 +19,20 @@ function etiqueta(periodo: string): string {
 export default function SunatPanel({
   clienteId,
   inicialSire,
+  inicialCred,
 }: {
   clienteId: string;
   inicialSire: SireResumen[];
+  inicialCred?: { solUser: string; clientId: string; clientSecret: string } | null;
 }) {
   const router = useRouter();
   const hoy = new Date();
-  // Credenciales (se ingresan UNA vez para todo).
-  const [solUser, setSolUser] = useState("");
+  // Credenciales: usuario SOL + API (client_id/secret) se GUARDAN y se prellenan.
+  // La Clave SOL NO se guarda: se escribe en cada consulta.
+  const [solUser, setSolUser] = useState(inicialCred?.solUser ?? "");
   const [solPass, setSolPass] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
+  const [clientId, setClientId] = useState(inicialCred?.clientId ?? "");
+  const [clientSecret, setClientSecret] = useState(inicialCred?.clientSecret ?? "");
   // Rango de periodos SIRE: Desde (mes/año) -> Hasta (mes/año).
   const [mesDesde, setMesDesde] = useState(1);
   const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
@@ -173,9 +176,9 @@ export default function SunatPanel({
     }
     setProgreso(null);
     setBusy(null);
-    // Limpiamos la clave solo al terminar todo el proceso.
+    // Solo limpiamos la Clave SOL (no se guarda). El usuario y la API quedan.
     setSolPass("");
-    setClientSecret("");
+    router.refresh();
   }
 
   async function limpiarSire() {
@@ -208,9 +211,9 @@ export default function SunatPanel({
         <span className="badge bg-slate-100 text-slate-500">SIRE + Buzón</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Ingresa las credenciales <strong>una sola vez</strong> y extrae compras/ventas
-        (SIRE) y los mensajes del buzón. La Clave SOL se usa solo para la consulta y{" "}
-        <strong>no se guarda</strong>.
+        El <strong>usuario SOL</strong> y la <strong>API (client_id/secret)</strong> se
+        <strong> guardan</strong> y quedan prellenados. La <strong>Clave SOL</strong> se
+        escribe en cada consulta y <strong>no se guarda</strong>.
       </p>
 
       {/* Credenciales (una vez) */}
