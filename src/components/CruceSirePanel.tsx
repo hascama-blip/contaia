@@ -205,7 +205,7 @@ function FileInput({
       <span className="label">{label}</span>
       <input
         type="file"
-        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        accept=".xlsx,.xls,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip"
         disabled={disabled}
         className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-700 hover:file:bg-brand-100"
         onChange={(e) => onChange(e.target.files?.[0] ?? null)}

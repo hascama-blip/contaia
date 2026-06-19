@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseFacturaXml } from "@/lib/facturaXml";
+import { esZip, extraerDeZip } from "@/lib/zip";
 import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
 import { clasificar } from "@/lib/clasificacion";
@@ -33,18 +34,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Adjunta los XML de las facturas." }, { status: 400 });
   }
 
-  // Lee cada XML.
-  const parsed = [];
+  // Lee cada archivo: si es ZIP, saca todos los XML de adentro (subcarpetas
+  // incluidas); si es XML, se usa directo.
+  const xmls: { name: string; xml: string }[] = [];
   const errores: string[] = [];
   for (const f of files) {
     if (f.size > MAX_SIZE) {
       errores.push(`${f.name}: supera 8 MB`);
       continue;
     }
-    const xml = Buffer.from(await f.arrayBuffer()).toString("utf-8");
+    const buf = Buffer.from(await f.arrayBuffer());
+    if (esZip(buf)) {
+      const inner = extraerDeZip(buf, [".xml"]);
+      if (inner.length === 0) errores.push(`${f.name}: el ZIP no contiene XML`);
+      for (const it of inner) xmls.push({ name: it.name, xml: it.data.toString("utf-8") });
+    } else {
+      xmls.push({ name: f.name, xml: buf.toString("utf-8") });
+    }
+  }
+
+  // Parsea cada XML.
+  const parsed = [];
+  for (const { name, xml } of xmls) {
     const fx = parseFacturaXml(xml);
     if (fx && fx.rucEmisor) parsed.push(fx);
-    else errores.push(`${f.name}: no es un XML de comprobante válido`);
+    else errores.push(`${name}: no es un XML de comprobante válido`);
   }
   if (parsed.length === 0) {
     return NextResponse.json(

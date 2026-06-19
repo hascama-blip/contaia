@@ -143,7 +143,7 @@ export default function ClasificacionPanel() {
         <input
           ref={fileRef}
           type="file"
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".xlsx,.xls,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip"
           className="hidden"
           onChange={(e) => e.target.files?.[0] && clasificar(e.target.files[0])}
         />

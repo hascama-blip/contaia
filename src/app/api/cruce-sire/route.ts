@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
+import { esZip, extraerDeZip } from "@/lib/zip";
 import {
   parseSireCompras,
   parseSireVentas,
@@ -41,7 +42,14 @@ export async function POST(req: NextRequest) {
   async function filasDe(f: File | null): Promise<unknown[][] | null> {
     if (!f) return null;
     if (f.size > MAX_SIZE) throw new Error(`"${f.name}" supera 15 MB.`);
-    return leerFilas(Buffer.from(await f.arrayBuffer()));
+    const buf = Buffer.from(await f.arrayBuffer());
+    if (esZip(buf)) {
+      // ZIP de SUNAT: usa el primer Excel de adentro.
+      const inner = extraerDeZip(buf, [".xlsx", ".xls"]);
+      if (inner.length === 0) throw new Error(`"${f.name}": el ZIP no tiene Excel.`);
+      return leerFilas(inner[0].data);
+    }
+    return leerFilas(buf);
   }
 
   try {

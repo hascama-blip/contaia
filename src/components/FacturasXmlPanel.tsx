@@ -135,7 +135,7 @@ export default function FacturasXmlPanel() {
         <input
           ref={fileRef}
           type="file"
-          accept=".xml,text/xml,application/xml"
+          accept=".xml,.zip,text/xml,application/xml,application/zip"
           multiple
           className="hidden"
           onChange={(e) => e.target.files?.length && leer(e.target.files)}

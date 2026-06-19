@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
+import { esZip, extraerDeZip } from "@/lib/zip";
 import { parseSireCompras } from "@/lib/cruceSire";
 import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
@@ -39,13 +40,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El archivo supera 15 MB." }, { status: 400 });
   }
 
-  let comps;
+  let comps: any[] = [];
   try {
-    const filas = await leerFilas(Buffer.from(await file.arrayBuffer()));
-    comps = parseSireCompras(filas).comprobantes;
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (esZip(buf)) {
+      // ZIP de SUNAT: lee TODOS los Excel de adentro y une los comprobantes
+      // (si el SIRE viene partido en 2 archivos).
+      const inner = extraerDeZip(buf, [".xlsx", ".xls"]);
+      for (const it of inner) {
+        try {
+          const filas = await leerFilas(it.data);
+          comps.push(...parseSireCompras(filas).comprobantes);
+        } catch {
+          /* archivo del zip que no es el detalle; se ignora */
+        }
+      }
+    } else {
+      const filas = await leerFilas(buf);
+      comps = parseSireCompras(filas).comprobantes;
+    }
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "No se pudo leer el Excel." },
+      { error: e instanceof Error ? e.message : "No se pudo leer el archivo." },
       { status: 400 }
     );
   }
