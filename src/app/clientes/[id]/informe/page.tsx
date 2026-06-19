@@ -660,7 +660,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
           <p>
-            Informe generado automáticamente por ASENCOIA a partir de la información de
+            Informe generado automáticamente por RADAR TRIBUTARIO (by ASENCO) a partir de la información de
             SUNAT y los documentos cargados. Debe ser validado por un contador o auditor
             colegiado antes de su uso formal.
           </p>

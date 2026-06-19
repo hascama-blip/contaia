@@ -4,7 +4,7 @@ import { LogoAsenco } from "@/components/Logo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASENCOIA — Diagnóstico Tributario SUNAT",
+  title: "RADAR TRIBUTARIO — by ASENCO",
   description:
     "Plataforma para consultar el estado tributario SUNAT de clientes, analizar documentos y generar informes.",
 };
@@ -40,7 +40,7 @@ export default function RootLayout({
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
         <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
-          ASENCOIA · Diagnóstico tributario asistido · {new Date().getFullYear()}
+          RADAR TRIBUTARIO · by ASENCO · Diagnóstico tributario asistido · {new Date().getFullYear()}
         </footer>
       </body>
     </html>
