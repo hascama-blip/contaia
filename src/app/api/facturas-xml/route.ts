@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
   if (files.length === 0) {
     return NextResponse.json({ error: "Adjunta los XML de las facturas." }, { status: 400 });
   }
+  // En el masivo solo se necesita la glosa (la cuenta ya viene del SIRE), así
+  // que se puede saltar la clasificación por decolecta: más rápido y sin gasto.
+  const soloGlosa = form.get("soloGlosa") === "1";
 
   // Lee cada archivo: si es ZIP, saca todos los XML de adentro (subcarpetas
   // incluidas); si es XML, se usa directo.
@@ -65,6 +68,17 @@ export async function POST(req: NextRequest) {
       { error: `No se pudo leer ningún XML. ${errores.slice(0, 3).join(" · ")}` },
       { status: 400 }
     );
+  }
+
+  // Modo rápido para el masivo: devuelve solo lo necesario para la glosa, sin
+  // tocar decolecta ni la memoria de cuentas.
+  if (soloGlosa) {
+    const facturas = parsed.map((p) => ({
+      tipo: p.tipo, serieNumero: p.serieNumero, fecha: p.fecha,
+      ruc: p.rucEmisor, razonSocial: p.razonSocialEmisor, glosa: p.glosa,
+      moneda: p.moneda, base: p.base, igv: p.igv, total: p.total, cuenta: "", lineas: p.lineas,
+    }));
+    return NextResponse.json({ facturas, proveedores: [], nuevos: 0, leidas: facturas.length, errores });
   }
 
   // Clasifica por proveedor (memoria > caché de rubro > decolecta una vez).

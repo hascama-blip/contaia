@@ -74,27 +74,31 @@ export default function MasivoFlow() {
   }
 
   async function subirXml(files: FileList, libro: "compras" | "ventas") {
-    setBusy("xml"); setError(null);
+    setBusy("xml"); setError(null); setInfo(`Leyendo ${files.length} archivo(s) XML…`);
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("file", f));
+      fd.append("soloGlosa", "1"); // en el masivo la cuenta ya viene del SIRE
       const res = await fetch("/api/facturas-xml", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return setError(data.error ?? "No se pudieron leer los XML.");
       const facturas: { serieNumero: string; ruc: string; glosa: string }[] = data.facturas ?? [];
+      const avisos = (data.errores ?? []).length ? ` · ${data.errores.length} con aviso` : "";
       if (libro === "compras") {
         const map = new Map<string, string>();
         for (const f of facturas) map.set(`${kXml(f)}|${f.ruc}`, f.glosa);
         const merged = compras.map((c) => ({ ...c, glosa: map.get(kC(c)) ?? c.glosa ?? "" }));
         setCompras(merged);
-        setInfo(`XML compras ✓ ${merged.filter((c) => c.glosa).length}/${merged.length} con glosa.`);
+        setInfo(`XML compras ✓ ${data.leidas ?? facturas.length} leídos · ${merged.filter((c) => c.glosa).length}/${merged.length} comprobantes con glosa${avisos}.`);
       } else {
         const map = new Map<string, string>();
         for (const f of facturas) map.set(kXml(f), f.glosa);
         const merged = ventas.map((c) => ({ ...c, glosa: map.get(kV(c)) ?? c.glosa ?? "" }));
         setVentas(merged);
-        setInfo(`XML ventas ✓ ${merged.filter((c) => c.glosa).length}/${merged.length} con glosa.`);
+        setInfo(`XML ventas ✓ ${data.leidas ?? facturas.length} leídos · ${merged.filter((c) => c.glosa).length}/${merged.length} comprobantes con glosa${avisos}.`);
       }
+    } catch {
+      setError("Se cortó la lectura de los XML. Si es un ZIP muy grande, intenta con menos archivos.");
     } finally {
       setBusy(null);
       if (refXC.current) refXC.current.value = "";
@@ -192,12 +196,16 @@ export default function MasivoFlow() {
           <div className="rounded-lg border border-slate-200 p-3">
             <p className="mb-2 text-sm font-semibold text-slate-700">XML compras</p>
             <input ref={refXC} type="file" accept=".xml,.zip" multiple className="hidden" onChange={(e) => e.target.files?.length && subirXml(e.target.files, "compras")} />
-            <button className="btn-ghost w-full" onClick={() => refXC.current?.click()} disabled={trabajando || compras.length === 0}>⬆ XML compras</button>
+            <button className="btn-ghost w-full" onClick={() => refXC.current?.click()} disabled={trabajando || compras.length === 0}>
+              {busy === "xml" ? "Procesando…" : "⬆ XML compras"}
+            </button>
           </div>
           <div className="rounded-lg border border-slate-200 p-3">
             <p className="mb-2 text-sm font-semibold text-slate-700">XML ventas</p>
             <input ref={refXV} type="file" accept=".xml,.zip" multiple className="hidden" onChange={(e) => e.target.files?.length && subirXml(e.target.files, "ventas")} />
-            <button className="btn-ghost w-full" onClick={() => refXV.current?.click()} disabled={trabajando || ventas.length === 0}>⬆ XML ventas</button>
+            <button className="btn-ghost w-full" onClick={() => refXV.current?.click()} disabled={trabajando || ventas.length === 0}>
+              {busy === "xml" ? "Procesando…" : "⬆ XML ventas"}
+            </button>
           </div>
         </div>
       </section>
