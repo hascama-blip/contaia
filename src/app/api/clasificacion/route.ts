@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
-import { esZip, extraerDeZip } from "@/lib/zip";
+import { esZipContenedor, extraerDeZip } from "@/lib/zip";
 import { parseSireExcel, analizarSireExcel } from "@/lib/sireExcel";
 import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   let motivo: string | undefined;
   try {
     const buf = Buffer.from(await file.arrayBuffer());
-    if (esZip(buf)) {
+    if (esZipContenedor(buf, file.name)) {
       // ZIP de SUNAT: lee TODOS los Excel de adentro y une los comprobantes
       // (si el SIRE viene partido en 2 archivos).
       const inner = extraerDeZip(buf, [".xlsx", ".xls"]);

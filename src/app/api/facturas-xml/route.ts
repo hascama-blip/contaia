@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseFacturaXml } from "@/lib/facturaXml";
-import { esZip, extraerDeZip } from "@/lib/zip";
+import { esZipContenedor, extraerDeZip } from "@/lib/zip";
 import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
 import { clasificar } from "@/lib/clasificacion";
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
     const buf = Buffer.from(await f.arrayBuffer());
-    if (esZip(buf)) {
+    if (esZipContenedor(buf, f.name)) {
       const inner = extraerDeZip(buf, [".xml"]);
       if (inner.length === 0) errores.push(`${f.name}: el ZIP no contiene XML`);
       for (const it of inner) xmls.push({ name: it.name, xml: it.data.toString("utf-8") });

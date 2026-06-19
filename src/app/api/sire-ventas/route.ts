@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
-import { esZip, extraerDeZip } from "@/lib/zip";
+import { esZipContenedor, extraerDeZip } from "@/lib/zip";
 import { analizarSireExcel } from "@/lib/sireExcel";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   let motivo: string | undefined;
   try {
     const buf = Buffer.from(await file.arrayBuffer());
-    if (esZip(buf)) {
+    if (esZipContenedor(buf, file.name)) {
       for (const it of extraerDeZip(buf, [".xlsx", ".xls"])) {
         try {
           const r = analizarSireExcel(await leerFilas(it.data));
