@@ -65,6 +65,7 @@ export async function construirExcelCruce(res: ResultadoCruce): Promise<Buffer> 
   wb.created = new Date();
 
   hojaResumen(wb, res);
+  hojaFaltantes(wb, res);
   if (res.compras) hojaLibro(wb, "Compras", res.compras);
   if (res.ventas) hojaLibro(wb, "Ventas", res.ventas);
 
@@ -132,6 +133,99 @@ function hojaResumen(wb: ExcelJS.Workbook, res: ResultadoCruce) {
     estados.font = { italic: true, color: { argb: "FF475569" } };
     ws.addRow([]);
   }
+}
+
+// ---- Hoja "Faltantes" -------------------------------------------------------
+// Comprobantes que están en el SIRE pero NO en el sistema contable (estado
+// "solo-sire"): es lo que falta REGISTRAR en contabilidad (típicamente facturas
+// de un mes anterior que recién aparecen en el SIRE). Junta compras y ventas.
+
+const COL_FALT: { header: string; width: number; money?: boolean }[] = [
+  { header: "Libro", width: 10 },
+  { header: "Tipo", width: 6 },
+  { header: "Serie", width: 10 },
+  { header: "Número", width: 12 },
+  { header: "RUC contraparte", width: 16 },
+  { header: "Razón social", width: 36 },
+  { header: "Fecha SIRE", width: 12 },
+  { header: "Base gravada", width: 14, money: true },
+  { header: "IGV", width: 12, money: true },
+  { header: "No gravadas", width: 13, money: true },
+  { header: "Total", width: 14, money: true },
+  { header: "Acción", width: 26 },
+];
+
+function hojaFaltantes(wb: ExcelJS.Workbook, res: ResultadoCruce) {
+  const ws = wb.addWorksheet("Faltantes");
+  ws.columns = COL_FALT.map((c) => ({ width: c.width }));
+
+  tituloCelda(ws, "Faltan registrar en contabilidad (están en el SIRE)");
+  ws.addRow([
+    "Comprobantes presentes en el SIRE pero ausentes en el sistema contable. Considerarlos para que la declaración cuadre.",
+  ]).font = { italic: true, color: { argb: "FF475569" } };
+  ws.addRow([]);
+
+  const header = ws.addRow(COL_FALT.map((c) => c.header));
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.eachCell((c) => {
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+    c.alignment = { vertical: "middle", wrapText: true };
+  });
+  const headerRow = header.number;
+  ws.views = [{ state: "frozen", ySplit: headerRow }];
+  ws.autoFilter = {
+    from: { row: headerRow, column: 1 },
+    to: { row: headerRow, column: COL_FALT.length },
+  };
+
+  const recolectar = (libro: CruceLibro | undefined, nombre: string) =>
+    (libro?.filas ?? [])
+      .filter((f) => f.estado === "solo-sire")
+      .map((f) => [
+        nombre,
+        f.tipoDoc,
+        f.serie,
+        f.numero,
+        f.rucContraparte,
+        f.razonSocial,
+        f.fechaSire,
+        f.baseSire,
+        f.igvSire,
+        f.noGravadoSire,
+        f.totalSire,
+        "Registrar en contabilidad",
+      ] as (string | number)[]);
+
+  const filas = [
+    ...recolectar(res.compras, "Compras"),
+    ...recolectar(res.ventas, "Ventas"),
+  ];
+
+  if (filas.length === 0) {
+    const r = ws.addRow(["✓ No hay comprobantes faltantes: todo lo del SIRE está en contabilidad."]);
+    r.font = { color: { argb: "FF047857" } };
+    return;
+  }
+
+  for (const valores of filas) {
+    const row = ws.addRow(valores);
+    COL_FALT.forEach((col, i) => {
+      if (col.money) row.getCell(i + 1).numFmt = "#,##0.00";
+    });
+    row.eachCell((c) => {
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4C7" } }; // naranja claro
+    });
+  }
+
+  // Fila de totales.
+  const totBase = filas.reduce((a, f) => a + (f[7] as number), 0);
+  const totIgv = filas.reduce((a, f) => a + (f[8] as number), 0);
+  const totNg = filas.reduce((a, f) => a + (f[9] as number), 0);
+  const totTot = filas.reduce((a, f) => a + (f[10] as number), 0);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const tot = ws.addRow(["", "", "", "", "", `TOTAL (${filas.length})`, "", r2(totBase), r2(totIgv), r2(totNg), r2(totTot), ""]);
+  tot.font = { bold: true };
+  [8, 9, 10, 11].forEach((i) => (tot.getCell(i).numFmt = "#,##0.00"));
 }
 
 const COLUMNAS: { header: string; key: keyof FilaCruce; width: number; money?: boolean }[] = [
