@@ -42,6 +42,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - `src/lib/ocr.ts` — **OCR (tesseract.js)** para fotos de **deudas tributarias**: extrae texto,
   montos, claves y sugiere tipo de deuda. Panel `DeudasPanel.tsx`, ruta `deudas/route.ts`,
   entidad `Deuda` en types/db. (El OCR se reintrodujo solo para deudas; las DJ siguen por unpdf.)
+- `src/lib/cruceSire.ts` + `src/lib/xlsxIO.ts` (**exceljs**) — **Cruce SIRE vs sistema contable
+  (Contasis)**: sube los Excel (SIRE RCE/RVIE + libros Contasis), empareja por serie‑número+RUC
+  y compara base/IGV/total comprobante por comprobante; descarga el comparativo en Excel.
+  Panel `CruceSirePanel.tsx` (suelto en **Inicio** vía `/api/cruce-sire`; también por cliente).
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listClientes } from "@/lib/db";
 import { sunatModo } from "@/lib/sunat";
 import { EstadoBars, RiesgoPie } from "@/components/DashboardCharts";
+import CruceSirePanel from "@/components/CruceSirePanel";
 import { RiesgoBadge } from "@/components/ui";
 import type { NivelRiesgo } from "@/lib/types";
 
@@ -136,6 +137,18 @@ export default async function DashboardPage() {
           <EstadoBars data={estadoData} />
         </div>
       </div>
+
+      {/* Herramienta suelta: Cruce SIRE vs Contabilidad (Contasis) */}
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Cruce SIRE vs Contabilidad</h2>
+          <p className="text-sm text-slate-500">
+            Sube los Excel del SIRE y de Contasis y compáralos comprobante por comprobante,
+            sin necesidad de registrar un cliente.
+          </p>
+        </div>
+        <CruceSirePanel />
+      </section>
 
       <div className="card p-4">
         <div className="mb-3 flex items-center justify-between">
