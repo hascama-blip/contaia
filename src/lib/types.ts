@@ -248,6 +248,8 @@ export interface BuzonResultado {
 export interface BuzonResumen {
   peligrosos: BuzonMensaje[];
   urgentes: BuzonMensaje[];
+  /** Todas las notificaciones del periodo consultado (para el reporte PDF). */
+  mensajes?: BuzonMensaje[];
   totalMensajes: number;
   consultadoAt: string;
 }

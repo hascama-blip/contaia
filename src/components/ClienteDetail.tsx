@@ -103,11 +103,18 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             {cliente.telefono && <> · {cliente.telefono}</>}
           </p>
         </div>
-        {d && (
-          <Link href={`/clientes/${cliente.id}/informe`} className="btn-primary">
-            📄 Generar informe
-          </Link>
-        )}
+        <div className="flex gap-2">
+          {cliente.buzon && (
+            <Link href={`/clientes/${cliente.id}/buzon`} className="btn-ghost">
+              📨 Notificaciones (PDF)
+            </Link>
+          )}
+          {d && (
+            <Link href={`/clientes/${cliente.id}/informe`} className="btn-primary">
+              📄 Generar informe
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

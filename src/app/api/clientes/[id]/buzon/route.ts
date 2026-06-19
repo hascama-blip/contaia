@@ -27,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       await setBuzon(cliente.id, {
         peligrosos: resultado.peligrosos,
         urgentes: resultado.urgentes,
+        mensajes: resultado.mensajes,
         totalMensajes: resultado.mensajes.length,
         consultadoAt: new Date().toISOString(),
       });
