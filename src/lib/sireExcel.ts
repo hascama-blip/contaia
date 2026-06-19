@@ -38,9 +38,17 @@ function fecha(v: any): string {
   return txt(v);
 }
 
-/** Parsea el Excel del SIRE (RCE o RVIE) a comprobantes. */
-export function parseSireExcel(filas: unknown[][]): CompSire[] {
-  if (!Array.isArray(filas) || filas.length === 0) return [];
+/** Resultado con diagnóstico: además de los comprobantes, explica el porqué si salen 0. */
+export interface SireExcelResult {
+  comps: CompSire[];
+  motivo?: string; // razón legible cuando comps está vacío
+}
+
+/** Parsea el Excel del SIRE (RCE o RVIE) y explica el resultado. */
+export function analizarSireExcel(filas: unknown[][]): SireExcelResult {
+  if (!Array.isArray(filas) || filas.length === 0) {
+    return { comps: [], motivo: "El archivo está vacío o no se pudo leer la hoja." };
+  }
 
   // Busca la fila de encabezados (la que tiene "Serie" y "Total CP" o similar).
   let hi = -1;
@@ -51,7 +59,14 @@ export function parseSireExcel(filas: unknown[][]): CompSire[] {
       break;
     }
   }
-  if (hi < 0) return [];
+  if (hi < 0) {
+    return {
+      comps: [],
+      motivo:
+        "No encontré la fila de encabezados del SIRE (debe tener columnas como “Serie del CDP” y “Total CP”). " +
+        "¿Es el Excel descargado del SIRE (propuesta RCE/RVIE)?",
+    };
+  }
 
   const head = (filas[hi] as any[]).map((c) => txt(c).toLowerCase());
   const find = (re: RegExp) => head.findIndex((x) => re.test(x));
@@ -71,15 +86,26 @@ export function parseSireExcel(filas: unknown[][]): CompSire[] {
   const iCuenta = find(/cuenta\s*contable/);
   const iGlosa = find(/^glosa/);
 
-  if (iSerie < 0 || iRuc < 0 || iTotal < 0) return [];
+  if (iSerie < 0 || iRuc < 0 || iTotal < 0) {
+    const faltan = [
+      iSerie < 0 && "Serie del CDP",
+      iRuc < 0 && "Nro Doc Identidad",
+      iTotal < 0 && "Total CP",
+    ].filter(Boolean).join(", ");
+    return { comps: [], motivo: `Faltan columnas en el encabezado: ${faltan}.` };
+  }
 
   const out: CompSire[] = [];
+  let descartadas = 0;
   for (let r = hi + 1; r < filas.length; r++) {
     const row = filas[r] as any[];
     if (!row) continue;
     const ruc = txt(row[iRuc]);
     const serie = txt(row[iSerie]);
-    if (!/^\d{11}$/.test(ruc) || !serie) continue;
+    if (!/^\d{8}$|^\d{11}$/.test(ruc) || !serie) {
+      if (ruc || serie) descartadas++;
+      continue;
+    }
     out.push({
       serie,
       numero: txt(row[iNum]),
@@ -94,5 +120,16 @@ export function parseSireExcel(filas: unknown[][]): CompSire[] {
       glosaArchivo: iGlosa >= 0 ? txt(row[iGlosa]) || undefined : undefined,
     });
   }
-  return out;
+  if (out.length === 0) {
+    return {
+      comps: [],
+      motivo: `Encontré el encabezado pero ninguna fila con documento válido (RUC/DNI + serie). Filas descartadas: ${descartadas}.`,
+    };
+  }
+  return { comps: out };
+}
+
+/** Parsea el Excel del SIRE (RCE o RVIE) a comprobantes. */
+export function parseSireExcel(filas: unknown[][]): CompSire[] {
+  return analizarSireExcel(filas).comps;
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZip, extraerDeZip } from "@/lib/zip";
-import { parseSireExcel } from "@/lib/sireExcel";
+import { analizarSireExcel } from "@/lib/sireExcel";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,18 +24,23 @@ export async function POST(req: NextRequest) {
   }
 
   let comps: any[] = [];
+  let motivo: string | undefined;
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     if (esZip(buf)) {
       for (const it of extraerDeZip(buf, [".xlsx", ".xls"])) {
         try {
-          comps.push(...parseSireExcel(await leerFilas(it.data)));
+          const r = analizarSireExcel(await leerFilas(it.data));
+          comps.push(...r.comps);
+          if (r.motivo) motivo = r.motivo;
         } catch {
           /* archivo del zip que no es el detalle */
         }
       }
     } else {
-      comps = parseSireExcel(await leerFilas(buf));
+      const r = analizarSireExcel(await leerFilas(buf));
+      comps = r.comps;
+      motivo = r.motivo;
     }
   } catch (e) {
     return NextResponse.json(
@@ -44,7 +49,10 @@ export async function POST(req: NextRequest) {
     );
   }
   if (comps.length === 0) {
-    return NextResponse.json({ error: "No se encontraron comprobantes de venta." }, { status: 400 });
+    return NextResponse.json(
+      { error: motivo ?? "No se encontraron comprobantes de venta." },
+      { status: 400 }
+    );
   }
 
   const comprobantes = comps.map((c) => ({

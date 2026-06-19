@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZip, extraerDeZip } from "@/lib/zip";
-import { parseSireExcel } from "@/lib/sireExcel";
+import { parseSireExcel, analizarSireExcel } from "@/lib/sireExcel";
 import { getCuentasProveedor, setCuentasProveedor, getRubros, mergeRubros } from "@/lib/db";
 import { consultarActividad } from "@/lib/sunat";
 import { clasificar } from "@/lib/clasificacion";
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   let comps: any[] = [];
+  let motivo: string | undefined;
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     if (esZip(buf)) {
@@ -49,15 +50,17 @@ export async function POST(req: NextRequest) {
       const inner = extraerDeZip(buf, [".xlsx", ".xls"]);
       for (const it of inner) {
         try {
-          const filas = await leerFilas(it.data);
-          comps.push(...parseSireExcel(filas));
+          const r = analizarSireExcel(await leerFilas(it.data));
+          comps.push(...r.comps);
+          if (r.motivo) motivo = r.motivo;
         } catch {
           /* archivo del zip que no es el detalle; se ignora */
         }
       }
     } else {
-      const filas = await leerFilas(buf);
-      comps = parseSireExcel(filas);
+      const r = analizarSireExcel(await leerFilas(buf));
+      comps = r.comps;
+      motivo = r.motivo;
     }
   } catch (e) {
     return NextResponse.json(
@@ -66,7 +69,10 @@ export async function POST(req: NextRequest) {
     );
   }
   if (comps.length === 0) {
-    return NextResponse.json({ error: "No se encontraron comprobantes en el archivo." }, { status: 400 });
+    return NextResponse.json(
+      { error: motivo ?? "No se encontraron comprobantes en el archivo." },
+      { status: 400 }
+    );
   }
 
   const memoria = await getCuentasProveedor();
