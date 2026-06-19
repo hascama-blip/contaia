@@ -96,6 +96,19 @@ export interface CredencialesSire {
   guardadoAt: string;
 }
 
+/** Cuenta contable aprendida/sugerida para un proveedor (memoria del estudio). */
+export interface ProveedorCuenta {
+  ruc: string;
+  razonSocial?: string;
+  /** Rubro / actividad económica (de decolecta). */
+  rubro?: string;
+  cuenta: string;
+  nombreCuenta?: string;
+  /** "aprendido" = confirmado por el operario; "sugerido" = automático. */
+  fuente: "aprendido" | "sugerido";
+  actualizadoAt: string;
+}
+
 /** Deuda tributaria detectada/indicada (foto con OCR o ingreso manual). */
 export interface Deuda {
   id: string;

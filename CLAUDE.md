@@ -42,6 +42,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - `src/lib/ocr.ts` — **OCR (tesseract.js)** para fotos de **deudas tributarias**: extrae texto,
   montos, claves y sugiere tipo de deuda. Panel `DeudasPanel.tsx`, ruta `deudas/route.ts`,
   entidad `Deuda` en types/db. (El OCR se reintrodujo solo para deudas; las DJ siguen por unpdf.)
+- `src/lib/clasificacion.ts` — **Compras → cuenta automática**: clasifica cada proveedor por su
+  **rubro** (actividad económica de decolecta, `consultarActividad` en sunat.ts) + reglas
+  `REGLAS_CUENTA` (ajustables). Memoria **RUC→cuenta** a nivel estudio (`Store.cuentasProveedor`,
+  `get/setCuentasProveedor`): lo confirmado se aprende. Panel `ClasificacionPanel.tsx` en Inicio,
+  rutas `/api/clasificacion` (+ `/excel` para Contasis). Entrada = Excel del SIRE compras (RCE),
+  parseado con `parseSireCompras`.
 - `src/lib/cruceSire.ts` + `src/lib/xlsxIO.ts` (**exceljs**) — **Cruce SIRE vs sistema contable
   (Contasis)**: sube los Excel (SIRE RCE/RVIE + libros Contasis), empareja por serie‑número+RUC
   y compara base/IGV/total comprobante por comprobante; descarga el comparativo en Excel.

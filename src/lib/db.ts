@@ -12,6 +12,7 @@ import type {
   DeclaracionAnual,
   Deuda,
   CredencialesSire,
+  ProveedorCuenta,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -29,6 +30,8 @@ export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 
 interface Store {
   clientes: Cliente[];
+  /** Memoria del estudio: RUC del proveedor → cuenta contable. */
+  cuentasProveedor?: Record<string, ProveedorCuenta>;
 }
 
 async function ensureDirs() {
@@ -41,6 +44,7 @@ async function readStore(): Promise<Store> {
   try {
     const raw = await fs.readFile(STORE_PATH, "utf-8");
     const store = JSON.parse(raw) as Store;
+    if (!store.cuentasProveedor) store.cuentasProveedor = {};
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
@@ -52,8 +56,27 @@ async function readStore(): Promise<Store> {
     }
     return store;
   } catch {
-    return { clientes: [] };
+    return { clientes: [], cuentasProveedor: {} };
   }
+}
+
+export async function getCuentasProveedor(): Promise<Record<string, ProveedorCuenta>> {
+  const store = await readStore();
+  return store.cuentasProveedor ?? {};
+}
+
+/** Aprende/actualiza cuentas por proveedor (merge en la memoria del estudio). */
+export async function setCuentasProveedor(
+  nuevas: ProveedorCuenta[]
+): Promise<Record<string, ProveedorCuenta>> {
+  const store = await readStore();
+  if (!store.cuentasProveedor) store.cuentasProveedor = {};
+  for (const p of nuevas) {
+    if (!/^\d{11}$/.test(p.ruc)) continue;
+    store.cuentasProveedor[p.ruc] = { ...p, fuente: "aprendido", actualizadoAt: new Date().toISOString() };
+  }
+  await writeStore(store);
+  return store.cuentasProveedor;
 }
 
 async function writeStore(store: Store): Promise<void> {

@@ -333,3 +333,36 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
 export function sunatModo(): Provider {
   return resolverProvider(getConfig());
 }
+
+// ---- Actividad económica (rubro) por decolecta, para clasificación ----------
+/**
+ * Devuelve el rubro (actividad económica) y la razón social de un RUC vía
+ * decolecta. Liviano y tolerante: null si no hay token o falla.
+ */
+export async function consultarActividad(
+  ruc: string
+): Promise<{ razonSocial: string; actividad: string } | null> {
+  const token = process.env.DECOLECTA_TOKEN ?? "";
+  const baseUrl = process.env.DECOLECTA_URL ?? "https://api.decolecta.com/v1/sunat/ruc/full";
+  if (!token || !/^\d{11}$/.test(ruc)) return null;
+  try {
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    const res = await fetch(`${baseUrl}${sep}numero=${ruc}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as Record<string, any>;
+    let act: any =
+      d.actividad_economica ?? d.actividadEconomica ?? d.ciiu ?? d.actividad ?? "";
+    if (!act && Array.isArray(d.actividades_economicas) && d.actividades_economicas.length) {
+      const a0 = d.actividades_economicas[0];
+      act = typeof a0 === "string" ? a0 : a0?.descripcion ?? a0?.actividad ?? a0?.ciiu ?? "";
+    }
+    return {
+      razonSocial: String(d.razon_social ?? d.razonSocial ?? d.nombre ?? ""),
+      actividad: String(act ?? ""),
+    };
+  } catch {
+    return null;
+  }
+}
