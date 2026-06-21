@@ -37,6 +37,13 @@ const OPCIONES: Opcion[] = [
       "Sube el SIRE de compras y ventas, agrega los XML (glosa, opcional), reclasifica las cuentas y genera el masivo para importar a Contasis.",
     destacado: true,
   },
+  {
+    href: "/herramientas/consultas",
+    icono: "📨",
+    titulo: "Consultas tributarias",
+    detalle:
+      "Extrae los mensajes del buzón electrónico SUNAT con sus asuntos y descarga, mensaje por mensaje, el PDF adjunto de cada notificación.",
+  },
 ];
 
 export default async function MenuPage() {

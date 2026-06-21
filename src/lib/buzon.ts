@@ -33,6 +33,16 @@ const LIST_URL =
   process.env.BUZON_LIST_URL ??
   "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&codCarpeta=00&codEtiqueta=&page=1&des_asunto=&codMensaje=&tipoOrden=NADA";
 
+// Endpoints para DESCARGAR el adjunto (PDF) de un mensaje. Son CALIBRABLES: el
+// detalle del mensaje suele traer el/los archivo(s) o un id para bajarlos. Si
+// SUNAT cambia la ruta, se ajusta por variable de entorno (igual que los demás).
+const DETALLE_URL =
+  process.env.BUZON_DETALLE_URL ??
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/detalleNotiMen?codMensaje={cod}";
+const ADJUNTO_URL =
+  process.env.BUZON_ADJUNTO_URL ??
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/descargaArchivo?codMensaje={cod}";
+
 const URGENTES = [
   "cobranza coactiva", "ejecución coactiva", "ejecucion coactiva",
   "resolución coactiva", "resolucion coactiva", "coactiv",
@@ -345,6 +355,169 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
     throw new Error(
       `Buzón: ${err instanceof Error ? err.message : String(err)} (usa Modo diagnóstico para más detalle)`
     );
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
+// ============================================================
+//  Descargar el ADJUNTO (PDF) de un mensaje del buzón
+// ============================================================
+
+export interface AdjuntoParams {
+  ruc: string;
+  solUser: string;
+  solPass: string;
+  codMensaje: string;
+  diagnostico?: boolean;
+}
+
+export interface AdjuntoResultado {
+  ok: boolean;
+  /** PDF en base64 (cuando ok). */
+  pdfBase64?: string;
+  filename?: string;
+  error?: string;
+  diag?: { pasos: any[] };
+}
+
+/** Inicia sesión en SOL y abre el visor del buzón. Devuelve el frame del visor. */
+async function abrirVisor(params: { ruc: string; solUser: string; solPass: string }, pasos: any[]) {
+  const browser = await lanzarNavegador();
+  const ctx = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  });
+  const page = await ctx.newPage();
+
+  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(2500);
+  await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
+  await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
+  await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
+  await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
+  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  pasos.push({ paso: "post-login", url: page.url() });
+
+  // Cerrar campaña "valida tus datos".
+  for (let intento = 0; intento < 5; intento++) {
+    const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+    if (!camp) break;
+    await clickPorTextoEnContexto(camp, ["Finalizar"]);
+    await page.waitForTimeout(1500);
+    await clickPorTextoEnContexto(camp, ["Continuar sin confirmar", "Continuar"]);
+    await page.waitForTimeout(2200);
+  }
+
+  // Abrir Buzón Electrónico.
+  await page
+    .evaluate(() => {
+      const els = Array.from(document.querySelectorAll('a, button, [role="button"]')) as HTMLElement[];
+      const el = els.find((e) => {
+        const txt = (e.textContent || "").trim().toLowerCase();
+        const href = (e.getAttribute("href") || "").toLowerCase();
+        const onclick = (e.getAttribute("onclick") || "").toLowerCase();
+        return /^buz[oó]n\s*electr/.test(txt) || href.includes("visornoti") || onclick.includes("visornoti") || onclick.includes("buzon");
+      });
+      if (el) el.click();
+    })
+    .catch(() => {});
+
+  const buscarVisor = () => {
+    for (const pg of ctx.pages()) for (const fr of pg.frames()) if (/ol-ti-itvisornoti/.test(fr.url())) return fr;
+    return null;
+  };
+  let visor: any = null;
+  for (let i = 0; i < 12 && !visor; i++) {
+    await page.waitForTimeout(2000);
+    visor = buscarVisor();
+  }
+  pasos.push({ paso: "abrir-visor", visorEncontrado: Boolean(visor) });
+  return { browser, ctx, page, visor };
+}
+
+/**
+ * Descarga el adjunto (PDF) de un mensaje del buzón por su codMensaje.
+ * En modo diagnóstico devuelve la respuesta cruda del detalle para calibrar la
+ * ruta del archivo (igual que se hizo con SIRE/buzón).
+ */
+export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<AdjuntoResultado> {
+  const { ruc, solUser, solPass, codMensaje } = params;
+  if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
+  if (!solUser || !solPass) return { ok: false, error: "Ingresa el Usuario y la Clave SOL." };
+  if (!codMensaje) return { ok: false, error: "Falta el código del mensaje." };
+
+  const diagnostico = params.diagnostico === true;
+  const pasos: any[] = [];
+  let browser: any = null;
+
+  try {
+    const sesion = await abrirVisor({ ruc, solUser, solPass }, pasos);
+    browser = sesion.browser;
+    const ejecutor = sesion.visor ?? sesion.page;
+
+    const detUrl = DETALLE_URL.replace("{cod}", encodeURIComponent(codMensaje)) + `&_=${Date.now()}`;
+    const detalle = (await ejecutor.evaluate(async (u: string) => {
+      try {
+        const r = await fetch(u, { credentials: "include" });
+        return { status: r.status, body: (await r.text()).slice(0, 20000) };
+      } catch (e) {
+        return { status: 0, body: String(e) };
+      }
+    }, detUrl)) as { status: number; body: string };
+    pasos.push({ paso: "detalle", url: detUrl, status: detalle.status, respuesta: detalle.body.slice(0, 1500) });
+
+    // Intenta ubicar el/los archivo(s) en el detalle (varios nombres posibles).
+    let codArchivo = "";
+    let nombre = `mensaje-${codMensaje}.pdf`;
+    try {
+      const j = JSON.parse(detalle.body);
+      const nodo = j?.archivos ?? j?.anexos ?? j?.listArchivos ?? j?.lisArchivos ?? j?.adjuntos ?? [];
+      const arr = Array.isArray(nodo) ? nodo : [nodo];
+      const a = arr.find((x: any) => x);
+      if (a) {
+        codArchivo = String(a.codArchivo ?? a.id ?? a.codigo ?? a.nombreArchivo ?? "");
+        if (a.nombreArchivo) nombre = String(a.nombreArchivo);
+      }
+    } catch {
+      /* el detalle no es JSON: se calibra con diagnóstico */
+    }
+
+    // Intenta descargar el PDF como binario.
+    const adjUrl =
+      ADJUNTO_URL.replace("{cod}", encodeURIComponent(codMensaje)).replace("{archivo}", encodeURIComponent(codArchivo)) +
+      `&codArchivo=${encodeURIComponent(codArchivo)}&_=${Date.now()}`;
+    const bin = (await ejecutor.evaluate(async (u: string) => {
+      try {
+        const r = await fetch(u, { credentials: "include" });
+        const ct = r.headers.get("content-type") || "";
+        const buf = await r.arrayBuffer();
+        let s = "";
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+        return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
+      } catch (e) {
+        return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
+      }
+    }, adjUrl)) as { status: number; ct: string; b64: string; firma: string };
+    pasos.push({ paso: "adjunto", url: adjUrl, status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+
+    if (diagnostico) return { ok: false, diag: { pasos } };
+
+    // Un PDF empieza con "%PDF".
+    if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
+      return { ok: true, pdfBase64: bin.b64, filename: nombre };
+    }
+    return {
+      ok: false,
+      error:
+        "No se pudo ubicar el PDF adjunto de este mensaje. Usa Modo diagnóstico y comparte el resultado para calibrar la ruta del archivo.",
+      diag: { pasos },
+    };
+  } catch (err) {
+    pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
   } finally {
     if (browser) await browser.close().catch(() => {});
   }
