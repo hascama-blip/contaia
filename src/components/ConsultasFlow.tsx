@@ -25,6 +25,8 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   const [bajando, setBajando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [modoDiag, setModoDiag] = useState(false);
+  const [diag, setDiag] = useState<string | null>(null);
 
   const cliente = clientes.find((c) => c.id === clienteId);
 
@@ -54,16 +56,22 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   }
 
   async function descargarPdf(m: Mensaje) {
-    setBajando(m.id); setError(null);
+    setBajando(m.id); setError(null); setDiag(null);
     try {
       const res = await fetch("/api/consultas/buzon/adjunto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id }),
+        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, diagnostico: modoDiag }),
       });
+      if (modoDiag) {
+        const data = await res.json().catch(() => ({}));
+        setDiag(JSON.stringify(data, null, 2));
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? "No se pudo descargar el PDF de ese mensaje.");
+        if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         return;
       }
       const blob = await res.blob();
@@ -79,6 +87,12 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
     <div className="space-y-5">
       {info && <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+      {diag && (
+        <div className="rounded-lg border border-slate-200 bg-slate-900 p-3">
+          <p className="mb-1 text-xs font-semibold text-slate-300">Diagnóstico (cópialo y pásamelo para calibrar la descarga):</p>
+          <pre className="max-h-80 overflow-auto text-[11px] leading-relaxed text-emerald-300">{diag}</pre>
+        </div>
+      )}
 
       {clientes.length === 0 ? (
         <div className="card p-6 text-sm text-slate-500">
@@ -120,9 +134,15 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
               />
             </div>
           </div>
-          <button className="btn-primary mt-3" onClick={extraer} disabled={busy}>
-            {busy ? "Extrayendo…" : "📨 Extraer buzón"}
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button className="btn-primary" onClick={extraer} disabled={busy}>
+              {busy ? "Extrayendo…" : "📨 Extraer buzón"}
+            </button>
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
+              Modo diagnóstico (al bajar un PDF, muestra la respuesta de SUNAT para calibrar)
+            </label>
+          </div>
           {cliente && (
             <p className="mt-2 text-xs text-slate-400">
               La Clave SOL se usa solo para esta consulta y no se guarda.
