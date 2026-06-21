@@ -535,6 +535,41 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         )) as { status: number; len: number; tieneArchivo: boolean; muestra: string };
         pasos.push({ paso: "probe-detalle", endpoint: c, ...res });
       }
+
+      // Lee el JS del visor para descubrir el endpoint real del detalle/adjunto
+      // (la función que arma idArchivo y llama a bajarArchivo).
+      const jsInfo = (await ejecutor.evaluate(async () => {
+        const abs = (u: string) => {
+          try { return new URL(u, location.href).href; } catch { return u; }
+        };
+        const srcs = Array.from(document.querySelectorAll("script[src]"))
+          .map((s) => abs((s as HTMLScriptElement).getAttribute("src") || ""))
+          .filter((u) => /sunat\.gob\.pe/.test(u));
+        const tokens = new Set<string>();
+        const urls = new Set<string>();
+        let ctxBajar = "";
+        for (const src of srcs.slice(0, 15)) {
+          try {
+            const r = await fetch(src, { credentials: "include" });
+            const t = await r.text();
+            (t.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:[Aa]rchivo|[Aa]djun|[Dd]etalle|[Ll]eer|NotiMen|[Mm]ensaje)[A-Za-z0-9_]*\b/g) || [])
+              .forEach((x) => tokens.add(x));
+            (t.match(/["'`]([A-Za-z0-9_./-]*\/visor\/[A-Za-z0-9_]+)["'`]/g) || [])
+              .forEach((x) => urls.add(x.replace(/["'`]/g, "")));
+            (t.match(/url\s*:\s*["'`]([^"'`]{2,80})["'`]/g) || []).forEach((x) => urls.add(x));
+            const i = t.indexOf("bajarArchivo");
+            if (i >= 0 && !ctxBajar) ctxBajar = t.slice(Math.max(0, i - 400), i + 200);
+          } catch { /* script de otro origen o inaccesible */ }
+        }
+        return { srcs, tokens: Array.from(tokens), urls: Array.from(urls), ctxBajar };
+      })) as { srcs: string[]; tokens: string[]; urls: string[]; ctxBajar: string };
+      pasos.push({
+        paso: "js-visor",
+        scripts: jsInfo.srcs,
+        tokens: jsInfo.tokens.slice(0, 80),
+        urls: jsInfo.urls.slice(0, 80),
+        contextoBajarArchivo: jsInfo.ctxBajar,
+      });
     }
 
     // idMensaje interno del visor (suele ser el codMensaje del listado).
