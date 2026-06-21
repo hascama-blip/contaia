@@ -457,6 +457,42 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     browser = sesion.browser;
     const ejecutor = sesion.visor ?? sesion.page;
 
+    // DIAGNÓSTICO ÚTIL: vuelca la fila CRUDA del mensaje desde listNotiMenPag
+    // (endpoint que SÍ funciona). Ahí suelen venir los campos del adjunto
+    // (codArchivo / nombreArchivo / indAnexo, etc.) con sus nombres reales.
+    if (diagnostico) {
+      const listUrl =
+        (/[?&]page=\d+/.test(LIST_URL) ? LIST_URL.replace(/([?&]page=)\d+/, "$11") : LIST_URL) +
+        `&_=${Date.now()}`;
+      const lista = (await ejecutor.evaluate(async (u: string) => {
+        try {
+          const r = await fetch(u, { credentials: "include" });
+          return { status: r.status, body: (await r.text()).slice(0, 60000) };
+        } catch (e) {
+          return { status: 0, body: String(e) };
+        }
+      }, listUrl)) as { status: number; body: string };
+      let filaCruda: any = null;
+      let primeraFila: any = null;
+      try {
+        const data = JSON.parse(lista.body);
+        const arr: any[] = Array.isArray(data)
+          ? data
+          : data?.rows ?? data?.lista ?? data?.mensajes ?? data?.registros ?? data?.data ?? [];
+        primeraFila = arr[0] ?? null;
+        filaCruda = arr.find((m) => String(m?.codMensaje ?? m?.numMensaje ?? m?.id ?? "") === String(codMensaje)) ?? null;
+      } catch {
+        /* no era JSON */
+      }
+      pasos.push({
+        paso: "lista-cruda",
+        status: lista.status,
+        camposPrimeraFila: primeraFila ? Object.keys(primeraFila) : [],
+        primeraFila,
+        filaDelMensaje: filaCruda,
+      });
+    }
+
     const detUrl = DETALLE_URL.replace("{cod}", encodeURIComponent(codMensaje)) + `&_=${Date.now()}`;
     const detalle = (await ejecutor.evaluate(async (u: string) => {
       try {
