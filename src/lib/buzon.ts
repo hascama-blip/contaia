@@ -36,12 +36,16 @@ const LIST_URL =
 // Endpoints para DESCARGAR el adjunto (PDF) de un mensaje. Son CALIBRABLES: el
 // detalle del mensaje suele traer el/los archivo(s) o un id para bajarlos. Si
 // SUNAT cambia la ruta, se ajusta por variable de entorno (igual que los demás).
+// Endpoint REAL del visor para bajar el adjunto (confirmado por DevTools):
+//   POST .../visor/bajarArchivo  con form: accion=archivo, idMensaje, idArchivo,
+//   sistema=0, indMensaje=5.
+const BAJAR_URL =
+  process.env.BUZON_BAJAR_URL ??
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/bajarArchivo";
+// Endpoint que devuelve el detalle del mensaje (de ahí sale idArchivo). CALIBRABLE.
 const DETALLE_URL =
   process.env.BUZON_DETALLE_URL ??
-  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/detalleNotiMen?codMensaje={cod}";
-const ADJUNTO_URL =
-  process.env.BUZON_ADJUNTO_URL ??
-  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/descargaArchivo?codMensaje={cod}";
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/detalleMensaje";
 
 const URGENTES = [
   "cobranza coactiva", "ejecución coactiva", "ejecucion coactiva",
@@ -369,6 +373,12 @@ export interface AdjuntoParams {
   solUser: string;
   solPass: string;
   codMensaje: string;
+  /** idMensaje interno del visor (si difiere del codMensaje). */
+  idMensaje?: string;
+  /** idArchivo del adjunto (si ya se conoce; si no, se busca en el detalle). */
+  idArchivo?: string;
+  /** indMensaje del visor (por defecto "5"). */
+  indMensaje?: string;
   diagnostico?: boolean;
 }
 
@@ -493,62 +503,85 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       });
     }
 
-    const detUrl = DETALLE_URL.replace("{cod}", encodeURIComponent(codMensaje)) + `&_=${Date.now()}`;
-    const detalle = (await ejecutor.evaluate(async (u: string) => {
-      try {
-        const r = await fetch(u, { credentials: "include" });
-        return { status: r.status, body: (await r.text()).slice(0, 20000) };
-      } catch (e) {
-        return { status: 0, body: String(e) };
-      }
-    }, detUrl)) as { status: number; body: string };
-    pasos.push({ paso: "detalle", url: detUrl, status: detalle.status, respuesta: detalle.body.slice(0, 1500) });
+    // idMensaje interno del visor (suele ser el codMensaje del listado).
+    const idMensaje = params.idMensaje || codMensaje;
+    const indMensaje = params.indMensaje || "5";
+    let idArchivo = params.idArchivo || "";
 
-    // Intenta ubicar el/los archivo(s) en el detalle (varios nombres posibles).
-    let codArchivo = "";
-    let nombre = `mensaje-${codMensaje}.pdf`;
-    try {
-      const j = JSON.parse(detalle.body);
-      const nodo = j?.archivos ?? j?.anexos ?? j?.listArchivos ?? j?.lisArchivos ?? j?.adjuntos ?? [];
-      const arr = Array.isArray(nodo) ? nodo : [nodo];
-      const a = arr.find((x: any) => x);
-      if (a) {
-        codArchivo = String(a.codArchivo ?? a.id ?? a.codigo ?? a.nombreArchivo ?? "");
-        if (a.nombreArchivo) nombre = String(a.nombreArchivo);
+    // Si no nos dieron idArchivo, lo buscamos en el detalle del mensaje.
+    if (!idArchivo) {
+      const det = (await ejecutor.evaluate(
+        async (a: { url: string; id: string; ind: string }) => {
+          try {
+            const r = await fetch(a.url, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: `idMensaje=${encodeURIComponent(a.id)}&sistema=0&indMensaje=${encodeURIComponent(a.ind)}`,
+            });
+            return { status: r.status, body: (await r.text()).slice(0, 20000) };
+          } catch (e) {
+            return { status: 0, body: String(e) };
+          }
+        },
+        { url: DETALLE_URL, id: idMensaje, ind: indMensaje }
+      )) as { status: number; body: string };
+      pasos.push({ paso: "detalle", status: det.status, respuesta: det.body.slice(0, 1500) });
+      try {
+        const j = JSON.parse(det.body);
+        const nodo = j?.archivos ?? j?.anexos ?? j?.lisArchivos ?? j?.listArchivos ?? j?.adjuntos ?? [];
+        const arr = Array.isArray(nodo) ? nodo : [nodo];
+        const a = arr.find((x: any) => x && (x.idArchivo ?? x.codArchivo ?? x.id));
+        if (a) idArchivo = String(a.idArchivo ?? a.codArchivo ?? a.id);
+      } catch {
+        const m = det.body.match(/idArchivo["'\s:=]+(\d+)/i);
+        if (m) idArchivo = m[1];
       }
-    } catch {
-      /* el detalle no es JSON: se calibra con diagnóstico */
+    }
+    pasos.push({ paso: "ids", idMensaje, idArchivo });
+
+    if (!idArchivo) {
+      return {
+        ok: false,
+        error:
+          "Encontré el endpoint de descarga (bajarArchivo) pero falta el idArchivo del mensaje. Usa Modo diagnóstico y compárteme el resultado para fijar la ruta del detalle.",
+        diag: { pasos },
+      };
     }
 
-    // Intenta descargar el PDF como binario.
-    const adjUrl =
-      ADJUNTO_URL.replace("{cod}", encodeURIComponent(codMensaje)).replace("{archivo}", encodeURIComponent(codArchivo)) +
-      `&codArchivo=${encodeURIComponent(codArchivo)}&_=${Date.now()}`;
-    const bin = (await ejecutor.evaluate(async (u: string) => {
-      try {
-        const r = await fetch(u, { credentials: "include" });
-        const ct = r.headers.get("content-type") || "";
-        const buf = await r.arrayBuffer();
-        let s = "";
-        const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-        return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
-      } catch (e) {
-        return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
-      }
-    }, adjUrl)) as { status: number; ct: string; b64: string; firma: string };
-    pasos.push({ paso: "adjunto", url: adjUrl, status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+    // POST real a bajarArchivo (form-urlencoded), confirmado por DevTools.
+    const bin = (await ejecutor.evaluate(
+      async (a: { url: string; idM: string; idA: string; ind: string }) => {
+        try {
+          const r = await fetch(a.url, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `accion=archivo&idMensaje=${encodeURIComponent(a.idM)}&idArchivo=${encodeURIComponent(a.idA)}&sistema=0&indMensaje=${encodeURIComponent(a.ind)}`,
+          });
+          const ct = r.headers.get("content-type") || "";
+          const buf = await r.arrayBuffer();
+          let s = "";
+          const bytes = new Uint8Array(buf);
+          for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+          return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
+        } catch (e) {
+          return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
+        }
+      },
+      { url: BAJAR_URL, idM: idMensaje, idA: idArchivo, ind: indMensaje }
+    )) as { status: number; ct: string; b64: string; firma: string };
+    pasos.push({ paso: "bajarArchivo", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
 
     if (diagnostico) return { ok: false, diag: { pasos } };
 
-    // Un PDF empieza con "%PDF".
     if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
-      return { ok: true, pdfBase64: bin.b64, filename: nombre };
+      return { ok: true, pdfBase64: bin.b64, filename: `mensaje-${codMensaje}.pdf` };
     }
     return {
       ok: false,
       error:
-        "No se pudo ubicar el PDF adjunto de este mensaje. Usa Modo diagnóstico y comparte el resultado para calibrar la ruta del archivo.",
+        "No se pudo descargar el adjunto. Usa Modo diagnóstico y comparte el resultado para terminar de calibrar.",
       diag: { pasos },
     };
   } catch (err) {
