@@ -501,6 +501,40 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         primeraFila,
         filaDelMensaje: filaCruda,
       });
+
+      // Sonda: prueba varios endpoints de detalle para ver cuál trae el archivo
+      // (idArchivo/nombreArchivo). Así calibramos en UNA sola corrida.
+      const base = "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/";
+      const candidatos = [
+        "detalleMensaje", "detalleNotiMen", "listNotiAdjun", "listarArchivos",
+        "listAdjuntos", "obtenerMensaje", "verMensaje", "leerMensaje", "detalleNotificacion",
+      ];
+      const idM = String((filaCruda?.codMensaje ?? filaCruda?.numMensaje ?? filaCruda?.id) ?? codMensaje);
+      for (const c of candidatos) {
+        const res = (await ejecutor.evaluate(
+          async (a: { url: string; id: string }) => {
+            try {
+              const r = await fetch(a.url, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `idMensaje=${encodeURIComponent(a.id)}&sistema=0&indMensaje=5`,
+              });
+              const t = await r.text();
+              return {
+                status: r.status,
+                len: t.length,
+                tieneArchivo: /idArchivo|nombreArchivo|constancia|\.pdf/i.test(t),
+                muestra: t.slice(0, 300),
+              };
+            } catch (e) {
+              return { status: 0, len: 0, tieneArchivo: false, muestra: String(e).slice(0, 120) };
+            }
+          },
+          { url: base + c, id: idM }
+        )) as { status: number; len: number; tieneArchivo: boolean; muestra: string };
+        pasos.push({ paso: "probe-detalle", endpoint: c, ...res });
+      }
     }
 
     // idMensaje interno del visor (suele ser el codMensaje del listado).
