@@ -315,18 +315,35 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
     );
   }
 
-  try {
-    if (provider === "decolecta") return await consultarDecolecta(cleaned, cfg);
-    if (provider === "apisnet") return await consultarApisNet(cleaned, cfg);
-    if (provider === "oficial") return await consultarOficial(cleaned, cfg);
-  } catch (err) {
-    const detalle = err instanceof Error ? err.message : String(err);
-    console.error(`[SUNAT] Falló fuente "${provider}":`, detalle);
-    if (fuenteRealExigida) {
-      throw new Error(`No se pudo obtener la información de SUNAT — ${detalle}`);
+  // Orden de intentos: la fuente elegida primero y, como RESPALDO, las demás
+  // fuentes reales que estén configuradas (si decolecta agota su límite, se
+  // intenta apis.net.pe u oficial automáticamente).
+  const orden: Provider[] = [];
+  if (provider !== "mock") orden.push(provider);
+  if (cfg.decolectaToken && !orden.includes("decolecta")) orden.push("decolecta");
+  if (cfg.apisnetToken && !orden.includes("apisnet")) orden.push("apisnet");
+  if (tieneCredenciales(cfg) && !orden.includes("oficial")) orden.push("oficial");
+
+  let ultimoError = "";
+  for (const p of orden) {
+    try {
+      if (p === "decolecta") return await consultarDecolecta(cleaned, cfg);
+      if (p === "apisnet") return await consultarApisNet(cleaned, cfg);
+      if (p === "oficial") return await consultarOficial(cleaned, cfg);
+    } catch (err) {
+      ultimoError = err instanceof Error ? err.message : String(err);
+      console.error(`[SUNAT] Falló fuente "${p}":`, ultimoError);
+      // sigue con la próxima fuente de respaldo
     }
-    // En modo "auto" degradamos a simulado para no romper el flujo de desarrollo.
   }
+
+  if (fuenteRealExigida || orden.length > 0) {
+    throw new Error(
+      `No se pudo obtener la información de SUNAT — ${ultimoError}. ` +
+        `Puedes escribir la razón social a mano y crear el cliente igual.`
+    );
+  }
+  // En modo "auto" sin ninguna fuente real, degradamos a simulado (desarrollo).
   return simular(cleaned);
 }
 
