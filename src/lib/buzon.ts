@@ -541,8 +541,8 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         pasos.push({ paso: "probe-detalle", endpoint: c, ...res });
       }
 
-      // Lee el JS del visor para descubrir el endpoint real del detalle/adjunto
-      // (la función que arma idArchivo y llama a bajarArchivo).
+      // Lee el JS del visor para descubrir la URL REAL que usan las funciones
+      // listArchivosAdjuntos / fGetDetalle (ahí está el endpoint del adjunto).
       const jsInfo = (await ejecutor.evaluate(async () => {
         const abs = (u: string) => {
           try { return new URL(u, location.href).href; } catch { return u; }
@@ -550,30 +550,30 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         const srcs = Array.from(document.querySelectorAll("script[src]"))
           .map((s) => abs((s as HTMLScriptElement).getAttribute("src") || ""))
           .filter((u) => /sunat\.gob\.pe/.test(u));
-        const tokens = new Set<string>();
         const urls = new Set<string>();
-        let ctxBajar = "";
-        for (const src of srcs.slice(0, 15)) {
+        const claves = ["listArchivosAdjuntos", "fGetDetalle", "obtenerDetalleValor", "descargaArchivoAlias", "bajarArchivo"];
+        const ctx: Record<string, string> = {};
+        for (const src of srcs.slice(0, 18)) {
           try {
             const r = await fetch(src, { credentials: "include" });
             const t = await r.text();
-            (t.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:[Aa]rchivo|[Aa]djun|[Dd]etalle|[Ll]eer|NotiMen|[Mm]ensaje)[A-Za-z0-9_]*\b/g) || [])
-              .forEach((x) => tokens.add(x));
-            (t.match(/["'`]([A-Za-z0-9_./-]*\/visor\/[A-Za-z0-9_]+)["'`]/g) || [])
+            // Cualquier ruta tipo .../algo.do o .../visor/algo o url:"..."
+            (t.match(/["'`]([A-Za-z0-9_./?=&%-]*(?:\/visor\/|\.do|listArch|Detalle|Adjun|bajarArchivo|Mensaje)[A-Za-z0-9_./?=&%-]*)["'`]/g) || [])
               .forEach((x) => urls.add(x.replace(/["'`]/g, "")));
-            (t.match(/url\s*:\s*["'`]([^"'`]{2,80})["'`]/g) || []).forEach((x) => urls.add(x));
-            const i = t.indexOf("bajarArchivo");
-            if (i >= 0 && !ctxBajar) ctxBajar = t.slice(Math.max(0, i - 400), i + 200);
-          } catch { /* script de otro origen o inaccesible */ }
+            for (const k of claves) {
+              if (ctx[k]) continue;
+              const i = t.indexOf(k);
+              if (i >= 0) ctx[k] = t.slice(Math.max(0, i - 250), i + 450);
+            }
+          } catch { /* inaccesible */ }
         }
-        return { srcs, tokens: Array.from(tokens), urls: Array.from(urls), ctxBajar };
-      })) as { srcs: string[]; tokens: string[]; urls: string[]; ctxBajar: string };
+        return { srcs, urls: Array.from(urls), ctx };
+      })) as { srcs: string[]; urls: string[]; ctx: Record<string, string> };
       pasos.push({
         paso: "js-visor",
         scripts: jsInfo.srcs,
-        tokens: jsInfo.tokens.slice(0, 80),
-        urls: jsInfo.urls.slice(0, 80),
-        contextoBajarArchivo: jsInfo.ctxBajar,
+        urls: jsInfo.urls.slice(0, 100),
+        contextos: jsInfo.ctx,
       });
     }
 
@@ -598,20 +598,27 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
               },
             },
           ];
+          const log: { url: string; metodo: string; status: number; len: number }[] = [];
+          let elegido = { status: 0, body: "" };
           for (const it of intentos) {
             try {
               const r = await fetch(it.url, it.opt);
               const t = await r.text();
+              log.push({ url: it.url, metodo: it.opt.method || "GET", status: r.status, len: t.length });
               if (r.status === 200 && t && !/Error 404/.test(t)) {
-                return { status: r.status, body: t.slice(0, 8000) };
+                elegido = { status: r.status, body: t.slice(0, 8000) };
+                break;
               }
-            } catch { /* siguiente intento */ }
+              if (!elegido.body) elegido = { status: r.status, body: t.slice(0, 2000) };
+            } catch (e) {
+              log.push({ url: it.url, metodo: it.opt.method || "GET", status: -1, len: 0 });
+            }
           }
-          return { status: 0, body: "" };
+          return { ...elegido, log };
         },
         { url: ARCHIVOS_URL, id: idMensaje }
-      )) as { status: number; body: string };
-      pasos.push({ paso: "listArchivosAdjuntos", status: arch.status, respuesta: arch.body.slice(0, 1200) });
+      )) as { status: number; body: string; log: any[] };
+      pasos.push({ paso: "listArchivosAdjuntos", status: arch.status, intentos: arch.log, respuesta: arch.body.slice(0, 1200) });
       try {
         const j = JSON.parse(arch.body);
         const nodo = Array.isArray(j)
