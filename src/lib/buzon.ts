@@ -42,7 +42,12 @@ const LIST_URL =
 const BAJAR_URL =
   process.env.BUZON_BAJAR_URL ??
   "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/bajarArchivo";
-// Endpoint que devuelve el detalle del mensaje (de ahí sale idArchivo). CALIBRABLE.
+// Lista los adjuntos de un mensaje (de ahí sale idArchivo). Descubierto en el
+// JS del visor: listArchivosAdjuntos.
+const ARCHIVOS_URL =
+  process.env.BUZON_ARCHIVOS_URL ??
+  "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listArchivosAdjuntos";
+// Endpoint que devuelve el detalle del mensaje. CALIBRABLE.
 const DETALLE_URL =
   process.env.BUZON_DETALLE_URL ??
   "https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/detalleMensaje";
@@ -572,75 +577,87 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       });
     }
 
-    // idMensaje interno del visor (suele ser el codMensaje del listado).
+    // idMensaje interno del visor (== codMensaje del listado).
     const idMensaje = params.idMensaje || codMensaje;
-    const indMensaje = params.indMensaje || "5";
     let idArchivo = params.idArchivo || "";
+    let sistema = "0";
 
-    // Si no nos dieron idArchivo, lo buscamos en el detalle del mensaje.
+    // Si no nos dieron idArchivo, lo sacamos de listArchivosAdjuntos(idMensaje).
     if (!idArchivo) {
-      const det = (await ejecutor.evaluate(
-        async (a: { url: string; id: string; ind: string }) => {
-          try {
-            const r = await fetch(a.url, {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: `idMensaje=${encodeURIComponent(a.id)}&sistema=0&indMensaje=${encodeURIComponent(a.ind)}`,
-            });
-            return { status: r.status, body: (await r.text()).slice(0, 20000) };
-          } catch (e) {
-            return { status: 0, body: String(e) };
+      const arch = (await ejecutor.evaluate(
+        async (a: { url: string; id: string }) => {
+          const intentos: { url: string; opt: any }[] = [
+            { url: `${a.url}?idMensaje=${encodeURIComponent(a.id)}`, opt: { credentials: "include" } },
+            {
+              url: a.url,
+              opt: {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `idMensaje=${encodeURIComponent(a.id)}`,
+              },
+            },
+          ];
+          for (const it of intentos) {
+            try {
+              const r = await fetch(it.url, it.opt);
+              const t = await r.text();
+              if (r.status === 200 && t && !/Error 404/.test(t)) {
+                return { status: r.status, body: t.slice(0, 8000) };
+              }
+            } catch { /* siguiente intento */ }
           }
+          return { status: 0, body: "" };
         },
-        { url: DETALLE_URL, id: idMensaje, ind: indMensaje }
+        { url: ARCHIVOS_URL, id: idMensaje }
       )) as { status: number; body: string };
-      pasos.push({ paso: "detalle", status: det.status, respuesta: det.body.slice(0, 1500) });
+      pasos.push({ paso: "listArchivosAdjuntos", status: arch.status, respuesta: arch.body.slice(0, 1200) });
       try {
-        const j = JSON.parse(det.body);
-        const nodo = j?.archivos ?? j?.anexos ?? j?.lisArchivos ?? j?.listArchivos ?? j?.adjuntos ?? [];
+        const j = JSON.parse(arch.body);
+        const nodo = Array.isArray(j)
+          ? j
+          : j?.archivos ?? j?.lista ?? j?.rows ?? j?.data ?? j?.lisArchivos ?? j?.listArchivos ?? [];
         const arr = Array.isArray(nodo) ? nodo : [nodo];
         const a = arr.find((x: any) => x && (x.idArchivo ?? x.codArchivo ?? x.id));
-        if (a) idArchivo = String(a.idArchivo ?? a.codArchivo ?? a.id);
+        if (a) {
+          idArchivo = String(a.idArchivo ?? a.codArchivo ?? a.id);
+          if (a.sistema != null) sistema = String(a.sistema);
+        }
       } catch {
-        const m = det.body.match(/idArchivo["'\s:=]+(\d+)/i);
+        const m = arch.body.match(/idArchivo["'\s:=]+(\d+)/i);
         if (m) idArchivo = m[1];
       }
     }
-    pasos.push({ paso: "ids", idMensaje, idArchivo });
+    pasos.push({ paso: "ids", idMensaje, idArchivo, sistema });
 
     if (!idArchivo) {
       return {
         ok: false,
         error:
-          "Encontré el endpoint de descarga (bajarArchivo) pero falta el idArchivo del mensaje. Usa Modo diagnóstico y compárteme el resultado para fijar la ruta del detalle.",
+          "No encontré el idArchivo del adjunto. Usa Modo diagnóstico y compárteme el resultado para ajustar listArchivosAdjuntos.",
         diag: { pasos },
       };
     }
 
-    // POST real a bajarArchivo (form-urlencoded), confirmado por DevTools.
-    const bin = (await ejecutor.evaluate(
-      async (a: { url: string; idM: string; idA: string; ind: string }) => {
-        try {
-          const r = await fetch(a.url, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `accion=archivo&idMensaje=${encodeURIComponent(a.idM)}&idArchivo=${encodeURIComponent(a.idA)}&sistema=0&indMensaje=${encodeURIComponent(a.ind)}`,
-          });
-          const ct = r.headers.get("content-type") || "";
-          const buf = await r.arrayBuffer();
-          let s = "";
-          const bytes = new Uint8Array(buf);
-          for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-          return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
-        } catch (e) {
-          return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
-        }
-      },
-      { url: BAJAR_URL, idM: idMensaje, idA: idArchivo, ind: indMensaje }
-    )) as { status: number; ct: string; b64: string; firma: string };
-    pasos.push({ paso: "bajarArchivo", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+    // Descarga GET tal como la arma el propio visor (confirmado en su JS):
+    //   bajarArchivo?accion=archivo&idMensaje=..&idArchivo=..&sistema=0&app=1
+    const link =
+      `${BAJAR_URL}?accion=archivo&idMensaje=${encodeURIComponent(idMensaje)}` +
+      `&idArchivo=${encodeURIComponent(idArchivo)}&sistema=${encodeURIComponent(sistema)}&app=1`;
+    const bin = (await ejecutor.evaluate(async (u: string) => {
+      try {
+        const r = await fetch(u, { credentials: "include" });
+        const ct = r.headers.get("content-type") || "";
+        const buf = await r.arrayBuffer();
+        let s = "";
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+        return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
+      } catch (e) {
+        return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
+      }
+    }, link)) as { status: number; ct: string; b64: string; firma: string };
+    pasos.push({ paso: "bajarArchivo", url: link, status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
 
     if (diagnostico) return { ok: false, diag: { pasos } };
 
