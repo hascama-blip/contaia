@@ -539,6 +539,16 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
+        {/* Sin deudas: mensaje positivo si se consultó y no hay pendientes */}
+        {cliente.deudasF36?.at && nDeudas === 0 && (
+          <section className="mt-6 evitar-corte">
+            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              Esta empresa no cuenta con deudas pendientes de acoger al fraccionamiento (consultado {fmtFecha(cliente.deudasF36.at)}).
+            </p>
+          </section>
+        )}
+
         {/* Deudas tributarias (Fraccionamiento F36, por sección) */}
         {nDeudas > 0 && (
           <section className="mt-6 print-full">

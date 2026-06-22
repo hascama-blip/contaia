@@ -727,10 +727,21 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     }
 
     if (!(await tieneTexto(/valores|acogibles/i))) {
+      // ¿Llegamos a la consulta pero NO hay solicitud pendiente? = sin deudas.
+      const consultaOk = await tieneTexto(/pedidos efectuados|acci[oó]n a seguir|estado actual/i);
+      const hayPendiente = await tieneTexto(/pendiente de elaborar/i);
+      if (consultaOk && !hayPendiente) {
+        return {
+          ok: true,
+          tablas: [],
+          mensaje: "Esta empresa no cuenta con deudas pendientes de acoger al fraccionamiento (no hay solicitud pendiente de elaborar).",
+          diag: { pasos },
+        };
+      }
       return {
         ok: false,
         error:
-          "Hice clic en “Elaborar Solicitud” pero aún no veo las pestañas. Revisa el diagnóstico (abrir-consulta/elaborar-solicitud/inspeccion).",
+          "No se pudo abrir el formulario de deudas. Si la empresa no tiene un pedido “Pendiente de Elaborar Solicitud”, no hay deudas que mostrar; si lo tiene, reintenta en unos minutos. (Revisa el diagnóstico.)",
         diag: { pasos },
       };
     }

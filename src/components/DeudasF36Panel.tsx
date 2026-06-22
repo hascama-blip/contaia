@@ -111,7 +111,7 @@ export default function DeudasF36Panel({
         {at ? ` Última extracción: ${new Date(at).toLocaleString("es-PE")}.` : ""}
       </p>
 
-      {tablas.length > 0 && (
+      {tablas.length > 0 ? (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-slate-500">{totalRegistros} deuda(s) en {tablas.length} sección(es).</p>
           {tablas.map((t) => (
@@ -141,7 +141,11 @@ export default function DeudasF36Panel({
             </div>
           ))}
         </div>
-      )}
+      ) : at ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
+          ✅ Esta empresa <b>no cuenta con deudas pendientes</b> de acoger al fraccionamiento.
+        </div>
+      ) : null}
     </section>
   );
 }
