@@ -155,6 +155,39 @@ async function clicTextoEspera(ctx: any, page: any, textos: string[], intentos =
   return null;
 }
 
+/** Clic NATIVO de Playwright (evento real) — necesario para menús con
+ * manejadores JS (addEventListener), que no responden a el.click() sintético. */
+async function clicNativo(ctx: any, textos: string[], timeout = 4000): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      for (const t of textos) {
+        for (const exact of [true, false]) {
+          try {
+            const loc = fr.getByText(t, { exact }).first();
+            if ((await loc.count()) > 0) {
+              await loc.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+              await loc.click({ timeout });
+              return t;
+            }
+          } catch {
+            /* siguiente */
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function clicNativoEspera(ctx: any, page: any, textos: string[], intentos = 8, esperaMs = 2000): Promise<string | null> {
+  for (let i = 0; i < intentos; i++) {
+    const hit = await clicNativo(ctx, textos);
+    if (hit) return hit;
+    await page.waitForTimeout(esperaMs);
+  }
+  return null;
+}
+
 /** Selecciona en un <select> la opción cuyo texto/valor contenga alguno de los textos. */
 async function seleccionarOpcion(ctx: any, textos: string[]): Promise<string | null> {
   for (const pg of ctx.pages()) {
@@ -409,7 +442,7 @@ async function irAFraccArt36(ctx: any, page: any, pasos: any[]) {
   const hechos: any[] = [];
   for (const opciones of ruta) {
     await cerrarPantallas(ctx, page);
-    const hit = await clicTextoEspera(ctx, page, opciones, 5, 1200);
+    const hit = await clicNativoEspera(ctx, page, opciones, 5, 1200);
     await page.waitForTimeout(2000);
     hechos.push({ buscaba: opciones[0], clico: hit });
   }
@@ -541,7 +574,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     await irAFraccArt36(s.ctx, s.page, pasos);
     // Clic POR TEXTO en "Consulta estado de pedido de deuda" (abre ventana/pestaña
     // nueva con la tabla de pedidos). El menú nuevo no usa onclick=ejecuta.
-    const ce = await clicTextoEspera(
+    const ce = await clicNativoEspera(
       s.ctx, s.page,
       ["Consulta estado de pedido de deuda", "Consulta estado de pedido"],
       6, 1500
@@ -550,7 +583,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
 
     // "Elaborar Solicitud" solo existe cuando la tabla de pedidos ya cargó, así
     // que reintentar clicarlo SIRVE de espera y de acción a la vez (fila 1).
-    const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 14, 2500);
+    const elab = await clicNativoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 14, 2500);
     await s.page.waitForTimeout(5000);
     await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "elaborar-solicitud", clico: elab });
@@ -580,7 +613,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     // Leer cada pestaña.
     const tablas: TablaDeuda[] = [];
     for (const p of PESTANAS) {
-      await clicTexto(s.ctx, [p]);
+      await clicNativo(s.ctx, [p]);
       await s.page.waitForTimeout(1800);
       const t = await leerTablaVisible(s.ctx);
       tablas.push({ pestana: p, headers: t?.headers ?? [], filas: t?.filas ?? [] });
