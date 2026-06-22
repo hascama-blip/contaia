@@ -522,6 +522,30 @@ const PESTANAS_DEF = [
   { label: "Deudas no Acogibles", match: "Acogibles" },
 ];
 
+/** Cambia de pestaña usando la API de dojo (dijit TabContainer.selectChild). */
+async function seleccionarPaneDijit(ctx: any, index: number): Promise<boolean> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const ok = await fr
+        .evaluate((idx: number) => {
+          const dj: any = (window as any).dijit;
+          if (!dj || !dj.registry) return false;
+          let tc: any = null;
+          dj.registry.forEach((w: any) => {
+            if (w && w.declaredClass && /TabContainer/.test(w.declaredClass)) tc = w;
+          });
+          if (!tc || typeof tc.getChildren !== "function") return false;
+          const kids = tc.getChildren();
+          if (!kids[idx]) return false;
+          try { tc.selectChild(kids[idx]); return true; } catch { return false; }
+        }, index)
+        .catch(() => false);
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+
 /** Clic en una PESTAÑA del form F36 (dojo dijitTab) por su texto distintivo.
  *  Clic NATIVO sobre el .dijitTab para que dispare el cambio de panel de dijit. */
 async function clicPestana(ctx: any, match: string): Promise<boolean> {
@@ -715,8 +739,11 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     const tablas: TablaDeuda[] = [];
     let prevSig = "__inicio__";
     const firma = (t: any) => (t?.filas ?? []).map((f: string[]) => f.join("|")).join("§");
-    for (const pd of PESTANAS_DEF) {
-      const clicado = await clicPestana(s.ctx, pd.match);
+    for (let idx = 0; idx < PESTANAS_DEF.length; idx++) {
+      const pd = PESTANAS_DEF[idx];
+      // Cambia de panel por la API de dojo (lo más confiable); si no, clic.
+      const porApi = await seleccionarPaneDijit(s.ctx, idx);
+      const clicado = porApi || (await clicPestana(s.ctx, pd.match));
       let t: any = null;
       for (let i = 0; i < 12; i++) {
         await s.page.waitForTimeout(1500);
@@ -725,7 +752,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       }
       prevSig = firma(t);
       tablas.push({ pestana: pd.label, headers: t?.headers ?? [], filas: t?.filas ?? [] });
-      pasos.push({ paso: "pestana", nombre: pd.label, clicado, filas: t?.filas?.length ?? 0 });
+      pasos.push({ paso: "pestana", nombre: pd.label, via: porApi ? "dojo" : clicado ? "clic" : "no", filas: t?.filas?.length ?? 0 });
     }
 
     return {
