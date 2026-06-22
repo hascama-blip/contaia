@@ -528,7 +528,7 @@ async function clicPestana(ctx: any, match: string): Promise<boolean> {
     for (const fr of pg.frames()) {
       const locs = [
         fr.getByRole("tab", { name: match }),
-        fr.locator("[role=tab], .dijitTab, .tab, td, span, a").filter({ hasText: match }),
+        fr.locator("[role=tab], .dijitTab, .tab").filter({ hasText: match }),
         fr.getByText(match, { exact: false }),
       ];
       for (const loc of locs) {
@@ -536,13 +536,28 @@ async function clicPestana(ctx: any, match: string): Promise<boolean> {
           const first = loc.first();
           if ((await first.count()) > 0) {
             await first.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
-            await first.click({ timeout: 4000 });
+            await first.click({ timeout: 3500, force: true });
             return true;
           }
         } catch {
           /* siguiente estrategia */
         }
       }
+      // Fallback: disparar eventos de mouse por JS sobre el elemento del tab.
+      const ok = await fr
+        .evaluate((m: string) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const els = Array.from(document.querySelectorAll('[role="tab"], .dijitTab, .tab, td, span, a, div')) as HTMLElement[];
+          const el = els.find((e) => e.children.length <= 2 && norm(e.textContent).includes(norm(m)));
+          if (!el) return false;
+          const tgt = (el.closest('[role="tab"], .dijitTab, .tab') as HTMLElement) || el;
+          for (const type of ["mousedown", "mouseup", "click"]) {
+            tgt.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+          }
+          return true;
+        }, match)
+        .catch(() => false);
+      if (ok) return true;
     }
   }
   return false;
@@ -664,6 +679,37 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
         "Elaborar Solicitud",
       ]);
       pasos.push({ paso: "inspeccion", urls, elementos: insp });
+
+      // Inspección de los TABS (estructura real para clicarlos).
+      const tabsInfo: any[] = [];
+      for (const pg of s.ctx.pages()) {
+        for (const fr of pg.frames()) {
+          const f = await fr
+            .evaluate((labels: string[]) => {
+              const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+              const res: any[] = [];
+              for (const t of labels) {
+                const el = (Array.from(document.querySelectorAll("*")) as HTMLElement[]).find(
+                  (e) => e.children.length === 0 && norm(e.textContent) === norm(t)
+                );
+                if (el) {
+                  res.push({
+                    t,
+                    tag: el.tagName,
+                    cls: (el.className || "").toString().slice(0, 50),
+                    role: el.getAttribute("role") || el.parentElement?.getAttribute("role") || "",
+                    pTag: el.parentElement?.tagName || "",
+                    pCls: (el.parentElement?.className || "").toString().slice(0, 50),
+                  });
+                }
+              }
+              return res;
+            }, ["Valores", "Deudas Autoliquidadas/Reliquidadas", "Otras Deudas", "Deudas no Acogibles"])
+            .catch(() => []);
+          if ((f as any[]).length) tabsInfo.push({ url: fr.url().slice(0, 60), tabs: f });
+        }
+      }
+      pasos.push({ paso: "tabs", info: tabsInfo });
     }
 
     if (!(await tieneTexto(/valores|acogibles/i))) {
