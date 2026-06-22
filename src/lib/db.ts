@@ -427,12 +427,26 @@ export async function getBuzonAdjunto(
   }
 }
 
-/** Guarda las deudas F36 extraídas del portal SOL. */
+/** Guarda (reemplaza) las deudas F36 extraídas del portal SOL. */
 export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[]): Promise<void> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
-  cliente.deudasF36 = { tablas, at: new Date().toISOString() };
+  const generadoAt = cliente.deudasF36?.generadoAt;
+  cliente.deudasF36 = { tablas, at: new Date().toISOString(), generadoAt };
+  await writeStore(store);
+}
+
+/** Marca cuándo se generó el pedido de deuda (para el límite de 3 días). */
+export async function setDeudaGenerado(clienteId: string): Promise<void> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return;
+  cliente.deudasF36 = {
+    tablas: cliente.deudasF36?.tablas ?? [],
+    at: cliente.deudasF36?.at ?? "",
+    generadoAt: new Date().toISOString(),
+  };
   await writeStore(store);
 }
 

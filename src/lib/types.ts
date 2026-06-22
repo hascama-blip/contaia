@@ -98,7 +98,7 @@ export interface Cliente {
   /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
   deudas: Deuda[];
   /** Deudas del F36 (fraccionamiento Art. 36) extraídas del portal SOL. */
-  deudasF36?: { tablas: DeudaF36Tabla[]; at: string } | null;
+  deudasF36?: { tablas: DeudaF36Tabla[]; at: string; generadoAt?: string } | null;
   /** Credenciales de la API SIRE guardadas (la Clave SOL NO se guarda). */
   credSire?: CredencialesSire | null;
 }

@@ -11,10 +11,13 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
   const [solPass, setSolPass] = useState("");
   const [tablas, setTablas] = useState<Tabla[]>([]);
   const [at, setAt] = useState<string | null>(null);
+  const [puedeActualizar, setPuedeActualizar] = useState(true);
+  const [diasParaActualizar, setDiasParaActualizar] = useState(0);
   const [busy, setBusy] = useState<"gen" | "ext" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
+  const [forzar, setForzar] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
   const cargarGuardadas = useCallback(async (id: string) => {
@@ -22,7 +25,12 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
     try {
       const res = await fetch(`/api/consultas/deudas/extraer?clienteId=${encodeURIComponent(id)}`);
       const data = await res.json().catch(() => ({}));
-      if (res.ok) { setTablas(data.tablas ?? []); setAt(data.at ?? null); }
+      if (res.ok) {
+        setTablas(data.tablas ?? []);
+        setAt(data.at ?? null);
+        setPuedeActualizar(data.puedeActualizar ?? true);
+        setDiasParaActualizar(data.diasParaActualizar ?? 0);
+      }
     } catch { /* */ }
   }, []);
 
@@ -43,7 +51,7 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
       const res = await fetch(`/api/consultas/deudas/${fase}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, diagnostico: modoDiag }),
+        body: JSON.stringify({ clienteId, solUser, solPass, diagnostico: modoDiag, forzar }),
       });
       const data = await res.json().catch(() => ({}));
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
@@ -52,7 +60,11 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
         if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         return;
       }
-      if (fase === "extraer") { setTablas(data.tablas ?? []); setAt(new Date().toISOString()); }
+      if (fase === "extraer") {
+        if (Array.isArray(data.tablas)) setTablas(data.tablas);
+        if (data.at) setAt(data.at);
+        if (!data.desdeCache) { setPuedeActualizar(false); setDiasParaActualizar(3); }
+      }
       setInfo(data.mensaje ?? "Listo.");
     } catch {
       setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
@@ -105,17 +117,24 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
             <button className="btn-primary" onClick={() => llamar("generar")} disabled={busy !== null}>
               {busy === "gen" ? "Generando…" : "1) Generar pedido de deuda"}
             </button>
-            <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null}>
-              {busy === "ext" ? "Extrayendo…" : "2) Consultar y extraer"}
+            <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null || (!puedeActualizar && !forzar)}>
+              {busy === "ext" ? "Extrayendo…" : puedeActualizar ? "2) Consultar y extraer" : `2) Actualizar (en ~${diasParaActualizar} día(s))`}
             </button>
             <label className="flex items-center gap-2 text-xs text-slate-500">
               <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
               Modo diagnóstico
             </label>
+            {!puedeActualizar && (
+              <label className="flex items-center gap-2 text-xs text-amber-600">
+                <input type="checkbox" checked={forzar} onChange={(e) => setForzar(e.target.checked)} />
+                Forzar ahora (ignora el límite de 3 días)
+              </label>
+            )}
           </div>
           <p className="mt-2 text-xs text-amber-600">
-            ⏱️ Tras “Generar pedido”, espera ~5 minutos antes de “Consultar y extraer” (SUNAT demora en
-            preparar el fraccionamiento). Los resultados quedan guardados.
+            ⏱️ Para no saturar SUNAT (te bloquea por “spam”), las deudas se actualizan <b>cada 3 días</b>.
+            Dentro de ese plazo se muestran las guardadas. La nueva extracción <b>reemplaza</b> la anterior.
+            {at && !puedeActualizar ? ` Última: ${new Date(at).toLocaleString("es-PE")}.` : ""}
           </p>
         </div>
       )}
