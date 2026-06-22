@@ -272,6 +272,41 @@ async function dumpFracc(ctx: any) {
   return { marcos, enlaces };
 }
 
+/** Inspecciona el elemento real de cada texto (tag/onclick/href/html). Compacto. */
+async function inspeccionar(ctx: any, textos: string[]) {
+  const out: any[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const found = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const res: any[] = [];
+          for (const t of textos) {
+            const el = (Array.from(document.querySelectorAll("a,button,li,span,td,div")) as HTMLElement[]).find((e) =>
+              norm(e.textContent).includes(norm(t))
+            );
+            if (!el) continue;
+            let n: HTMLElement | null = el;
+            let info: any = null;
+            for (let i = 0; i < 5 && n; i++) {
+              if (n.tagName === "A" || n.tagName === "BUTTON" || n.getAttribute("onclick")) {
+                info = { t, tag: n.tagName, onclick: (n.getAttribute("onclick") || "").slice(0, 220), href: (n.getAttribute("href") || "").slice(0, 220), html: (n.outerHTML || "").slice(0, 260) };
+                break;
+              }
+              n = n.parentElement;
+            }
+            res.push(info || { t, tag: el.tagName, onclick: "", href: "", html: (el.outerHTML || "").slice(0, 260) });
+          }
+          return res;
+        }, textos)
+        .catch(() => []);
+      out.push(...(found as any[]));
+    }
+  }
+  const seen = new Set<string>();
+  return out.filter((x) => { const k = x.t + x.html; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 /** Vuelca TODOS los enlaces del menú con onclick ejecuta(...code=X) para mapear. */
 async function dumpEjecuta(ctx: any) {
   const out: { t: string; oc: string }[] = [];
@@ -517,23 +552,18 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "elaborar-solicitud", clico: elab });
 
-    // Diagnóstico: qué páginas/pestañas hay abiertas y qué muestran.
+    // Diagnóstico COMPACTO: URLs de pestañas + el elemento real del menú.
     if (diagnostico) {
-      const paginas: any[] = [];
-      for (const pg of s.ctx.pages()) {
-        const t = (await pg.evaluate(() => (document.body?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 280)).catch(() => "")) as string;
-        paginas.push({ url: pg.url().slice(0, 110), texto: t });
-      }
-      pasos.push({ paso: "paginas", paginas });
+      const urls = s.ctx.pages().map((p: any) => p.url().slice(0, 95));
+      const insp = await inspeccionar(s.ctx, ["Consulta estado de pedido de deuda", "Elaborar Solicitud"]);
+      pasos.push({ paso: "inspeccion", urls, elementos: insp });
     }
-
-    if (diagnostico) pasos.push({ paso: "fracc-pagina", ...(await dumpFracc(s.ctx)) });
 
     if (!(await tieneTexto(/valores|acogibles/i))) {
       return {
         ok: false,
         error:
-          "Hice clic en “Elaborar Solicitud” pero aún no veo las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/elaborar-solicitud/paginas).",
+          "Hice clic en “Elaborar Solicitud” pero aún no veo las pestañas. Revisa el diagnóstico (abrir-consulta/elaborar-solicitud/inspeccion).",
         diag: { pasos },
       };
     }
