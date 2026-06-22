@@ -525,15 +525,22 @@ async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: s
       const t = await fr
         .evaluate(() => {
           const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+          // visible = no oculto por display:none (panel de pestaña inactivo).
           const visible = (el: Element) => {
-            const r = (el as HTMLElement).getBoundingClientRect();
+            const he = el as HTMLElement;
+            if (he.offsetParent === null && he.tagName !== "BODY") return false;
+            const r = he.getBoundingClientRect();
             return r.width > 0 && r.height > 0;
           };
-          // columnas "técnicas" (snake_case / ind_/cod_/mto_/num_/fec_/lst_/pid)
           const esTecnico = (h: string) => /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(h) || /^(ind|cod|mto|num|fec|lst|pid)[A-Za-z0-9]*$/.test(h);
           const KW = ["periodo", "tributario", "valor", "deuda", "monto", "importe", "tributo", "resoluci"];
+          // filas del encabezado de la solicitud (NO son deudas).
+          const esJunk = (j: string) =>
+            /(ruc\s*:|raz[oó]n social|n[uú]mero de proceso|fecha de pedido|entidad\s*:|c[oó]digo de pago|garant[ií]a|monto acogido \(s|total de registros|total valores)/i.test(j);
+          const esDeuda = (tds: string[]) =>
+            tds.some((c) => /^\d{1,2}\/\d{4}$/.test(c)) || /orden de pago|resoluci[oó]n|multa|liquidaci/i.test(tds.join(" "));
 
-          // 1) Cabeceras del grid de deudas.
+          // 1) Cabeceras del grid de deudas (del panel visible).
           let headers: string[] | null = null;
           for (const tb of Array.from(document.querySelectorAll("table")).filter(visible)) {
             let hs = Array.from(tb.querySelectorAll("thead th, thead td")).map((x) => norm(x.textContent));
@@ -550,15 +557,15 @@ async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: s
           const nVis = iTec > 0 ? iTec : headers.length;
           const visHeaders = headers.slice(0, nVis);
 
-          // 2) Filas: cualquier <tr> visible que parezca deuda (no el form de pago).
+          // 2) Filas de deuda del panel VISIBLE (excluye encabezado y form).
           const filas: string[][] = [];
           const seen = new Set<string>();
           for (const tr of Array.from(document.querySelectorAll("tr"))) {
             if (!visible(tr)) continue;
             const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
-            if (tds.filter((c) => c).length < 3) continue;
+            if (tds.filter((c) => c).length < 2) continue;
             const joined = tds.join(" ");
-            if (!/\d{1,2}\/\d{4}|\d{6,}|orden de pago|resoluci|liquidaci|multa/i.test(joined)) continue;
+            if (esJunk(joined) || !esDeuda(tds)) continue;
             const fila = tds.slice(0, nVis);
             const key = fila.join("|");
             if (seen.has(key)) continue;
@@ -639,11 +646,11 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     // Leer cada pestaña.
     const tablas: TablaDeuda[] = [];
     for (const p of PESTANAS) {
-      await clicNativo(s.ctx, [p]);
-      await s.page.waitForTimeout(1800);
+      const clicado = await clicNativo(s.ctx, [p]);
+      await s.page.waitForTimeout(2800);
       const t = await leerTablaVisible(s.ctx);
       tablas.push({ pestana: p, headers: t?.headers ?? [], filas: t?.filas ?? [] });
-      pasos.push({ paso: "pestana", nombre: p, filas: t?.filas.length ?? 0, headers: t?.headers ?? [] });
+      pasos.push({ paso: "pestana", nombre: p, clicado, filas: t?.filas.length ?? 0 });
     }
 
     return {
