@@ -522,42 +522,32 @@ const PESTANAS_DEF = [
   { label: "Deudas no Acogibles", match: "Acogibles" },
 ];
 
-/** Clic en una PESTAÑA del form F36 (dijitTab) por su texto distintivo. */
+/** Clic en una PESTAÑA del form F36 (dojo dijitTab) por su texto distintivo.
+ *  Clic NATIVO sobre el .dijitTab para que dispare el cambio de panel de dijit. */
 async function clicPestana(ctx: any, match: string): Promise<boolean> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
-      const locs = [
+      const candidatos = [
+        fr.locator(".dijitTab").filter({ hasText: match }),
         fr.getByRole("tab", { name: match }),
-        fr.locator("[role=tab], .dijitTab, .tab").filter({ hasText: match }),
-        fr.getByText(match, { exact: false }),
+        fr.locator("span.tabLabel", { hasText: match }),
       ];
-      for (const loc of locs) {
+      for (const loc of candidatos) {
         try {
-          const first = loc.first();
-          if ((await first.count()) > 0) {
-            await first.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
-            await first.click({ timeout: 3500, force: true });
-            return true;
-          }
+          const el = loc.first();
+          if ((await el.count()) === 0) continue;
+          await el.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+          await el.click({ timeout: 5000 }); // clic real (no force): dijit lo necesita
+          return true;
         } catch {
-          /* siguiente estrategia */
+          try {
+            await loc.first().click({ timeout: 3000, force: true });
+            return true;
+          } catch {
+            /* siguiente candidato */
+          }
         }
       }
-      // Fallback: disparar eventos de mouse por JS sobre el elemento del tab.
-      const ok = await fr
-        .evaluate((m: string) => {
-          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const els = Array.from(document.querySelectorAll('[role="tab"], .dijitTab, .tab, td, span, a, div')) as HTMLElement[];
-          const el = els.find((e) => e.children.length <= 2 && norm(e.textContent).includes(norm(m)));
-          if (!el) return false;
-          const tgt = (el.closest('[role="tab"], .dijitTab, .tab') as HTMLElement) || el;
-          for (const type of ["mousedown", "mouseup", "click"]) {
-            tgt.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
-          }
-          return true;
-        }, match)
-        .catch(() => false);
-      if (ok) return true;
     }
   }
   return false;
@@ -728,10 +718,10 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     for (const pd of PESTANAS_DEF) {
       const clicado = await clicPestana(s.ctx, pd.match);
       let t: any = null;
-      for (let i = 0; i < 8; i++) {
-        await s.page.waitForTimeout(1200);
+      for (let i = 0; i < 12; i++) {
+        await s.page.waitForTimeout(1500);
         t = await leerTablaVisible(s.ctx);
-        if (firma(t) !== prevSig) break; // el grid ya se actualizó
+        if (firma(t) !== prevSig) break; // el grid ya se actualizó (o quedó vacío)
       }
       prevSig = firma(t);
       tablas.push({ pestana: pd.label, headers: t?.headers ?? [], filas: t?.filas ?? [] });
