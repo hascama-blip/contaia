@@ -20,6 +20,7 @@ export default function DeudasF36Panel({
   const [at, setAt] = useState<string | null>(inicial?.at ?? null);
   const [puedeActualizar, setPuedeActualizar] = useState(true);
   const [diasParaActualizar, setDiasParaActualizar] = useState(0);
+  const [nota, setNota] = useState<string | null>((inicial as any)?.nota ?? null);
   const [busy, setBusy] = useState<"gen" | "ext" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export default function DeudasF36Panel({
       if (res.ok) {
         setTablas(data.tablas ?? []);
         setAt(data.at ?? null);
+        setNota(data.nota ?? null);
         setPuedeActualizar(data.puedeActualizar ?? true);
         setDiasParaActualizar(data.diasParaActualizar ?? 0);
       }
@@ -57,6 +59,7 @@ export default function DeudasF36Panel({
       if (!res.ok) { setError(data.error ?? "No se pudo completar."); return; }
       if (fase === "extraer" && Array.isArray(data.tablas)) {
         setTablas(data.tablas);
+        setNota(data.nota ?? null);
         if (data.at) setAt(data.at);
         if (!data.desdeCache) { setPuedeActualizar(false); setDiasParaActualizar(3); }
       }
@@ -80,6 +83,11 @@ export default function DeudasF36Panel({
 
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+      {nota && (
+        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          ⚠ <b>SUNAT:</b> {nota}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>

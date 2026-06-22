@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       desdeCache: true,
       tablas: guardado.tablas,
       at: guardado.at,
+      nota: guardado.nota ?? null,
       mensaje: `Mostrando lo guardado (${new Date(guardado.at).toLocaleString("es-PE")}). Para no saturar SUNAT, podrás actualizar en ~${diasRestantes(guardado.at)} día(s).`,
     });
   }
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
   if (r.ok && r.tablas && !body.diagnostico) {
-    await setDeudasF36(cliente.id, r.tablas).catch(() => {}); // reemplaza lo anterior
+    await setDeudasF36(cliente.id, r.tablas, r.nota).catch(() => {}); // reemplaza lo anterior
   }
   return NextResponse.json(r, { status: r.ok || body.diagnostico ? 200 : 400 });
 }
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     tablas: g?.tablas ?? [],
     at: g?.at ?? null,
+    nota: g?.nota ?? null,
     puedeActualizar,
     diasParaActualizar: g?.at && !puedeActualizar ? diasRestantes(g.at) : 0,
   });

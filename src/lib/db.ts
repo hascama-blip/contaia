@@ -428,12 +428,12 @@ export async function getBuzonAdjunto(
 }
 
 /** Guarda (reemplaza) las deudas F36 extraídas del portal SOL. */
-export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[]): Promise<void> {
+export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[], nota?: string): Promise<void> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
   const generadoAt = cliente.deudasF36?.generadoAt;
-  cliente.deudasF36 = { tablas, at: new Date().toISOString(), generadoAt };
+  cliente.deudasF36 = { tablas, at: new Date().toISOString(), generadoAt, nota: nota || undefined };
   await writeStore(store);
 }
 

@@ -75,6 +75,8 @@ export default async function InformePage({ params }: { params: { id: string } }
     observacionesFinal.push({ nivel: "alto", texto: `Condición de domicilio: ${sunat.condicion}. Actualizar para volver a HABIDO.` });
   if (totalDeuda > 0)
     observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias en SUNAT por ${fmtSoles(totalDeuda)} (${nDeudas} valor(es)). Evaluar pago o fraccionamiento.` });
+  if (cliente.deudasF36?.nota)
+    observacionesFinal.push({ nivel: "alto", texto: `SUNAT (fraccionamiento): ${cliente.deudasF36.nota}` });
   if (nPeligrosos > 0)
     observacionesFinal.push({ nivel: "alto", texto: `Buzón SOL: ${nPeligrosos} mensaje(s) de fiscalización / procedimientos no contenciosos. Atención inmediata.` });
   if (nUrgentes > 0)
@@ -539,8 +541,18 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
+        {/* Mensaje de bloqueo de SUNAT (p.ej. "Tiene deuda pendiente por Perdida") */}
+        {cliente.deudasF36?.nota && (
+          <section className="mt-6 evitar-corte">
+            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
+            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ⚠ SUNAT: {cliente.deudasF36.nota}
+            </p>
+          </section>
+        )}
+
         {/* Sin deudas: mensaje positivo si se consultó y no hay pendientes */}
-        {cliente.deudasF36?.at && nDeudas === 0 && (
+        {cliente.deudasF36?.at && nDeudas === 0 && !cliente.deudasF36?.nota && (
           <section className="mt-6 evitar-corte">
             <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">

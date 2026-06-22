@@ -32,6 +32,8 @@ export interface FraccResultado {
   ok: boolean;
   mensaje?: string;
   tablas?: TablaDeuda[];
+  /** Mensaje de SUNAT (texto en rojo) cuando bloquea el trámite. */
+  nota?: string;
   error?: string;
   diag?: { pasos: any[] };
 }
@@ -577,6 +579,46 @@ async function clicPestana(ctx: any, match: string): Promise<boolean> {
   return false;
 }
 
+/** Detecta la pantalla "La aplicación ha retornado el siguiente mensaje" y
+ *  copia el mensaje (el texto en rojo) + la acción a realizar. */
+async function detectarMensajeApp(ctx: any): Promise<{ mensaje: string; accion: string } | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const m = await fr
+        .evaluate(() => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+          const body = document.body?.innerText || "";
+          if (!/aplicaci[oó]n ha retornado el siguiente mensaje/i.test(body)) return null;
+          // Texto en ROJO (font[color], style color rojo, o computed rojizo).
+          let rojo = "";
+          const cands = Array.from(document.querySelectorAll('font, b, strong, span, td, div, p')) as HTMLElement[];
+          for (const e of cands) {
+            const attr = (e.getAttribute("color") || "") + " " + (e.getAttribute("style") || "");
+            let esRojo = /red|#f00|#ff0000|rgb\(2/i.test(attr);
+            if (!esRojo) {
+              try {
+                const c = getComputedStyle(e).color || "";
+                const mm = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                if (mm && +mm[1] > 150 && +mm[2] < 90 && +mm[3] < 90) esRojo = true;
+              } catch {}
+            }
+            const txt = norm(e.textContent);
+            if (esRojo && txt && txt.length < 200 && !/aplicaci[oó]n ha retornado/i.test(txt)) { rojo = txt; break; }
+          }
+          if (!rojo) {
+            const g = body.match(/siguiente mensaje\s*:?\s*([\s\S]*?)\s*Acci[oó]n a realizar/i);
+            if (g) rojo = norm(g[1]);
+          }
+          const a = body.match(/Acci[oó]n a realizar\s*:?\s*([\s\S]*?)(?:Anterior|$)/i);
+          return { mensaje: rojo, accion: a ? norm(a[1]) : "" };
+        })
+        .catch(() => null);
+      if (m && m.mensaje) return m;
+    }
+  }
+  return null;
+}
+
 /** Lee el GRID DE DEUDAS visible. La cabecera y los datos pueden estar en
  *  tablas separadas (grid dojo), así que toma las cabeceras del grid de deudas
  *  y las filas de cualquier tabla visible con datos de deuda. */
@@ -724,6 +766,18 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
         }
       }
       pasos.push({ paso: "tabs", info: tabsInfo });
+    }
+
+    // ¿SUNAT mostró un mensaje de bloqueo? (p.ej. "Tiene deuda pendiente por Perdida").
+    const msgApp = await detectarMensajeApp(s.ctx);
+    if (msgApp) {
+      return {
+        ok: true,
+        tablas: [],
+        nota: msgApp.mensaje,
+        mensaje: `⚠ SUNAT: ${msgApp.mensaje}${msgApp.accion ? " — " + msgApp.accion : ""}`,
+        diag: { pasos },
+      };
     }
 
     if (!(await tieneTexto(/valores|acogibles/i))) {
