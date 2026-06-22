@@ -6,7 +6,8 @@ import { generarPedidoDeuda } from "@/lib/fraccionamiento";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 días
+// Periodo de prueba: límite desactivado (0). Para reactivarlo, usar 3*24*60*60*1000.
+const COOLDOWN_MS = 0;
 
 // FASE 1: genera el pedido de deuda (Art. 36, Tesoro). Máx. 1 vez cada 3 días.
 export async function POST(req: NextRequest) {

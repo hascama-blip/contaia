@@ -6,7 +6,8 @@ import { setDeudasF36 } from "@/lib/db";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 días
+// Periodo de prueba: límite desactivado (0). Para reactivarlo, usar 3*24*60*60*1000.
+const COOLDOWN_MS = 0;
 
 function diasRestantes(at: string) {
   return Math.ceil((COOLDOWN_MS - (Date.now() - new Date(at).getTime())) / (24 * 60 * 60 * 1000));
