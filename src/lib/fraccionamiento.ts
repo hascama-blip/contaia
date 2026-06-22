@@ -451,7 +451,86 @@ async function irAFraccArt36(ctx: any, page: any, pasos: any[]) {
   pasos.push({ paso: "navegar-fracc", hechos });
 }
 
+/** Lee la tabla "Pedidos Efectuados" (Consulta estado de pedido de deuda):
+ *  por cada fila devuelve { entidad, estado, accion }. */
+async function leerPedidos(ctx: any): Promise<{ entidad: string; estado: string; accion: string }[]> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const rows = await fr
+        .evaluate(() => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+          const body = document.body?.innerText || "";
+          if (!/pedidos efectuados|acci[oó]n a seguir|estado actual/i.test(body)) return null;
+          const out: any[] = [];
+          for (const tr of Array.from(document.querySelectorAll("tr"))) {
+            const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
+            if (tds.length < 4) continue;
+            const entidad = tds.find((c) => /^(tesoro|essalud|onp)$/i.test(c) || /(tesoro|essalud|onp)/i.test(c));
+            if (!entidad) continue;
+            out.push({ entidad, estado: tds[tds.length - 2] || "", accion: tds[tds.length - 1] || "" });
+          }
+          return out;
+        })
+        .catch(() => null);
+      if (rows && rows.length) return rows;
+    }
+  }
+  return [];
+}
+
+/** Clic NATIVO en el enlace de "Acción a Seguir" de la fila de una entidad
+ *  (p.ej. la fila TESORO → "Generar Nuevo Número Pedido"). */
+async function clicAccionPedido(ctx: any, entidad: string, accion: string): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      try {
+        const filas = fr.locator("tr").filter({ hasText: entidad }).filter({ hasText: accion });
+        const n = await filas.count();
+        for (let i = 0; i < n; i++) {
+          const link = filas.nth(i).getByText(accion, { exact: false }).first();
+          if ((await link.count()) > 0) {
+            await link.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+            await link.click({ timeout: 4000 });
+            return `${entidad} → ${accion}`;
+          }
+        }
+      } catch {
+        /* siguiente frame */
+      }
+    }
+  }
+  // Respaldo: clic sintético dentro de la fila (por si el enlace tiene onclick).
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate(
+          ({ entidad, accion }: { entidad: string; accion: string }) => {
+            const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+            for (const tr of Array.from(document.querySelectorAll("tr")) as HTMLElement[]) {
+              if (!norm(tr.textContent).includes(norm(entidad))) continue;
+              const links = Array.from(tr.querySelectorAll("a,[onclick],input[type=button],input[type=submit]")) as HTMLElement[];
+              const el = links.find((a) =>
+                norm((a.textContent || "") + " " + (a.getAttribute("onclick") || "") + " " + ((a as HTMLInputElement).value || "")).includes(norm(accion))
+              );
+              if (el) { el.click(); return `${entidad} → ${accion}`; }
+            }
+            return null;
+          },
+          { entidad, accion }
+        )
+        .catch(() => null);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
 // ---- FASE 1: generar pedido de deuda ---------------------------------------
+// El flujo correcto (según el portal) es: Fracc Art 36 → "Consulta estado de
+// pedido de deuda" → en la fila de TESORO, clic en la acción
+// "Generar Nuevo Número Pedido". Eso crea un pedido fresco (los anteriores
+// quedan "Cancelado por plazo Vencido"). Luego de ~5 min queda "Pendiente de
+// Elaborar Solicitud" y se puede extraer.
 export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResultado> {
   const { ruc, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
@@ -470,41 +549,81 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     }
 
     await irAFraccArt36(s.ctx, s.page, pasos);
-    // "Generación de pedido de deuda"
-    const gp = await clicTextoEspera(s.ctx, s.page, ["Generación de pedido de deuda", "Generacion de pedido de deuda"], 6, 1500);
+
+    // Abrir "Consulta estado de pedido de deuda" (ahí está la acción de generar).
+    const ce = await clicNativoEspera(
+      s.ctx, s.page,
+      ["Consulta estado de pedido de deuda", "Consulta estado de pedido"],
+      6, 1500
+    );
     await s.page.waitForTimeout(3000);
     await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "generacion-pedido", clico: gp });
-    if (diagnostico) pasos.push({ paso: "fracc-tras-generacion", ...(await dumpFracc(s.ctx)) });
+    pasos.push({ paso: "abrir-consulta", clico: ce });
 
-    // Vuelca el formulario para ver cómo elegir Entidad y el botón real.
-    pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
+    // Leer la tabla de pedidos (reintenta hasta que cargue).
+    let pedidos: { entidad: string; estado: string; accion: string }[] = [];
+    for (let i = 0; i < 8; i++) {
+      pedidos = await leerPedidos(s.ctx);
+      if (pedidos.length) break;
+      await s.page.waitForTimeout(1500);
+    }
+    pasos.push({ paso: "pedidos", filas: pedidos });
+    if (diagnostico) pasos.push({ paso: "form-consulta", formularios: await dumpFormularios(s.ctx) });
 
-    // Entidad = TESORO: primero como opción de <select>, luego como radio/enlace.
-    let tesoro: string | null = await seleccionarOpcion(s.ctx, ["Tesoro", "TESORO"]);
-    if (!tesoro) tesoro = await clicTexto(s.ctx, ["Tesoro", "TESORO"]);
-    await s.page.waitForTimeout(1200);
-    pasos.push({ paso: "tesoro", elegido: tesoro });
+    // ¿Ya hay un pedido TESORO listo para elaborar? No hace falta generar.
+    const tesoroListo = pedidos.find((p) => /tesoro/i.test(p.entidad) && /elaborar/i.test(p.accion));
+    if (tesoroListo) {
+      return {
+        ok: true,
+        mensaje: "Ya hay un pedido de deuda (TESORO) listo. Usa “Consultar y extraer”.",
+        diag: { pasos },
+      };
+    }
 
-    // Generar / enviar la solicitud (varias etiquetas posibles).
-    const env = await clicTextoEspera(
+    // Generar nuevo número de pedido para TESORO (acción de la fila).
+    let gen = await clicAccionPedido(s.ctx, "TESORO", "Generar Nuevo Número Pedido");
+    if (!gen) gen = await clicAccionPedido(s.ctx, "TESORO", "Generar Nuevo");
+    await s.page.waitForTimeout(2000);
+    await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "generar-nuevo", clico: gen });
+
+    // Tras la acción suele aparecer un formulario/confirmación: aceptar.
+    const conf = await clicTextoEspera(
       s.ctx, s.page,
-      ["Generar Pedido", "Generar pedido", "Generar", "Enviar solicitud", "Enviar", "Grabar", "Aceptar", "Continuar"],
-      4, 1200
+      ["Generar Pedido", "Generar pedido", "Aceptar", "Confirmar", "Grabar", "Enviar", "Continuar", "Sí", "Si"],
+      3, 1200
     );
     await s.page.waitForTimeout(3500);
     await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "enviar", clico: env });
+    pasos.push({ paso: "confirmar", clico: conf });
 
-    // Vuelca el resultado (mensaje de confirmación / nº de pedido).
-    pasos.push({ paso: "resultado", formularios: await dumpFormularios(s.ctx) });
+    // Verificar: re-leer la tabla; un TESORO que ya NO esté "Cancelado por plazo
+    // Vencido" indica que se generó (queda en proceso o pendiente de elaborar).
+    let pedidos2: { entidad: string; estado: string; accion: string }[] = [];
+    for (let i = 0; i < 6; i++) {
+      pedidos2 = await leerPedidos(s.ctx);
+      const fresco = pedidos2.find((p) => /tesoro/i.test(p.entidad) && !/cancelado|vencido/i.test(p.estado));
+      if (fresco) break;
+      await s.page.waitForTimeout(2000);
+    }
+    pasos.push({ paso: "verificar", filas: pedidos2 });
+    const tesoroFresco = pedidos2.find((p) => /tesoro/i.test(p.entidad) && !/cancelado|vencido/i.test(p.estado));
+    if (diagnostico) pasos.push({ paso: "resultado", formularios: await dumpFormularios(s.ctx) });
+
+    if (tesoroFresco || gen) {
+      return {
+        ok: true,
+        mensaje:
+          "Pedido de deuda generado (TESORO). Espera ~5 minutos y usa “Consultar y extraer”." +
+          (tesoroFresco ? ` Estado: ${tesoroFresco.estado}.` : ""),
+        diag: { pasos },
+      };
+    }
 
     return {
-      ok: Boolean(gp && env),
-      mensaje:
-        gp && env
-          ? "Pedido de deuda enviado (Tesoro). Espera ~5 minutos y usa “Consultar y extraer”."
-          : "No pude completar la generación. Revisa el diagnóstico (form-generacion) para calibrar.",
+      ok: false,
+      error:
+        "No encontré la acción “Generar Nuevo Número Pedido” en la fila TESORO. Si ya hay un pedido en proceso, espera y usa “Consultar y extraer”; si no, reintenta (revisa el diagnóstico “pedidos”).",
       diag: { pasos },
     };
   } catch (err) {
