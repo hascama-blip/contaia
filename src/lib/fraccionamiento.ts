@@ -210,16 +210,66 @@ async function dumpFormularios(ctx: any) {
   return out;
 }
 
-/** Cierra pantallas intermedias (campaña "valida tus datos" y modales). */
+/** Clic por texto DENTRO de un frame concreto. */
+async function clickEnFrame(frame: any, textos: string[]): Promise<string | null> {
+  return frame
+    .evaluate((textos: string[]) => {
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const els = Array.from(
+        document.querySelectorAll('a, button, input[type="button"], input[type="submit"], [role="button"]')
+      ) as HTMLElement[];
+      for (const t of textos) {
+        const tl = norm(t);
+        const el = els.find((e) => norm((e.textContent || "") + " " + ((e as HTMLInputElement).value || "")).includes(tl));
+        if (el) { el.click(); return t; }
+      }
+      return null;
+    }, textos)
+    .catch(() => null);
+}
+
+/** Cierra la campaña "valida tus datos" dentro de SU frame (Continuar sin confirmar). */
 async function cerrarPantallas(ctx: any, page: any) {
-  for (let i = 0; i < 4; i++) {
-    const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+  for (let i = 0; i < 6; i++) {
+    const camp = ctx
+      .pages()
+      .flatMap((p: any) => p.frames())
+      .find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
     if (!camp) break;
-    await clicTexto(ctx, ["Finalizar"]);
+    await clickEnFrame(camp, ["Continuar sin confirmar"]);
+    await page.waitForTimeout(1000);
+    await clickEnFrame(camp, ["Finalizar"]);
     await page.waitForTimeout(1200);
-    await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
-    await page.waitForTimeout(1500);
   }
+}
+
+/** Diagnóstico dirigido: enlaces de fraccionamiento/deuda (onclick completo) y marcos. */
+async function dumpFracc(ctx: any) {
+  const re = /fracc|deuda|art\.?\s*36|pedido|elaborar|tesoro|generar|esessalud|essalud/i;
+  const marcos: string[] = [];
+  const enlaces: { frame: string; t: string; oc: string }[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      marcos.push((fr.url() || "").slice(0, 110));
+      const items = await fr
+        .evaluate(
+          (reSrc: string) => {
+            const re = new RegExp(reSrc, "i");
+            return (Array.from(document.querySelectorAll("a,button,[role=button],input")) as HTMLElement[])
+              .map((e) => ({
+                t: (e.textContent || (e as HTMLInputElement).value || "").replace(/\s+/g, " ").trim().slice(0, 70),
+                oc: (e.getAttribute("onclick") || (e as HTMLInputElement).value || "").slice(0, 200),
+              }))
+              .filter((x) => re.test(x.t) || re.test(x.oc))
+              .slice(0, 40);
+          },
+          re.source
+        )
+        .catch(() => []);
+      for (const it of items) enlaces.push({ frame: (fr.url() || "").slice(0, 60), ...it });
+    }
+  }
+  return { marcos, enlaces };
 }
 
 async function loginSol(params: FraccParams, pasos: any[]) {
@@ -280,7 +330,8 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
-    if (diagnostico) pasos.push({ paso: "menus-inicio", menus: await dumpMenus(s.ctx) });
+    await cerrarPantallas(s.ctx, s.page);
+    if (diagnostico) pasos.push({ paso: "fracc-inicio", ...(await dumpFracc(s.ctx)) });
 
     await irAFraccArt36(s.ctx, s.page, pasos);
     // "Generación de pedido de deuda"
@@ -288,6 +339,7 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     await s.page.waitForTimeout(3000);
     await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "generacion-pedido", clico: gp });
+    if (diagnostico) pasos.push({ paso: "fracc-tras-generacion", ...(await dumpFracc(s.ctx)) });
 
     // Vuelca el formulario para ver cómo elegir Entidad y el botón real.
     pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
@@ -372,6 +424,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
+    await cerrarPantallas(s.ctx, s.page);
 
     await irAFraccArt36(s.ctx, s.page, pasos);
     // "Consulta estado de pedido de deuda"
@@ -379,6 +432,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     await s.page.waitForTimeout(3500);
     await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "consulta-estado", clico: ce });
+    if (diagnostico) pasos.push({ paso: "fracc-consulta", ...(await dumpFracc(s.ctx)) });
 
     if (diagnostico) pasos.push({ paso: "menus-consulta", menus: await dumpMenus(s.ctx) });
 
