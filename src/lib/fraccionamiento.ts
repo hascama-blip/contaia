@@ -514,7 +514,39 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
 }
 
 // ---- FASE 2: consultar estado y extraer las deudas -------------------------
-const PESTANAS = ["Valores", "Deudas Autoliquidadas/Reliquidadas", "Otras Deudas", "Deudas no Acogibles"];
+// Cada pestaña con un texto DISTINTIVO para ubicar su tab.
+const PESTANAS_DEF = [
+  { label: "Valores", match: "Valores" },
+  { label: "Deudas Autoliquidadas/Reliquidadas", match: "Autoliquidadas" },
+  { label: "Otras Deudas", match: "Otras Deudas" },
+  { label: "Deudas no Acogibles", match: "Acogibles" },
+];
+
+/** Clic en una PESTAÑA del form F36 (dijitTab) por su texto distintivo. */
+async function clicPestana(ctx: any, match: string): Promise<boolean> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const locs = [
+        fr.getByRole("tab", { name: match }),
+        fr.locator("[role=tab], .dijitTab, .tab, td, span, a").filter({ hasText: match }),
+        fr.getByText(match, { exact: false }),
+      ];
+      for (const loc of locs) {
+        try {
+          const first = loc.first();
+          if ((await first.count()) > 0) {
+            await first.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+            await first.click({ timeout: 4000 });
+            return true;
+          }
+        } catch {
+          /* siguiente estrategia */
+        }
+      }
+    }
+  }
+  return false;
+}
 
 /** Lee el GRID DE DEUDAS visible. La cabecera y los datos pueden estar en
  *  tablas separadas (grid dojo), así que toma las cabeceras del grid de deudas
@@ -643,14 +675,21 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       };
     }
 
-    // Leer cada pestaña.
+    // Leer cada pestaña: clicarla y esperar a que el cuadro CAMBIE antes de leer.
     const tablas: TablaDeuda[] = [];
-    for (const p of PESTANAS) {
-      const clicado = await clicNativo(s.ctx, [p]);
-      await s.page.waitForTimeout(2800);
-      const t = await leerTablaVisible(s.ctx);
-      tablas.push({ pestana: p, headers: t?.headers ?? [], filas: t?.filas ?? [] });
-      pasos.push({ paso: "pestana", nombre: p, clicado, filas: t?.filas.length ?? 0 });
+    let prevSig = "__inicio__";
+    const firma = (t: any) => (t?.filas ?? []).map((f: string[]) => f.join("|")).join("§");
+    for (const pd of PESTANAS_DEF) {
+      const clicado = await clicPestana(s.ctx, pd.match);
+      let t: any = null;
+      for (let i = 0; i < 8; i++) {
+        await s.page.waitForTimeout(1200);
+        t = await leerTablaVisible(s.ctx);
+        if (firma(t) !== prevSig) break; // el grid ya se actualizó
+      }
+      prevSig = firma(t);
+      tablas.push({ pestana: pd.label, headers: t?.headers ?? [], filas: t?.filas ?? [] });
+      pasos.push({ paso: "pestana", nombre: pd.label, clicado, filas: t?.filas?.length ?? 0 });
     }
 
     return {
