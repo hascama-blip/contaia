@@ -490,27 +490,6 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     if (s.loginError) return { ok: false, error: MSG_LOGIN_ERROR, diag: { pasos } };
     await cerrarPantallas(s.ctx, s.page);
 
-    // Entrar al módulo POR EL MENÚ (el acceso directo por URL no lleva los
-    // parámetros de auth). Clic en el ENLACE REAL (ejecuta...) de la opción
-    // "Consulta estado de pedido de deuda"; si no, navega por el árbol.
-    let nav = await clicMenu(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"]);
-    if (!nav) {
-      await irAFraccArt36(s.ctx, s.page, pasos);
-      nav = await clicMenu(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"]);
-    }
-    pasos.push({ paso: "abrir-consulta", onclick: nav });
-
-    // Esperar a que cargue el app de fraccionamiento (su frame/pestaña real).
-    const appCargado = () => {
-      for (const pg of s.ctx.pages())
-        for (const fr of pg.frames())
-          if (/ol-ti-itwarfraccf36|ol-ti-itfraccionamiento-art36/.test(fr.url())) return true;
-      return false;
-    };
-    for (let i = 0; i < 12 && !appCargado(); i++) await s.page.waitForTimeout(2000);
-    await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "app-fracc", cargado: appCargado() });
-
     const tieneTexto = async (re: RegExp) => {
       for (const pg of s.ctx.pages())
         for (const fr of pg.frames()) {
@@ -520,10 +499,29 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       return false;
     };
 
-    // Abrir la fila 1 → "Elaborar Solicitud" (carga el form con pestañas).
+    // Navega el árbol del menú: Mi fraccionamiento → Solicito art.36 → Fracc Art 36.
+    await irAFraccArt36(s.ctx, s.page, pasos);
+    // Clic POR TEXTO en "Consulta estado de pedido de deuda" (abre ventana/pestaña
+    // nueva con la tabla de pedidos). El menú nuevo no usa onclick=ejecuta.
+    const ce = await clicTextoEspera(
+      s.ctx, s.page,
+      ["Consulta estado de pedido de deuda", "Consulta estado de pedido"],
+      6, 1500
+    );
+    pasos.push({ paso: "abrir-consulta", clico: ce });
+
+    // Esperar la página de "Pedidos Efectuados" (tabla con "Elaborar Solicitud").
+    for (let i = 0; i < 14; i++) {
+      if (await tieneTexto(/elaborar|pedidos efectuados|estado actual|acci[oó]n a seguir/i)) break;
+      await s.page.waitForTimeout(2000);
+    }
+    await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "consulta-cargada", ok: await tieneTexto(/elaborar|pedidos efectuados/i) });
+
+    // Fila 1 → "Elaborar Solicitud" (abre el form con las 4 pestañas).
     if (await tieneTexto(/elaborar|estado actual|acci[oó]n a seguir/i)) {
       const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
-      await s.page.waitForTimeout(4000);
+      await s.page.waitForTimeout(5000);
       await cerrarPantallas(s.ctx, s.page);
       pasos.push({ paso: "elaborar-solicitud", clico: elab });
     }
@@ -534,7 +532,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       return {
         ok: false,
         error:
-          "Entré pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/app-fracc/fracc-pagina).",
+          "Entré pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/consulta-cargada/fracc-pagina).",
         diag: { pasos },
       };
     }
