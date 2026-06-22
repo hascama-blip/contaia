@@ -378,6 +378,8 @@ export interface AdjuntoParams {
   solUser: string;
   solPass: string;
   codMensaje: string;
+  /** Asunto del mensaje (para ubicarlo y abrirlo en el visor). */
+  asunto?: string;
   /** idMensaje interno del visor (si difiere del codMensaje). */
   idMensaje?: string;
   /** idArchivo del adjunto (si ya se conoce; si no, se busca en el detalle). */
@@ -577,104 +579,134 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       });
     }
 
-    // idMensaje interno del visor (== codMensaje del listado).
-    const idMensaje = params.idMensaje || codMensaje;
-    let idArchivo = params.idArchivo || "";
-    let sistema = "0";
-
-    // Si no nos dieron idArchivo, lo sacamos de listArchivosAdjuntos(idMensaje).
-    if (!idArchivo) {
-      const arch = (await ejecutor.evaluate(
-        async (a: { url: string; id: string }) => {
-          const intentos: { url: string; opt: any }[] = [
-            { url: `${a.url}?idMensaje=${encodeURIComponent(a.id)}`, opt: { credentials: "include" } },
-            {
-              url: a.url,
-              opt: {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `idMensaje=${encodeURIComponent(a.id)}`,
-              },
-            },
-          ];
-          const log: { url: string; metodo: string; status: number; len: number }[] = [];
-          let elegido = { status: 0, body: "" };
-          for (const it of intentos) {
-            try {
-              const r = await fetch(it.url, it.opt);
-              const t = await r.text();
-              log.push({ url: it.url, metodo: it.opt.method || "GET", status: r.status, len: t.length });
-              if (r.status === 200 && t && !/Error 404/.test(t)) {
-                elegido = { status: r.status, body: t.slice(0, 8000) };
-                break;
-              }
-              if (!elegido.body) elegido = { status: r.status, body: t.slice(0, 2000) };
-            } catch (e) {
-              log.push({ url: it.url, metodo: it.opt.method || "GET", status: -1, len: 0 });
-            }
-          }
-          return { ...elegido, log };
-        },
-        { url: ARCHIVOS_URL, id: idMensaje }
-      )) as { status: number; body: string; log: any[] };
-      pasos.push({ paso: "listArchivosAdjuntos", status: arch.status, intentos: arch.log, respuesta: arch.body.slice(0, 1200) });
+    // El detalle del mensaje (con el enlace del adjunto) lo renderiza el visor
+    // al hacer CLIC en el mensaje (server-side, master.do). Así que lo abrimos
+    // como un humano y leemos el href del adjunto.
+    let asunto = params.asunto || "";
+    if (!asunto) {
+      const listUrl =
+        (/[?&]page=\d+/.test(LIST_URL) ? LIST_URL.replace(/([?&]page=)\d+/, "$11") : LIST_URL) +
+        `&_=${Date.now()}`;
+      const lr = (await ejecutor.evaluate(async (u: string) => {
+        try { const r = await fetch(u, { credentials: "include" }); return await r.text(); } catch { return ""; }
+      }, listUrl)) as string;
       try {
-        const j = JSON.parse(arch.body);
-        const nodo = Array.isArray(j)
-          ? j
-          : j?.archivos ?? j?.lista ?? j?.rows ?? j?.data ?? j?.lisArchivos ?? j?.listArchivos ?? [];
-        const arr = Array.isArray(nodo) ? nodo : [nodo];
-        const a = arr.find((x: any) => x && (x.idArchivo ?? x.codArchivo ?? x.id));
-        if (a) {
-          idArchivo = String(a.idArchivo ?? a.codArchivo ?? a.id);
-          if (a.sistema != null) sistema = String(a.sistema);
-        }
-      } catch {
-        const m = arch.body.match(/idArchivo["'\s:=]+(\d+)/i);
-        if (m) idArchivo = m[1];
-      }
+        const data = JSON.parse(lr);
+        const arr: any[] = Array.isArray(data)
+          ? data
+          : data?.rows ?? data?.lista ?? data?.mensajes ?? data?.registros ?? data?.data ?? [];
+        const row = arr.find((m) => String(m?.codMensaje ?? m?.id ?? "") === String(codMensaje));
+        if (row) asunto = String(row.desAsunto || "");
+      } catch { /* */ }
     }
-    pasos.push({ paso: "ids", idMensaje, idArchivo, sistema });
 
-    if (!idArchivo) {
+    // Clic en el mensaje por su asunto.
+    const clickeado = (await ejecutor.evaluate((asuntoTxt: string) => {
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const t = norm(asuntoTxt).replace(/^asunto:\s*/, "").slice(0, 35);
+      if (!t) return false;
+      const els = Array.from(document.querySelectorAll("a,li,div,span,td,tr,p")) as HTMLElement[];
+      for (const e of els) {
+        if (norm(e.textContent).includes(t)) {
+          let n: HTMLElement | null = e;
+          for (let i = 0; i < 5 && n; i++) {
+            try {
+              if (n.tagName === "A" || (n.getAttribute && n.getAttribute("onclick"))) { n.click(); return true; }
+            } catch { /* */ }
+            n = n.parentElement;
+          }
+          try { e.click(); return true; } catch { /* */ }
+        }
+      }
+      return false;
+    }, asunto)) as boolean;
+    pasos.push({ paso: "click-mensaje", asunto: asunto.slice(0, 60), clickeado });
+
+    // Esperar el detalle y leer el enlace del adjunto (bajarArchivo o gendoc).
+    let enlaces: string[] = [];
+    for (let i = 0; i < 8 && enlaces.length === 0; i++) {
+      await sesion.page.waitForTimeout(1500);
+      enlaces = (await ejecutor.evaluate(() => {
+        const out = new Set<string>();
+        const tomar = (s: any) => {
+          if (!s) return;
+          const m = String(s).match(/(?:https?:\/\/[^\s'"]+|\/[^\s'"]+)?(?:bajarArchivo|gendocS01Alias)[^\s'")]*/i);
+          if (m) out.add(m[0]);
+        };
+        document.querySelectorAll("a").forEach((a) => { tomar(a.getAttribute("href")); tomar(a.getAttribute("onclick")); });
+        return Array.from(out);
+      })) as string[];
+    }
+    pasos.push({ paso: "enlaces-adjunto", cantidad: enlaces.length, enlaces: enlaces.slice(0, 5) });
+
+    if (diagnostico) {
+      const dump = (await ejecutor.evaluate(() => {
+        const cont = document.querySelector("#listArchivosAdjuntos");
+        const anchors = (Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[])
+          .map((a) => ({
+            href: (a.getAttribute("href") || "").slice(0, 200),
+            onclick: (a.getAttribute("onclick") || "").slice(0, 200),
+            txt: (a.textContent || "").trim().slice(0, 60),
+          }))
+          .filter((a) => /archivo|gendoc|bajar|constancia|adjun|\.pdf/i.test(a.href + a.onclick + a.txt))
+          .slice(0, 20);
+        return { listAdj: cont ? (cont as HTMLElement).outerHTML.slice(0, 2500) : null, anchors };
+      })) as any;
+      pasos.push({ paso: "detalle-dom", ...dump });
+      return { ok: false, diag: { pasos } };
+    }
+
+    if (enlaces.length === 0) {
       return {
         ok: false,
-        error:
-          "No encontré el idArchivo del adjunto. Usa Modo diagnóstico y compárteme el resultado para ajustar listArchivosAdjuntos.",
+        error: "No pude ubicar el enlace del adjunto tras abrir el mensaje. Usa Modo diagnóstico y compárteme el resultado.",
         diag: { pasos },
       };
     }
 
-    // Descarga GET tal como la arma el propio visor (confirmado en su JS):
-    //   bajarArchivo?accion=archivo&idMensaje=..&idArchivo=..&sistema=0&app=1
-    const link =
-      `${BAJAR_URL}?accion=archivo&idMensaje=${encodeURIComponent(idMensaje)}` +
-      `&idArchivo=${encodeURIComponent(idArchivo)}&sistema=${encodeURIComponent(sistema)}&app=1`;
-    const bin = (await ejecutor.evaluate(async (u: string) => {
-      try {
-        const r = await fetch(u, { credentials: "include" });
-        const ct = r.headers.get("content-type") || "";
-        const buf = await r.arrayBuffer();
-        let s = "";
-        const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-        return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
-      } catch (e) {
-        return { status: 0, ct: "", b64: "", firma: String(e).slice(0, 5) };
+    const abs = (u: string) => (u.startsWith("http") ? u : `https://ww1.sunat.gob.pe${u.startsWith("/") ? "" : "/"}${u}`);
+    const url0 = abs(enlaces[0]);
+    pasos.push({ paso: "descarga-url", url: url0 });
+
+    // Caso A: bajarArchivo → PDF binario directo.
+    if (/bajarArchivo/i.test(url0)) {
+      const bin = (await ejecutor.evaluate(async (u: string) => {
+        try {
+          const r = await fetch(u, { credentials: "include" });
+          const ct = r.headers.get("content-type") || "";
+          const b = await r.arrayBuffer();
+          const by = new Uint8Array(b);
+          let s = "";
+          for (let i = 0; i < by.length; i++) s += String.fromCharCode(by[i]);
+          return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
+        } catch (e) {
+          return { status: 0, ct: "", b64: "", firma: "" };
+        }
+      }, url0)) as { status: number; ct: string; b64: string; firma: string };
+      pasos.push({ paso: "bajarArchivo", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+      if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
+        return { ok: true, pdfBase64: bin.b64, filename: `mensaje-${codMensaje}.pdf` };
       }
-    }, link)) as { status: number; ct: string; b64: string; firma: string };
-    pasos.push({ paso: "bajarArchivo", url: link, status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
-
-    if (diagnostico) return { ok: false, diag: { pasos } };
-
-    if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
-      return { ok: true, pdfBase64: bin.b64, filename: `mensaje-${codMensaje}.pdf` };
     }
+
+    // Caso B: gendocS01Alias (HTML) → renderizar a PDF con el navegador.
+    try {
+      const pg2 = await sesion.ctx.newPage();
+      await pg2.goto(url0, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+      const pdfBuf = await pg2.pdf({ format: "A4", printBackground: true });
+      await pg2.close();
+      const b64 = Buffer.from(pdfBuf).toString("base64");
+      if (b64) {
+        pasos.push({ paso: "render-pdf", bytes: b64.length });
+        return { ok: true, pdfBase64: b64, filename: `mensaje-${codMensaje}.pdf` };
+      }
+    } catch (e) {
+      pasos.push({ paso: "render-pdf-error", respuesta: String(e).slice(0, 200) });
+    }
+
     return {
       ok: false,
-      error:
-        "No se pudo descargar el adjunto. Usa Modo diagnóstico y comparte el resultado para terminar de calibrar.",
+      error: "Ubiqué el adjunto pero no pude convertirlo a PDF. Usa Modo diagnóstico y compárteme el resultado.",
       diag: { pasos },
     };
   } catch (err) {

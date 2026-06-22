@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     solUser,
     solPass,
     codMensaje,
+    asunto: typeof body.asunto === "string" ? body.asunto : "",
     diagnostico: body.diagnostico === true,
   });
 

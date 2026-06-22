@@ -61,7 +61,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       const res = await fetch("/api/consultas/buzon/adjunto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, diagnostico: modoDiag }),
+        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, diagnostico: modoDiag }),
       });
       if (modoDiag) {
         const data = await res.json().catch(() => ({}));
