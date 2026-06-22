@@ -145,6 +145,83 @@ async function dumpMenus(ctx: any) {
   return out;
 }
 
+/** Clic por texto con reintentos (espera a que cargue el marco de contenido). */
+async function clicTextoEspera(ctx: any, page: any, textos: string[], intentos = 6, esperaMs = 1500): Promise<string | null> {
+  for (let i = 0; i < intentos; i++) {
+    const hit = await clicTexto(ctx, textos);
+    if (hit) return hit;
+    await page.waitForTimeout(esperaMs);
+  }
+  return null;
+}
+
+/** Selecciona en un <select> la opción cuyo texto/valor contenga alguno de los textos. */
+async function seleccionarOpcion(ctx: any, textos: string[]): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const selects = Array.from(document.querySelectorAll("select")) as HTMLSelectElement[];
+          for (const sel of selects) {
+            for (const opt of Array.from(sel.options)) {
+              const blob = norm(opt.textContent) + " " + norm(opt.value);
+              if (textos.some((t) => blob.includes(norm(t)))) {
+                sel.value = opt.value;
+                sel.dispatchEvent(new Event("change", { bubbles: true }));
+                return opt.textContent || opt.value;
+              }
+            }
+          }
+          return null;
+        }, textos)
+        .catch(() => null);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/** Vuelca formularios (selects con opciones, inputs radio, botones) para calibrar. */
+async function dumpFormularios(ctx: any) {
+  const out: any[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const info = await fr
+        .evaluate(() => {
+          const selects = (Array.from(document.querySelectorAll("select")) as HTMLSelectElement[]).map((s) => ({
+            name: s.name || s.id,
+            opciones: Array.from(s.options).map((o) => (o.textContent || "").trim()).slice(0, 12),
+          }));
+          const radios = (Array.from(document.querySelectorAll('input[type=radio]')) as HTMLInputElement[]).map((r) => ({
+            name: r.name, value: r.value, label: (r.closest("label")?.textContent || r.parentElement?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
+          }));
+          const botones = (Array.from(document.querySelectorAll('button, input[type=button], input[type=submit], a')) as HTMLElement[])
+            .map((b) => ((b as HTMLInputElement).value || b.textContent || "").replace(/\s+/g, " ").trim())
+            .filter((t) => t).slice(0, 30);
+          return { selects, radios, botones };
+        })
+        .catch(() => null);
+      if (info && (info.selects.length || info.radios.length || info.botones.length)) {
+        out.push({ url: (fr.url() || "").slice(0, 90), ...info });
+      }
+    }
+  }
+  return out;
+}
+
+/** Cierra pantallas intermedias (campaña "valida tus datos" y modales). */
+async function cerrarPantallas(ctx: any, page: any) {
+  for (let i = 0; i < 4; i++) {
+    const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+    if (!camp) break;
+    await clicTexto(ctx, ["Finalizar"]);
+    await page.waitForTimeout(1200);
+    await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
+    await page.waitForTimeout(1500);
+  }
+}
+
 async function loginSol(params: FraccParams, pasos: any[]) {
   const browser = await lanzarNavegador();
   const ctx = await browser.newContext({
@@ -175,19 +252,19 @@ async function loginSol(params: FraccParams, pasos: any[]) {
   return { browser, ctx, page };
 }
 
-/** Navega por el menú hasta Fracc Art 36 (por texto). */
+/** Navega por el menú hasta Fracc Art 36 (por texto, con reintentos). */
 async function irAFraccArt36(ctx: any, page: any, pasos: any[]) {
   const ruta = [
-    ["Mi fraccionamiento", "Mis Fraccionamientos", "Fraccionamiento"],
-    ["Solicito fraccionamiento art.36", "Solicito fraccionamiento", "art. 36", "art.36"],
-    ["Fracc Art 36", "Fracc. Art 36", "Fraccionamiento Art. 36", "Art 36"],
+    ["Mi fraccionamiento", "MI FRACCIONAMIENTO", "Fraccionamiento"],
+    ["Solicito fraccionamiento art.36", "Solicito fraccionamiento art. 36", "Solicito fraccionamiento"],
+    ["Fracc Art 36", "Fracc. Art 36", "Fracc Art. 36"],
   ];
   const hechos: any[] = [];
   for (const opciones of ruta) {
-    const hit = await clicTexto(ctx, opciones);
-    await page.waitForTimeout(2500);
+    await cerrarPantallas(ctx, page);
+    const hit = await clicTextoEspera(ctx, page, opciones, 5, 1200);
+    await page.waitForTimeout(2000);
     hechos.push({ buscaba: opciones[0], clico: hit });
-    if (!hit) break;
   }
   pasos.push({ paso: "navegar-fracc", hechos });
 }
@@ -207,26 +284,39 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
 
     await irAFraccArt36(s.ctx, s.page, pasos);
     // "Generación de pedido de deuda"
-    const gp = await clicTexto(s.ctx, ["Generación de pedido de deuda", "Generacion de pedido de deuda", "pedido de deuda"]);
-    await s.page.waitForTimeout(2500);
-    pasos.push({ paso: "generacion-pedido", clico: gp });
-    // Elegir TESORO
-    const tesoro = await clicTexto(s.ctx, ["Tesoro", "TESORO"]);
-    await s.page.waitForTimeout(1500);
-    pasos.push({ paso: "tesoro", clico: tesoro });
-    // Enviar solicitud
-    const env = await clicTexto(s.ctx, ["Enviar solicitud", "Enviar", "Aceptar", "Generar"]);
+    const gp = await clicTextoEspera(s.ctx, s.page, ["Generación de pedido de deuda", "Generacion de pedido de deuda"], 6, 1500);
     await s.page.waitForTimeout(3000);
+    await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "generacion-pedido", clico: gp });
+
+    // Vuelca el formulario para ver cómo elegir Entidad y el botón real.
+    pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
+
+    // Entidad = TESORO: primero como opción de <select>, luego como radio/enlace.
+    let tesoro: string | null = await seleccionarOpcion(s.ctx, ["Tesoro", "TESORO"]);
+    if (!tesoro) tesoro = await clicTexto(s.ctx, ["Tesoro", "TESORO"]);
+    await s.page.waitForTimeout(1200);
+    pasos.push({ paso: "tesoro", elegido: tesoro });
+
+    // Generar / enviar la solicitud (varias etiquetas posibles).
+    const env = await clicTextoEspera(
+      s.ctx, s.page,
+      ["Generar Pedido", "Generar pedido", "Generar", "Enviar solicitud", "Enviar", "Grabar", "Aceptar", "Continuar"],
+      4, 1200
+    );
+    await s.page.waitForTimeout(3500);
+    await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "enviar", clico: env });
 
-    if (diagnostico) pasos.push({ paso: "menus-fin", menus: await dumpMenus(s.ctx) });
+    // Vuelca el resultado (mensaje de confirmación / nº de pedido).
+    pasos.push({ paso: "resultado", formularios: await dumpFormularios(s.ctx) });
 
     return {
       ok: Boolean(gp && env),
       mensaje:
         gp && env
-          ? "Pedido de deuda enviado. Espera ~5 minutos y luego usa “Consultar y extraer deudas”."
-          : "No pude completar todos los pasos del pedido. Revisa el diagnóstico.",
+          ? "Pedido de deuda enviado (Tesoro). Espera ~5 minutos y usa “Consultar y extraer”."
+          : "No pude completar la generación. Revisa el diagnóstico (form-generacion) para calibrar.",
       diag: { pasos },
     };
   } catch (err) {
@@ -285,16 +375,18 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
 
     await irAFraccArt36(s.ctx, s.page, pasos);
     // "Consulta estado de pedido de deuda"
-    const ce = await clicTexto(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido", "estado de pedido"]);
-    await s.page.waitForTimeout(3000);
+    const ce = await clicTextoEspera(s.ctx, s.page, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"], 6, 1500);
+    await s.page.waitForTimeout(3500);
+    await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "consulta-estado", clico: ce });
 
     if (diagnostico) pasos.push({ paso: "menus-consulta", menus: await dumpMenus(s.ctx) });
 
-    // En la fila 1 (la más reciente), cuando está listo aparece el enlace azul
-    // "Elaborar solicitud". Lo clicamos (el aviso se acepta solo).
-    const elab = await clicTexto(s.ctx, ["Elaborar solicitud", "Elaborar Solicitud", "elaborar"]);
+    // En la fila 1 (la más reciente) aparece el enlace azul "Elaborar Solicitud"
+    // cuando el pedido está listo. Reintenta varias veces (la tabla tarda).
+    const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
     await s.page.waitForTimeout(4000);
+    await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "elaborar-solicitud", clico: elab });
     if (!elab) {
       return {
