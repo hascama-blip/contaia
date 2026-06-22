@@ -518,6 +518,16 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     await cerrarPantallas(s.ctx, s.page);
     pasos.push({ paso: "consulta-cargada", ok: await tieneTexto(/elaborar|pedidos efectuados/i) });
 
+    // Diagnóstico: qué páginas/pestañas hay abiertas y qué muestran.
+    if (diagnostico) {
+      const paginas: any[] = [];
+      for (const pg of s.ctx.pages()) {
+        const t = (await pg.evaluate(() => (document.body?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 280)).catch(() => "")) as string;
+        paginas.push({ url: pg.url().slice(0, 110), texto: t });
+      }
+      pasos.push({ paso: "paginas", paginas });
+    }
+
     // Fila 1 → "Elaborar Solicitud" (abre el form con las 4 pestañas).
     if (await tieneTexto(/elaborar|estado actual|acci[oó]n a seguir/i)) {
       const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
