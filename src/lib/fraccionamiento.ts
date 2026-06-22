@@ -326,8 +326,39 @@ async function loginSol(params: FraccParams, pasos: any[]) {
     await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
     await page.waitForTimeout(1800);
   }
-  pasos.push({ paso: "login", url: page.url() });
-  return { browser, ctx, page };
+  await cerrarPantallas(ctx, page);
+  // ¿El login fue rechazado? (bloqueo temporal por muchos intentos = "spam").
+  const url = page.url();
+  const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
+  const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
+  pasos.push({ paso: "login", url, loginError });
+  return { browser, ctx, page, loginError };
+}
+
+const MSG_LOGIN_ERROR =
+  "SUNAT rechazó el inicio de sesión (bloqueo temporal por varios intentos seguidos). Espera ~10 minutos y reintenta una sola vez.";
+
+/** Clic en el ENLACE REAL del menú (onclick ejecuta/iconExecute) por su texto. */
+async function clicMenu(ctx: any, textos: string[]): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const els = Array.from(document.querySelectorAll("a,[onclick]")) as HTMLElement[];
+          for (const t of textos) {
+            const el = els.find(
+              (e) => /ejecuta\(|iconexecute/i.test(e.getAttribute("onclick") || "") && norm(e.textContent).includes(norm(t))
+            );
+            if (el) { el.click(); return (el.getAttribute("onclick") || "").slice(0, 160); }
+          }
+          return null;
+        }, textos)
+        .catch(() => null);
+      if (hit) return hit;
+    }
+  }
+  return null;
 }
 
 /** Navega por el menú hasta Fracc Art 36 (por texto, con reintentos). */
@@ -358,6 +389,7 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
+    if (s.loginError) return { ok: false, error: MSG_LOGIN_ERROR, diag: { pasos } };
     await cerrarPantallas(s.ctx, s.page);
     if (diagnostico) {
       pasos.push({ paso: "fracc-inicio", ...(await dumpFracc(s.ctx)) });
@@ -455,30 +487,42 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
+    if (s.loginError) return { ok: false, error: MSG_LOGIN_ERROR, diag: { pasos } };
     await cerrarPantallas(s.ctx, s.page);
 
-    // VAMOS DIRECTO al módulo F36 (URLs reales del portal), sin pelear con el
-    // menú-árbol. Probamos la entrada del app y el form de acogimiento.
-    const entradas = [
-      "https://ww1.sunat.gob.pe/ol-ti-itwarfraccf36/f36S01Alias",
-      "https://ww1.sunat.gob.pe/ol-ti-itfraccionamiento-art36/SolicitudAcogimiento.html",
-    ];
-    const tieneTexto = async (re: RegExp) =>
-      (await s.page.evaluate((src: string) => new RegExp(src, "i").test(document.body?.innerText || ""), re.source).catch(() => false)) as boolean;
-
-    for (const u of entradas) {
-      const resp = await s.page.goto(u, { waitUntil: "networkidle", timeout: 60000 }).catch(() => null);
-      await s.page.waitForTimeout(2500);
-      await cerrarPantallas(s.ctx, s.page);
-      const txt = (await s.page.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
-      pasos.push({ paso: "goto", url: u, status: resp ? resp.status() : null, final: s.page.url(), texto: txt.replace(/\s+/g, " ").trim().slice(0, 200) });
-      if (await tieneTexto(/valores|acogibles|elaborar|estado actual|pedido/i)) break;
+    // Entrar al módulo POR EL MENÚ (el acceso directo por URL no lleva los
+    // parámetros de auth). Clic en el ENLACE REAL (ejecuta...) de la opción
+    // "Consulta estado de pedido de deuda"; si no, navega por el árbol.
+    let nav = await clicMenu(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"]);
+    if (!nav) {
+      await irAFraccArt36(s.ctx, s.page, pasos);
+      nav = await clicMenu(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"]);
     }
+    pasos.push({ paso: "abrir-consulta", onclick: nav });
 
-    // Si caímos en la "Consulta de estados de pedidos de deuda", abrir la fila 1
-    // (Elaborar Solicitud) para que cargue el form con las pestañas.
+    // Esperar a que cargue el app de fraccionamiento (su frame/pestaña real).
+    const appCargado = () => {
+      for (const pg of s.ctx.pages())
+        for (const fr of pg.frames())
+          if (/ol-ti-itwarfraccf36|ol-ti-itfraccionamiento-art36/.test(fr.url())) return true;
+      return false;
+    };
+    for (let i = 0; i < 12 && !appCargado(); i++) await s.page.waitForTimeout(2000);
+    await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "app-fracc", cargado: appCargado() });
+
+    const tieneTexto = async (re: RegExp) => {
+      for (const pg of s.ctx.pages())
+        for (const fr of pg.frames()) {
+          const ok = await fr.evaluate((src: string) => new RegExp(src, "i").test(document.body?.innerText || ""), re.source).catch(() => false);
+          if (ok) return true;
+        }
+      return false;
+    };
+
+    // Abrir la fila 1 → "Elaborar Solicitud" (carga el form con pestañas).
     if (await tieneTexto(/elaborar|estado actual|acci[oó]n a seguir/i)) {
-      const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 6, 2000);
+      const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
       await s.page.waitForTimeout(4000);
       await cerrarPantallas(s.ctx, s.page);
       pasos.push({ paso: "elaborar-solicitud", clico: elab });
@@ -490,7 +534,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       return {
         ok: false,
         error:
-          "Entré al módulo pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (goto/fracc-pagina) para ajustar la URL/clic exacto.",
+          "Entré pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/app-fracc/fracc-pagina).",
         diag: { pasos },
       };
     }
