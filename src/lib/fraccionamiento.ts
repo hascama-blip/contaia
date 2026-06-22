@@ -451,9 +451,12 @@ async function irAFraccArt36(ctx: any, page: any, pasos: any[]) {
   pasos.push({ paso: "navegar-fracc", hechos });
 }
 
-/** Lee la tabla "Pedidos Efectuados" (Consulta estado de pedido de deuda):
- *  por cada fila devuelve { entidad, estado, accion }. */
-async function leerPedidos(ctx: any): Promise<{ entidad: string; estado: string; accion: string }[]> {
+/** Lee la tabla "Pedidos Efectuados" (Consulta estado de pedido de deuda).
+ *  Mapea las columnas POR CABECERA (la tabla trae una columna de número de fila
+ *  al inicio y una columna vacía al final), así no confundimos Estado con Acción. */
+async function leerPedidos(
+  ctx: any
+): Promise<{ entidad: string; numero: string; fecha: string; estado: string; accion: string }[]> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
       const rows = await fr
@@ -461,13 +464,36 @@ async function leerPedidos(ctx: any): Promise<{ entidad: string; estado: string;
           const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
           const body = document.body?.innerText || "";
           if (!/pedidos efectuados|acci[oó]n a seguir|estado actual/i.test(body)) return null;
+          const trs = Array.from(document.querySelectorAll("tr"));
+          // Localiza la fila de cabecera (tiene "Entidad", "Estado", "Acción").
+          let hi = -1;
+          let iEnt = -1, iNum = -1, iFec = -1, iEst = -1, iAcc = -1;
+          for (let i = 0; i < trs.length; i++) {
+            const cells = Array.from(trs[i].querySelectorAll("th,td")).map((c) => norm(c.textContent).toLowerCase());
+            const e = cells.findIndex((c) => c.includes("entidad"));
+            const s = cells.findIndex((c) => c.includes("estado"));
+            const a = cells.findIndex((c) => c.includes("acci"));
+            if (e >= 0 && s >= 0 && a >= 0) {
+              hi = i; iEnt = e; iEst = s; iAcc = a;
+              iNum = cells.findIndex((c) => c.includes("pedido") && !c.includes("acci"));
+              iFec = cells.findIndex((c) => c.includes("fecha"));
+              break;
+            }
+          }
+          if (hi < 0) return null;
           const out: any[] = [];
-          for (const tr of Array.from(document.querySelectorAll("tr"))) {
-            const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
-            if (tds.length < 4) continue;
-            const entidad = tds.find((c) => /^(tesoro|essalud|onp)$/i.test(c) || /(tesoro|essalud|onp)/i.test(c));
-            if (!entidad) continue;
-            out.push({ entidad, estado: tds[tds.length - 2] || "", accion: tds[tds.length - 1] || "" });
+          for (let i = hi + 1; i < trs.length; i++) {
+            const tds = Array.from(trs[i].querySelectorAll("td")).map((c) => norm(c.textContent));
+            if (tds.length <= Math.max(iEnt, iEst, iAcc)) continue;
+            const entidad = tds[iEnt] || "";
+            if (!/(tesoro|essalud|onp)/i.test(entidad)) continue;
+            out.push({
+              entidad,
+              numero: iNum >= 0 ? tds[iNum] || "" : "",
+              fecha: iFec >= 0 ? tds[iFec] || "" : "",
+              estado: tds[iEst] || "",
+              accion: tds[iAcc] || "",
+            });
           }
           return out;
         })
@@ -525,12 +551,72 @@ async function clicAccionPedido(ctx: any, entidad: string, accion: string): Prom
   return null;
 }
 
+/** Marca la entidad TESORO en el formulario de generación: prueba radio/checkbox
+ *  (por su etiqueta), luego <select>, y por último clic de texto. */
+async function marcarEntidad(ctx: any, textos: string[]): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const match = (s: string) => textos.some((t) => norm(s).includes(norm(t)));
+          // 1) radio / checkbox cuya etiqueta o fila contenga "Tesoro".
+          const inputs = Array.from(document.querySelectorAll('input[type=radio],input[type=checkbox]')) as HTMLInputElement[];
+          for (const inp of inputs) {
+            const lbl =
+              (inp.closest("label")?.textContent || "") +
+              " " + (inp.closest("tr")?.textContent || "") +
+              " " + (inp.parentElement?.textContent || "") +
+              " " + (inp.value || "");
+            if (match(lbl)) { inp.checked = true; inp.click(); inp.dispatchEvent(new Event("change", { bubbles: true })); return "radio/checkbox"; }
+          }
+          // 2) <select> con opción Tesoro.
+          for (const sel of Array.from(document.querySelectorAll("select")) as HTMLSelectElement[]) {
+            for (const opt of Array.from(sel.options)) {
+              if (match((opt.textContent || "") + " " + opt.value)) {
+                sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); return "select";
+              }
+            }
+          }
+          return null;
+        }, textos)
+        .catch(() => null);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/** Abre "Consulta estado de pedido de deuda" y devuelve los pedidos (con reintentos). */
+async function abrirConsultaPedidos(ctx: any, page: any, pasos: any[]) {
+  await irAFraccArt36(ctx, page, pasos);
+  const ce = await clicNativoEspera(
+    ctx, page,
+    ["Consulta estado de pedido de deuda", "Consulta estado de pedido"],
+    6, 1500
+  );
+  await page.waitForTimeout(3000);
+  await cerrarPantallas(ctx, page);
+  let pedidos: { entidad: string; numero: string; fecha: string; estado: string; accion: string }[] = [];
+  for (let i = 0; i < 8; i++) {
+    pedidos = await leerPedidos(ctx);
+    if (pedidos.length) break;
+    await page.waitForTimeout(1500);
+  }
+  pasos.push({ paso: "consulta", clico: ce, pedidos });
+  return pedidos;
+}
+
+const esTesoroVigente = (p: { entidad: string; estado: string }) =>
+  /tesoro/i.test(p.entidad) && !/cancelado|vencido|anulad|rechazad/i.test(p.estado);
+
 // ---- FASE 1: generar pedido de deuda ---------------------------------------
-// El flujo correcto (según el portal) es: Fracc Art 36 → "Consulta estado de
-// pedido de deuda" → en la fila de TESORO, clic en la acción
-// "Generar Nuevo Número Pedido". Eso crea un pedido fresco (los anteriores
-// quedan "Cancelado por plazo Vencido"). Luego de ~5 min queda "Pendiente de
-// Elaborar Solicitud" y se puede extraer.
+// Flujo del portal: Fracc Art 36 → "Generación de pedido de deuda" → marcar
+// TESORO → generar. (También se puede desde "Consulta estado de pedido de
+// deuda", acción "Generar Nuevo Número Pedido" de la fila TESORO.) Luego de
+// ~5 min el pedido queda "Pendiente de Elaborar Solicitud" y se puede extraer.
+// Sólo reporta éxito si, al re-consultar, hay un pedido TESORO VIGENTE
+// (no "Cancelado por plazo Vencido").
 export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResultado> {
   const { ruc, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
@@ -548,74 +634,75 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
       pasos.push({ paso: "menu-completo", links: await dumpEjecuta(s.ctx) });
     }
 
-    await irAFraccArt36(s.ctx, s.page, pasos);
-
-    // Abrir "Consulta estado de pedido de deuda" (ahí está la acción de generar).
-    const ce = await clicNativoEspera(
-      s.ctx, s.page,
-      ["Consulta estado de pedido de deuda", "Consulta estado de pedido"],
-      6, 1500
-    );
-    await s.page.waitForTimeout(3000);
-    await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "abrir-consulta", clico: ce });
-
-    // Leer la tabla de pedidos (reintenta hasta que cargue).
-    let pedidos: { entidad: string; estado: string; accion: string }[] = [];
-    for (let i = 0; i < 8; i++) {
-      pedidos = await leerPedidos(s.ctx);
-      if (pedidos.length) break;
-      await s.page.waitForTimeout(1500);
-    }
-    pasos.push({ paso: "pedidos", filas: pedidos });
-    if (diagnostico) pasos.push({ paso: "form-consulta", formularios: await dumpFormularios(s.ctx) });
-
-    // ¿Ya hay un pedido TESORO listo para elaborar? No hace falta generar.
-    const tesoroListo = pedidos.find((p) => /tesoro/i.test(p.entidad) && /elaborar/i.test(p.accion));
-    if (tesoroListo) {
-      return {
-        ok: true,
-        mensaje: "Ya hay un pedido de deuda (TESORO) listo. Usa “Consultar y extraer”.",
-        diag: { pasos },
-      };
+    // Estado inicial: ¿ya hay un pedido TESORO vigente / listo para elaborar?
+    const antes = await abrirConsultaPedidos(s.ctx, s.page, pasos);
+    const numsAntes = new Set(antes.filter((p) => /tesoro/i.test(p.entidad)).map((p) => p.numero));
+    const yaListo = antes.find((p) => /tesoro/i.test(p.entidad) && /elaborar/i.test(p.accion));
+    if (yaListo) {
+      return { ok: true, mensaje: "Ya hay un pedido de deuda (TESORO) listo. Usa “Consultar y extraer”.", diag: { pasos } };
     }
 
-    // Generar nuevo número de pedido para TESORO (acción de la fila).
+    // 1) Intento por la acción de la fila TESORO: "Generar Nuevo Número Pedido".
+    let via = "";
     let gen = await clicAccionPedido(s.ctx, "TESORO", "Generar Nuevo Número Pedido");
-    if (!gen) gen = await clicAccionPedido(s.ctx, "TESORO", "Generar Nuevo");
-    await s.page.waitForTimeout(2000);
+    if (gen) via = "accion-fila";
+    await s.page.waitForTimeout(2500);
     await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "generar-nuevo", clico: gen });
 
-    // Tras la acción suele aparecer un formulario/confirmación: aceptar.
-    const conf = await clicTextoEspera(
+    // 2) Si no, ir al formulario dedicado "Generación de pedido de deuda".
+    if (!gen) {
+      await irAFraccArt36(s.ctx, s.page, pasos);
+      const gp = await clicNativoEspera(
+        s.ctx, s.page,
+        ["Generación de pedido de deuda", "Generacion de pedido de deuda"],
+        6, 1500
+      );
+      await s.page.waitForTimeout(2500);
+      await cerrarPantallas(s.ctx, s.page);
+      pasos.push({ paso: "abrir-generacion", clico: gp });
+      if (gp) { gen = gp; via = "form-dedicado"; }
+    }
+
+    // Formulario de generación: capturarlo (para calibrar) y completarlo.
+    pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
+    const ent = await marcarEntidad(s.ctx, ["Tesoro", "TESORO"]);
+    await s.page.waitForTimeout(1000);
+    pasos.push({ paso: "marcar-tesoro", via: ent });
+
+    const env = await clicTextoEspera(
       s.ctx, s.page,
-      ["Generar Pedido", "Generar pedido", "Aceptar", "Confirmar", "Grabar", "Enviar", "Continuar", "Sí", "Si"],
-      3, 1200
+      ["Generar Pedido", "Generar pedido", "Generar", "Solicitar", "Enviar solicitud", "Enviar", "Grabar", "Aceptar", "Confirmar", "Continuar"],
+      4, 1200
     );
     await s.page.waitForTimeout(3500);
     await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "confirmar", clico: conf });
+    // Segundo paso de confirmación si lo hubiera.
+    const conf = await clicTextoEspera(s.ctx, s.page, ["Aceptar", "Confirmar", "Sí", "Si", "Continuar", "Finalizar"], 2, 1000);
+    await s.page.waitForTimeout(2500);
+    await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "enviar", via, env, conf });
 
-    // Verificar: re-leer la tabla; un TESORO que ya NO esté "Cancelado por plazo
-    // Vencido" indica que se generó (queda en proceso o pendiente de elaborar).
-    let pedidos2: { entidad: string; estado: string; accion: string }[] = [];
-    for (let i = 0; i < 6; i++) {
-      pedidos2 = await leerPedidos(s.ctx);
-      const fresco = pedidos2.find((p) => /tesoro/i.test(p.entidad) && !/cancelado|vencido/i.test(p.estado));
-      if (fresco) break;
-      await s.page.waitForTimeout(2000);
+    // VERIFICAR de verdad: re-consultar y comprobar un TESORO VIGENTE
+    // (nuevo número o estado distinto de cancelado/vencido).
+    let despues: { entidad: string; numero: string; fecha: string; estado: string; accion: string }[] = [];
+    let tesoroVigente: any = null;
+    for (let i = 0; i < 4; i++) {
+      despues = await abrirConsultaPedidos(s.ctx, s.page, pasos);
+      tesoroVigente =
+        despues.find((p) => /tesoro/i.test(p.entidad) && p.numero && !numsAntes.has(p.numero)) ||
+        despues.find(esTesoroVigente);
+      if (tesoroVigente) break;
+      await s.page.waitForTimeout(2500);
     }
-    pasos.push({ paso: "verificar", filas: pedidos2 });
-    const tesoroFresco = pedidos2.find((p) => /tesoro/i.test(p.entidad) && !/cancelado|vencido/i.test(p.estado));
+    pasos.push({ paso: "verificar", tesoroVigente: tesoroVigente ?? null });
     if (diagnostico) pasos.push({ paso: "resultado", formularios: await dumpFormularios(s.ctx) });
 
-    if (tesoroFresco || gen) {
+    if (tesoroVigente) {
       return {
         ok: true,
         mensaje:
-          "Pedido de deuda generado (TESORO). Espera ~5 minutos y usa “Consultar y extraer”." +
-          (tesoroFresco ? ` Estado: ${tesoroFresco.estado}.` : ""),
+          `Pedido de deuda generado (TESORO, N° ${tesoroVigente.numero || "s/n"}). ` +
+          `Estado: ${tesoroVigente.estado || "en proceso"}. Espera ~5 minutos y usa “Consultar y extraer”.`,
         diag: { pasos },
       };
     }
@@ -623,7 +710,8 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     return {
       ok: false,
       error:
-        "No encontré la acción “Generar Nuevo Número Pedido” en la fila TESORO. Si ya hay un pedido en proceso, espera y usa “Consultar y extraer”; si no, reintenta (revisa el diagnóstico “pedidos”).",
+        "No pude confirmar la generación: SUNAT sigue mostrando los pedidos TESORO como “Cancelado por plazo Vencido”. " +
+        "Marca “Modo diagnóstico” y vuelve a darle a “Generar pedido”, y pásame el resultado (paso “form-generacion”) para calibrar el formulario.",
       diag: { pasos },
     };
   } catch (err) {

@@ -25,6 +25,8 @@ export default function DeudasF36Panel({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [forzar, setForzar] = useState(false);
+  const [modoDiag, setModoDiag] = useState(false);
+  const [diag, setDiag] = useState<string | null>(null);
 
   // Recuerda la Clave SOL de la sesión (se pide 1 vez por módulo).
   useEffect(() => { setSolPassState(getSolPass(clienteId)); }, [clienteId]);
@@ -47,16 +49,21 @@ export default function DeudasF36Panel({
   async function llamar(fase: "generar" | "extraer") {
     if (!solPass) return setError("Ingresa la Clave SOL.");
     setSolPass(clienteId, solPass); // recordar en la sesión
-    setBusy(fase === "generar" ? "gen" : "ext"); setError(null);
+    setBusy(fase === "generar" ? "gen" : "ext"); setError(null); setDiag(null);
     setInfo(fase === "generar" ? "Generando el pedido de deuda en SUNAT…" : "Consultando y extrayendo las deudas…");
     try {
       const res = await fetch(`/api/consultas/deudas/${fase}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, forzar }),
+        body: JSON.stringify({ clienteId, solUser, solPass, forzar, diagnostico: modoDiag }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo completar."); return; }
+      if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo completar.");
+        if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+        return;
+      }
       if (fase === "extraer" && Array.isArray(data.tablas)) {
         setTablas(data.tablas);
         setNota(data.nota ?? null);
@@ -113,7 +120,18 @@ export default function DeudasF36Panel({
             Forzar (ignora el límite de 3 días)
           </label>
         )}
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
+          Modo diagnóstico
+        </label>
       </div>
+
+      {diag && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-900 p-3">
+          <p className="mb-1 text-xs font-semibold text-slate-300">Diagnóstico (cópialo y pásamelo para calibrar):</p>
+          <pre className="max-h-80 overflow-auto text-[11px] leading-relaxed text-emerald-300">{diag}</pre>
+        </div>
+      )}
       <p className="mt-2 text-xs text-amber-600">
         ⏱️ Tras “Generar pedido”, espera ~5 min antes de “Consultar y extraer”.
         {at ? ` Última extracción: ${new Date(at).toLocaleString("es-PE")}.` : ""}
