@@ -516,7 +516,8 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
 // ---- FASE 2: consultar estado y extraer las deudas -------------------------
 const PESTANAS = ["Valores", "Deudas Autoliquidadas/Reliquidadas", "Otras Deudas", "Deudas no Acogibles"];
 
-/** Lee la tabla actualmente visible en cualquier frame (cabeceras + filas). */
+/** Lee el GRID DE DEUDAS visible: la tabla cuyas cabeceras son de deuda
+ *  (Periodo, Código Tributario, Número de Valor, Deuda, Monto…), no el form. */
 async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: string[][] } | null> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
@@ -526,23 +527,40 @@ async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: s
             const r = (el as HTMLElement).getBoundingClientRect();
             return r.width > 0 && r.height > 0;
           };
-          const tablas = Array.from(document.querySelectorAll("table")).filter(visible);
-          // elige la tabla visible con más filas de datos
-          let best: { headers: string[]; filas: string[][] } | null = null;
-          for (const tb of tablas) {
-            const ths = Array.from(tb.querySelectorAll("thead th, tr th")).map((x) => (x.textContent || "").replace(/\s+/g, " ").trim());
-            const trs = Array.from(tb.querySelectorAll("tbody tr")).length
-              ? Array.from(tb.querySelectorAll("tbody tr"))
-              : Array.from(tb.querySelectorAll("tr"));
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+          const KW = [
+            "periodo", "codigo tributario", "código tributario", "tipo de resol", "numero de valor",
+            "número de valor", "deuda", "monto", "importe", "tributo", "acogerse", "acogido",
+            "documento", "saldo", "interes", "interés", "concepto",
+          ];
+          const limpia = (s: string) => s.toLowerCase();
+          const headersDe = (tb: Element) => {
+            // cabeceras: thead th/td, o la primera fila con th, o la primera fila.
+            let hs = Array.from(tb.querySelectorAll("thead th, thead td")).map((x) => norm(x.textContent));
+            if (!hs.length) {
+              const firstTr = tb.querySelector("tr");
+              if (firstTr) hs = Array.from(firstTr.querySelectorAll("th,td")).map((x) => norm(x.textContent));
+            }
+            return hs.filter((h) => h);
+          };
+          let best: { headers: string[]; filas: string[][]; score: number } | null = null;
+          for (const tb of Array.from(document.querySelectorAll("table")).filter(visible)) {
+            const headers = headersDe(tb);
+            const ht = limpia(headers.join(" "));
+            const score = KW.reduce((a, k) => a + (ht.includes(k) ? 1 : 0), 0);
+            if (score < 2) continue; // no es el grid de deudas
+            // filas de datos: tbody tr, o todas las tr menos la de cabecera.
+            let trs = Array.from(tb.querySelectorAll("tbody tr"));
+            if (!trs.length) trs = Array.from(tb.querySelectorAll("tr")).slice(1);
             const filas = trs
-              .map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => (td.textContent || "").replace(/\s+/g, " ").trim()))
-              .filter((f) => f.length && f.some((c) => c));
-            if (filas.length && (!best || filas.length > best.filas.length)) best = { headers: ths, filas };
+              .map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent)))
+              .filter((f) => f.length > 1 && f.some((c) => c) && !/^(seleccione|total)/i.test(f.join(" ")));
+            if (!best || score > best.score) best = { headers, filas, score };
           }
-          return best;
+          return best ? { headers: best.headers, filas: best.filas } : null;
         })
         .catch(() => null);
-      if (t && t.filas.length) return t;
+      if (t && t.headers.length) return t;
     }
   }
   return null;
