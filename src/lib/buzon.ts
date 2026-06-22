@@ -402,6 +402,7 @@ export interface AdjuntoResultado {
 async function abrirVisor(params: { ruc: string; solUser: string; solPass: string }, pasos: any[]) {
   const browser = await lanzarNavegador();
   const ctx = await browser.newContext({
+    acceptDownloads: true,
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
   });
@@ -704,32 +705,64 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       )) as { href: string; oc: string; txt: string }[];
       pasos.push({ paso: "constancia-anchors", anchors: innerAnchors });
 
-      // Elegir el enlace al documento real (resolución): href directo a doc.
-      let resoUrl = "";
-      for (const a of innerAnchors) {
-        const blob = `${a.href} ${a.oc}`;
-        const m = blob.match(/(?:https?:\/\/[^\s'"]+|\/[^\s'"]+)?(?:gendocS01Alias|bajarArchivo|descargaArchivo|unloadfile|\.pdf)[^\s'")]*/i);
-        if (m && !/^javascript/i.test(m[0]) && abs(m[0]) !== gendocLink) { resoUrl = abs(m[0]); break; }
-      }
-
+      // CLIC en el enlace azul (la resolución) y capturar la descarga. SUNAT
+      // genera el reporte (rvalores_...) en varios pasos y lo descarga; lo
+      // capturamos tal cual lo haría una persona (download / popup / navegación).
       let pdfB64 = "";
-      if (resoUrl) {
-        pasos.push({ paso: "resolucion-url", url: resoUrl });
-        const bin = await fetchPdf(pg2, resoUrl);
-        pasos.push({ paso: "resolucion-fetch", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
-        if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
-          pdfB64 = bin.b64;
-        } else {
-          // Es HTML (otra constancia/doc): renderizar a PDF.
-          const pg3 = await sesion.ctx.newPage();
-          await pg3.goto(resoUrl, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
-          const buf = await pg3.pdf({ format: "A4", printBackground: true }).catch(() => null);
-          await pg3.close();
-          if (buf) pdfB64 = Buffer.from(buf).toString("base64");
+      let nombreArch = "";
+      const espDownload = pg2.waitForEvent("download", { timeout: 35000 }).catch(() => null);
+      const espPopup = sesion.ctx.waitForEvent("page", { timeout: 35000 }).catch(() => null);
+      const clicked = (await pg2.evaluate(() => {
+        const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
+        const esDoc = (x: HTMLAnchorElement) =>
+          /goarchivo|descarga|valor|gendoc|bajararchivo|verpdf|reporte|unloadfile/i.test(
+            (x.getAttribute("onclick") || "") + (x.getAttribute("href") || "")
+          );
+        const a =
+          anchors.find(esDoc) ||
+          anchors.find(
+            (x) => /\d{6,}/.test((x.textContent || "").replace(/\D/g, "")) && (x.getAttribute("href") || x.getAttribute("onclick"))
+          );
+        if (!a) return null;
+        (a as HTMLElement).click();
+        return ((a.getAttribute("onclick") || "") + " | " + (a.getAttribute("href") || "")).slice(0, 200);
+      })) as string | null;
+      pasos.push({ paso: "clic-resolucion", anchor: clicked });
+
+      const dl = await espDownload;
+      if (dl) {
+        const p = await dl.path().catch(() => null);
+        nombreArch = (dl.suggestedFilename && dl.suggestedFilename()) || "";
+        if (p) {
+          const fs = await import("fs");
+          pdfB64 = fs.readFileSync(p).toString("base64");
+          pasos.push({ paso: "download", filename: nombreArch, bytes: pdfB64.length });
+        }
+      }
+      if (!pdfB64) {
+        const popup = await espPopup;
+        if (popup) {
+          await popup.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+          const purl = popup.url();
+          pasos.push({ paso: "popup", url: purl });
+          const bin = await fetchPdf(popup, purl);
+          if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) pdfB64 = bin.b64;
+          else {
+            const buf = await popup.pdf({ format: "A4", printBackground: true }).catch(() => null);
+            if (buf) pdfB64 = Buffer.from(buf).toString("base64");
+          }
+          await popup.close().catch(() => {});
+        }
+      }
+      if (!pdfB64) {
+        const purl = pg2.url();
+        if (purl && purl !== gendocLink) {
+          const bin = await fetchPdf(pg2, purl);
+          if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) pdfB64 = bin.b64;
         }
       }
 
-      // Fallback: si no hallé la resolución, devuelvo la constancia renderizada.
+      // Fallback: la constancia renderizada (para no quedar sin nada).
       let constB64 = "";
       if (!pdfB64) {
         const buf = await pg2.pdf({ format: "A4", printBackground: true }).catch(() => null);
@@ -738,7 +771,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       await pg2.close().catch(() => {});
 
       if (diagnostico) return { ok: false, diag: { pasos } };
-      if (pdfB64) return { ok: true, pdfBase64: pdfB64, filename: `resolucion-${codMensaje}.pdf` };
+      if (pdfB64) return { ok: true, pdfBase64: pdfB64, filename: nombreArch || `resolucion-${codMensaje}.pdf` };
       if (constB64) return { ok: true, pdfBase64: constB64, filename: `constancia-${codMensaje}.pdf` };
     }
 
