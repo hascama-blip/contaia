@@ -639,24 +639,23 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     }
     pasos.push({ paso: "enlaces-adjunto", cantidad: enlaces.length, enlaces: enlaces.slice(0, 5) });
 
-    if (diagnostico) {
-      const dump = (await ejecutor.evaluate(() => {
-        const cont = document.querySelector("#listArchivosAdjuntos");
-        const anchors = (Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[])
-          .map((a) => ({
-            href: (a.getAttribute("href") || "").slice(0, 200),
-            onclick: (a.getAttribute("onclick") || "").slice(0, 200),
-            txt: (a.textContent || "").trim().slice(0, 60),
-          }))
-          .filter((a) => /archivo|gendoc|bajar|constancia|adjun|\.pdf/i.test(a.href + a.onclick + a.txt))
-          .slice(0, 20);
-        return { listAdj: cont ? (cont as HTMLElement).outerHTML.slice(0, 2500) : null, anchors };
-      })) as any;
-      pasos.push({ paso: "detalle-dom", ...dump });
-      return { ok: false, diag: { pasos } };
-    }
-
     if (enlaces.length === 0) {
+      if (diagnostico) {
+        const dump = (await ejecutor.evaluate(() => {
+          const cont = document.querySelector("#listArchivosAdjuntos");
+          const anchors = (Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[])
+            .map((a) => ({
+              href: (a.getAttribute("href") || "").slice(0, 200),
+              onclick: (a.getAttribute("onclick") || "").slice(0, 200),
+              txt: (a.textContent || "").trim().slice(0, 60),
+            }))
+            .filter((a) => /archivo|gendoc|bajar|constancia|adjun|\.pdf/i.test(a.href + a.onclick + a.txt))
+            .slice(0, 20);
+          return { listAdj: cont ? (cont as HTMLElement).outerHTML.slice(0, 2500) : null, anchors };
+        })) as any;
+        pasos.push({ paso: "detalle-dom", ...dump });
+        return { ok: false, diag: { pasos } };
+      }
       return {
         ok: false,
         error: "No pude ubicar el enlace del adjunto tras abrir el mensaje. Usa Modo diagnóstico y compárteme el resultado.",
@@ -665,48 +664,97 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     }
 
     const abs = (u: string) => (u.startsWith("http") ? u : `https://ww1.sunat.gob.pe${u.startsWith("/") ? "" : "/"}${u}`);
-    const url0 = abs(enlaces[0]);
-    pasos.push({ paso: "descarga-url", url: url0 });
 
-    // Caso A: bajarArchivo → PDF binario directo.
-    if (/bajarArchivo/i.test(url0)) {
-      const bin = (await ejecutor.evaluate(async (u: string) => {
+    // baja binario por fetch en el contexto de una página (con cookies).
+    const fetchPdf = async (pg: any, u: string) =>
+      (await pg.evaluate(async (url: string) => {
         try {
-          const r = await fetch(u, { credentials: "include" });
+          const r = await fetch(url, { credentials: "include" });
           const ct = r.headers.get("content-type") || "";
           const b = await r.arrayBuffer();
           const by = new Uint8Array(b);
           let s = "";
           for (let i = 0; i < by.length; i++) s += String.fromCharCode(by[i]);
           return { status: r.status, ct, b64: btoa(s), firma: s.slice(0, 5) };
-        } catch (e) {
+        } catch {
           return { status: 0, ct: "", b64: "", firma: "" };
         }
-      }, url0)) as { status: number; ct: string; b64: string; firma: string };
-      pasos.push({ paso: "bajarArchivo", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
-      if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
+      }, u)) as { status: number; ct: string; b64: string; firma: string };
+
+    // La CONSTANCIA (gendoc) contiene el enlace a la RESOLUCIÓN (lo que se
+    // necesita). Preferimos ese flujo; si no hay gendoc, usamos bajarArchivo.
+    const gendocLink = enlaces.map(abs).find((u) => /gendocS01Alias/i.test(u)) || "";
+    const bajarLink = enlaces.map(abs).find((u) => /bajarArchivo/i.test(u)) || "";
+
+    if (gendocLink) {
+      pasos.push({ paso: "constancia-url", url: gendocLink });
+      const pg2 = await sesion.ctx.newPage();
+      await pg2.goto(gendocLink, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+
+      // Enlaces internos de la constancia (ahí está el azul de la resolución).
+      const innerAnchors = (await pg2.evaluate(() =>
+        (Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[])
+          .map((a) => ({
+            href: (a.getAttribute("href") || "").slice(0, 300),
+            oc: (a.getAttribute("onclick") || "").slice(0, 300),
+            txt: (a.textContent || "").trim().slice(0, 50),
+          }))
+          .filter((a) => a.href || a.oc)
+          .slice(0, 20)
+      )) as { href: string; oc: string; txt: string }[];
+      pasos.push({ paso: "constancia-anchors", anchors: innerAnchors });
+
+      // Elegir el enlace al documento real (resolución): href directo a doc.
+      let resoUrl = "";
+      for (const a of innerAnchors) {
+        const blob = `${a.href} ${a.oc}`;
+        const m = blob.match(/(?:https?:\/\/[^\s'"]+|\/[^\s'"]+)?(?:gendocS01Alias|bajarArchivo|descargaArchivo|unloadfile|\.pdf)[^\s'")]*/i);
+        if (m && !/^javascript/i.test(m[0]) && abs(m[0]) !== gendocLink) { resoUrl = abs(m[0]); break; }
+      }
+
+      let pdfB64 = "";
+      if (resoUrl) {
+        pasos.push({ paso: "resolucion-url", url: resoUrl });
+        const bin = await fetchPdf(pg2, resoUrl);
+        pasos.push({ paso: "resolucion-fetch", status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+        if (bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
+          pdfB64 = bin.b64;
+        } else {
+          // Es HTML (otra constancia/doc): renderizar a PDF.
+          const pg3 = await sesion.ctx.newPage();
+          await pg3.goto(resoUrl, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+          const buf = await pg3.pdf({ format: "A4", printBackground: true }).catch(() => null);
+          await pg3.close();
+          if (buf) pdfB64 = Buffer.from(buf).toString("base64");
+        }
+      }
+
+      // Fallback: si no hallé la resolución, devuelvo la constancia renderizada.
+      let constB64 = "";
+      if (!pdfB64) {
+        const buf = await pg2.pdf({ format: "A4", printBackground: true }).catch(() => null);
+        if (buf) constB64 = Buffer.from(buf).toString("base64");
+      }
+      await pg2.close().catch(() => {});
+
+      if (diagnostico) return { ok: false, diag: { pasos } };
+      if (pdfB64) return { ok: true, pdfBase64: pdfB64, filename: `resolucion-${codMensaje}.pdf` };
+      if (constB64) return { ok: true, pdfBase64: constB64, filename: `constancia-${codMensaje}.pdf` };
+    }
+
+    // Sin gendoc: bajar el archivo guardado (constancia) directo.
+    if (bajarLink) {
+      const bin = await fetchPdf(ejecutor, bajarLink);
+      pasos.push({ paso: "bajarArchivo", url: bajarLink, status: bin.status, ct: bin.ct, firma: bin.firma, bytes: bin.b64.length });
+      if (!diagnostico && bin.status === 200 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct)) && bin.b64) {
         return { ok: true, pdfBase64: bin.b64, filename: `mensaje-${codMensaje}.pdf` };
       }
     }
 
-    // Caso B: gendocS01Alias (HTML) → renderizar a PDF con el navegador.
-    try {
-      const pg2 = await sesion.ctx.newPage();
-      await pg2.goto(url0, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
-      const pdfBuf = await pg2.pdf({ format: "A4", printBackground: true });
-      await pg2.close();
-      const b64 = Buffer.from(pdfBuf).toString("base64");
-      if (b64) {
-        pasos.push({ paso: "render-pdf", bytes: b64.length });
-        return { ok: true, pdfBase64: b64, filename: `mensaje-${codMensaje}.pdf` };
-      }
-    } catch (e) {
-      pasos.push({ paso: "render-pdf-error", respuesta: String(e).slice(0, 200) });
-    }
-
+    if (diagnostico) return { ok: false, diag: { pasos } };
     return {
       ok: false,
-      error: "Ubiqué el adjunto pero no pude convertirlo a PDF. Usa Modo diagnóstico y compárteme el resultado.",
+      error: "Ubiqué el adjunto pero no pude obtener el PDF de la resolución. Usa Modo diagnóstico y compárteme el resultado.",
       diag: { pasos },
     };
   } catch (err) {
