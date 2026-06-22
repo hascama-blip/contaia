@@ -385,6 +385,47 @@ export async function deleteDeuda(clienteId: string, deudaId: string): Promise<C
   return cliente;
 }
 
+// ---- Caché de PDFs del buzón ----------------------------------------------
+
+/** Guarda el PDF de un mensaje en uploads y registra su metadato en el cliente. */
+export async function setBuzonAdjunto(
+  clienteId: string,
+  codMensaje: string,
+  pdf: Buffer,
+  nombre: string
+): Promise<void> {
+  await ensureDirs();
+  const archivo = `buzon_${clienteId}_${codMensaje}.pdf`;
+  await fs.writeFile(path.join(UPLOADS_DIR, archivo), pdf);
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return;
+  if (!cliente.buzonAdjuntos) cliente.buzonAdjuntos = {};
+  cliente.buzonAdjuntos[codMensaje] = {
+    archivo,
+    nombre: nombre || `mensaje-${codMensaje}.pdf`,
+    at: new Date().toISOString(),
+    size: pdf.length,
+  };
+  await writeStore(store);
+}
+
+/** Lee el PDF cacheado de un mensaje (o null si no está). */
+export async function getBuzonAdjunto(
+  clienteId: string,
+  codMensaje: string
+): Promise<{ pdf: Buffer; nombre: string } | null> {
+  const cliente = await getCliente(clienteId);
+  const meta = cliente?.buzonAdjuntos?.[codMensaje];
+  if (!meta) return null;
+  try {
+    const pdf = await fs.readFile(path.join(UPLOADS_DIR, meta.archivo));
+    return { pdf, nombre: meta.nombre };
+  } catch {
+    return null;
+  }
+}
+
 export async function clearSire(clienteId: string): Promise<Cliente | null> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);

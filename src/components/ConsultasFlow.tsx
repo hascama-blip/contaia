@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface ClienteOpt {
   id: string;
@@ -21,6 +21,8 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   const [solUser, setSolUser] = useState(clientes[0]?.solUser ?? "");
   const [solPass, setSolPass] = useState("");
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null);
+  const [consultadoAt, setConsultadoAt] = useState<string | null>(null);
+  const [cacheados, setCacheados] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [bajando, setBajando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,10 +32,35 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
 
   const cliente = clientes.find((c) => c.id === clienteId);
 
+  // Carga lo YA GUARDADO (sin clave): mensajes + qué PDFs están en caché.
+  const cargarGuardados = useCallback(async (id: string) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/consultas/buzon?clienteId=${encodeURIComponent(id)}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const msgs: Mensaje[] = data.mensajes ?? [];
+        setMensajes(msgs.length ? msgs : null);
+        setConsultadoAt(data.consultadoAt ?? null);
+        setCacheados(new Set<string>(data.cacheados ?? []));
+        if (msgs.length) setInfo(`Mostrando ${msgs.length} mensaje(s) guardado(s)${data.consultadoAt ? "" : ""}. Usa “Actualizar” para traer lo último.`);
+      }
+    } catch {
+      /* sin guardados */
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarGuardados(clienteId);
+  }, [clienteId, cargarGuardados]);
+
   function elegir(id: string) {
     setClienteId(id);
     setSolUser(clientes.find((c) => c.id === id)?.solUser ?? "");
     setMensajes(null);
+    setCacheados(new Set());
+    setInfo(null);
+    setError(null);
   }
 
   async function extraer() {
@@ -49,7 +76,8 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo leer el buzón."); return; }
       setMensajes(data.mensajes ?? []);
-      setInfo(`Se encontraron ${data.mensajes?.length ?? 0} mensaje(s).`);
+      setConsultadoAt(new Date().toISOString());
+      setInfo(`Se encontraron ${data.mensajes?.length ?? 0} mensaje(s). Quedaron guardados.`);
     } catch {
       setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
     } finally { setBusy(false); }
@@ -74,12 +102,15 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
         if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         return;
       }
+      const desdeCache = res.headers.get("X-Desde-Cache") === "1";
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `${(m.asunto || "adjunto").slice(0, 40).replace(/[^\w\s-]/g, "")}.pdf`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      setCacheados((prev) => new Set(prev).add(m.id)); // ahora queda guardado
+      setInfo(desdeCache ? "PDF abierto desde lo guardado (sin reingresar a SUNAT)." : "PDF descargado y guardado para próximas veces.");
     } finally { setBajando(null); }
   }
 
@@ -100,7 +131,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
         </div>
       ) : (
         <section className="card p-5">
-          <h2 className="mb-3 font-bold text-slate-800">Extraer mensajes del buzón</h2>
+          <h2 className="mb-3 font-bold text-slate-800">Buzón electrónico</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="text-xs font-semibold text-slate-600">Empresa</label>
@@ -130,24 +161,23 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                 className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-brand-500"
                 value={solPass}
                 onChange={(e) => setSolPass(e.target.value)}
-                placeholder="No se guarda"
+                placeholder="Solo para traer/actualizar"
               />
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button className="btn-primary" onClick={extraer} disabled={busy}>
-              {busy ? "Extrayendo…" : "📨 Extraer buzón"}
+              {busy ? "Extrayendo…" : mensajes ? "🔄 Actualizar buzón" : "📨 Extraer buzón"}
             </button>
             <label className="flex items-center gap-2 text-xs text-slate-500">
               <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
-              Modo diagnóstico (al bajar un PDF, muestra la respuesta de SUNAT para calibrar)
+              Modo diagnóstico
             </label>
           </div>
-          {cliente && (
-            <p className="mt-2 text-xs text-slate-400">
-              La Clave SOL se usa solo para esta consulta y no se guarda.
-            </p>
-          )}
+          <p className="mt-2 text-xs text-slate-400">
+            Los mensajes y los PDF que descargues quedan <b>guardados</b>: la próxima vez se abren al
+            instante, sin volver a ingresar la Clave SOL. La Clave SOL nunca se guarda.
+          </p>
         </section>
       )}
 
@@ -156,7 +186,9 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="font-bold text-slate-800">Mensajes del buzón</h2>
             <p className="text-xs text-slate-400">
-              {mensajes.length} mensaje(s) · clic en el ícono PDF para descargar el adjunto.
+              {mensajes.length} mensaje(s)
+              {consultadoAt ? ` · consultado ${new Date(consultadoAt).toLocaleString("es-PE")}` : ""}
+              {" "}· 📄 descarga el adjunto (verde = ya guardado).
             </p>
           </div>
           {mensajes.length === 0 ? (
@@ -172,31 +204,38 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {mensajes.map((m) => (
-                  <tr key={m.id}>
-                    <td className="whitespace-nowrap px-4 py-2 text-slate-500">{m.fecha}</td>
-                    <td className="px-4 py-2">
-                      {m.nivel === "otro" ? (
-                        <span className="text-xs text-slate-400">Informativa</span>
-                      ) : (
-                        <span className={`badge ${m.nivel === "peligroso" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
-                          {m.tipo || "—"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-slate-700">{m.asunto}</td>
-                    <td className="px-4 py-2 text-center">
-                      <button
-                        onClick={() => descargarPdf(m)}
-                        disabled={bajando !== null}
-                        title="Descargar PDF adjunto"
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {bajando === m.id ? "…" : "📄 PDF"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {mensajes.map((m) => {
+                  const guardado = cacheados.has(m.id);
+                  return (
+                    <tr key={m.id}>
+                      <td className="whitespace-nowrap px-4 py-2 text-slate-500">{m.fecha}</td>
+                      <td className="px-4 py-2">
+                        {m.nivel === "otro" ? (
+                          <span className="text-xs text-slate-400">Informativa</span>
+                        ) : (
+                          <span className={`badge ${m.nivel === "peligroso" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
+                            {m.tipo || "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">{m.asunto}</td>
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => descargarPdf(m)}
+                          disabled={bajando !== null}
+                          title={guardado ? "Abrir PDF guardado (sin reingresar a SUNAT)" : "Descargar PDF adjunto"}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs disabled:opacity-50 ${
+                            guardado
+                              ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              : "border-slate-200 text-red-600 hover:bg-red-50"
+                          }`}
+                        >
+                          {bajando === m.id ? "…" : guardado ? "✓ PDF" : "📄 PDF"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

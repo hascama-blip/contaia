@@ -89,6 +89,8 @@ export interface Cliente {
   sire: SireResumen[];
   /** Buzón electrónico (urgentes) del mes en curso. */
   buzon: BuzonResumen | null;
+  /** Caché de PDFs descargados del buzón, por codMensaje (para no re-bajarlos). */
+  buzonAdjuntos?: Record<string, AdjuntoCache>;
   /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */
   declaraciones: DeclaracionMensual[];
   /** Declaraciones juradas ANUALES (Formulario 710) para comparar año vs año. */
@@ -253,6 +255,16 @@ export interface BuzonResultado {
   /** Cobranza y valores. */
   urgentes: BuzonMensaje[];
   diag?: { pasos: any[] };
+}
+
+/** PDF del buzón ya descargado y guardado (caché). */
+export interface AdjuntoCache {
+  /** Nombre del archivo guardado en uploads. */
+  archivo: string;
+  /** Nombre para descargar (sugerido por SUNAT). */
+  nombre: string;
+  at: string;
+  size: number;
 }
 
 /** Buzón persistido en el cliente (para el informe). */
