@@ -683,27 +683,30 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         }
       }, u)) as { status: number; ct: string; b64: string; firma: string };
 
-    // Helper: busca el enlace de DOCUMENTO (número azul = la resolución) en
-    // TODAS las frames de la página (incluye sub-iframes donde se renderiza la
-    // constancia), hace clic y captura lo que SUNAT descargue/abra.
-    const intentarDescarga = async (targetPage: any, label: string) => {
-      const espDl = targetPage.waitForEvent("download", { timeout: 25000 }).catch(() => null);
+    // Helper: busca el enlace de DOCUMENTO (número azul = la resolución) en una
+    // lista de frames (incluye sub-iframes / otras pestañas), hace clic y captura
+    // lo que SUNAT descargue/abra. ownerPage = página donde escuchar la descarga.
+    const intentarDescarga = async (frames: any[], ownerPage: any, label: string) => {
+      const espDl = ownerPage.waitForEvent("download", { timeout: 25000 }).catch(() => null);
       const espPg = sesion.ctx.waitForEvent("page", { timeout: 25000 }).catch(() => null);
       let clicked: string | null = null;
       const framesDump: any[] = [];
-      for (const fr of targetPage.frames()) {
+      for (const fr of frames) {
         const res = (await fr
           .evaluate(() => {
             const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
             const txt = (x: HTMLAnchorElement) => (x.textContent || "").trim();
-            const acc = (x: HTMLAnchorElement) => (x.getAttribute("onclick") || "") + " " + (x.getAttribute("href") || "");
+            const acc = (x: HTMLAnchorElement) => ((x.getAttribute("onclick") || "") + " " + (x.getAttribute("href") || "")).toLowerCase();
+            const noCons = (x: HTMLAnchorElement) => !/constancia|bajararchivo|menuinternet|iconexecute/.test((txt(x) + " " + acc(x)).toLowerCase());
             const cands = anchors
-              .map((x) => ({ t: txt(x).slice(0, 50), a: acc(x).slice(0, 120) }))
-              .filter((c) => c.t || c.a)
-              .slice(0, 12);
+              .map((x) => ({ t: txt(x).slice(0, 50), a: acc(x).slice(0, 140) }))
+              .filter((c) => c.t || c.a.trim())
+              .slice(0, 15);
             const a =
-              anchors.find((x) => /^[\d][\d\s.\-]{5,}$/.test(txt(x)) && !/constancia/i.test(txt(x) + acc(x))) ||
-              anchors.find((x) => /valor|reporte|gendoc|goarchivo|unloadfile|verpdf/i.test(acc(x)) && !/constancia|bajararchivo/i.test(acc(x)));
+              // 1) el número del documento en azul (texto = dígitos/guiones)
+              anchors.find((x) => /^[\d][\d\s.\-]{5,}$/.test(txt(x)) && noCons(x)) ||
+              // 2) handlers de descarga reales del visor (no la constancia ni el menú)
+              anchors.find((x) => /visorpdfdescarga|goarchivodescarga|descargaarchivoalias|gendocs01alias|unloadfile/.test(acc(x)) && noCons(x));
             if (a) {
               (a as HTMLElement).click();
               return { clicked: (txt(a) + " || " + acc(a)).slice(0, 200), cands };
@@ -729,8 +732,12 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     let pdfB64 = "";
     let nombreArch = "";
 
-    // Nivel 1: el número azul puede estar en el detalle o en un sub-iframe.
-    const r = await intentarDescarga(sesion.page, "detalle");
+    // La página real del visor (donde vive el detalle y los sub-iframes).
+    const visorPage = sesion.visor ? sesion.visor.page() : sesion.page;
+    const todasFrames = () => sesion.ctx.pages().flatMap((p: any) => p.frames());
+
+    // Nivel 1: el número azul está en el detalle o en un sub-iframe del visor.
+    const r = await intentarDescarga(todasFrames(), visorPage, "detalle");
     if (r.b64) { pdfB64 = r.b64; nombreArch = r.nombre || ""; }
 
     // Nivel 2: si abrió una página nueva (la constancia), buscar el número azul ahí.
@@ -738,7 +745,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       const pg2 = r.popup;
       await pg2.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
       pasos.push({ paso: "constancia-url", url: pg2.url() });
-      const r2 = await intentarDescarga(pg2, "constancia");
+      const r2 = await intentarDescarga(pg2.frames(), pg2, "constancia");
       if (r2.b64) { pdfB64 = r2.b64; nombreArch = r2.nombre || nombreArch; }
 
       if (!pdfB64 && r2.popup) {
