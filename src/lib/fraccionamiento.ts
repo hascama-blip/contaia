@@ -516,48 +516,56 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
 // ---- FASE 2: consultar estado y extraer las deudas -------------------------
 const PESTANAS = ["Valores", "Deudas Autoliquidadas/Reliquidadas", "Otras Deudas", "Deudas no Acogibles"];
 
-/** Lee el GRID DE DEUDAS visible: la tabla cuyas cabeceras son de deuda
- *  (Periodo, Código Tributario, Número de Valor, Deuda, Monto…), no el form. */
+/** Lee el GRID DE DEUDAS visible. La cabecera y los datos pueden estar en
+ *  tablas separadas (grid dojo), así que toma las cabeceras del grid de deudas
+ *  y las filas de cualquier tabla visible con datos de deuda. */
 async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: string[][] } | null> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
       const t = await fr
         .evaluate(() => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
           const visible = (el: Element) => {
             const r = (el as HTMLElement).getBoundingClientRect();
             return r.width > 0 && r.height > 0;
           };
-          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-          const KW = [
-            "periodo", "codigo tributario", "código tributario", "tipo de resol", "numero de valor",
-            "número de valor", "deuda", "monto", "importe", "tributo", "acogerse", "acogido",
-            "documento", "saldo", "interes", "interés", "concepto",
-          ];
-          const limpia = (s: string) => s.toLowerCase();
-          const headersDe = (tb: Element) => {
-            // cabeceras: thead th/td, o la primera fila con th, o la primera fila.
+          // columnas "técnicas" (snake_case / ind_/cod_/mto_/num_/fec_/lst_/pid)
+          const esTecnico = (h: string) => /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(h) || /^(ind|cod|mto|num|fec|lst|pid)[A-Za-z0-9]*$/.test(h);
+          const KW = ["periodo", "tributario", "valor", "deuda", "monto", "importe", "tributo", "resoluci"];
+
+          // 1) Cabeceras del grid de deudas.
+          let headers: string[] | null = null;
+          for (const tb of Array.from(document.querySelectorAll("table")).filter(visible)) {
             let hs = Array.from(tb.querySelectorAll("thead th, thead td")).map((x) => norm(x.textContent));
             if (!hs.length) {
-              const firstTr = tb.querySelector("tr");
-              if (firstTr) hs = Array.from(firstTr.querySelectorAll("th,td")).map((x) => norm(x.textContent));
+              const f0 = tb.querySelector("tr");
+              if (f0) hs = Array.from(f0.querySelectorAll("th,td")).map((x) => norm(x.textContent));
             }
-            return hs.filter((h) => h);
-          };
-          let best: { headers: string[]; filas: string[][]; score: number } | null = null;
-          for (const tb of Array.from(document.querySelectorAll("table")).filter(visible)) {
-            const headers = headersDe(tb);
-            const ht = limpia(headers.join(" "));
-            const score = KW.reduce((a, k) => a + (ht.includes(k) ? 1 : 0), 0);
-            if (score < 2) continue; // no es el grid de deudas
-            // filas de datos: tbody tr, o todas las tr menos la de cabecera.
-            let trs = Array.from(tb.querySelectorAll("tbody tr"));
-            if (!trs.length) trs = Array.from(tb.querySelectorAll("tr")).slice(1);
-            const filas = trs
-              .map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent)))
-              .filter((f) => f.length > 1 && f.some((c) => c) && !/^(seleccione|total)/i.test(f.join(" ")));
-            if (!best || score > best.score) best = { headers, filas, score };
+            hs = hs.filter((h) => h);
+            const score = KW.reduce((a, k) => a + (hs.join(" ").toLowerCase().includes(k) ? 1 : 0), 0);
+            if (score >= 3) { headers = hs; break; }
           }
-          return best ? { headers: best.headers, filas: best.filas } : null;
+          if (!headers) return null;
+          const iTec = headers.findIndex(esTecnico);
+          const nVis = iTec > 0 ? iTec : headers.length;
+          const visHeaders = headers.slice(0, nVis);
+
+          // 2) Filas: cualquier <tr> visible que parezca deuda (no el form de pago).
+          const filas: string[][] = [];
+          const seen = new Set<string>();
+          for (const tr of Array.from(document.querySelectorAll("tr"))) {
+            if (!visible(tr)) continue;
+            const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
+            if (tds.filter((c) => c).length < 3) continue;
+            const joined = tds.join(" ");
+            if (!/\d{1,2}\/\d{4}|\d{6,}|orden de pago|resoluci|liquidaci|multa/i.test(joined)) continue;
+            const fila = tds.slice(0, nVis);
+            const key = fila.join("|");
+            if (seen.has(key)) continue;
+            seen.add(key);
+            filas.push(fila);
+          }
+          return { headers: visHeaders, filas };
         })
         .catch(() => null);
       if (t && t.headers.length) return t;
