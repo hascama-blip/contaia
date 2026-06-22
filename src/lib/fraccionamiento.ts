@@ -457,27 +457,40 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     browser = s.browser;
     await cerrarPantallas(s.ctx, s.page);
 
-    await irAFraccArt36(s.ctx, s.page, pasos);
-    // "Consulta estado de pedido de deuda"
-    const ce = await clicTextoEspera(s.ctx, s.page, ["Consulta estado de pedido de deuda", "Consulta estado de pedido"], 6, 1500);
-    await s.page.waitForTimeout(3500);
-    await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "consulta-estado", clico: ce });
-    if (diagnostico) pasos.push({ paso: "fracc-consulta", ...(await dumpFracc(s.ctx)) });
+    // VAMOS DIRECTO al módulo F36 (URLs reales del portal), sin pelear con el
+    // menú-árbol. Probamos la entrada del app y el form de acogimiento.
+    const entradas = [
+      "https://ww1.sunat.gob.pe/ol-ti-itwarfraccf36/f36S01Alias",
+      "https://ww1.sunat.gob.pe/ol-ti-itfraccionamiento-art36/SolicitudAcogimiento.html",
+    ];
+    const tieneTexto = async (re: RegExp) =>
+      (await s.page.evaluate((src: string) => new RegExp(src, "i").test(document.body?.innerText || ""), re.source).catch(() => false)) as boolean;
 
-    if (diagnostico) pasos.push({ paso: "menus-consulta", menus: await dumpMenus(s.ctx) });
+    for (const u of entradas) {
+      const resp = await s.page.goto(u, { waitUntil: "networkidle", timeout: 60000 }).catch(() => null);
+      await s.page.waitForTimeout(2500);
+      await cerrarPantallas(s.ctx, s.page);
+      const txt = (await s.page.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
+      pasos.push({ paso: "goto", url: u, status: resp ? resp.status() : null, final: s.page.url(), texto: txt.replace(/\s+/g, " ").trim().slice(0, 200) });
+      if (await tieneTexto(/valores|acogibles|elaborar|estado actual|pedido/i)) break;
+    }
 
-    // En la fila 1 (la más reciente) aparece el enlace azul "Elaborar Solicitud"
-    // cuando el pedido está listo. Reintenta varias veces (la tabla tarda).
-    const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
-    await s.page.waitForTimeout(4000);
-    await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "elaborar-solicitud", clico: elab });
-    if (!elab) {
+    // Si caímos en la "Consulta de estados de pedidos de deuda", abrir la fila 1
+    // (Elaborar Solicitud) para que cargue el form con las pestañas.
+    if (await tieneTexto(/elaborar|estado actual|acci[oó]n a seguir/i)) {
+      const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 6, 2000);
+      await s.page.waitForTimeout(4000);
+      await cerrarPantallas(s.ctx, s.page);
+      pasos.push({ paso: "elaborar-solicitud", clico: elab });
+    }
+
+    if (diagnostico) pasos.push({ paso: "fracc-pagina", ...(await dumpFracc(s.ctx)) });
+
+    if (!(await tieneTexto(/valores|acogibles/i))) {
       return {
         ok: false,
         error:
-          "No encontré el enlace “Elaborar solicitud” (puede que el pedido aún no esté listo; espera unos minutos más) o cambió el flujo. Revisa el diagnóstico.",
+          "Entré al módulo pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (goto/fracc-pagina) para ajustar la URL/clic exacto.",
         diag: { pasos },
       };
     }
