@@ -272,6 +272,34 @@ async function dumpFracc(ctx: any) {
   return { marcos, enlaces };
 }
 
+/** Vuelca TODOS los enlaces del menú con onclick ejecuta(...code=X) para mapear. */
+async function dumpEjecuta(ctx: any) {
+  const out: { t: string; oc: string }[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const items = await fr
+        .evaluate(() =>
+          (Array.from(document.querySelectorAll("a,[onclick]")) as HTMLElement[])
+            .map((e) => ({
+              t: (e.textContent || "").replace(/\s+/g, " ").trim().slice(0, 70),
+              oc: (e.getAttribute("onclick") || "").slice(0, 220),
+            }))
+            .filter((x) => /ejecuta\(|iconexecute/i.test(x.oc))
+            .slice(0, 250)
+        )
+        .catch(() => []);
+      out.push(...(items as any[]));
+    }
+  }
+  const seen = new Set<string>();
+  return out.filter((x) => {
+    const k = x.t + x.oc;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 async function loginSol(params: FraccParams, pasos: any[]) {
   const browser = await lanzarNavegador();
   const ctx = await browser.newContext({
@@ -331,7 +359,10 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     const s = await loginSol(params, pasos);
     browser = s.browser;
     await cerrarPantallas(s.ctx, s.page);
-    if (diagnostico) pasos.push({ paso: "fracc-inicio", ...(await dumpFracc(s.ctx)) });
+    if (diagnostico) {
+      pasos.push({ paso: "fracc-inicio", ...(await dumpFracc(s.ctx)) });
+      pasos.push({ paso: "menu-completo", links: await dumpEjecuta(s.ctx) });
+    }
 
     await irAFraccArt36(s.ctx, s.page, pasos);
     // "Generación de pedido de deuda"
