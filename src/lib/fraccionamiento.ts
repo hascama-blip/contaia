@@ -272,7 +272,7 @@ async function dumpFracc(ctx: any) {
   return { marcos, enlaces };
 }
 
-/** Inspecciona el elemento real de cada texto (tag/onclick/href/html). Compacto. */
+/** Inspecciona el elemento CLICKABLE más interno de cada texto (el enlace real). */
 async function inspeccionar(ctx: any, textos: string[]) {
   const out: any[] = [];
   for (const pg of ctx.pages()) {
@@ -282,20 +282,23 @@ async function inspeccionar(ctx: any, textos: string[]) {
           const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
           const res: any[] = [];
           for (const t of textos) {
-            const el = (Array.from(document.querySelectorAll("a,button,li,span,td,div")) as HTMLElement[]).find((e) =>
+            const cands = (Array.from(document.querySelectorAll("a,[onclick],[href]")) as HTMLElement[]).filter((e) =>
               norm(e.textContent).includes(norm(t))
             );
-            if (!el) continue;
-            let n: HTMLElement | null = el;
-            let info: any = null;
-            for (let i = 0; i < 5 && n; i++) {
-              if (n.tagName === "A" || n.tagName === "BUTTON" || n.getAttribute("onclick")) {
-                info = { t, tag: n.tagName, onclick: (n.getAttribute("onclick") || "").slice(0, 220), href: (n.getAttribute("href") || "").slice(0, 220), html: (n.outerHTML || "").slice(0, 260) };
-                break;
-              }
-              n = n.parentElement;
+            // el más interno = el de texto más corto
+            cands.sort((a, b) => (a.textContent || "").length - (b.textContent || "").length);
+            const el = cands[0];
+            if (el) {
+              res.push({
+                t,
+                tag: el.tagName,
+                onclick: (el.getAttribute("onclick") || "").slice(0, 240),
+                href: (el.getAttribute("href") || "").slice(0, 240),
+                txt: (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60),
+              });
+            } else {
+              res.push({ t, found: false });
             }
-            res.push(info || { t, tag: el.tagName, onclick: "", href: "", html: (el.outerHTML || "").slice(0, 260) });
           }
           return res;
         }, textos)
@@ -304,7 +307,7 @@ async function inspeccionar(ctx: any, textos: string[]) {
     }
   }
   const seen = new Set<string>();
-  return out.filter((x) => { const k = x.t + x.html; if (seen.has(k)) return false; seen.add(k); return true; });
+  return out.filter((x) => { const k = x.t + (x.onclick || "") + (x.href || ""); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
 /** Vuelca TODOS los enlaces del menú con onclick ejecuta(...code=X) para mapear. */
@@ -555,7 +558,13 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     // Diagnóstico COMPACTO: URLs de pestañas + el elemento real del menú.
     if (diagnostico) {
       const urls = s.ctx.pages().map((p: any) => p.url().slice(0, 95));
-      const insp = await inspeccionar(s.ctx, ["Consulta estado de pedido de deuda", "Elaborar Solicitud"]);
+      const insp = await inspeccionar(s.ctx, [
+        "Mi fraccionamiento",
+        "Solicito fraccionamiento art.36",
+        "Fracc Art 36",
+        "Consulta estado de pedido de deuda",
+        "Elaborar Solicitud",
+      ]);
       pasos.push({ paso: "inspeccion", urls, elementos: insp });
     }
 
