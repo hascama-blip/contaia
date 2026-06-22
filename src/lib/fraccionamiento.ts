@@ -510,13 +510,12 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
     );
     pasos.push({ paso: "abrir-consulta", clico: ce });
 
-    // Esperar la página de "Pedidos Efectuados" (tabla con "Elaborar Solicitud").
-    for (let i = 0; i < 14; i++) {
-      if (await tieneTexto(/elaborar|pedidos efectuados|estado actual|acci[oó]n a seguir/i)) break;
-      await s.page.waitForTimeout(2000);
-    }
+    // "Elaborar Solicitud" solo existe cuando la tabla de pedidos ya cargó, así
+    // que reintentar clicarlo SIRVE de espera y de acción a la vez (fila 1).
+    const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 14, 2500);
+    await s.page.waitForTimeout(5000);
     await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "consulta-cargada", ok: await tieneTexto(/elaborar|pedidos efectuados/i) });
+    pasos.push({ paso: "elaborar-solicitud", clico: elab });
 
     // Diagnóstico: qué páginas/pestañas hay abiertas y qué muestran.
     if (diagnostico) {
@@ -528,21 +527,13 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       pasos.push({ paso: "paginas", paginas });
     }
 
-    // Fila 1 → "Elaborar Solicitud" (abre el form con las 4 pestañas).
-    if (await tieneTexto(/elaborar|estado actual|acci[oó]n a seguir/i)) {
-      const elab = await clicTextoEspera(s.ctx, s.page, ["Elaborar Solicitud", "Elaborar solicitud"], 8, 2000);
-      await s.page.waitForTimeout(5000);
-      await cerrarPantallas(s.ctx, s.page);
-      pasos.push({ paso: "elaborar-solicitud", clico: elab });
-    }
-
     if (diagnostico) pasos.push({ paso: "fracc-pagina", ...(await dumpFracc(s.ctx)) });
 
     if (!(await tieneTexto(/valores|acogibles/i))) {
       return {
         ok: false,
         error:
-          "Entré pero no veo el formulario con las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/consulta-cargada/fracc-pagina).",
+          "Hice clic en “Elaborar Solicitud” pero aún no veo las pestañas de deudas. Revisa el diagnóstico (abrir-consulta/elaborar-solicitud/paginas).",
         diag: { pasos },
       };
     }
