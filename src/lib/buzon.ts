@@ -683,37 +683,44 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         }
       }, u)) as { status: number; ct: string; b64: string; firma: string };
 
-    // Helper: clic en el enlace de DOCUMENTO (el número azul = la resolución,
-    // NO el clip "constancia") y captura lo que SUNAT descargue/abra.
-    const intentarDescarga = async (frame: any, ownerPage: any, label: string) => {
-      const espDl = ownerPage.waitForEvent("download", { timeout: 30000 }).catch(() => null);
-      const espPg = sesion.ctx.waitForEvent("page", { timeout: 30000 }).catch(() => null);
-      const clicked = (await frame
-        .evaluate(() => {
-          const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
-          const txt = (x: HTMLAnchorElement) => (x.textContent || "").trim();
-          const acc = (x: HTMLAnchorElement) => (x.getAttribute("onclick") || "") + " " + (x.getAttribute("href") || "");
-          const a =
-            // 1) el número de documento en azul (texto = dígitos/guiones), no "constancia"
-            anchors.find((x) => /^[\d][\d\s.\-]{5,}$/.test(txt(x)) && !/constancia/i.test(txt(x))) ||
-            // 2) enlaces de valor/reporte/gendoc/descarga que NO sean la constancia
-            anchors.find((x) => /valor|reporte|gendoc|goarchivo|unloadfile|verpdf/i.test(acc(x)) && !/constancia/i.test(txt(x) + acc(x))) ||
-            // 3) último recurso: cualquier enlace de archivo
-            anchors.find((x) => /bajararchivo|descarga|gendoc|\.pdf/i.test(acc(x)));
-          if (!a) return null;
-          (a as HTMLElement).click();
-          return (txt(a) + " || " + acc(a)).slice(0, 200);
-        })
-        .catch(() => null)) as string | null;
-      pasos.push({ paso: "clic-" + label, anchor: clicked });
+    // Helper: busca el enlace de DOCUMENTO (número azul = la resolución) en
+    // TODAS las frames de la página (incluye sub-iframes donde se renderiza la
+    // constancia), hace clic y captura lo que SUNAT descargue/abra.
+    const intentarDescarga = async (targetPage: any, label: string) => {
+      const espDl = targetPage.waitForEvent("download", { timeout: 25000 }).catch(() => null);
+      const espPg = sesion.ctx.waitForEvent("page", { timeout: 25000 }).catch(() => null);
+      let clicked: string | null = null;
+      const framesDump: any[] = [];
+      for (const fr of targetPage.frames()) {
+        const res = (await fr
+          .evaluate(() => {
+            const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
+            const txt = (x: HTMLAnchorElement) => (x.textContent || "").trim();
+            const acc = (x: HTMLAnchorElement) => (x.getAttribute("onclick") || "") + " " + (x.getAttribute("href") || "");
+            const cands = anchors
+              .map((x) => ({ t: txt(x).slice(0, 50), a: acc(x).slice(0, 120) }))
+              .filter((c) => c.t || c.a)
+              .slice(0, 12);
+            const a =
+              anchors.find((x) => /^[\d][\d\s.\-]{5,}$/.test(txt(x)) && !/constancia/i.test(txt(x) + acc(x))) ||
+              anchors.find((x) => /valor|reporte|gendoc|goarchivo|unloadfile|verpdf/i.test(acc(x)) && !/constancia|bajararchivo/i.test(acc(x)));
+            if (a) {
+              (a as HTMLElement).click();
+              return { clicked: (txt(a) + " || " + acc(a)).slice(0, 200), cands };
+            }
+            return { clicked: null, cands };
+          })
+          .catch(() => ({ clicked: null, cands: [] }))) as { clicked: string | null; cands: any[] };
+        framesDump.push({ url: (fr.url() || "").slice(0, 90), cands: res.cands });
+        if (res.clicked) { clicked = res.clicked; break; }
+      }
+      pasos.push({ paso: "clic-" + label, anchor: clicked, frames: framesDump });
+      if (!clicked) return { b64: "", nombre: "", popup: null as any };
       const dl = await espDl;
       if (dl) {
         const p = await dl.path().catch(() => null);
         const nom = (dl.suggestedFilename && dl.suggestedFilename()) || "";
-        if (p) {
-          const fs = await import("fs");
-          return { b64: fs.readFileSync(p).toString("base64"), nombre: nom, popup: null as any };
-        }
+        if (p) { const fs = await import("fs"); return { b64: fs.readFileSync(p).toString("base64"), nombre: nom, popup: null as any }; }
       }
       const pg = await espPg;
       return { b64: "", nombre: "", popup: pg };
@@ -722,33 +729,28 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     let pdfB64 = "";
     let nombreArch = "";
 
-    // Nivel 1: clic en el detalle del mensaje.
-    const r = await intentarDescarga(ejecutor, sesion.page, "detalle");
+    // Nivel 1: el número azul puede estar en el detalle o en un sub-iframe.
+    const r = await intentarDescarga(sesion.page, "detalle");
     if (r.b64) { pdfB64 = r.b64; nombreArch = r.nombre || ""; }
 
-    // Nivel 2: si abrió la constancia (gendoc), clic en su número azul.
+    // Nivel 2: si abrió una página nueva (la constancia), buscar el número azul ahí.
     if (!pdfB64 && r.popup) {
       const pg2 = r.popup;
       await pg2.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
       pasos.push({ paso: "constancia-url", url: pg2.url() });
-      const r2 = await intentarDescarga(pg2, pg2, "constancia");
+      const r2 = await intentarDescarga(pg2, "constancia");
       if (r2.b64) { pdfB64 = r2.b64; nombreArch = r2.nombre || nombreArch; }
 
-      // Nivel 3: si la constancia abrió otra pestaña con el documento.
       if (!pdfB64 && r2.popup) {
         const pg3 = r2.popup;
         await pg3.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
         pasos.push({ paso: "doc-url", url: pg3.url() });
         const bin = await fetchPdf(pg3, pg3.url());
         if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) pdfB64 = bin.b64;
-        else {
-          const buf = await pg3.pdf({ format: "A4", printBackground: true }).catch(() => null);
-          if (buf) pdfB64 = Buffer.from(buf).toString("base64");
-        }
+        else { const buf = await pg3.pdf({ format: "A4", printBackground: true }).catch(() => null); if (buf) pdfB64 = Buffer.from(buf).toString("base64"); }
         await pg3.close().catch(() => {});
       }
 
-      // Último recurso: la constancia renderizada (para no quedar sin nada).
       if (!pdfB64) {
         const buf = await pg2.pdf({ format: "A4", printBackground: true }).catch(() => null);
         if (buf) { pdfB64 = Buffer.from(buf).toString("base64"); nombreArch = nombreArch || `constancia-${codMensaje}.pdf`; }
