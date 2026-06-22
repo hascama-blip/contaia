@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { BuzonMensaje, SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
+import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -33,6 +34,11 @@ export default function SunatPanel({
   const [solPass, setSolPass] = useState("");
   const [clientId, setClientId] = useState(inicialCred?.clientId ?? "");
   const [clientSecret, setClientSecret] = useState(inicialCred?.clientSecret ?? "");
+  // La API (client_id/secret) guardada queda BLOQUEADA (solo lectura).
+  const [apiBloqueada, setApiBloqueada] = useState(Boolean(inicialCred?.clientId && inicialCred?.clientSecret));
+  // Recordar la Clave SOL en la sesión (se pide 1 vez por módulo).
+  useEffect(() => { setSolPass(getSolPass(clienteId)); }, [clienteId]);
+  useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
   // Rango de periodos SIRE: Desde (mes/año) -> Hasta (mes/año).
   const [mesDesde, setMesDesde] = useState(1);
   const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
@@ -231,14 +237,24 @@ export default function SunatPanel({
             <input className="input" type="password" value={solPass} onChange={(e) => setSolPass(e.target.value)} autoComplete="new-password" />
           </div>
           <div>
-            <label className="label">client_id</label>
-            <input className="input" value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />
+            <label className="label">
+              client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 guardado</span>}
+            </label>
+            <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} value={clientId} onChange={(e) => setClientId(e.target.value)} readOnly={apiBloqueada} autoComplete="off" />
           </div>
           <div>
-            <label className="label">client_secret</label>
-            <input className="input" type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} autoComplete="new-password" />
+            <label className="label">
+              client_secret {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 guardado</span>}
+            </label>
+            <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} readOnly={apiBloqueada} autoComplete="new-password" />
           </div>
         </div>
+        {apiBloqueada && (
+          <p className="mt-1 text-xs text-slate-400">
+            La API queda guardada y bloqueada. Para todo, solo se pide la <b>Clave SOL</b> (1 vez por sesión).{" "}
+            <button type="button" className="text-brand-600 hover:underline" onClick={() => setApiBloqueada(false)}>Editar API</button>
+          </p>
+        )}
       </div>
 
       {/* Rango de periodos SIRE: Desde -> Hasta */}

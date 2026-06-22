@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
 interface ClienteOpt {
   id: string;
@@ -52,7 +53,9 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
 
   useEffect(() => {
     cargarGuardados(clienteId);
+    setSolPass(getSolPass(clienteId)); // recordar la Clave SOL de la sesión
   }, [clienteId, cargarGuardados]);
+  useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
 
   function elegir(id: string) {
     setClienteId(id);

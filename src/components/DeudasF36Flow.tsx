@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
 interface ClienteOpt { id: string; razonSocial: string; ruc: string; solUser: string }
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
@@ -34,7 +35,11 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { cargarGuardadas(clienteId); }, [clienteId, cargarGuardadas]);
+  useEffect(() => {
+    cargarGuardadas(clienteId);
+    setSolPass(getSolPass(clienteId));
+  }, [clienteId, cargarGuardadas]);
+  useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
 
   function elegir(id: string) {
     setClienteId(id);

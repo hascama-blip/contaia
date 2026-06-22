@@ -53,9 +53,17 @@ export default async function InformePage({ params }: { params: { id: string } }
   const declAnuales = cliente.declaracionesAnuales ?? [];
   const compAnual = declAnuales.length >= 2 ? compararAnual(declAnuales) : null;
 
-  // Deudas tributarias (fotos OCR / manual).
-  const deudas = cliente.deudas ?? [];
-  const totalDeuda = deudas.reduce((a, x) => a + x.monto, 0);
+  // Deudas tributarias extraídas de SUNAT (Fraccionamiento F36).
+  const deudasF36 = cliente.deudasF36?.tablas ?? [];
+  const idxDeudaCol = (headers: string[]) =>
+    headers.findIndex((h) => /deuda a acogerse|deuda|importe|monto/i.test(h));
+  const aNum = (s: string) => Number(String(s).replace(/[^\d.-]/g, "")) || 0;
+  const totalDeuda = deudasF36.reduce((acc, t) => {
+    const ci = idxDeudaCol(t.headers);
+    if (ci < 0) return acc;
+    return acc + t.filas.reduce((a, f) => a + aNum(f[ci] ?? ""), 0);
+  }, 0);
+  const nDeudas = deudasF36.reduce((a, t) => a + t.filas.length, 0);
   const nPeligrosos = cliente.buzon?.peligrosos?.length ?? 0;
   const nUrgentes = cliente.buzon?.urgentes?.length ?? 0;
 
@@ -66,7 +74,7 @@ export default async function InformePage({ params }: { params: { id: string } }
   if (sunat && sunat.condicion.toUpperCase() !== "HABIDO")
     observacionesFinal.push({ nivel: "alto", texto: `Condición de domicilio: ${sunat.condicion}. Actualizar para volver a HABIDO.` });
   if (totalDeuda > 0)
-    observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias registradas por ${fmtSoles(totalDeuda)} (${deudas.length} concepto(s)). Evaluar pago o fraccionamiento.` });
+    observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias en SUNAT por ${fmtSoles(totalDeuda)} (${nDeudas} valor(es)). Evaluar pago o fraccionamiento.` });
   if (nPeligrosos > 0)
     observacionesFinal.push({ nivel: "alto", texto: `Buzón SOL: ${nPeligrosos} mensaje(s) de fiscalización / procedimientos no contenciosos. Atención inmediata.` });
   if (nUrgentes > 0)
@@ -531,43 +539,33 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
-        {/* Deudas tributarias (agrupadas por sección F36) */}
-        {deudas.length > 0 && (
+        {/* Deudas tributarias (Fraccionamiento F36, por sección) */}
+        {nDeudas > 0 && (
           <section className="mt-6 print-full">
-            <h3 className="sec-h">
-              Deudas tributarias
-            </h3>
-            {Array.from(
-              deudas.reduce((map, d) => {
-                const k = d.seccion || "Sin sección";
-                if (!map.has(k)) map.set(k, [] as typeof deudas);
-                map.get(k)!.push(d);
-                return map;
-              }, new Map<string, typeof deudas>())
-            ).map(([seccion, lista]) => {
-              const sub = lista.reduce((a, x) => a + x.monto, 0);
-              return (
-                <div key={seccion} className="mb-3 overflow-hidden rounded-lg border border-slate-200">
-                  <div className="flex items-center justify-between bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">
-                    <span>{seccion}</span>
-                    <span>{fmtSoles(sub)}</span>
-                  </div>
+            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
+            {deudasF36.filter((t) => t.filas.length > 0).map((t) => (
+              <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
+                <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <tbody>
-                      {lista.map((x) => (
-                        <tr key={x.id} className="border-t border-slate-100">
-                          <td className="px-3 py-1 font-medium text-slate-700">{x.tipo}</td>
-                          <td className="px-3 py-1 text-slate-500">{x.periodo || "—"}</td>
-                          <td className="px-3 py-1 text-slate-400">{x.numero || ""}</td>
-                          <td className="px-3 py-1 text-right font-semibold text-red-600">{fmtSoles(x.monto)}</td>
-                        </tr>
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-400">
+                        {t.headers.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-1">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {t.filas.map((f, r) => (
+                        <tr key={r}>{f.map((c, i) => <td key={i} className="whitespace-nowrap px-3 py-1 text-slate-700">{c}</td>)}</tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              );
-            })}
-            <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA: {fmtSoles(totalDeuda)}</p>
+              </div>
+            ))}
+            <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA A ACOGERSE: {fmtSoles(totalDeuda)}</p>
+            {cliente.deudasF36?.at && (
+              <p className="text-right text-[11px] text-slate-400">Extraído de SUNAT: {fmtFecha(cliente.deudasF36.at)}</p>
+            )}
           </section>
         )}
 

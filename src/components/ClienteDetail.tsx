@@ -7,7 +7,7 @@ import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
-import DeudasPanel from "./DeudasPanel";
+import DeudasF36Panel from "./DeudasF36Panel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -195,8 +195,12 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             inicial={cliente.declaracionesAnuales ?? []}
           />
 
-          {/* Deudas tributarias (foto con OCR o ingreso manual) */}
-          <DeudasPanel clienteId={cliente.id} inicial={cliente.deudas ?? []} />
+          {/* Deudas tributarias: extracción directa de SUNAT (Fraccionamiento F36) */}
+          <DeudasF36Panel
+            clienteId={cliente.id}
+            solUserGuardado={cliente.credSire?.solUser ?? ""}
+            inicial={cliente.deudasF36 ?? null}
+          />
         </div>
 
         {/* Columna derecha: diagnóstico */}
