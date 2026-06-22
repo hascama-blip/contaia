@@ -97,6 +97,8 @@ export interface Cliente {
   declaracionesAnuales: DeclaracionAnual[];
   /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
   deudas: Deuda[];
+  /** Deudas del F36 (fraccionamiento Art. 36) extraídas del portal SOL. */
+  deudasF36?: { tablas: DeudaF36Tabla[]; at: string } | null;
   /** Credenciales de la API SIRE guardadas (la Clave SOL NO se guarda). */
   credSire?: CredencialesSire | null;
 }
@@ -255,6 +257,13 @@ export interface BuzonResultado {
   /** Cobranza y valores. */
   urgentes: BuzonMensaje[];
   diag?: { pasos: any[] };
+}
+
+/** Una pestaña de deudas del F36 (Valores, Otras Deudas, etc.). */
+export interface DeudaF36Tabla {
+  pestana: string;
+  headers: string[];
+  filas: string[][];
 }
 
 /** PDF del buzón ya descargado y guardado (caché). */

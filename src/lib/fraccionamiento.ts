@@ -1,0 +1,330 @@
+// ============================================================
+//  Fraccionamiento Art. 36 (F36) — pedido y extracción de deudas (portal SOL)
+// ============================================================
+// Flujo (manual): Mi Fraccionamiento → Solicito fraccionamiento art.36 →
+// Fracc Art 36 → "Generación de pedido de deuda" (Tesoro) → enviar → esperar
+// ~5 min → "Consulta estado de pedido de deuda" → fila 1 → cuando esté listo
+// aparece un enlace azul "Elaborar solicitud" → (aceptar el aviso) → se abre el
+// F36 con pestañas: Valores, Deudas Autoliquidadas/Reliquidadas, Otras Deudas,
+// Deudas no Acogibles. Se lee cada pestaña (cabeceras + filas).
+//
+// Como es navegación por menús SOL, hay MODO DIAGNÓSTICO que vuelca menús y DOM
+// para calibrar selectores (igual que se hizo con SIRE/buzón).
+
+const LOGIN_URL =
+  process.env.BUZON_LOGIN_URL ??
+  "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?exe=01.04.00.00.000000";
+
+export interface FraccParams {
+  ruc: string;
+  solUser: string;
+  solPass: string;
+  diagnostico?: boolean;
+}
+
+export interface TablaDeuda {
+  pestana: string;
+  headers: string[];
+  filas: string[][];
+}
+
+export interface FraccResultado {
+  ok: boolean;
+  mensaje?: string;
+  tablas?: TablaDeuda[];
+  error?: string;
+  diag?: { pasos: any[] };
+}
+
+async function lanzarNavegador() {
+  const { chromium } = await import("playwright-core");
+  try {
+    const sparticuz = (await import("@sparticuz/chromium")).default as any;
+    const executablePath = await sparticuz.executablePath();
+    if (executablePath) {
+      return chromium.launch({
+        headless: true,
+        executablePath,
+        args: [...(sparticuz.args ?? []), "--no-sandbox", "--disable-dev-shm-usage"],
+      });
+    }
+  } catch {
+    /* fallback local */
+  }
+  return chromium.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+  });
+}
+
+async function rellenar(page: any, selectores: string[], valor: string) {
+  for (const sel of selectores) {
+    try {
+      const el = await page.$(sel);
+      if (el) { await el.fill(valor); return true; }
+    } catch {}
+  }
+  return false;
+}
+async function clickAny(page: any, selectores: string[]) {
+  for (const sel of selectores) {
+    try {
+      const el = await page.$(sel);
+      if (el) { await el.click(); return true; }
+    } catch {}
+  }
+  return false;
+}
+
+/** Acepta automáticamente cualquier alert/confirm ("mensaje de página web"). */
+function autoAceptarDialogos(ctx: any) {
+  const enganchar = (pg: any) => pg.on("dialog", (d: any) => d.accept().catch(() => {}));
+  ctx.pages().forEach(enganchar);
+  ctx.on("page", enganchar);
+}
+
+/** Clic por TEXTO en cualquier frame de cualquier pestaña. Devuelve lo clicado. */
+async function clicTexto(ctx: any, textos: string[]): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const els = Array.from(
+            document.querySelectorAll('a, button, input[type="button"], input[type="submit"], [role="button"], li, span, td')
+          ) as HTMLElement[];
+          for (const t of textos) {
+            const tl = norm(t);
+            const el = els.find((e) => {
+              const blob = norm(
+                (e.textContent || "") + " " + ((e as HTMLInputElement).value || "") + " " + (e.getAttribute("onclick") || "")
+              );
+              return blob.includes(tl);
+            });
+            if (el) {
+              let n: HTMLElement | null = el;
+              for (let i = 0; i < 4 && n; i++) {
+                if (n.tagName === "A" || n.tagName === "BUTTON" || n.tagName === "INPUT" || n.getAttribute("onclick")) {
+                  n.click();
+                  return t;
+                }
+                n = n.parentElement;
+              }
+              el.click();
+              return t;
+            }
+          }
+          return null;
+        }, textos)
+        .catch(() => null);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/** Vuelca los enlaces/menús visibles (para calibrar la navegación). */
+async function dumpMenus(ctx: any) {
+  const out: any[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const items = await fr
+        .evaluate(() => {
+          return (Array.from(document.querySelectorAll("a,button,[role=button]")) as HTMLElement[])
+            .map((e) => ({
+              t: (e.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60),
+              oc: (e.getAttribute("onclick") || "").slice(0, 120),
+            }))
+            .filter((x) => x.t || x.oc)
+            .slice(0, 60);
+        })
+        .catch(() => []);
+      if (items.length) out.push({ url: (fr.url() || "").slice(0, 90), items });
+    }
+  }
+  return out;
+}
+
+async function loginSol(params: FraccParams, pasos: any[]) {
+  const browser = await lanzarNavegador();
+  const ctx = await browser.newContext({
+    acceptDownloads: true,
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  });
+  autoAceptarDialogos(ctx);
+  const page = await ctx.newPage();
+  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(2500);
+  await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
+  await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
+  await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
+  await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
+  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  // Cerrar campaña "valida tus datos".
+  for (let i = 0; i < 5; i++) {
+    const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+    if (!camp) break;
+    await clicTexto(ctx, ["Finalizar"]);
+    await page.waitForTimeout(1200);
+    await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
+    await page.waitForTimeout(1800);
+  }
+  pasos.push({ paso: "login", url: page.url() });
+  return { browser, ctx, page };
+}
+
+/** Navega por el menú hasta Fracc Art 36 (por texto). */
+async function irAFraccArt36(ctx: any, page: any, pasos: any[]) {
+  const ruta = [
+    ["Mi fraccionamiento", "Mis Fraccionamientos", "Fraccionamiento"],
+    ["Solicito fraccionamiento art.36", "Solicito fraccionamiento", "art. 36", "art.36"],
+    ["Fracc Art 36", "Fracc. Art 36", "Fraccionamiento Art. 36", "Art 36"],
+  ];
+  const hechos: any[] = [];
+  for (const opciones of ruta) {
+    const hit = await clicTexto(ctx, opciones);
+    await page.waitForTimeout(2500);
+    hechos.push({ buscaba: opciones[0], clico: hit });
+    if (!hit) break;
+  }
+  pasos.push({ paso: "navegar-fracc", hechos });
+}
+
+// ---- FASE 1: generar pedido de deuda ---------------------------------------
+export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResultado> {
+  const { ruc, solUser, solPass } = params;
+  if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
+  if (!solUser || !solPass) return { ok: false, error: "Ingresa el Usuario y la Clave SOL." };
+  const diagnostico = params.diagnostico === true;
+  const pasos: any[] = [];
+  let browser: any = null;
+  try {
+    const s = await loginSol(params, pasos);
+    browser = s.browser;
+    if (diagnostico) pasos.push({ paso: "menus-inicio", menus: await dumpMenus(s.ctx) });
+
+    await irAFraccArt36(s.ctx, s.page, pasos);
+    // "Generación de pedido de deuda"
+    const gp = await clicTexto(s.ctx, ["Generación de pedido de deuda", "Generacion de pedido de deuda", "pedido de deuda"]);
+    await s.page.waitForTimeout(2500);
+    pasos.push({ paso: "generacion-pedido", clico: gp });
+    // Elegir TESORO
+    const tesoro = await clicTexto(s.ctx, ["Tesoro", "TESORO"]);
+    await s.page.waitForTimeout(1500);
+    pasos.push({ paso: "tesoro", clico: tesoro });
+    // Enviar solicitud
+    const env = await clicTexto(s.ctx, ["Enviar solicitud", "Enviar", "Aceptar", "Generar"]);
+    await s.page.waitForTimeout(3000);
+    pasos.push({ paso: "enviar", clico: env });
+
+    if (diagnostico) pasos.push({ paso: "menus-fin", menus: await dumpMenus(s.ctx) });
+
+    return {
+      ok: Boolean(gp && env),
+      mensaje:
+        gp && env
+          ? "Pedido de deuda enviado. Espera ~5 minutos y luego usa “Consultar y extraer deudas”."
+          : "No pude completar todos los pasos del pedido. Revisa el diagnóstico.",
+      diag: { pasos },
+    };
+  } catch (err) {
+    pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
+// ---- FASE 2: consultar estado y extraer las deudas -------------------------
+const PESTANAS = ["Valores", "Deudas Autoliquidadas/Reliquidadas", "Otras Deudas", "Deudas no Acogibles"];
+
+/** Lee la tabla actualmente visible en cualquier frame (cabeceras + filas). */
+async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: string[][] } | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const t = await fr
+        .evaluate(() => {
+          const visible = (el: Element) => {
+            const r = (el as HTMLElement).getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          };
+          const tablas = Array.from(document.querySelectorAll("table")).filter(visible);
+          // elige la tabla visible con más filas de datos
+          let best: { headers: string[]; filas: string[][] } | null = null;
+          for (const tb of tablas) {
+            const ths = Array.from(tb.querySelectorAll("thead th, tr th")).map((x) => (x.textContent || "").replace(/\s+/g, " ").trim());
+            const trs = Array.from(tb.querySelectorAll("tbody tr")).length
+              ? Array.from(tb.querySelectorAll("tbody tr"))
+              : Array.from(tb.querySelectorAll("tr"));
+            const filas = trs
+              .map((tr) => Array.from(tr.querySelectorAll("td")).map((td) => (td.textContent || "").replace(/\s+/g, " ").trim()))
+              .filter((f) => f.length && f.some((c) => c));
+            if (filas.length && (!best || filas.length > best.filas.length)) best = { headers: ths, filas };
+          }
+          return best;
+        })
+        .catch(() => null);
+      if (t && t.filas.length) return t;
+    }
+  }
+  return null;
+}
+
+export async function extraerDeudasF36(params: FraccParams): Promise<FraccResultado> {
+  const { ruc, solUser, solPass } = params;
+  if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
+  if (!solUser || !solPass) return { ok: false, error: "Ingresa el Usuario y la Clave SOL." };
+  const diagnostico = params.diagnostico === true;
+  const pasos: any[] = [];
+  let browser: any = null;
+  try {
+    const s = await loginSol(params, pasos);
+    browser = s.browser;
+
+    await irAFraccArt36(s.ctx, s.page, pasos);
+    // "Consulta estado de pedido de deuda"
+    const ce = await clicTexto(s.ctx, ["Consulta estado de pedido de deuda", "Consulta estado de pedido", "estado de pedido"]);
+    await s.page.waitForTimeout(3000);
+    pasos.push({ paso: "consulta-estado", clico: ce });
+
+    if (diagnostico) pasos.push({ paso: "menus-consulta", menus: await dumpMenus(s.ctx) });
+
+    // En la fila 1 (la más reciente), cuando está listo aparece el enlace azul
+    // "Elaborar solicitud". Lo clicamos (el aviso se acepta solo).
+    const elab = await clicTexto(s.ctx, ["Elaborar solicitud", "Elaborar Solicitud", "elaborar"]);
+    await s.page.waitForTimeout(4000);
+    pasos.push({ paso: "elaborar-solicitud", clico: elab });
+    if (!elab) {
+      return {
+        ok: false,
+        error:
+          "No encontré el enlace “Elaborar solicitud” (puede que el pedido aún no esté listo; espera unos minutos más) o cambió el flujo. Revisa el diagnóstico.",
+        diag: { pasos },
+      };
+    }
+
+    // Leer cada pestaña.
+    const tablas: TablaDeuda[] = [];
+    for (const p of PESTANAS) {
+      await clicTexto(s.ctx, [p]);
+      await s.page.waitForTimeout(1800);
+      const t = await leerTablaVisible(s.ctx);
+      tablas.push({ pestana: p, headers: t?.headers ?? [], filas: t?.filas ?? [] });
+      pasos.push({ paso: "pestana", nombre: p, filas: t?.filas.length ?? 0, headers: t?.headers ?? [] });
+    }
+
+    return {
+      ok: tablas.some((t) => t.filas.length > 0),
+      tablas,
+      mensaje: `Extraídas ${tablas.reduce((a, t) => a + t.filas.length, 0)} fila(s) en ${tablas.length} pestaña(s).`,
+      diag: { pasos },
+    };
+  } catch (err) {
+    pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}

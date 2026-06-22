@@ -14,6 +14,7 @@ import type {
   CredencialesSire,
   ProveedorCuenta,
   Usuario,
+  DeudaF36Tabla,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -424,6 +425,15 @@ export async function getBuzonAdjunto(
   } catch {
     return null;
   }
+}
+
+/** Guarda las deudas F36 extraídas del portal SOL. */
+export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[]): Promise<void> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return;
+  cliente.deudasF36 = { tablas, at: new Date().toISOString() };
+  await writeStore(store);
 }
 
 export async function clearSire(clienteId: string): Promise<Cliente | null> {

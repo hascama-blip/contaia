@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listClientes } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import ConsultasFlow from "@/components/ConsultasFlow";
+import DeudasF36Flow from "@/components/DeudasF36Flow";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Consultas tributarias — Radar Tributario" };
@@ -27,6 +28,8 @@ export default async function Page() {
         </p>
       </div>
       <ConsultasFlow clientes={lista} />
+      <hr className="border-slate-200" />
+      <DeudasF36Flow clientes={lista} />
     </div>
   );
 }
