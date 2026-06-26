@@ -770,6 +770,52 @@ export async function consultarResumenSire(
   }
 }
 
+/** Estado de presentación de un periodo (sin descargar montos). */
+export interface SireEstadoPeriodo {
+  periodo: string;
+  presentadoVentas: boolean | null;
+  presentadoCompras: boolean | null;
+}
+
+/**
+ * Consulta SOLO el estado presentado/no presentado (RVIE + RCE) para un rango de
+ * periodos, sin descargar los resúmenes. Rápido: 1 token + omisos/periodos por
+ * libro. Reutiliza el mismo endpoint que ya alimenta el SIRE.
+ */
+export async function consultarEstadoSire(params: {
+  ruc: string;
+  periodos: string[];
+  solUser: string;
+  solPass: string;
+  clientId?: string;
+  clientSecret?: string;
+  diagnostico?: boolean;
+}): Promise<{ estados?: SireEstadoPeriodo[]; diag?: SireDiag }> {
+  const { ruc, solUser, solPass } = params;
+  if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
+  const validos = (params.periodos ?? []).filter(periodoValido);
+  if (!validos.length) throw new Error("Indica al menos un periodo válido (AAAAMM).");
+  if (!solUser || !solPass) throw new Error("Ingresa el Usuario SOL y la Clave SOL.");
+
+  const cfg = getConfig();
+  const clientId = params.clientId || cfg.defClientId;
+  const clientSecret = params.clientSecret || cfg.defClientSecret;
+  if (!clientId || !clientSecret) {
+    throw new Error("Faltan las credenciales de la app SIRE (client_id y client_secret).");
+  }
+
+  const diag: SireDiag = { periodo: validos.join(","), pasos: [] };
+  const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
+  const estados: SireEstadoPeriodo[] = [];
+  for (const periodo of validos) {
+    const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo, "ventas", diag);
+    const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo, "compras", diag);
+    estados.push({ periodo, presentadoVentas: presV, presentadoCompras: presC });
+  }
+  if (params.diagnostico) return { diag };
+  return { estados, diag };
+}
+
 export function etiquetaPeriodo(periodo: string): string {
   if (!periodoValido(periodo)) return periodo;
   const meses = [
