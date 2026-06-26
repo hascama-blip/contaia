@@ -15,6 +15,7 @@ interface Mensaje {
   asunto: string;
   tipo: string;
   nivel: "peligroso" | "urgente" | "otro";
+  origen?: "notificaciones" | "mensajes";
 }
 
 export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) {
@@ -189,7 +190,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="font-bold text-slate-800">Mensajes del buzón</h2>
             <p className="text-xs text-slate-400">
-              {mensajes.length} mensaje(s)
+              Últimos 6 de <b>Notificaciones</b> y 6 de <b>Mensajes</b> ({mensajes.length} en total)
               {consultadoAt ? ` · consultado ${new Date(consultadoAt).toLocaleString("es-PE")}` : ""}
               {" "}· 📄 descarga el adjunto (verde = ya guardado).
             </p>
@@ -200,6 +201,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-400">
                 <tr>
+                  <th className="px-4 py-2">Módulo</th>
                   <th className="px-4 py-2">Fecha</th>
                   <th className="px-4 py-2">Categoría</th>
                   <th className="px-4 py-2">Asunto</th>
@@ -211,6 +213,11 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                   const guardado = cacheados.has(m.id);
                   return (
                     <tr key={m.id}>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <span className={`badge ${m.origen === "mensajes" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
+                          {m.origen === "mensajes" ? "Mensajes" : "Notificaciones"}
+                        </span>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-2 text-slate-500">{m.fecha}</td>
                       <td className="px-4 py-2">
                         {m.nivel === "otro" ? (

@@ -264,6 +264,8 @@ export interface BuzonMensaje {
   nivel: "peligroso" | "urgente" | "otro";
   urgente: boolean;
   leido: boolean;
+  /** Módulo del buzón: "notificaciones" (tipoMsj=2) o "mensajes" (tipoMsj=1). */
+  origen?: "notificaciones" | "mensajes";
 }
 
 export interface BuzonResultado {

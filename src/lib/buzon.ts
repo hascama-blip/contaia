@@ -208,7 +208,6 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
 
   const pasos: any[] = [];
   const diagnostico = params.diagnostico === true;
-  const dias = params.dias && params.dias > 0 ? params.dias : 15;
   let browser: any = null;
 
   try {
@@ -304,12 +303,14 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
     pasos.push({ paso: "abrir-buzon", clickBuzon, contextos, visorEncontrado: Boolean(visor) });
 
     // Llamar al endpoint interno desde el contexto del visor (origin correcto).
+    // tipoMsj distingue el módulo: 2 = Buzón Notificaciones, 1 = Buzón Mensajes.
     const ejecutor = visor ?? page;
-    const fetchPagina = async (pag: number) => {
+    const fetchLista = async (tipoMsj: number, pag: number) => {
+      const base = LIST_URL.replace(/tipoMsj=\d+/, `tipoMsj=${tipoMsj}`);
       const url =
-        (/[?&]page=\d+/.test(LIST_URL)
-          ? LIST_URL.replace(/([?&]page=)\d+/, `$1${pag}`)
-          : `${LIST_URL}${LIST_URL.includes("?") ? "&" : "?"}page=${pag}`) +
+        (/[?&]page=\d+/.test(base)
+          ? base.replace(/([?&]page=)\d+/, `$1${pag}`)
+          : `${base}${base.includes("?") ? "&" : "?"}page=${pag}`) +
         `&_=${Date.now()}`;
       return (await ejecutor.evaluate(async (u: string) => {
         try {
@@ -321,7 +322,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       }, url)) as { status: number; body: string };
     };
 
-    const primera = await fetchPagina(1);
+    const primera = await fetchLista(2, 1);
     pasos.push({ paso: "listNotiMenPag", status: primera.status, respuesta: primera.body.slice(0, 800) });
     if (diagnostico) {
       return { mensajes: [], peligrosos: [], urgentes: [], diag: { pasos } };
@@ -330,27 +331,19 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       throw new Error(`No se pudo leer el buzón (estado ${primera.status}). Posible bloqueo o sesión.`);
     }
 
-    // Solo el MES EN CURSO: corte = el más reciente entre (hoy - N días) y el
-    // primer día del mes actual. Así no entran mensajes de meses anteriores.
-    const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime();
-    const cutoff = Math.max(inicioMes, Date.now() - dias * 24 * 60 * 60 * 1000);
+    // Los ÚLTIMOS 6 de CADA módulo (la página 1 viene del más reciente). Sin
+    // filtro de fecha: simplemente los 6 primeros de Notificaciones y de Mensajes.
+    const TOP_N = 6;
+    const modulos: { tipoMsj: number; origen: "notificaciones" | "mensajes" }[] = [
+      { tipoMsj: 2, origen: "notificaciones" },
+      { tipoMsj: 1, origen: "mensajes" },
+    ];
     const todas: BuzonMensaje[] = [];
-    const agregar = (body: string) => {
-      const ms = mapearMensajes(body);
-      let seguir = true;
-      for (const m of ms) {
-        const f = parseFecha(m.fecha);
-        if (f && f.getTime() < cutoff) { seguir = false; break; }
-        todas.push(m);
-      }
-      return { seguir, count: ms.length };
-    };
-    let r = agregar(primera.body);
-    for (let pag = 2; pag <= 20 && r.seguir && r.count > 0; pag++) {
-      const p = await fetchPagina(pag);
-      if (p.status !== 200) break;
-      r = agregar(p.body);
+    for (const mod of modulos) {
+      const body = mod.tipoMsj === 2 ? primera.body : (await fetchLista(mod.tipoMsj, 1)).body;
+      const ms = mapearMensajes(body).slice(0, TOP_N).map((m) => ({ ...m, origen: mod.origen }));
+      todas.push(...ms);
+      pasos.push({ paso: "modulo", origen: mod.origen, tipoMsj: mod.tipoMsj, traidos: ms.length });
     }
 
     const peligrosos = todas.filter((m) => m.nivel === "peligroso");
