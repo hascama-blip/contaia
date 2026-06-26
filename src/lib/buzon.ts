@@ -380,6 +380,8 @@ export interface AdjuntoParams {
   codMensaje: string;
   /** Asunto del mensaje (para ubicarlo y abrirlo en el visor). */
   asunto?: string;
+  /** Fecha y hora del mensaje (clave única para seleccionar la fila correcta). */
+  fecha?: string;
   /** idMensaje interno del visor (si difiere del codMensaje). */
   idMensaje?: string;
   /** idArchivo del adjunto (si ya se conoce; si no, se busca en el detalle). */
@@ -453,6 +455,27 @@ async function abrirVisor(params: { ruc: string; solUser: string; solPass: strin
   }
   pasos.push({ paso: "abrir-visor", visorEncontrado: Boolean(visor) });
   return { browser, ctx, page, visor };
+}
+
+/** Descompone una fecha del buzón en partes para ubicar la fila exacta del
+ *  mensaje en el visor (la fecha+hora es única). Acepta "DD/MM/YYYY HH:MM:SS"
+ *  o ISO "YYYY-MM-DD HH:MM:SS". */
+function partesFecha(f: string): { dmy: string; hm: string; hms: string } | null {
+  const s = String(f || "").trim();
+  const p2 = (x: any) => String(x).padStart(2, "0");
+  let d: any, mo: any, y: any, h: any, mi: any, se: any;
+  let m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) { y = m[1]; mo = m[2]; d = m[3]; h = m[4]; mi = m[5]; se = m[6]; }
+  else {
+    m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (m) { d = m[1]; mo = m[2]; y = m[3]; h = m[4]; mi = m[5]; se = m[6]; }
+  }
+  if (!y) return null;
+  return {
+    dmy: `${p2(d)}/${p2(mo)}/${y}`,
+    hm: `${p2(h)}:${p2(mi)}`,
+    hms: se ? `${p2(h)}:${p2(mi)}:${p2(se)}` : `${p2(h)}:${p2(mi)}`,
+  };
 }
 
 /**
@@ -619,12 +642,14 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       pasos.push({ paso: "filas-visor", codMensaje, filas });
     }
 
-    // Selección del mensaje POR codMensaje (lo confiable): así no abre siempre el
-    // mismo detalle. Estrategia: (1) elemento cuyo onclick/atributos contengan el
-    // codMensaje (o idMensaje), (2) por asunto COMPLETO en una fila concreta.
+    // Selección del mensaje. PRIORIDAD: la FECHA+HORA (única por mensaje) → así
+    // se clica la fila correcta de la lista y el detalle de la derecha cambia.
+    // Respaldos: codMensaje en atributos, luego asunto completo.
     const idM = String(params.idMensaje || codMensaje);
+    const fp = partesFecha(params.fecha || "");
     const sel = (await ejecutor.evaluate(
-      ({ cod, idm, asuntoTxt }: { cod: string; idm: string; asuntoTxt: string }) => {
+      (arg: { cod: string; idm: string; asuntoTxt: string; dmy: string; hm: string; hms: string }) => {
+        const { cod, idm, asuntoTxt, dmy, hm, hms } = arg;
         const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
         const codes = Array.from(new Set([cod, idm].map(String).filter((c) => c && c.length >= 4)));
         const attrsBlob = (e: Element) => {
@@ -645,7 +670,30 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
           try { start.click(); return { ok: true, via: via + "-raw", html: (start.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) }; }
           catch { return { ok: false, via, html: "" }; }
         };
-        const all = Array.from(document.querySelectorAll("a,tr,li,div,span,td,[onclick],[id]")) as HTMLElement[];
+        const all = Array.from(document.querySelectorAll("a,tr,li,div,span,td,p,[onclick],[id]")) as HTMLElement[];
+
+        // 0) por FECHA+HORA: ubica la fila cuyo texto contiene la fecha y la hora,
+        //    sube al contenedor de la fila y clica su enlace de asunto.
+        if (dmy && hm) {
+          const filaTs = all.find((e) => {
+            if (e.children.length > 4) return false;
+            const tx = norm(e.textContent);
+            return tx.includes(dmy.toLowerCase()) && (tx.includes(hms.toLowerCase()) || tx.includes(hm.toLowerCase()));
+          });
+          if (filaTs) {
+            let row: HTMLElement | null = filaTs;
+            for (let i = 0; i < 6 && row; i++) {
+              const link = row.querySelector ? (row.querySelector("a") as HTMLElement | null) : null;
+              if (link && (row.textContent || "").length < 600) {
+                link.click();
+                return { ok: true, via: "fecha", html: (link.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) };
+              }
+              row = row.parentElement;
+            }
+            return clickAncestro(filaTs, "fecha");
+          }
+        }
+
         // 1) por codMensaje / idMensaje en atributos u onclick
         for (const c of codes) {
           const byCode = all.find((e) => attrsBlob(e).includes(c));
@@ -659,9 +707,13 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         }
         return { ok: false, via: "none", html: "" };
       },
-      { cod: String(codMensaje), idm: idM, asuntoTxt: asunto }
+      { cod: String(codMensaje), idm: idM, asuntoTxt: asunto, dmy: fp?.dmy ?? "", hm: fp?.hm ?? "", hms: fp?.hms ?? "" }
     )) as { ok: boolean; via: string; html: string };
-    pasos.push({ paso: "click-mensaje", codMensaje, idMensaje: idM, asunto: asunto.slice(0, 60), seleccion: sel });
+    pasos.push({ paso: "click-mensaje", codMensaje, idMensaje: idM, fecha: params.fecha ?? "", asunto: asunto.slice(0, 60), seleccion: sel });
+
+    // Dar tiempo a que el detalle (panel derecho) se actualice por AJAX antes de
+    // leer el adjunto, para no tomar el enlace del mensaje anterior.
+    await sesion.page.waitForTimeout(3000);
 
     // Esperar a que cargue el detalle (que aparezca el número azul del documento
     // o algún enlace de archivo). No filtramos solo por bajarArchivo/gendoc

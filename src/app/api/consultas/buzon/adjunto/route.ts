@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     solPass,
     codMensaje,
     asunto: typeof body.asunto === "string" ? body.asunto : "",
+    fecha: typeof body.fecha === "string" ? body.fecha : "",
     diagnostico,
   });
 
