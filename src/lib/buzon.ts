@@ -672,25 +672,32 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         };
         const all = Array.from(document.querySelectorAll("a,tr,li,div,span,td,p,[onclick],[id]")) as HTMLElement[];
 
-        // 0) por FECHA+HORA: ubica la fila cuyo texto contiene la fecha y la hora,
-        //    sube al contenedor de la fila y clica su enlace de asunto.
+        // 0) por FECHA+HORA: ubica el LEAF (nodo sin hijos) cuyo texto es la fecha
+        //    y hora, sube a la fila y clica el enlace de asunto (el <a> de texto
+        //    más largo). Usar leaf evita clicar el contenedor padre completo.
         if (dmy && hm) {
-          const filaTs = all.find((e) => {
-            if (e.children.length > 4) return false;
+          const todos = Array.from(document.querySelectorAll("*")) as HTMLElement[];
+          const leaf = todos.find((e) => {
+            if (e.children.length !== 0) return false;
             const tx = norm(e.textContent);
             return tx.includes(dmy.toLowerCase()) && (tx.includes(hms.toLowerCase()) || tx.includes(hm.toLowerCase()));
           });
-          if (filaTs) {
-            let row: HTMLElement | null = filaTs;
+          if (leaf) {
+            let row: HTMLElement | null = leaf;
             for (let i = 0; i < 6 && row; i++) {
-              const link = row.querySelector ? (row.querySelector("a") as HTMLElement | null) : null;
-              if (link && (row.textContent || "").length < 600) {
-                link.click();
-                return { ok: true, via: "fecha", html: (link.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) };
+              if ((row.textContent || "").length < 600 && row.querySelectorAll) {
+                const links = Array.from(row.querySelectorAll("a")) as HTMLElement[];
+                const asuntoLink = links
+                  .filter((a) => (a.textContent || "").trim().length > 12)
+                  .sort((a, b) => (b.textContent || "").length - (a.textContent || "").length)[0];
+                if (asuntoLink) {
+                  asuntoLink.click();
+                  return { ok: true, via: "fecha", html: (asuntoLink.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) };
+                }
               }
               row = row.parentElement;
             }
-            return clickAncestro(filaTs, "fecha");
+            return clickAncestro(leaf, "fecha");
           }
         }
 
@@ -828,9 +835,54 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     const visorPage = sesion.visor ? sesion.visor.page() : sesion.page;
     const todasFrames = () => sesion.ctx.pages().flatMap((p: any) => p.frames());
 
-    // Nivel 1: el número azul está en el detalle o en un sub-iframe del visor.
-    const r = await intentarDescarga(todasFrames(), visorPage, "detalle");
-    if (r.b64) { pdfB64 = r.b64; nombreArch = r.nombre || ""; }
+    // PRIMARIO: descarga DIRECTA del documento. El enlace azul del detalle es
+    // goarchivodescarga(idArchivo, sistema, idMensaje), que arma la URL:
+    //   /ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=&idArchivo=&sistema=&app=1
+    // Verificamos que idMensaje == codMensaje (el mensaje correcto) antes de bajar.
+    let docArgs: { idArchivo: string; sistema: string; idMensaje: string; texto: string } | null = null;
+    let docFrame: any = null;
+    for (const fr of todasFrames()) {
+      const found = (await fr
+        .evaluate(() => {
+          const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
+          for (const a of anchors) {
+            const oc = (a.getAttribute("onclick") || "") + " " + (a.getAttribute("href") || "");
+            const m = oc.match(/goarchivodescarga\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+            if (m) return { idArchivo: m[1], sistema: m[2], idMensaje: m[3], texto: (a.textContent || "").trim().slice(0, 80) };
+          }
+          return null;
+        })
+        .catch(() => null)) as any;
+      if (found) { docArgs = found; docFrame = fr; break; }
+    }
+    const coincide = docArgs ? String(docArgs.idMensaje) === String(codMensaje) : false;
+    pasos.push({ paso: "doc-info", docArgs, esperado: String(codMensaje), coincide });
+
+    if (docArgs && coincide) {
+      const url = `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=${docArgs.idMensaje}&idArchivo=${docArgs.idArchivo}&sistema=${docArgs.sistema}&app=1`;
+      const bin = await fetchPdf(docFrame, url);
+      pasos.push({ paso: "doc-fetch", url, status: bin.status, ct: bin.ct, firma: bin.firma });
+      if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) {
+        pdfB64 = bin.b64;
+        nombreArch = `${(asunto || "documento").replace(/[^\w\s.-]/g, "").trim().slice(0, 50) || "documento"}.pdf`;
+      }
+    }
+
+    // Si el detalle abierto NO es el mensaje pedido, no bajamos un PDF equivocado.
+    if (!pdfB64 && docArgs && !coincide) {
+      return {
+        ok: false,
+        error: "Se abrió un mensaje distinto al pedido (la lista no cambió de selección). Reintenta; si persiste, usa Modo diagnóstico.",
+        diag: { pasos },
+      };
+    }
+
+    // RESPALDO: método de clic (número azul / constancia) si no hubo descarga directa.
+    let r: { b64: string; nombre: string; popup: any } = { b64: "", nombre: "", popup: null };
+    if (!pdfB64) {
+      r = await intentarDescarga(todasFrames(), visorPage, "detalle");
+      if (r.b64) { pdfB64 = r.b64; nombreArch = r.nombre || ""; }
+    }
 
     // Nivel 2: si abrió una página nueva (la constancia), buscar el número azul ahí.
     if (!pdfB64 && r.popup) {
