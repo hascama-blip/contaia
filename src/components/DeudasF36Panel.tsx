@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getSolPass, setSolPass } from "@/lib/solSession";
+import { getSolPass } from "@/lib/solSession";
 
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
 
@@ -14,8 +14,6 @@ export default function DeudasF36Panel({
   solUserGuardado: string;
   inicial: { tablas: Tabla[]; at: string } | null | undefined;
 }) {
-  const [solUser, setSolUser] = useState(solUserGuardado);
-  const [solPass, setSolPassState] = useState("");
   const [tablas, setTablas] = useState<Tabla[]>(inicial?.tablas ?? []);
   const [at, setAt] = useState<string | null>(inicial?.at ?? null);
   const [puedeActualizar, setPuedeActualizar] = useState(true);
@@ -27,9 +25,6 @@ export default function DeudasF36Panel({
   const [forzar, setForzar] = useState(false);
   const [modoDiag, setModoDiag] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
-
-  // Recuerda la Clave SOL de la sesión (se pide 1 vez por módulo).
-  useEffect(() => { setSolPassState(getSolPass(clienteId)); }, [clienteId]);
 
   const cargar = useCallback(async () => {
     try {
@@ -47,8 +42,9 @@ export default function DeudasF36Panel({
   useEffect(() => { cargar(); }, [cargar]);
 
   async function llamar(fase: "generar" | "extraer") {
-    if (!solPass) return setError("Ingresa la Clave SOL.");
-    setSolPass(clienteId, solPass); // recordar en la sesión
+    const solUser = solUserGuardado;
+    const solPass = getSolPass(clienteId);
+    if (!solUser || !solPass) return setError("Carga tus accesos SOL (arriba) para continuar.");
     setBusy(fase === "generar" ? "gen" : "ext"); setError(null); setDiag(null);
     setInfo(fase === "generar" ? "Generando el pedido de deuda en SUNAT…" : "Consultando y extrayendo las deudas…");
     try {
@@ -96,18 +92,7 @@ export default function DeudasF36Panel({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="text-xs font-semibold text-slate-600">Usuario SOL</label>
-          <input className="input mt-1" value={solUser} onChange={(e) => setSolUser(e.target.value)} placeholder="Usuario SOL" />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-600">Clave SOL</label>
-          <input className="input mt-1" type="password" value={solPass} onChange={(e) => setSolPassState(e.target.value)} placeholder="Solo se pide 1 vez por sesión" />
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-1 flex flex-wrap items-center gap-3">
         <button className="btn-ghost" onClick={() => llamar("generar")} disabled={busy !== null}>
           {busy === "gen" ? "Generando…" : "1) Generar pedido"}
         </button>

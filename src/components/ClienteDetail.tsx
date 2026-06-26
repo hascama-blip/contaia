@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
+import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
@@ -117,6 +118,9 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
           )}
         </div>
       </div>
+
+      {/* Accesos SOL: se cargan 1 vez y los usan todos los módulos */}
+      <AccesosSol clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Columna izquierda: SUNAT + documentos */}

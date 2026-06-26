@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BuzonMensaje } from "@/lib/types";
-import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
+import { getSolPass } from "@/lib/solSession";
 
-// Buzón electrónico (Fase 1 · diagnóstico previo). Solo necesita Usuario + Clave
-// SOL (no la API). La Clave SOL se pide 1 vez por sesión.
+// Buzón electrónico (paso 1). Usa los accesos SOL cargados arriba (Usuario
+// guardado + Clave de la sesión); no vuelve a pedir credenciales.
 export default function BuzonPanel({
   clienteId,
   solUserGuardado,
@@ -18,8 +18,6 @@ export default function BuzonPanel({
   yaConsultado?: boolean;
 }) {
   const router = useRouter();
-  const [solUser, setSolUser] = useState(solUserGuardado);
-  const [solPass, setSolPass] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
@@ -29,12 +27,11 @@ export default function BuzonPanel({
   const [peligrosos, setPeligrosos] = useState<BuzonMensaje[]>([]);
   const [urgentes, setUrgentes] = useState<BuzonMensaje[]>([]);
 
-  useEffect(() => { setSolPass(getSolPass(clienteId)); }, [clienteId]);
-  useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
-
   async function consultar() {
     setError(null); setDiag(null);
-    if (!solUser || !solPass) { setError("Ingresa el Usuario y la Clave SOL."); return; }
+    const solUser = solUserGuardado;
+    const solPass = getSolPass(clienteId);
+    if (!solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para consultar."); return; }
     setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/buzon`, {
@@ -66,20 +63,9 @@ export default function BuzonPanel({
           </Link>
         )}
       </div>
-      <p className="mb-3 text-xs text-slate-500">Mensajes del mes en curso. Solo necesita Usuario + Clave SOL.</p>
+      <p className="mb-3 text-xs text-slate-500">Mensajes del mes en curso. Usa los accesos SOL cargados.</p>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="label">Usuario SOL</label>
-          <input className="input" value={solUser} onChange={(e) => setSolUser(e.target.value)} autoComplete="off" />
-        </div>
-        <div>
-          <label className="label">Clave SOL</label>
-          <input className="input" type="password" value={solPass} onChange={(e) => setSolPass(e.target.value)} placeholder="1 vez por sesión" autoComplete="new-password" />
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button className="btn-primary" onClick={consultar} disabled={busy}>
           {busy ? "Consultando…" : "Consultar buzón"}
         </button>

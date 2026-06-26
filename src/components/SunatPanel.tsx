@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
+import { getSolPass } from "@/lib/solSession";
 
 interface EstadoP { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }
-import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -33,16 +33,13 @@ export default function SunatPanel({
 }) {
   const router = useRouter();
   const hoy = new Date();
-  const [solUser, setSolUser] = useState(inicialCred?.solUser ?? "");
-  const [solPass, setSolPass] = useState("");
+  // Usuario SOL viene de los accesos guardados; la Clave SOL se lee de la sesión.
+  const solUser = inicialCred?.solUser ?? "";
   const [clientId, setClientId] = useState(inicialCred?.clientId ?? "");
   const [clientSecret, setClientSecret] = useState(inicialCred?.clientSecret ?? "");
   // La API guardada queda BLOQUEADA (solo lectura) y habilita la extracción.
   const [apiBloqueada, setApiBloqueada] = useState(Boolean(inicialCred?.clientId && inicialCred?.clientSecret));
   const [guardandoApi, setGuardandoApi] = useState(false);
-
-  useEffect(() => { setSolPass(getSolPass(clienteId)); }, [clienteId]);
-  useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
 
   const [mesDesde, setMesDesde] = useState(1);
   const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
@@ -78,7 +75,7 @@ export default function SunatPanel({
   }
 
   async function guardarApi() {
-    if (!solUser.trim()) { setError("Ingresa el Usuario SOL."); return; }
+    if (!solUser.trim()) { setError("Carga el Usuario SOL en los accesos de arriba."); return; }
     if (!clientId.trim() || !clientSecret.trim()) { setError("Ingresa el client_id y el client_secret."); return; }
     setGuardandoApi(true);
     setError(null);
@@ -101,7 +98,8 @@ export default function SunatPanel({
 
   async function consultarSire(simulado: boolean, periodoOverride?: string): Promise<boolean> {
     setError(null); setDiag(null);
-    if (!simulado && (!solUser || !solPass)) { setError("Ingresa el Usuario SOL y la Clave SOL."); return false; }
+    const solPass = simulado ? "" : getSolPass(clienteId);
+    if (!simulado && (!solUser || !solPass)) { setError("Carga tus accesos SOL (arriba) para extraer."); return false; }
     if (!simulado && !apiLista) { setError("Coloca y guarda la API (client_id/secret) para extraer el SIRE."); return false; }
     setBusy("sire");
     try {
@@ -134,7 +132,8 @@ export default function SunatPanel({
 
   async function consultarEstado() {
     setError(null); setDiag(null);
-    if (!solUser || !solPass) { setError("Ingresa el Usuario SOL y la Clave SOL."); return; }
+    const solPass = getSolPass(clienteId);
+    if (!solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para el estado."); return; }
     if (!apiLista) { setError("Coloca y guarda la API (client_id/secret) para el estado del SIRE."); return; }
     if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
     setBusy("estado");
@@ -160,7 +159,8 @@ export default function SunatPanel({
   }
 
   async function recorrerRango() {
-    if (!solUser || !solPass) { setError("Ingresa el Usuario SOL y la Clave SOL."); return; }
+    const solPass = getSolPass(clienteId);
+    if (!solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para extraer."); return; }
     if (!apiLista) { setError("Coloca y guarda la API (client_id/secret) para extraer el SIRE."); return; }
     if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
     setBusy("todo"); setError(null); setDiag(null);
@@ -170,7 +170,6 @@ export default function SunatPanel({
       await consultarSire(false, periodos[i]);
     }
     setProgreso(null); setBusy(null);
-    setSolPass(""); // solo la clave se limpia; usuario y API quedan
     router.refresh();
   }
 
@@ -209,14 +208,6 @@ export default function SunatPanel({
           API SUNAT (SIRE)
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label">Usuario SOL</label>
-            <input className="input" value={solUser} onChange={(e) => setSolUser(e.target.value)} autoComplete="off" />
-          </div>
-          <div>
-            <label className="label">Clave SOL</label>
-            <input className="input" type="password" value={solPass} onChange={(e) => setSolPass(e.target.value)} placeholder="1 vez por sesión" autoComplete="new-password" />
-          </div>
           <div>
             <label className="label">
               client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
