@@ -994,8 +994,15 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
             renderizado = txt.length > 120;
           }
           if (!renderizado) {
-            const html = (await detFrame.content().catch(() => "")) as string;
-            if (html) await np.setContent(html, { waitUntil: "load", timeout: 30000 }).catch(() => {});
+            let html = (await detFrame.content().catch(() => "")) as string;
+            if (html) {
+              // base href para resolver CSS/imágenes relativas del gendoc.
+              let base = "https://ww1.sunat.gob.pe/";
+              try { base = new URL(url).origin + "/"; } catch { /* */ }
+              if (!/<base\s/i.test(html)) html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${base}">`);
+              await np.setContent(html, { waitUntil: "load", timeout: 30000 }).catch(() => {});
+              await np.waitForTimeout(800);
+            }
           }
           const buf = await np.pdf({ format: "A4", printBackground: true, margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" } }).catch(() => null);
           await np.close().catch(() => {});
