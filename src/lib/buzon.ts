@@ -944,22 +944,29 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       }
     }
 
-    // C) MENSAJE SOLO TEXTO (sin adjunto): renderizar el detalle como PDF (lo que
-    //    haría el ícono de imprimir). Se localiza el frame del cuerpo del mensaje.
+    // C) MENSAJE SOLO TEXTO (sin adjunto): renderizar a PDF el cuerpo del mensaje,
+    //    que es justo lo que imprime el ícono de la hoja (sobre el iframe
+    //    "iframeapplication" / el gendoc del detalle). Se elige el frame del
+    //    cuerpo (preferir iframeapplication/gendoc; si no, el de más texto).
     if (!pdfB64 && params.origen === "mensajes") {
       let detFrame: any = null;
+      let mejorScore = 0;
+      let detUrl = "";
       for (const fr of todasFrames()) {
         const u = (fr.url() || "").toLowerCase();
-        if (/menuinternet|campanha|gettime|about:blank/.test(u)) continue;
-        const esDetalle = (await fr
+        if (/menuinternet|campanha|gettime|about:blank|visornoti\/master/.test(u)) continue;
+        const info = (await fr
           .evaluate(() => {
-            const t = (document.body?.innerText || "");
-            return /estimad[oa]|contribuyente|atentamente|sunat/i.test(t) && t.length > 120 && !/buz[oó]n notificaciones/i.test(t);
+            const t = document.body?.innerText || "";
+            return { len: t.length, name: (window as any).name || "", tieneMenu: /buz[oó]n notificaciones/i.test(t) };
           })
-          .catch(() => false)) as boolean;
-        if (esDetalle) { detFrame = fr; break; }
+          .catch(() => ({ len: 0, name: "", tieneMenu: true }))) as { len: number; name: string; tieneMenu: boolean };
+        if (info.tieneMenu || info.len <= 120) continue;
+        const esApp = info.name === "iframeapplication" || /gendoc/.test(u);
+        const score = info.len + (esApp ? 1_000_000 : 0);
+        if (score > mejorScore) { mejorScore = score; detFrame = fr; detUrl = fr.url(); }
       }
-      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame) });
+      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame), url: (detUrl || "").slice(0, 90) });
       if (detFrame) {
         try {
           const np = await sesion.ctx.newPage();
