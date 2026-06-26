@@ -6,8 +6,6 @@ import type { SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
 import { getSolPass } from "@/lib/solSession";
 
-interface EstadoP { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }
-
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre",
@@ -52,7 +50,6 @@ export default function SunatPanel({
   const [diag, setDiag] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [sire, setSire] = useState<SireResumen[]>(inicialSire ?? []);
-  const [estados, setEstados] = useState<EstadoP[] | null>(null);
 
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
   const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
@@ -125,34 +122,6 @@ export default function SunatPanel({
     } catch {
       setError("Error de red al consultar el SIRE.");
       return false;
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function consultarEstado() {
-    setError(null); setDiag(null);
-    const solPass = getSolPass(clienteId);
-    if (!solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para el estado."); return; }
-    if (!apiLista) { setError("Coloca y guarda la API (client_id/secret) para el estado del SIRE."); return; }
-    if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
-    setBusy("estado");
-    try {
-      const res = await fetch(`/api/clientes/${clienteId}/sire-estado`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          periodos: rangoPeriodos(periodoDesde, periodoHasta),
-          solUser, solPass, clientId, clientSecret,
-          diagnostico: diagModo,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo consultar el estado."); return; }
-      if (data.diag) { setDiag(JSON.stringify(data.diag, null, 2)); return; }
-      setEstados(data.estados ?? []);
-    } catch {
-      setError("Error de red al consultar el estado del SIRE.");
     } finally {
       setBusy(null);
     }
@@ -277,9 +246,6 @@ export default function SunatPanel({
       {progreso && <div className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">Extrayendo… {progreso}</div>}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="btn-ghost" onClick={consultarEstado} disabled={trabajando || !apiLista} title="Solo presentado/no presentado, sin bajar montos">
-          {busy === "estado" ? "Consultando…" : "📋 Estado SIRE (rápido)"}
-        </button>
         <button className="btn-primary" onClick={recorrerRango} disabled={trabajando || !apiLista}>
           {busy === "todo" ? "Extrayendo…" : "⚡ Extraer SIRE del rango"}
         </button>
@@ -289,32 +255,6 @@ export default function SunatPanel({
       </div>
 
       {diag && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
-
-      {estados && estados.length > 0 && (
-        <div className="mt-5">
-          <h4 className="mb-2 text-sm font-semibold text-slate-700">Estado de presentación (SIRE)</h4>
-          <div className="overflow-hidden rounded-lg border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-[11px] uppercase text-slate-400">
-                <tr>
-                  <th className="px-3 py-1.5">Periodo</th>
-                  <th className="px-3 py-1.5">Ventas (RVIE)</th>
-                  <th className="px-3 py-1.5">Compras (RCE)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {estados.map((e) => (
-                  <tr key={e.periodo}>
-                    <td className="px-3 py-1.5 font-medium text-slate-700">{etiqueta(e.periodo)}</td>
-                    <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoVentas} /></td>
-                    <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoCompras} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {sire.length > 0 && (
         <div className="mt-5">
@@ -360,15 +300,6 @@ function Acumulado({ resultados }: { resultados: SireResumen[] }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function EstadoBadge({ ok }: { ok: boolean | null }) {
-  if (ok === null) return <span className="badge bg-slate-100 text-slate-500">? Desconocido</span>;
-  return (
-    <span className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-      {ok ? "✓ Presentado" : "✕ No presentado"}
-    </span>
   );
 }
 

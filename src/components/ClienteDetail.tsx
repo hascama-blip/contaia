@@ -7,6 +7,7 @@ import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
+import EstadoSirePanel from "./EstadoSirePanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
@@ -217,21 +218,10 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             yaConsultado={Boolean(cliente.buzon)}
           />
 
-          {/* ───── 2 · Extracción SIRE + comparativo mensual (requiere API) ───── */}
-          <FaseHeader n="2" titulo="Extracción SIRE y comparativo mensual" detalle="Requiere colocar y bloquear la API." />
+          {/* ───── 2 · Estado SIRE (presentado / no presentado) ───── */}
+          <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
 
-          <SunatPanel
-            clienteId={cliente.id}
-            inicialSire={cliente.sire ?? []}
-            inicialCred={cliente.credSire ?? null}
-          />
-
-          {/* Declaraciones mensuales (PDF) comparadas contra el SIRE */}
-          <DeclaracionesPanel
-            clienteId={cliente.id}
-            inicialDeclaraciones={cliente.declaraciones ?? []}
-            inicialSire={cliente.sire ?? []}
-          />
+          <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
 
           {/* ───── 3 · Deudas (Fraccionamiento F36) — solo Usuario + Clave SOL ───── */}
           <FaseHeader n="3" titulo="Deudas (Fraccionamiento Art. 36)" detalle="Solo Usuario + Clave SOL." />
@@ -242,8 +232,26 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             inicial={cliente.deudasF36 ?? null}
           />
 
-          {/* ───── 4 · Comparativo anual (subida de PDF) ───── */}
-          <FaseHeader n="4" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
+          {/* ───── 4 · Extracción SIRE (montos) — requiere API ───── */}
+          <FaseHeader n="4" titulo="Extracción SIRE (montos)" detalle="Coloca y bloquea la API para sacar compras/ventas." />
+
+          <SunatPanel
+            clienteId={cliente.id}
+            inicialSire={cliente.sire ?? []}
+            inicialCred={cliente.credSire ?? null}
+          />
+
+          {/* ───── 5 · Comparativo mensual (DJ 621 vs SIRE) ───── */}
+          <FaseHeader n="5" titulo="Comparativo mensual" detalle="Sube el PDF de la DJ mensual (621) vs SIRE." />
+
+          <DeclaracionesPanel
+            clienteId={cliente.id}
+            inicialDeclaraciones={cliente.declaraciones ?? []}
+            inicialSire={cliente.sire ?? []}
+          />
+
+          {/* ───── 6 · Comparativo anual (subida de PDF) ───── */}
+          <FaseHeader n="6" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
 
           <DeclaracionesAnualesPanel
             clienteId={cliente.id}
