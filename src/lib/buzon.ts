@@ -493,6 +493,29 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     browser = sesion.browser;
     const ejecutor = sesion.visor ?? sesion.page;
 
+    // Cargar el MÓDULO correcto del buzón ANTES de seleccionar. El visor abre en
+    // "Notificaciones" (tipoMsj=2); si el mensaje es de "Mensajes" (tipoMsj=1) hay
+    // que cambiar de lista o no se encontrará la fila. fListarNotiMen(tipoMsj,...)
+    // es la función del propio visor (en el menú lateral aListNoti/aListMen).
+    const tipoMsj = params.origen === "mensajes" ? 1 : 2;
+    const cambioModulo = (await ejecutor
+      .evaluate((tm: number) => {
+        const w = window as any;
+        try {
+          if (typeof w.fListarNotiMen === "function") {
+            w.fListarNotiMen(tm, "00", "", 1, "list", "", "NADA", true);
+            if (typeof w.mostrarMover === "function") w.mostrarMover(tm === 2);
+            return "fn";
+          }
+        } catch { /* */ }
+        const el = document.getElementById(tm === 1 ? "aListMen" : "aListNoti") as HTMLElement | null;
+        if (el) { el.click(); return "click"; }
+        return "no";
+      }, tipoMsj)
+      .catch(() => "err")) as string;
+    await sesion.page.waitForTimeout(3500);
+    pasos.push({ paso: "cambio-modulo", origen: params.origen ?? "notificaciones", tipoMsj, via: cambioModulo });
+
     // DIAGNÓSTICO ÚTIL: vuelca la fila CRUDA del mensaje desde listNotiMenPag
     // (endpoint que SÍ funciona). Ahí suelen venir los campos del adjunto
     // (codArchivo / nombreArchivo / indAnexo, etc.) con sus nombres reales.
