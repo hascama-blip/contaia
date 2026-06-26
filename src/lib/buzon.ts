@@ -839,7 +839,9 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     // goarchivodescarga(idArchivo, sistema, idMensaje), que arma la URL:
     //   /ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=&idArchivo=&sistema=&app=1
     // Verificamos que idMensaje == codMensaje (el mensaje correcto) antes de bajar.
-    let docArgs: { idArchivo: string; sistema: string; idMensaje: string; texto: string } | null = null;
+    // goarchivodescarga(idArchivo, sistema [, idMensaje]). El 3er arg es OPCIONAL:
+    // si falta, el idMensaje es el del mensaje abierto (= el que seleccionamos).
+    let docArgs: { idArchivo: string; sistema: string; idMsgCall: string; texto: string } | null = null;
     let docFrame: any = null;
     for (const fr of todasFrames()) {
       const found = (await fr
@@ -847,19 +849,22 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
           const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
           for (const a of anchors) {
             const oc = (a.getAttribute("onclick") || "") + " " + (a.getAttribute("href") || "");
-            const m = oc.match(/goarchivodescarga\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-            if (m) return { idArchivo: m[1], sistema: m[2], idMensaje: m[3], texto: (a.textContent || "").trim().slice(0, 80) };
+            const m = oc.match(/goarchivodescarga\(\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)/i);
+            if (m) return { idArchivo: m[1], sistema: m[2], idMsgCall: m[3] || "", texto: (a.textContent || "").trim().slice(0, 80) };
           }
           return null;
         })
         .catch(() => null)) as any;
       if (found) { docArgs = found; docFrame = fr; break; }
     }
-    const coincide = docArgs ? String(docArgs.idMensaje) === String(codMensaje) : false;
-    pasos.push({ paso: "doc-info", docArgs, esperado: String(codMensaje), coincide });
+    // idMensaje del documento: el del propio enlace si lo trae; si no, el que
+    // seleccionamos (codMensaje). coincide=false solo si el enlace trae OTRO id.
+    const idMsgDoc = docArgs ? (docArgs.idMsgCall || String(codMensaje)) : "";
+    const coincide = docArgs ? (!docArgs.idMsgCall || docArgs.idMsgCall === String(codMensaje)) : false;
+    pasos.push({ paso: "doc-info", docArgs, idMsgDoc, esperado: String(codMensaje), coincide });
 
     if (docArgs && coincide) {
-      const url = `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=${docArgs.idMensaje}&idArchivo=${docArgs.idArchivo}&sistema=${docArgs.sistema}&app=1`;
+      const url = `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=${idMsgDoc}&idArchivo=${docArgs.idArchivo}&sistema=${docArgs.sistema}&app=1`;
       const bin = await fetchPdf(docFrame, url);
       pasos.push({ paso: "doc-fetch", url, status: bin.status, ct: bin.ct, firma: bin.firma });
       if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) {
@@ -868,7 +873,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       }
     }
 
-    // Si el detalle abierto NO es el mensaje pedido, no bajamos un PDF equivocado.
+    // Si el detalle abierto trae OTRO idMensaje, no bajamos un PDF equivocado.
     if (!pdfB64 && docArgs && !coincide) {
       return {
         ok: false,
