@@ -375,6 +375,8 @@ export interface AdjuntoParams {
   asunto?: string;
   /** Fecha y hora del mensaje (clave única para seleccionar la fila correcta). */
   fecha?: string;
+  /** Módulo de origen: "notificaciones" o "mensajes" (afecta cómo se baja). */
+  origen?: "notificaciones" | "mensajes";
   /** idMensaje interno del visor (si difiere del codMensaje). */
   idMensaje?: string;
   /** idArchivo del adjunto (si ya se conoce; si no, se busca en el detalle). */
@@ -873,6 +875,90 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
         error: "Se abrió un mensaje distinto al pedido (la lista no cambió de selección). Reintenta; si persiste, usa Modo diagnóstico.",
         diag: { pasos },
       };
+    }
+
+    // B) ADJUNTO CON CLIP (Buzón Mensajes): el enlace azul con clip está cableado
+    //    a visorPdfDescarga('<href>') (o es un <a href> a bajarArchivo). Se baja
+    //    ese archivo directo. (También sirve de respaldo para la constancia.)
+    if (!pdfB64) {
+      let attHref = "";
+      let attFrame: any = null;
+      for (const fr of todasFrames()) {
+        const href = (await fr
+          .evaluate(() => {
+            const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
+            for (const a of anchors) {
+              const m = (a.getAttribute("onclick") || "").match(/visorpdfdescarga\(\s*['"]([^'"]+)['"]/i);
+              if (m) return m[1];
+            }
+            const cont = document.querySelector("#listArchivosAdjuntos a") as HTMLAnchorElement | null;
+            if (cont) {
+              const m = (cont.getAttribute("onclick") || "").match(/visorpdfdescarga\(\s*['"]([^'"]+)['"]/i);
+              if (m) return m[1];
+              const h = cont.getAttribute("href") || "";
+              if (/bajararchivo/i.test(h)) return h;
+            }
+            for (const a of anchors) {
+              const h = a.getAttribute("href") || "";
+              if (/bajararchivo/i.test(h)) return h;
+            }
+            return "";
+          })
+          .catch(() => "")) as string;
+        if (href && /bajararchivo/i.test(href)) { attHref = href; attFrame = fr; break; }
+      }
+      pasos.push({ paso: "adjunto-clip", attHref });
+      if (attHref) {
+        const full = attHref.startsWith("http")
+          ? attHref
+          : `https://ww1.sunat.gob.pe${attHref.startsWith("/") ? "" : "/"}${attHref}`;
+        const bin = await fetchPdf(attFrame || visorPage, full);
+        pasos.push({ paso: "adjunto-fetch", url: full, status: bin.status, ct: bin.ct, firma: bin.firma });
+        if (bin.b64 && (bin.firma.startsWith("%PDF") || /pdf/i.test(bin.ct))) {
+          pdfB64 = bin.b64;
+          nombreArch = `${(asunto || "adjunto").replace(/[^\w\s.-]/g, "").trim().slice(0, 50) || "adjunto"}.pdf`;
+        }
+      }
+    }
+
+    // C) MENSAJE SOLO TEXTO (sin adjunto): renderizar el detalle como PDF (lo que
+    //    haría el ícono de imprimir). Se localiza el frame del cuerpo del mensaje.
+    if (!pdfB64 && params.origen === "mensajes") {
+      let detFrame: any = null;
+      for (const fr of todasFrames()) {
+        const u = (fr.url() || "").toLowerCase();
+        if (/menuinternet|campanha|gettime|about:blank/.test(u)) continue;
+        const esDetalle = (await fr
+          .evaluate(() => {
+            const t = (document.body?.innerText || "");
+            return /estimad[oa]|contribuyente|atentamente|sunat/i.test(t) && t.length > 120 && !/buz[oó]n notificaciones/i.test(t);
+          })
+          .catch(() => false)) as boolean;
+        if (esDetalle) { detFrame = fr; break; }
+      }
+      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame) });
+      if (detFrame) {
+        try {
+          const np = await sesion.ctx.newPage();
+          const url = detFrame.url();
+          let renderizado = false;
+          if (url && /^https?:/.test(url) && !/about:blank/.test(url)) {
+            await np.goto(url, { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+            const txt = (await np.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+            renderizado = txt.length > 120;
+          }
+          if (!renderizado) {
+            const html = (await detFrame.content().catch(() => "")) as string;
+            if (html) await np.setContent(html, { waitUntil: "load", timeout: 30000 }).catch(() => {});
+          }
+          const buf = await np.pdf({ format: "A4", printBackground: true, margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" } }).catch(() => null);
+          await np.close().catch(() => {});
+          if (buf) {
+            pdfB64 = Buffer.from(buf).toString("base64");
+            nombreArch = `${(asunto || "mensaje").replace(/[^\w\s.-]/g, "").trim().slice(0, 50) || "mensaje"}.pdf`;
+          }
+        } catch { /* cae al respaldo */ }
+      }
     }
 
     // RESPALDO: método de clic (número azul / constancia) si no hubo descarga directa.

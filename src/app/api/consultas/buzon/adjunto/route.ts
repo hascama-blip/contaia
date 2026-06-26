@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     codMensaje,
     asunto: typeof body.asunto === "string" ? body.asunto : "",
     fecha: typeof body.fecha === "string" ? body.fecha : "",
+    origen: body.origen === "mensajes" ? "mensajes" : body.origen === "notificaciones" ? "notificaciones" : undefined,
     diagnostico,
   });
 
