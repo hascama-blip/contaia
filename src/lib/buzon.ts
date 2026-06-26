@@ -601,27 +601,67 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       } catch { /* */ }
     }
 
-    // Clic en el mensaje por su asunto.
-    const clickeado = (await ejecutor.evaluate((asuntoTxt: string) => {
-      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
-      const t = norm(asuntoTxt).replace(/^asunto:\s*/, "").slice(0, 35);
-      if (!t) return false;
-      const els = Array.from(document.querySelectorAll("a,li,div,span,td,tr,p")) as HTMLElement[];
-      for (const e of els) {
-        if (norm(e.textContent).includes(t)) {
-          let n: HTMLElement | null = e;
-          for (let i = 0; i < 5 && n; i++) {
-            try {
-              if (n.tagName === "A" || (n.getAttribute && n.getAttribute("onclick"))) { n.click(); return true; }
-            } catch { /* */ }
+    // Diagnóstico: vuelca las filas del visor (onclick/texto) y si el codMensaje
+    // aparece en ellas, para calibrar la selección si fuese necesario.
+    if (diagnostico) {
+      const filas = (await ejecutor.evaluate((cod: string) => {
+        const out: any[] = [];
+        const els = Array.from(document.querySelectorAll("a,tr,li,[onclick]")) as HTMLElement[];
+        for (const e of els) {
+          const oc = e.getAttribute("onclick") || "";
+          const txt = (e.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60);
+          if (!oc && !txt) continue;
+          out.push({ tag: e.tagName, id: (e.id || "").slice(0, 40), oc: oc.slice(0, 140), txt, tieneCod: (oc + " " + (e.id || "")).includes(cod) });
+          if (out.length >= 30) break;
+        }
+        return out;
+      }, String(codMensaje))) as any[];
+      pasos.push({ paso: "filas-visor", codMensaje, filas });
+    }
+
+    // Selección del mensaje POR codMensaje (lo confiable): así no abre siempre el
+    // mismo detalle. Estrategia: (1) elemento cuyo onclick/atributos contengan el
+    // codMensaje (o idMensaje), (2) por asunto COMPLETO en una fila concreta.
+    const idM = String(params.idMensaje || codMensaje);
+    const sel = (await ejecutor.evaluate(
+      ({ cod, idm, asuntoTxt }: { cod: string; idm: string; asuntoTxt: string }) => {
+        const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const codes = Array.from(new Set([cod, idm].map(String).filter((c) => c && c.length >= 4)));
+        const attrsBlob = (e: Element) => {
+          const a = e as HTMLElement;
+          let s = (a.getAttribute("onclick") || "") + " " + (a.getAttribute("href") || "") + " " + (a.id || "");
+          for (const at of Array.from(a.attributes || [])) s += " " + at.value;
+          return s;
+        };
+        const clickAncestro = (start: HTMLElement, via: string) => {
+          let n: HTMLElement | null = start;
+          for (let i = 0; i < 6 && n; i++) {
+            if (n.tagName === "A" || (n.getAttribute && n.getAttribute("onclick"))) {
+              n.click();
+              return { ok: true, via, html: (n.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) };
+            }
             n = n.parentElement;
           }
-          try { e.click(); return true; } catch { /* */ }
+          try { start.click(); return { ok: true, via: via + "-raw", html: (start.outerHTML || "").replace(/\s+/g, " ").slice(0, 180) }; }
+          catch { return { ok: false, via, html: "" }; }
+        };
+        const all = Array.from(document.querySelectorAll("a,tr,li,div,span,td,[onclick],[id]")) as HTMLElement[];
+        // 1) por codMensaje / idMensaje en atributos u onclick
+        for (const c of codes) {
+          const byCode = all.find((e) => attrsBlob(e).includes(c));
+          if (byCode) return clickAncestro(byCode, "codMensaje");
         }
-      }
-      return false;
-    }, asunto)) as boolean;
-    pasos.push({ paso: "click-mensaje", asunto: asunto.slice(0, 60), clickeado });
+        // 2) por asunto COMPLETO en una celda/fila concreta (no un contenedor grande)
+        const t = norm(asuntoTxt).replace(/^asunto:\s*/, "");
+        if (t) {
+          const byAsunto = all.find((e) => e.children.length <= 4 && norm(e.textContent).includes(t));
+          if (byAsunto) return clickAncestro(byAsunto, "asunto");
+        }
+        return { ok: false, via: "none", html: "" };
+      },
+      { cod: String(codMensaje), idm: idM, asuntoTxt: asunto }
+    )) as { ok: boolean; via: string; html: string };
+    pasos.push({ paso: "click-mensaje", codMensaje, idMensaje: idM, asunto: asunto.slice(0, 60), seleccion: sel });
 
     // Esperar a que cargue el detalle (que aparezca el número azul del documento
     // o algún enlace de archivo). No filtramos solo por bajarArchivo/gendoc

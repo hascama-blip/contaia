@@ -86,13 +86,13 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
     } finally { setBusy(false); }
   }
 
-  async function descargarPdf(m: Mensaje) {
+  async function descargarPdf(m: Mensaje, forzar = false) {
     setBajando(m.id); setError(null); setDiag(null);
     try {
       const res = await fetch("/api/consultas/buzon/adjunto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, diagnostico: modoDiag }),
+        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, diagnostico: modoDiag, forzar }),
       });
       if (modoDiag) {
         const data = await res.json().catch(() => ({}));
@@ -223,18 +223,30 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                       </td>
                       <td className="px-4 py-2 text-slate-700">{m.asunto}</td>
                       <td className="px-4 py-2 text-center">
-                        <button
-                          onClick={() => descargarPdf(m)}
-                          disabled={bajando !== null}
-                          title={guardado ? "Abrir PDF guardado (sin reingresar a SUNAT)" : "Descargar PDF adjunto"}
-                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs disabled:opacity-50 ${
-                            guardado
-                              ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                              : "border-slate-200 text-red-600 hover:bg-red-50"
-                          }`}
-                        >
-                          {bajando === m.id ? "…" : guardado ? "✓ PDF" : "📄 PDF"}
-                        </button>
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => descargarPdf(m)}
+                            disabled={bajando !== null}
+                            title={guardado ? "Abrir PDF guardado (sin reingresar a SUNAT)" : "Descargar PDF adjunto"}
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs disabled:opacity-50 ${
+                              guardado
+                                ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                : "border-slate-200 text-red-600 hover:bg-red-50"
+                            }`}
+                          >
+                            {bajando === m.id ? "…" : guardado ? "✓ PDF" : "📄 PDF"}
+                          </button>
+                          {guardado && (
+                            <button
+                              onClick={() => descargarPdf(m, true)}
+                              disabled={bajando !== null}
+                              title="Volver a descargar desde SUNAT (ignora lo guardado)"
+                              className="rounded-lg border border-slate-200 px-1.5 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              ↻
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
