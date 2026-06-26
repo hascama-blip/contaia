@@ -204,8 +204,8 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             )}
           </section>
 
-          {/* ───── Fase 1 · Diagnóstico previo (solo Usuario + Clave SOL) ───── */}
-          <FaseHeader n="1" titulo="Diagnóstico previo" detalle="Solo Usuario + Clave SOL. Buzón y fraccionamiento." />
+          {/* ───── 1 · Buzón electrónico (solo Usuario + Clave SOL) ───── */}
+          <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL." />
 
           <BuzonPanel
             clienteId={cliente.id}
@@ -213,14 +213,7 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             yaConsultado={Boolean(cliente.buzon)}
           />
 
-          {/* Deudas tributarias: extracción directa de SUNAT (Fraccionamiento F36) */}
-          <DeudasF36Panel
-            clienteId={cliente.id}
-            solUserGuardado={cliente.credSire?.solUser ?? ""}
-            inicial={cliente.deudasF36 ?? null}
-          />
-
-          {/* ───── Fase 2 · Extracción SIRE + comparativo mensual (requiere API) ───── */}
+          {/* ───── 2 · Extracción SIRE + comparativo mensual (requiere API) ───── */}
           <FaseHeader n="2" titulo="Extracción SIRE y comparativo mensual" detalle="Requiere colocar y bloquear la API." />
 
           <SunatPanel
@@ -236,8 +229,17 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             inicialSire={cliente.sire ?? []}
           />
 
-          {/* ───── Fase 3 · Comparativo anual (subida de PDF) ───── */}
-          <FaseHeader n="3" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
+          {/* ───── 3 · Deudas (Fraccionamiento F36) — solo Usuario + Clave SOL ───── */}
+          <FaseHeader n="3" titulo="Deudas (Fraccionamiento Art. 36)" detalle="Solo Usuario + Clave SOL." />
+
+          <DeudasF36Panel
+            clienteId={cliente.id}
+            solUserGuardado={cliente.credSire?.solUser ?? ""}
+            inicial={cliente.deudasF36 ?? null}
+          />
+
+          {/* ───── 4 · Comparativo anual (subida de PDF) ───── */}
+          <FaseHeader n="4" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
 
           <DeclaracionesAnualesPanel
             clienteId={cliente.id}
