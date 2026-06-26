@@ -853,6 +853,38 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     const visorPage = sesion.visor ? sesion.visor.page() : sesion.page;
     const todasFrames = () => sesion.ctx.pages().flatMap((p: any) => p.frames());
 
+    // Localizar el frame del DETALLE ACTUAL (el del mensaje PEDIDO). Se verifica
+    // que su cuerpo contenga un número largo del asunto o un trozo del asunto;
+    // así NO se lee un detalle viejo/stale de otro mensaje (p.ej. el primero).
+    const numsAsunto = (asunto.match(/\d{4,}/g) || []);
+    const chunkAsunto = asunto.replace(/\s+/g, " ").trim().toLowerCase().replace(/[^a-z0-9áéíóúñ ]/g, "").slice(0, 26);
+    let detalleFrame: any = null;
+    for (let intento = 0; intento < 6 && !detalleFrame; intento++) {
+      for (const fr of todasFrames()) {
+        const u = (fr.url() || "").toLowerCase();
+        if (/menuinternet|campanha|gettime|about:blank/.test(u)) continue;
+        const ok = (await fr
+          .evaluate((arg: { chunk: string; nums: string[] }) => {
+            const t = (document.body?.innerText || "").replace(/\s+/g, " ").toLowerCase();
+            if (/buz[oó]n notificaciones|mis carpetas|mis etiquetas/.test(t)) return false; // lista/menú
+            if (arg.nums.length && arg.nums.some((n) => t.includes(n.toLowerCase()))) return true;
+            return arg.chunk.length > 10 && t.includes(arg.chunk);
+          }, { chunk: chunkAsunto, nums: numsAsunto })
+          .catch(() => false)) as boolean;
+        if (ok) { detalleFrame = fr; break; }
+      }
+      if (!detalleFrame) await sesion.page.waitForTimeout(1500);
+    }
+    pasos.push({ paso: "detalle-frame", encontrado: Boolean(detalleFrame), url: (detalleFrame?.url() || "").slice(0, 90) });
+    if (!detalleFrame) {
+      return {
+        ok: false,
+        error: "No se abrió el detalle del mensaje pedido (la lista no cambió de selección). Reintenta; si persiste, usa Modo diagnóstico.",
+        diag: { pasos },
+      };
+    }
+    const framesDetalle = () => [detalleFrame];
+
     // PRIMARIO: descarga DIRECTA del documento. El enlace azul del detalle es
     // goarchivodescarga(idArchivo, sistema, idMensaje), que arma la URL:
     //   /ol-ti-itvisornoti/visor/bajarArchivo?accion=archivo&idMensaje=&idArchivo=&sistema=&app=1
@@ -861,7 +893,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     // si falta, el idMensaje es el del mensaje abierto (= el que seleccionamos).
     let docArgs: { idArchivo: string; sistema: string; idMsgCall: string; texto: string } | null = null;
     let docFrame: any = null;
-    for (const fr of todasFrames()) {
+    for (const fr of framesDetalle()) {
       const found = (await fr
         .evaluate(() => {
           const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
@@ -906,7 +938,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     if (!pdfB64) {
       let attHref = "";
       let attFrame: any = null;
-      for (const fr of todasFrames()) {
+      for (const fr of framesDetalle()) {
         const href = (await fr
           .evaluate(() => {
             const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
@@ -949,24 +981,8 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     //    "iframeapplication" / el gendoc del detalle). Se elige el frame del
     //    cuerpo (preferir iframeapplication/gendoc; si no, el de más texto).
     if (!pdfB64 && params.origen === "mensajes") {
-      let detFrame: any = null;
-      let mejorScore = 0;
-      let detUrl = "";
-      for (const fr of todasFrames()) {
-        const u = (fr.url() || "").toLowerCase();
-        if (/menuinternet|campanha|gettime|about:blank|visornoti\/master/.test(u)) continue;
-        const info = (await fr
-          .evaluate(() => {
-            const t = document.body?.innerText || "";
-            return { len: t.length, name: (window as any).name || "", tieneMenu: /buz[oó]n notificaciones/i.test(t) };
-          })
-          .catch(() => ({ len: 0, name: "", tieneMenu: true }))) as { len: number; name: string; tieneMenu: boolean };
-        if (info.tieneMenu || info.len <= 120) continue;
-        const esApp = info.name === "iframeapplication" || /gendoc/.test(u);
-        const score = info.len + (esApp ? 1_000_000 : 0);
-        if (score > mejorScore) { mejorScore = score; detFrame = fr; detUrl = fr.url(); }
-      }
-      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame), url: (detUrl || "").slice(0, 90) });
+      const detFrame = detalleFrame; // el detalle ya verificado del mensaje pedido
+      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame), url: (detFrame?.url() || "").slice(0, 90) });
       if (detFrame) {
         try {
           const np = await sesion.ctx.newPage();
