@@ -493,6 +493,21 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     browser = sesion.browser;
     const ejecutor = sesion.visor ?? sesion.page;
 
+    // Si NO se cargó el visor, lo más común es que SUNAT no autenticó (rebote a
+    // la página de login) por bloqueo temporal de tantos ingresos seguidos.
+    if (!sesion.visor && !diagnostico) {
+      const url = (sesion.page.url() || "");
+      const bloqueo = /autenticamenuinternet|loginmenusol|oauth2|api-seguridad/i.test(url);
+      pasos.push({ paso: "sin-visor", url: url.slice(0, 120), bloqueo });
+      return {
+        ok: false,
+        error: bloqueo
+          ? "SUNAT no completó el inicio de sesión (posible bloqueo temporal por varios ingresos seguidos). Espera ~10 minutos y descarga una sola vez. Lo ya guardado se abre sin reingresar."
+          : "No se pudo abrir el buzón (no se cargó el visor). Reintenta en un momento.",
+        diag: { pasos },
+      };
+    }
+
     // Cargar el MÓDULO correcto del buzón ANTES de seleccionar. El visor abre en
     // "Notificaciones" (tipoMsj=2); si el mensaje es de "Mensajes" (tipoMsj=1) hay
     // que cambiar de lista o no se encontrará la fila. fListarNotiMen(tipoMsj,...)
