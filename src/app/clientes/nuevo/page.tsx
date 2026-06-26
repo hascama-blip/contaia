@@ -174,7 +174,39 @@ export default function NuevoClientePage() {
               </span>
             </div>
             {sunat.direccion && (
-              <p className="mt-2 text-xs text-slate-500">{sunat.direccion}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                <span className="font-semibold text-slate-600">Domicilio fiscal:</span>{" "}
+                {sunat.direccion}
+              </p>
+            )}
+            {sunat.representantes && sunat.representantes.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1 text-xs font-semibold text-slate-600">
+                  Representantes legales ({sunat.representantes.length})
+                </p>
+                <div className="overflow-hidden rounded-md border border-brand-100 bg-white">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-left text-[11px] uppercase text-slate-400">
+                      <tr>
+                        <th className="px-2 py-1">Nombre</th>
+                        <th className="px-2 py-1 whitespace-nowrap">Documento</th>
+                        <th className="px-2 py-1">Cargo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sunat.representantes.map((r, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1 text-slate-700">{r.nombre}</td>
+                          <td className="px-2 py-1 whitespace-nowrap text-slate-600">
+                            {[r.tipoDoc, r.numeroDoc].filter(Boolean).join(" ")}
+                          </td>
+                          <td className="px-2 py-1 text-slate-500">{r.cargo ?? ""}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}

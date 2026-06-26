@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consultarSunat, rucValido } from "@/lib/sunat";
+import { consultarSunat, rucValido, debugDecolecta } from "@/lib/sunat";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,10 @@ export async function GET(
       { error: "El RUC debe tener 11 dígitos numéricos." },
       { status: 400 }
     );
+  }
+  // ?debug=1 → respuestas crudas de decolecta (para calibrar el mapeo).
+  if (_req.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json(await debugDecolecta(ruc));
   }
   try {
     const sunat = await consultarSunat(ruc);

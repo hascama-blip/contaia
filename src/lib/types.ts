@@ -15,9 +15,25 @@ export interface SunatInfo {
   tributos: string[];
   /** Indica si emite comprobantes electrónicos. */
   comprobanteElectronico: boolean;
+  /** Representantes legales (nombre completo + documento). */
+  representantes?: RepresentanteLegal[];
   /** Fuente de los datos: "oficial" (API SUNAT SOL), "externo" (apis.net.pe) o "simulado". */
   fuente: "oficial" | "externo" | "simulado";
   consultadoAt: string;
+}
+
+/** Representante legal de un contribuyente (de SUNAT vía decolecta). */
+export interface RepresentanteLegal {
+  /** Tipo de documento: "DNI", "C.E.", etc. */
+  tipoDoc?: string;
+  /** Número de documento (DNI / C.E.). */
+  numeroDoc: string;
+  /** Nombre completo (apellidos y nombres) tal como lo entrega SUNAT. */
+  nombre: string;
+  /** Cargo: "GERENTE GENERAL", "APODERADO", etc. */
+  cargo?: string;
+  /** Fecha desde la que ejerce el cargo. */
+  desde?: string;
 }
 
 export interface ExtraccionDocumento {

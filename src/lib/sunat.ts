@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { SunatInfo } from "./types";
+import type { SunatInfo, RepresentanteLegal } from "./types";
 
 // ============================================================
 //  Integración SUNAT (oficial OAuth2 con Clave SOL) + fallback simulado
@@ -31,6 +31,7 @@ interface SunatConfig {
   apiBase: string;
   decolectaToken: string;
   decolectaUrl: string;
+  repsUrl: string;
   apisnetToken: string;
   apisnetUrl: string;
   forceMock: boolean;
@@ -56,6 +57,10 @@ function getConfig(): SunatConfig {
     decolectaToken: process.env.DECOLECTA_TOKEN ?? "",
     decolectaUrl:
       process.env.DECOLECTA_URL ?? "https://api.decolecta.com/v1/sunat/ruc/full",
+    // Endpoint de representantes legales de decolecta (configurable por si cambia).
+    repsUrl:
+      process.env.DECOLECTA_REPRESENTANTES_URL ??
+      "https://api.decolecta.com/v1/sunat/representantes-legales",
     // Fuente externa apis.net.pe (consulta RUC). Requiere token gratuito.
     apisnetToken: process.env.APISNET_TOKEN ?? "",
     apisnetUrl: process.env.APISNET_URL ?? "https://api.apis.net.pe/v2/sunat/ruc",
@@ -165,6 +170,60 @@ async function leerCuerpo(res: Response): Promise<string> {
   }
 }
 
+// ---- Representantes legales (decolecta) -------------------------------------
+
+/** Normaliza la respuesta de representantes (la forma exacta varía: array suelto,
+ *  {data:[...]}, {representantes:[...]}, nombre combinado o partido en apellidos). */
+function parseRepresentantes(payload: any): RepresentanteLegal[] {
+  const arr = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload?.representantes)
+    ? payload.representantes
+    : Array.isArray(payload?.representantes_legales)
+    ? payload.representantes_legales
+    : [];
+  return (arr as any[])
+    .map((r) => {
+      const nombre = String(
+        r.nombre ??
+          r.nombre_completo ??
+          r.nombreCompleto ??
+          [r.apellido_paterno, r.apellido_materno, r.nombres].filter(Boolean).join(" ")
+      )
+        .replace(/\s+/g, " ")
+        .trim();
+      return {
+        tipoDoc:
+          String(r.tipo_documento ?? r.tipoDocumento ?? r.tipo_doc ?? r.tipo ?? "").trim() ||
+          undefined,
+        numeroDoc: String(
+          r.numero_documento ?? r.numeroDocumento ?? r.documento ?? r.num_doc ?? r.dni ?? ""
+        ).trim(),
+        nombre,
+        cargo: String(r.cargo ?? r.descripcion_cargo ?? r.desc_cargo ?? "").trim() || undefined,
+        desde: String(r.fecha_desde ?? r.desde ?? r.fecha ?? "").trim() || undefined,
+      } as RepresentanteLegal;
+    })
+    .filter((r) => r.nombre || r.numeroDoc);
+}
+
+/** Consulta los representantes legales en decolecta. Best-effort: [] si falla. */
+async function consultarRepresentantes(ruc: string, cfg: SunatConfig): Promise<RepresentanteLegal[]> {
+  if (!cfg.decolectaToken || !cfg.repsUrl) return [];
+  try {
+    const sep = cfg.repsUrl.includes("?") ? "&" : "?";
+    const res = await fetch(`${cfg.repsUrl}${sep}numero=${ruc}`, {
+      headers: { Authorization: `Bearer ${cfg.decolectaToken}`, Accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    return parseRepresentantes(await res.json());
+  } catch {
+    return [];
+  }
+}
+
 // ---- Fuente externa: decolecta.com -----------------------------------------
 
 async function consultarDecolecta(
@@ -199,6 +258,11 @@ async function consultarDecolecta(
   if (d.es_buen_contribuyente) tributos.push("BUEN CONTRIBUYENTE");
   if (d.tipo_contribuyente && !d.tipo) tributos.push(String(d.tipo_contribuyente));
 
+  // Representantes legales: si vienen embebidos en /full los usamos; si no,
+  // consultamos el endpoint dedicado (no es fatal si falla).
+  let representantes = parseRepresentantes(d.representantes_legales ?? d.representantes);
+  if (!representantes.length) representantes = await consultarRepresentantes(ruc, cfg);
+
   return {
     ruc,
     razonSocial: d.razon_social ?? d.razonSocial ?? d.nombre ?? "",
@@ -207,10 +271,35 @@ async function consultarDecolecta(
     tipoContribuyente: d.tipo_contribuyente ?? d.tipo ?? "",
     direccion: direccion || "",
     tributos,
+    representantes,
     comprobanteElectronico: true,
     fuente: "externo",
     consultadoAt: new Date().toISOString(),
   };
+}
+
+/** Diagnóstico: respuestas CRUDAS de decolecta (RUC full + representantes) para
+ *  calibrar el mapeo si los nombres de campo difieren. */
+export async function debugDecolecta(ruc: string): Promise<any> {
+  const cfg = getConfig();
+  if (!cfg.decolectaToken) return { error: "Sin DECOLECTA_TOKEN configurado." };
+  const headers = { Authorization: `Bearer ${cfg.decolectaToken}`, Accept: "application/json" };
+  const out: any = {};
+  try {
+    const sep = cfg.decolectaUrl.includes("?") ? "&" : "?";
+    const r = await fetch(`${cfg.decolectaUrl}${sep}numero=${ruc}`, { headers });
+    out.full = { status: r.status, body: await r.json().catch(() => null) };
+  } catch (e) {
+    out.full = { error: e instanceof Error ? e.message : String(e) };
+  }
+  try {
+    const sep = cfg.repsUrl.includes("?") ? "&" : "?";
+    const r = await fetch(`${cfg.repsUrl}${sep}numero=${ruc}`, { headers });
+    out.representantes = { url: cfg.repsUrl, status: r.status, body: await r.json().catch(() => null) };
+  } catch (e) {
+    out.representantes = { error: e instanceof Error ? e.message : String(e) };
+  }
+  return out;
 }
 
 // ---- Fuente externa: apis.net.pe -------------------------------------------
