@@ -16,6 +16,7 @@ interface Mensaje {
   tipo: string;
   nivel: "peligroso" | "urgente" | "otro";
   origen?: "notificaciones" | "mensajes";
+  adjuntos?: number;
 }
 
 export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) {
@@ -93,7 +94,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       const res = await fetch("/api/consultas/buzon/adjunto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, diagnostico: modoDiag, forzar }),
+        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, adjuntos: m.adjuntos, diagnostico: modoDiag, forzar }),
       });
       if (modoDiag) {
         const data = await res.json().catch(() => ({}));

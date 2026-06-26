@@ -266,6 +266,8 @@ export interface BuzonMensaje {
   leido: boolean;
   /** Módulo del buzón: "notificaciones" (tipoMsj=2) o "mensajes" (tipoMsj=1). */
   origen?: "notificaciones" | "mensajes";
+  /** Cantidad de archivos adjuntos (cantidadArchAdj). 0 = solo texto. */
+  adjuntos?: number;
 }
 
 export interface BuzonResultado {

@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     asunto: typeof body.asunto === "string" ? body.asunto : "",
     fecha: typeof body.fecha === "string" ? body.fecha : "",
     origen: body.origen === "mensajes" ? "mensajes" : body.origen === "notificaciones" ? "notificaciones" : undefined,
+    adjuntos: typeof body.adjuntos === "number" ? body.adjuntos : undefined,
     diagnostico,
   });
 

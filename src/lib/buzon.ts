@@ -174,6 +174,7 @@ function mapearMensajes(body: string): BuzonMensaje[] {
       nivel,
       urgente: nivel !== "otro",
       leido: false,
+      adjuntos: Number(m.cantidadArchAdj ?? m.cantidadArchadj ?? 0) || 0,
     };
   });
 }
@@ -377,6 +378,8 @@ export interface AdjuntoParams {
   fecha?: string;
   /** Módulo de origen: "notificaciones" o "mensajes" (afecta cómo se baja). */
   origen?: "notificaciones" | "mensajes";
+  /** Cantidad de adjuntos del mensaje (0 = solo texto → se imprime, no se baja adjunto). */
+  adjuntos?: number;
   /** idMensaje interno del visor (si difiere del codMensaje). */
   idMensaje?: string;
   /** idArchivo del adjunto (si ya se conoce; si no, se busca en el detalle). */
@@ -938,10 +941,11 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       };
     }
 
-    // B) ADJUNTO CON CLIP (Buzón Mensajes): el enlace azul con clip está cableado
-    //    a visorPdfDescarga('<href>') (o es un <a href> a bajarArchivo). Se baja
-    //    ese archivo directo. (También sirve de respaldo para la constancia.)
-    if (!pdfB64) {
+    // B) ADJUNTO CON CLIP: solo si el mensaje TIENE adjuntos (cantidadArchAdj > 0).
+    //    Si es solo texto (adjuntos === 0), NO se baja archivo: la lista de
+    //    adjuntos del visor no se limpia y mostraría el del mensaje anterior →
+    //    se va directo al render (caso C, el ícono de impresión).
+    if (!pdfB64 && params.adjuntos !== 0) {
       let attHref = adjUrlDeEnlaces; // el adjunto del detalle actual (si lo hubo)
       let attFrame: any = null;
       for (const fr of (attHref ? [] : framesDetalle())) {
