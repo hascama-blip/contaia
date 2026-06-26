@@ -18,6 +18,13 @@ interface Mensaje {
   origen?: "notificaciones" | "mensajes";
   adjuntos?: number;
 }
+interface Seguimiento {
+  codMensaje: string;
+  diasAtencion: number;
+  comentario: string;
+  fechaLimite: string;
+  atendido?: boolean;
+}
 
 export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) {
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? "");
@@ -32,8 +39,42 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  // Seguimientos guardados por mensaje (plazo de atención + comentario).
+  const [segs, setSegs] = useState<Record<string, Seguimiento>>({});
+  const [guardandoSeg, setGuardandoSeg] = useState<string | null>(null);
 
   const cliente = clientes.find((c) => c.id === clienteId);
+
+  const cargarSeguimientos = useCallback(async (id: string) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/consultas/buzon/seguimiento?clienteId=${encodeURIComponent(id)}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.seguimientos)) {
+        const map: Record<string, Seguimiento> = {};
+        for (const s of data.seguimientos) map[s.codMensaje] = s;
+        setSegs(map);
+      }
+    } catch { /* */ }
+  }, []);
+
+  async function guardarSeguimiento(m: Mensaje, diasAtencion: number, comentario: string) {
+    setGuardandoSeg(m.id);
+    try {
+      const res = await fetch("/api/consultas/buzon/seguimiento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, diasAtencion, comentario }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.seguimiento) {
+        setSegs((prev) => ({ ...prev, [m.id]: data.seguimiento }));
+        setInfo("Seguimiento guardado.");
+      } else {
+        setError(data.error ?? "No se pudo guardar el seguimiento.");
+      }
+    } finally { setGuardandoSeg(null); }
+  }
 
   // Carga lo YA GUARDADO (sin clave): mensajes + qué PDFs están en caché.
   const cargarGuardados = useCallback(async (id: string) => {
@@ -55,8 +96,9 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
 
   useEffect(() => {
     cargarGuardados(clienteId);
+    cargarSeguimientos(clienteId);
     setSolPass(getSolPass(clienteId)); // recordar la Clave SOL de la sesión
-  }, [clienteId, cargarGuardados]);
+  }, [clienteId, cargarGuardados, cargarSeguimientos]);
   useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
 
   function elegir(id: string) {
@@ -207,6 +249,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                   <th className="px-4 py-2">Categoría</th>
                   <th className="px-4 py-2">Asunto</th>
                   <th className="px-4 py-2 text-center">PDF</th>
+                  <th className="px-4 py-2">Atención / comentario</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -256,6 +299,13 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                           )}
                         </div>
                       </td>
+                      <td className="px-4 py-2">
+                        <SeguimientoCell
+                          inicial={segs[m.id]}
+                          guardando={guardandoSeg === m.id}
+                          onGuardar={(dias, comentario) => guardarSeguimiento(m, dias, comentario)}
+                        />
+                      </td>
                     </tr>
                   );
                 })}
@@ -263,6 +313,65 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
             </table>
           )}
         </section>
+      )}
+    </div>
+  );
+}
+
+function fmtDia(iso: string): string {
+  try { return new Date(iso).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+  catch { return iso; }
+}
+
+// Control por mensaje: plazo de atención (5/10/15 días) + comentario + guardar.
+function SeguimientoCell({
+  inicial,
+  guardando,
+  onGuardar,
+}: {
+  inicial?: Seguimiento;
+  guardando: boolean;
+  onGuardar: (dias: number, comentario: string) => void;
+}) {
+  const [dias, setDias] = useState<number>(inicial?.diasAtencion ?? 5);
+  const [comentario, setComentario] = useState<string>(inicial?.comentario ?? "");
+  useEffect(() => {
+    if (inicial) { setDias(inicial.diasAtencion); setComentario(inicial.comentario); }
+  }, [inicial?.codMensaje]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const vencido = inicial && new Date(inicial.fechaLimite).getTime() <= Date.now();
+
+  return (
+    <div className="flex min-w-[260px] flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <select
+          className="rounded-md border border-slate-300 px-1.5 py-1 text-xs outline-none focus:border-brand-500"
+          value={dias}
+          onChange={(e) => setDias(Number(e.target.value))}
+        >
+          <option value={5}>5 días</option>
+          <option value={10}>10 días</option>
+          <option value={15}>15 días</option>
+        </select>
+        <input
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs outline-none focus:border-brand-500"
+          placeholder="Comentario…"
+          value={comentario}
+          onChange={(e) => setComentario(e.target.value)}
+        />
+        <button
+          onClick={() => onGuardar(dias, comentario)}
+          disabled={guardando}
+          className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {guardando ? "…" : "Guardar"}
+        </button>
+      </div>
+      {inicial && (
+        <span className={`text-[11px] ${vencido ? "font-semibold text-red-600" : "text-slate-400"}`}>
+          {vencido ? "⏰ Venció" : "Vence"} {fmtDia(inicial.fechaLimite)}
+          {inicial.atendido ? " · atendido" : ""}
+        </span>
       )}
     </div>
   );

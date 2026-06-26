@@ -15,6 +15,7 @@ import type {
   ProveedorCuenta,
   Usuario,
   DeudaF36Tabla,
+  SeguimientoBuzon,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -457,6 +458,70 @@ export async function clearSire(clienteId: string): Promise<Cliente | null> {
   cliente.sire = [];
   await writeStore(store);
   return cliente;
+}
+
+// ---- Seguimiento de mensajes del buzón (plazo de atención + comentario) ----
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+export async function setSeguimientoBuzon(
+  clienteId: string,
+  datos: { codMensaje: string; asunto: string; fecha: string; origen?: "notificaciones" | "mensajes"; diasAtencion: number; comentario: string }
+): Promise<SeguimientoBuzon | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  if (!cliente.seguimientosBuzon) cliente.seguimientosBuzon = [];
+  const creadoAt = new Date().toISOString();
+  const seg: SeguimientoBuzon = {
+    codMensaje: datos.codMensaje,
+    asunto: datos.asunto,
+    fecha: datos.fecha,
+    origen: datos.origen,
+    diasAtencion: datos.diasAtencion,
+    comentario: datos.comentario ?? "",
+    creadoAt,
+    fechaLimite: new Date(Date.now() + datos.diasAtencion * MS_DIA).toISOString(),
+    atendido: false,
+  };
+  const i = cliente.seguimientosBuzon.findIndex((s) => s.codMensaje === datos.codMensaje);
+  if (i >= 0) cliente.seguimientosBuzon[i] = seg;
+  else cliente.seguimientosBuzon.push(seg);
+  await writeStore(store);
+  return seg;
+}
+
+export async function atenderSeguimientoBuzon(
+  clienteId: string,
+  codMensaje: string,
+  atendido: boolean
+): Promise<boolean> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  const seg = cliente?.seguimientosBuzon?.find((s) => s.codMensaje === codMensaje);
+  if (!seg) return false;
+  seg.atendido = atendido;
+  await writeStore(store);
+  return true;
+}
+
+/** Recordatorios del usuario: seguimientos no atendidos, con su empresa, marcando
+ *  los vencidos (fechaLimite <= ahora). Ordenados por fecha límite ascendente. */
+export async function getRecordatorios(
+  ownerId: string
+): Promise<Array<SeguimientoBuzon & { clienteId: string; razonSocial: string; ruc: string; vencido: boolean }>> {
+  const store = await readStore();
+  const now = Date.now();
+  const out: Array<SeguimientoBuzon & { clienteId: string; razonSocial: string; ruc: string; vencido: boolean }> = [];
+  for (const c of store.clientes) {
+    if (c.ownerId && c.ownerId !== ownerId) continue;
+    for (const s of c.seguimientosBuzon ?? []) {
+      if (s.atendido) continue;
+      out.push({ ...s, clienteId: c.id, razonSocial: c.razonSocial, ruc: c.ruc, vencido: new Date(s.fechaLimite).getTime() <= now });
+    }
+  }
+  out.sort((a, b) => new Date(a.fechaLimite).getTime() - new Date(b.fechaLimite).getTime());
+  return out;
 }
 
 export async function setBuzon(

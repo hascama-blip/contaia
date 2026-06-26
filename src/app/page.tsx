@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,9 @@ export default async function MenuPage() {
           </Link>
         </div>
       </section>
+
+      {/* Recordatorios de buzón (plazos de atención vencidos / por vencer) */}
+      <RecordatoriosBanner />
 
       {/* Menú de tarjetas */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

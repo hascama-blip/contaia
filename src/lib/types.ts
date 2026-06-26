@@ -117,6 +117,8 @@ export interface Cliente {
   deudasF36?: { tablas: DeudaF36Tabla[]; at: string; generadoAt?: string; nota?: string } | null;
   /** Credenciales de la API SIRE guardadas (la Clave SOL NO se guarda). */
   credSire?: CredencialesSire | null;
+  /** Seguimientos de mensajes del buzón (plazo de atención + comentario). */
+  seguimientosBuzon?: SeguimientoBuzon[];
 }
 
 /** Credenciales SIRE persistidas (sin la Clave SOL, que es efímera). */
@@ -294,6 +296,23 @@ export interface AdjuntoCache {
   nombre: string;
   at: string;
   size: number;
+}
+
+/** Seguimiento de un mensaje del buzón: plazo de atención + comentario. */
+export interface SeguimientoBuzon {
+  codMensaje: string;
+  asunto: string;
+  /** Fecha del mensaje (para mostrar en el recordatorio). */
+  fecha: string;
+  origen?: "notificaciones" | "mensajes";
+  /** Plazo de atención en días (5, 10 o 15). */
+  diasAtencion: number;
+  comentario: string;
+  creadoAt: string;
+  /** creadoAt + diasAtencion (cuando vence, se recuerda). */
+  fechaLimite: string;
+  /** Si ya se atendió (quita el recordatorio). */
+  atendido?: boolean;
 }
 
 /** Buzón persistido en el cliente (para el informe). */
