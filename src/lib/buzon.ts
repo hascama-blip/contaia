@@ -1066,7 +1066,10 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       await pg2.close().catch(() => {});
     }
 
-    if (diagnostico) return { ok: false, diag: { pasos } };
+    if (diagnostico) {
+      pasos.push({ paso: "resultado", pdfObtenido: Boolean(pdfB64), nota: pdfB64 ? "OK: en modo normal se descargaría este PDF." : "No se capturó PDF." });
+      return { ok: false, diag: { pasos } };
+    }
     if (pdfB64) return { ok: true, pdfBase64: pdfB64, filename: nombreArch || `resolucion-${codMensaje}.pdf` };
     return {
       ok: false,
