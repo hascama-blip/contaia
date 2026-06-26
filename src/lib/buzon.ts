@@ -868,37 +868,28 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     const visorPage = sesion.visor ? sesion.visor.page() : sesion.page;
     const todasFrames = () => sesion.ctx.pages().flatMap((p: any) => p.frames());
 
-    // Localizar el frame del DETALLE ACTUAL (el del mensaje PEDIDO). Se verifica
-    // que su cuerpo contenga un número largo del asunto o un trozo del asunto;
-    // así NO se lee un detalle viejo/stale de otro mensaje (p.ej. el primero).
-    const numsAsunto = (asunto.match(/\d{4,}/g) || []);
-    const chunkAsunto = asunto.replace(/\s+/g, " ").trim().toLowerCase().replace(/[^a-z0-9áéíóúñ ]/g, "").slice(0, 26);
-    let detalleFrame: any = null;
-    for (let intento = 0; intento < 6 && !detalleFrame; intento++) {
-      for (const fr of todasFrames()) {
-        const u = (fr.url() || "").toLowerCase();
-        if (/menuinternet|campanha|gettime|about:blank/.test(u)) continue;
-        const ok = (await fr
-          .evaluate((arg: { chunk: string; nums: string[] }) => {
-            const t = (document.body?.innerText || "").replace(/\s+/g, " ").toLowerCase();
-            if (/buz[oó]n notificaciones|mis carpetas|mis etiquetas/.test(t)) return false; // lista/menú
-            if (arg.nums.length && arg.nums.some((n) => t.includes(n.toLowerCase()))) return true;
-            return arg.chunk.length > 10 && t.includes(arg.chunk);
-          }, { chunk: chunkAsunto, nums: numsAsunto })
-          .catch(() => false)) as boolean;
-        if (ok) { detalleFrame = fr; break; }
-      }
-      if (!detalleFrame) await sesion.page.waitForTimeout(1500);
-    }
-    pasos.push({ paso: "detalle-frame", encontrado: Boolean(detalleFrame), url: (detalleFrame?.url() || "").slice(0, 90) });
-    if (!detalleFrame) {
+    // La selección por fecha (sel.ok) confirma que se abrió el mensaje PEDIDO. Si
+    // falló, el detalle sería el del mensaje por defecto → cortamos para no bajar
+    // uno equivocado. (El detalle puede ir en el mismo frame del visor o en un
+    // sub-iframe gendoc, así que no se aísla por contenido.)
+    if (!sel.ok) {
       return {
         ok: false,
-        error: "No se abrió el detalle del mensaje pedido (la lista no cambió de selección). Reintenta; si persiste, usa Modo diagnóstico.",
+        error: "No se pudo seleccionar el mensaje en la lista (reintenta). Si persiste, usa Modo diagnóstico.",
         diag: { pasos },
       };
     }
-    const framesDetalle = () => [detalleFrame];
+    const framesDetalle = () => todasFrames();
+
+    // Adjunto (clip) ya detectado por el paso de enlaces (lo más fiable y del
+    // mensaje actual, p.ej. /ol-ti-itvisornoti/visor/bajarArchivo/<id>/0/0/<ruc>).
+    const adjUrlDeEnlaces = (() => {
+      for (const e of enlaces) {
+        const m = e.match(/\/ol-ti-itvisornoti\/visor\/bajarArchivo\/[^\s|"']+/i);
+        if (m) return m[0];
+      }
+      return "";
+    })();
 
     // PRIMARIO: descarga DIRECTA del documento. El enlace azul del detalle es
     // goarchivodescarga(idArchivo, sistema, idMensaje), que arma la URL:
@@ -951,9 +942,9 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     //    a visorPdfDescarga('<href>') (o es un <a href> a bajarArchivo). Se baja
     //    ese archivo directo. (También sirve de respaldo para la constancia.)
     if (!pdfB64) {
-      let attHref = "";
+      let attHref = adjUrlDeEnlaces; // el adjunto del detalle actual (si lo hubo)
       let attFrame: any = null;
-      for (const fr of framesDetalle()) {
+      for (const fr of (attHref ? [] : framesDetalle())) {
         const href = (await fr
           .evaluate(() => {
             const anchors = Array.from(document.querySelectorAll("a")) as HTMLAnchorElement[];
@@ -996,8 +987,22 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     //    "iframeapplication" / el gendoc del detalle). Se elige el frame del
     //    cuerpo (preferir iframeapplication/gendoc; si no, el de más texto).
     if (!pdfB64 && params.origen === "mensajes") {
-      const detFrame = detalleFrame; // el detalle ya verificado del mensaje pedido
-      pasos.push({ paso: "texto-render", detalleEncontrado: Boolean(detFrame), url: (detFrame?.url() || "").slice(0, 90) });
+      // Frame del cuerpo: preferir gendoc/iframeapplication; si no, el de más texto
+      // que no sea el menú; en último caso, la página del visor completa.
+      let detFrame: any = null;
+      let mejor = 0;
+      for (const fr of todasFrames()) {
+        const u = (fr.url() || "").toLowerCase();
+        if (/menuinternet|campanha|gettime|about:blank/.test(u)) continue;
+        const info = (await fr
+          .evaluate(() => ({ len: (document.body?.innerText || "").length, name: (window as any).name || "" }))
+          .catch(() => ({ len: 0, name: "" }))) as { len: number; name: string };
+        const esApp = info.name === "iframeapplication" || /gendoc/.test(u);
+        const score = info.len + (esApp ? 1_000_000 : 0);
+        if (info.len > 120 && score > mejor) { mejor = score; detFrame = fr; }
+      }
+      if (!detFrame) detFrame = visorPage;
+      pasos.push({ paso: "texto-render", url: (detFrame?.url?.() || "").slice(0, 90) });
       if (detFrame) {
         try {
           const np = await sesion.ctx.newPage();
