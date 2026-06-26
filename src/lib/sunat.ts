@@ -170,6 +170,18 @@ async function leerCuerpo(res: Response): Promise<string> {
   }
 }
 
+/** fetch con timeout (AbortController): evita que una fuente lenta cuelgue toda
+ *  la consulta (Render corta en ~30s y devuelve 502). */
+async function fetchTimeout(url: string, opts: any, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // ---- Representantes legales (decolecta) -------------------------------------
 
 /** Normaliza la respuesta de representantes (la forma exacta varía: array suelto,
@@ -214,9 +226,11 @@ async function consultarRepresentantes(ruc: string, cfg: SunatConfig): Promise<R
   if (!cfg.decolectaToken || !cfg.repsUrl) return [];
   try {
     const sep = cfg.repsUrl.includes("?") ? "&" : "?";
-    const res = await fetch(`${cfg.repsUrl}${sep}numero=${ruc}`, {
-      headers: { Authorization: `Bearer ${cfg.decolectaToken}`, Accept: "application/json" },
-    });
+    const res = await fetchTimeout(
+      `${cfg.repsUrl}${sep}numero=${ruc}`,
+      { headers: { Authorization: `Bearer ${cfg.decolectaToken}`, Accept: "application/json" } },
+      8000
+    );
     if (!res.ok) return [];
     return parseRepresentantes(await res.json());
   } catch {
@@ -287,14 +301,14 @@ export async function debugDecolecta(ruc: string): Promise<any> {
   const out: any = {};
   try {
     const sep = cfg.decolectaUrl.includes("?") ? "&" : "?";
-    const r = await fetch(`${cfg.decolectaUrl}${sep}numero=${ruc}`, { headers });
+    const r = await fetchTimeout(`${cfg.decolectaUrl}${sep}numero=${ruc}`, { headers }, 10000);
     out.full = { status: r.status, body: await r.json().catch(() => null) };
   } catch (e) {
     out.full = { error: e instanceof Error ? e.message : String(e) };
   }
   try {
     const sep = cfg.repsUrl.includes("?") ? "&" : "?";
-    const r = await fetch(`${cfg.repsUrl}${sep}numero=${ruc}`, { headers });
+    const r = await fetchTimeout(`${cfg.repsUrl}${sep}numero=${ruc}`, { headers }, 10000);
     out.representantes = { url: cfg.repsUrl, status: r.status, body: await r.json().catch(() => null) };
   } catch (e) {
     out.representantes = { error: e instanceof Error ? e.message : String(e) };
