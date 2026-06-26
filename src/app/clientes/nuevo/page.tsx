@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SunatInfo } from "@/lib/types";
 import { CondicionBadge, EstadoBadge } from "@/components/ui";
+import { setSolPass } from "@/lib/solSession";
 
 export default function NuevoClientePage() {
   const router = useRouter();
@@ -12,6 +13,11 @@ export default function NuevoClientePage() {
     ruc: "",
     email: "",
     telefono: "",
+    // Credenciales SOL: usuario + clave (obligatorios) y API (opcional).
+    solUser: "",
+    solPass: "",
+    clientId: "",
+    clientSecret: "",
   });
   const [sunat, setSunat] = useState<SunatInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,19 +80,37 @@ export default function NuevoClientePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Usuario + Clave SOL son obligatorios (habilitan el diagnóstico previo).
+    if (!form.solUser.trim() || !form.solPass.trim()) {
+      setError("El Usuario SOL y la Clave SOL son obligatorios para el diagnóstico.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/clientes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Adjuntamos la info SUNAT consultada para guardarla con el cliente.
-        body: JSON.stringify({ ...form, sunat }),
+        // Adjuntamos la info SUNAT consultada + credenciales (la Clave SOL NO se guarda).
+        body: JSON.stringify({
+          razonSocial: form.razonSocial,
+          ruc: form.ruc,
+          email: form.email,
+          telefono: form.telefono,
+          sunat,
+          cred: {
+            solUser: form.solUser,
+            clientId: form.clientId,
+            clientSecret: form.clientSecret,
+          },
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "No se pudo crear el cliente.");
         return;
       }
+      // La Clave SOL queda solo en la sesión del navegador (nunca en la BD).
+      setSolPass(data.cliente.id, form.solPass);
       router.push(`/clientes/${data.cliente.id}`);
     } catch {
       setError("Error de red.");
@@ -247,6 +271,60 @@ export default function NuevoClientePage() {
               onChange={(e) => set("telefono", e.target.value)}
               placeholder="999 888 777"
             />
+          </div>
+        </div>
+
+        {/* Credenciales SOL (obligatorias para el diagnóstico) */}
+        <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-4">
+          <p className="text-sm font-semibold text-slate-700">Credenciales SUNAT (SOL)</p>
+          <p className="mb-3 text-xs text-slate-500">
+            El <b>Usuario</b> y la <b>Clave SOL</b> son obligatorios (habilitan buzón y
+            fraccionamiento). La <b>API</b> es opcional aquí: se puede colocar luego en campo
+            para habilitar el SIRE. <b>La Clave SOL nunca se guarda.</b>
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Usuario SOL *</label>
+              <input
+                className="input"
+                value={form.solUser}
+                onChange={(e) => set("solUser", e.target.value)}
+                placeholder="Usuario SOL"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label className="label">Clave SOL *</label>
+              <input
+                className="input"
+                type="password"
+                value={form.solPass}
+                onChange={(e) => set("solPass", e.target.value)}
+                placeholder="No se guarda"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="label">client_id (API) — opcional</label>
+              <input
+                className="input"
+                value={form.clientId}
+                onChange={(e) => set("clientId", e.target.value)}
+                placeholder="Se puede colocar luego"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label className="label">client_secret (API) — opcional</label>
+              <input
+                className="input"
+                type="password"
+                value={form.clientSecret}
+                onChange={(e) => set("clientSecret", e.target.value)}
+                placeholder="Se puede colocar luego"
+                autoComplete="new-password"
+              />
+            </div>
           </div>
         </div>
 

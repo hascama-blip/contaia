@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCliente, getClienteByRuc, listClientes } from "@/lib/db";
+import { createCliente, getClienteByRuc, listClientes, setCredSire } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
 
@@ -51,5 +51,16 @@ export async function POST(req: NextRequest) {
     sunat,
     ownerId: user.id,
   });
+  // Credenciales SOL del alta: se guardan Usuario SOL + API (la Clave SOL NO).
+  const cred = body.cred;
+  if (cred && typeof cred === "object" && typeof cred.solUser === "string" && cred.solUser.trim()) {
+    const actualizado = await setCredSire(cliente.id, {
+      solUser: cred.solUser.trim(),
+      clientId: typeof cred.clientId === "string" ? cred.clientId.trim() : "",
+      clientSecret: typeof cred.clientSecret === "string" ? cred.clientSecret.trim() : "",
+      guardadoAt: new Date().toISOString(),
+    });
+    if (actualizado) cliente.credSire = actualizado.credSire;
+  }
   return NextResponse.json({ cliente }, { status: 201 });
 }

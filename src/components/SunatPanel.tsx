@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { BuzonMensaje, SireResumen } from "@/lib/types";
+import type { SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
@@ -17,6 +17,9 @@ function etiqueta(periodo: string): string {
   return `${MESES[mes - 1] ?? "?"} ${anio}`;
 }
 
+// Panel SIRE (Fase 2): extrae compras/ventas y el estado presentado/no presentado.
+// Requiere la API (client_id/secret) COLOCADA Y BLOQUEADA. Usuario SOL viene del
+// alta; la Clave SOL se pide 1 vez por sesión (nunca se guarda).
 export default function SunatPanel({
   clienteId,
   inicialSire,
@@ -28,18 +31,17 @@ export default function SunatPanel({
 }) {
   const router = useRouter();
   const hoy = new Date();
-  // Credenciales: usuario SOL + API (client_id/secret) se GUARDAN y se prellenan.
-  // La Clave SOL NO se guarda: se escribe en cada consulta.
   const [solUser, setSolUser] = useState(inicialCred?.solUser ?? "");
   const [solPass, setSolPass] = useState("");
   const [clientId, setClientId] = useState(inicialCred?.clientId ?? "");
   const [clientSecret, setClientSecret] = useState(inicialCred?.clientSecret ?? "");
-  // La API (client_id/secret) guardada queda BLOQUEADA (solo lectura).
+  // La API guardada queda BLOQUEADA (solo lectura) y habilita la extracción.
   const [apiBloqueada, setApiBloqueada] = useState(Boolean(inicialCred?.clientId && inicialCred?.clientSecret));
-  // Recordar la Clave SOL en la sesión (se pide 1 vez por módulo).
+  const [guardandoApi, setGuardandoApi] = useState(false);
+
   useEffect(() => { setSolPass(getSolPass(clienteId)); }, [clienteId]);
   useEffect(() => { if (solPass) setSolPassSesion(clienteId, solPass); }, [clienteId, solPass]);
-  // Rango de periodos SIRE: Desde (mes/año) -> Hasta (mes/año).
+
   const [mesDesde, setMesDesde] = useState(1);
   const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
   const [mesHasta, setMesHasta] = useState(hoy.getMonth() + 1);
@@ -50,16 +52,12 @@ export default function SunatPanel({
   const [error, setError] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
-
   const [sire, setSire] = useState<SireResumen[]>(inicialSire ?? []);
-  const [buzon, setBuzon] = useState<BuzonMensaje[] | null>(null);
-  const [peligrosos, setPeligrosos] = useState<BuzonMensaje[]>([]);
-  const [urgentes, setUrgentes] = useState<BuzonMensaje[]>([]);
 
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
   const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
+  const apiLista = Boolean(clientId && clientSecret && apiBloqueada);
 
-  /** Lista de periodos "YYYYMM" entre desde y hasta (inclusive, ascendente). */
   function rangoPeriodos(desde: string, hasta: string): string[] {
     const out: string[] = [];
     let y = Number(desde.slice(0, 4));
@@ -70,30 +68,38 @@ export default function SunatPanel({
     while ((y < yH || (y === yH && m <= mH)) && guard < 240) {
       out.push(`${y}${String(m).padStart(2, "0")}`);
       m++;
-      if (m > 12) {
-        m = 1;
-        y++;
-      }
+      if (m > 12) { m = 1; y++; }
       guard++;
     }
     return out;
   }
 
-  function faltanCreds(): boolean {
-    if (!solUser || !solPass) {
-      setError("Ingresa el Usuario SOL y la Clave SOL.");
-      return true;
+  async function guardarApi() {
+    if (!solUser.trim()) { setError("Ingresa el Usuario SOL."); return; }
+    if (!clientId.trim() || !clientSecret.trim()) { setError("Ingresa el client_id y el client_secret."); return; }
+    setGuardandoApi(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/credenciales`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solUser, clientId, clientSecret }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo guardar la API."); return; }
+      setApiBloqueada(true);
+      router.refresh();
+    } catch {
+      setError("Error de red al guardar la API.");
+    } finally {
+      setGuardandoApi(false);
     }
-    return false;
   }
 
-  async function consultarSire(
-    simulado: boolean,
-    periodoOverride?: string
-  ): Promise<boolean> {
-    setError(null);
-    setDiag(null);
-    if (!simulado && faltanCreds()) return false;
+  async function consultarSire(simulado: boolean, periodoOverride?: string): Promise<boolean> {
+    setError(null); setDiag(null);
+    if (!simulado && (!solUser || !solPass)) { setError("Ingresa el Usuario SOL y la Clave SOL."); return false; }
+    if (!simulado && !apiLista) { setError("Coloca y guarda la API (client_id/secret) para extraer el SIRE."); return false; }
     setBusy("sire");
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire`, {
@@ -110,14 +116,8 @@ export default function SunatPanel({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "No se pudo consultar el SIRE.");
-        return false;
-      }
-      if (data.diag) {
-        setDiag(JSON.stringify(data.diag, null, 2));
-        return false;
-      }
+      if (!res.ok) { setError(data.error ?? "No se pudo consultar el SIRE."); return false; }
+      if (data.diag) { setDiag(JSON.stringify(data.diag, null, 2)); return false; }
       const r: SireResumen = data.resumen;
       setSire((prev) => [r, ...prev.filter((p) => p.periodo !== r.periodo)]);
       return true;
@@ -129,76 +129,28 @@ export default function SunatPanel({
     }
   }
 
-  async function consultarBuzon(): Promise<boolean> {
-    setError(null);
-    setDiag(null);
-    if (faltanCreds()) return false;
-    setBusy("buzon");
-    try {
-      const res = await fetch(`/api/clientes/${clienteId}/buzon`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, clientId, clientSecret, dias: 15, diagnostico: diagModo }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "No se pudo consultar el buzón.");
-        return false;
-      }
-      if (data.diag) {
-        setDiag(JSON.stringify(data.diag, null, 2));
-        return false;
-      }
-      setBuzon(data.mensajes ?? []);
-      setPeligrosos(data.peligrosos ?? []);
-      setUrgentes(data.urgentes ?? []);
-      return true;
-    } catch {
-      setError("Error de red al consultar el buzón.");
-      return false;
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  /** Recorre el rango Desde→Hasta extrayendo el SIRE de cada mes. */
-  async function recorrerRango(conBuzon: boolean) {
-    if (faltanCreds()) return;
-    if (periodoDesde > periodoHasta) {
-      setError("El periodo 'Desde' no puede ser mayor que 'Hasta'.");
-      return;
-    }
-    setBusy("todo");
-    setError(null);
-    setDiag(null);
+  async function recorrerRango() {
+    if (!solUser || !solPass) { setError("Ingresa el Usuario SOL y la Clave SOL."); return; }
+    if (!apiLista) { setError("Coloca y guarda la API (client_id/secret) para extraer el SIRE."); return; }
+    if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
+    setBusy("todo"); setError(null); setDiag(null);
     const periodos = rangoPeriodos(periodoDesde, periodoHasta);
     for (let i = 0; i < periodos.length; i++) {
       setProgreso(`SIRE ${etiqueta(periodos[i])} (${i + 1}/${periodos.length})`);
       await consultarSire(false, periodos[i]);
     }
-    if (conBuzon) {
-      setProgreso("Buzón (mes en curso)…");
-      await consultarBuzon();
-    }
-    setProgreso(null);
-    setBusy(null);
-    // Solo limpiamos la Clave SOL (no se guarda). El usuario y la API quedan.
-    setSolPass("");
+    setProgreso(null); setBusy(null);
+    setSolPass(""); // solo la clave se limpia; usuario y API quedan
     router.refresh();
   }
 
   async function limpiarSire() {
     if (sire.length === 0) return;
     if (!confirm("¿Borrar el SIRE descargado de este cliente para bajar otro?")) return;
-    setBusy("limpiar");
-    setError(null);
-    setDiag(null);
+    setBusy("limpiar"); setError(null); setDiag(null);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire`, { method: "DELETE" });
-      if (!res.ok) {
-        setError("No se pudo limpiar el SIRE.");
-        return;
-      }
+      if (!res.ok) { setError("No se pudo limpiar el SIRE."); return; }
       setSire([]);
       router.refresh();
     } catch {
@@ -213,19 +165,18 @@ export default function SunatPanel({
   return (
     <section className="card p-5">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-800">Consulta SUNAT</h2>
-        <span className="badge bg-slate-100 text-slate-500">SIRE + Buzón</span>
+        <h3 className="font-semibold text-slate-800">📊 SIRE — compras/ventas y estado</h3>
+        <span className="badge bg-slate-100 text-slate-500">Requiere API</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        El <strong>usuario SOL</strong> y la <strong>API (client_id/secret)</strong> se
-        <strong> guardan</strong> y quedan prellenados. La <strong>Clave SOL</strong> se
-        escribe en cada consulta y <strong>no se guarda</strong>.
+        Extrae los montos (RVIE/RCE) y el estado <b>presentado / no presentado</b> por periodo.
+        Necesita la <b>API (client_id/secret)</b> colocada y bloqueada.
       </p>
 
-      {/* Credenciales (una vez) */}
+      {/* API: colocar y bloquear */}
       <div className="rounded-lg border border-slate-200 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Credenciales SOL
+          API SUNAT (SIRE)
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -234,30 +185,37 @@ export default function SunatPanel({
           </div>
           <div>
             <label className="label">Clave SOL</label>
-            <input className="input" type="password" value={solPass} onChange={(e) => setSolPass(e.target.value)} autoComplete="new-password" />
+            <input className="input" type="password" value={solPass} onChange={(e) => setSolPass(e.target.value)} placeholder="1 vez por sesión" autoComplete="new-password" />
           </div>
           <div>
             <label className="label">
-              client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 guardado</span>}
+              client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
             </label>
             <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} value={clientId} onChange={(e) => setClientId(e.target.value)} readOnly={apiBloqueada} autoComplete="off" />
           </div>
           <div>
             <label className="label">
-              client_secret {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 guardado</span>}
+              client_secret {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
             </label>
             <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} readOnly={apiBloqueada} autoComplete="new-password" />
           </div>
         </div>
-        {apiBloqueada && (
-          <p className="mt-1 text-xs text-slate-400">
-            La API queda guardada y bloqueada. Para todo, solo se pide la <b>Clave SOL</b> (1 vez por sesión).{" "}
+        {apiBloqueada ? (
+          <p className="mt-2 text-xs text-slate-400">
+            API guardada y bloqueada. Para extraer solo se pide la <b>Clave SOL</b>.{" "}
             <button type="button" className="text-brand-600 hover:underline" onClick={() => setApiBloqueada(false)}>Editar API</button>
           </p>
+        ) : (
+          <div className="mt-2 flex items-center gap-3">
+            <button type="button" className="btn-primary" onClick={guardarApi} disabled={guardandoApi}>
+              {guardandoApi ? "Guardando…" : "Guardar y bloquear API"}
+            </button>
+            <span className="text-xs text-slate-400">Coloca la API en campo para habilitar el SIRE.</span>
+          </div>
         )}
       </div>
 
-      {/* Rango de periodos SIRE: Desde -> Hasta */}
+      {/* Rango de periodos SIRE */}
       <div className="mt-3 rounded-lg border border-slate-200 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Rango SIRE (desde → hasta)
@@ -266,9 +224,7 @@ export default function SunatPanel({
           <div>
             <label className="label">Mes desde</label>
             <select className="input" value={mesDesde} onChange={(e) => setMesDesde(Number(e.target.value))}>
-              {MESES.map((m, i) => (
-                <option key={m} value={i + 1}>{m}</option>
-              ))}
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
             </select>
           </div>
           <div>
@@ -278,9 +234,7 @@ export default function SunatPanel({
           <div>
             <label className="label">Mes hasta</label>
             <select className="input" value={mesHasta} onChange={(e) => setMesHasta(Number(e.target.value))}>
-              {MESES.map((m, i) => (
-                <option key={m} value={i + 1}>{m}</option>
-              ))}
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
             </select>
           </div>
           <div>
@@ -289,7 +243,7 @@ export default function SunatPanel({
           </div>
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Ej.: Enero 2025 → Diciembre 2025 · Enero 2026 → Junio 2026 · Enero → Marzo 2026.
+          Ej.: Enero 2025 → Diciembre 2025 · Enero 2026 → Junio 2026.
         </p>
       </div>
 
@@ -299,90 +253,31 @@ export default function SunatPanel({
       </label>
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-      {progreso && (
-        <div className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
-          Extrayendo… {progreso}
-        </div>
-      )}
+      {progreso && <div className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">Extrayendo… {progreso}</div>}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={() => recorrerRango(true)} disabled={trabajando}>
-          {busy === "todo" ? "Extrayendo…" : "⚡ Extraer rango (SIRE + buzón)"}
-        </button>
-        <button className="btn-ghost" onClick={() => recorrerRango(false)} disabled={trabajando}>
-          Solo SIRE del rango
-        </button>
-        <button className="btn-ghost" onClick={consultarBuzon} disabled={trabajando}>
-          {busy === "buzon" ? "Buzón…" : "Solo buzón"}
+        <button className="btn-primary" onClick={recorrerRango} disabled={trabajando || !apiLista}>
+          {busy === "todo" ? "Extrayendo…" : "⚡ Extraer SIRE del rango"}
         </button>
         <button className="btn-ghost" onClick={() => consultarSire(true, periodoHasta)} disabled={trabajando} title="Ejemplo SIRE sin Clave SOL">
           Ver ejemplo
         </button>
       </div>
 
-      {diag && (
-        <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>
-      )}
+      {diag && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
-      {/* Resultados SIRE */}
       {sire.length > 0 && (
         <div className="mt-5">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-700">Compras y Ventas (SIRE)</h3>
-            <button
-              className="text-xs text-slate-400 hover:text-red-600"
-              onClick={limpiarSire}
-              disabled={trabajando}
-              title="Borrar el SIRE descargado para bajar otro"
-            >
+            <h4 className="text-sm font-semibold text-slate-700">Compras y Ventas (SIRE)</h4>
+            <button className="text-xs text-slate-400 hover:text-red-600" onClick={limpiarSire} disabled={trabajando} title="Borrar el SIRE descargado para bajar otro">
               {busy === "limpiar" ? "Limpiando…" : "🧹 Limpiar SIRE"}
             </button>
           </div>
           <Acumulado resultados={sire} />
           <div className="mt-3 space-y-3">
-            {sire.map((r) => (
-              <ResumenCard key={r.periodo} r={r} />
-            ))}
+            {sire.map((r) => <ResumenCard key={r.periodo} r={r} />)}
           </div>
-        </div>
-      )}
-
-      {/* Resultados Buzón */}
-      {buzon && (
-        <div className="mt-6">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">
-            Buzón electrónico (mes en curso)
-          </h3>
-          {peligrosos.length > 0 && (
-            <div className="mb-3 rounded-lg border-2 border-red-300 bg-red-50 p-3">
-              <p className="mb-2 text-sm font-bold text-red-700">
-                🚨 {peligrosos.length} MÁS PELIGROSO(S) — fiscalización / no contenciosas
-              </p>
-              <ul className="space-y-2">
-                {peligrosos.map((m) => <MensajeItem key={m.id} m={m} />)}
-              </ul>
-            </div>
-          )}
-          {urgentes.length > 0 && (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-              <p className="mb-2 text-sm font-semibold text-orange-700">
-                ⚠ {urgentes.length} urgente(s) — cobranza / valores
-              </p>
-              <ul className="space-y-2">
-                {urgentes.map((m) => <MensajeItem key={m.id} m={m} />)}
-              </ul>
-            </div>
-          )}
-          <p className="mb-2 mt-3 text-xs font-semibold uppercase text-slate-400">
-            Todos ({buzon.length})
-          </p>
-          {buzon.length === 0 ? (
-            <p className="text-sm text-slate-400">Sin mensajes en los últimos 15 días.</p>
-          ) : (
-            <ul className="space-y-2">
-              {buzon.map((m) => <MensajeItem key={m.id} m={m} />)}
-            </ul>
-          )}
         </div>
       )}
     </section>
@@ -472,23 +367,5 @@ function Bloque({ titulo, color, total, pct, igv, base, comprobantes }: { titulo
         <span>IGV: {fmtSoles(igv)}</span>
       </div>
     </div>
-  );
-}
-
-function MensajeItem({ m }: { m: BuzonMensaje }) {
-  const badge =
-    m.nivel === "peligroso"
-      ? "bg-red-100 text-red-700"
-      : m.nivel === "urgente"
-        ? "bg-orange-100 text-orange-700"
-        : "bg-slate-100 text-slate-500";
-  return (
-    <li className="rounded-md border border-slate-200 bg-white p-2 text-sm">
-      <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-slate-800">{m.asunto || "(sin asunto)"}</span>
-        {m.tipo && <span className={`badge shrink-0 ${badge}`}>{m.tipo}</span>}
-      </div>
-      <p className="text-xs text-slate-500">{m.fecha}</p>
-    </li>
   );
 }

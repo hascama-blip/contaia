@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Cliente } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
+import BuzonPanel from "./BuzonPanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
@@ -152,7 +153,7 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
                   label="Comprobante electrónico"
                   value={cliente.sunat.comprobanteElectronico ? "Sí" : "No"}
                 />
-                <Field label="Dirección" value={cliente.sunat.direccion} />
+                <Field label="Domicilio fiscal" value={cliente.sunat.direccion} />
                 <div className="sm:col-span-2">
                   <p className="text-xs uppercase text-slate-400">Tributos / régimen</p>
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -163,6 +164,35 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
                     ))}
                   </div>
                 </div>
+                {cliente.sunat.representantes && cliente.sunat.representantes.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <p className="mb-1 text-xs uppercase text-slate-400">
+                      Representantes legales ({cliente.sunat.representantes.length})
+                    </p>
+                    <div className="overflow-hidden rounded-md border border-slate-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50 text-left text-[11px] uppercase text-slate-400">
+                          <tr>
+                            <th className="px-2 py-1">Nombre</th>
+                            <th className="px-2 py-1 whitespace-nowrap">Documento</th>
+                            <th className="px-2 py-1">Cargo</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {cliente.sunat.representantes.map((r, i) => (
+                            <tr key={i}>
+                              <td className="px-2 py-1 text-slate-700">{r.nombre}</td>
+                              <td className="px-2 py-1 whitespace-nowrap text-slate-600">
+                                {[r.tipoDoc, r.numeroDoc].filter(Boolean).join(" ")}
+                              </td>
+                              <td className="px-2 py-1 text-slate-500">{r.cargo ?? ""}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
                 <p className="text-xs text-slate-400 sm:col-span-2">
                   Fuente: {cliente.sunat.fuente} · {fmtFecha(cliente.sunat.consultadoAt)}
                 </p>
@@ -174,7 +204,25 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             )}
           </section>
 
-          {/* Consulta SUNAT unificada: SIRE + Buzón con una sola credencial */}
+          {/* ───── Fase 1 · Diagnóstico previo (solo Usuario + Clave SOL) ───── */}
+          <FaseHeader n="1" titulo="Diagnóstico previo" detalle="Solo Usuario + Clave SOL. Buzón y fraccionamiento." />
+
+          <BuzonPanel
+            clienteId={cliente.id}
+            solUserGuardado={cliente.credSire?.solUser ?? ""}
+            yaConsultado={Boolean(cliente.buzon)}
+          />
+
+          {/* Deudas tributarias: extracción directa de SUNAT (Fraccionamiento F36) */}
+          <DeudasF36Panel
+            clienteId={cliente.id}
+            solUserGuardado={cliente.credSire?.solUser ?? ""}
+            inicial={cliente.deudasF36 ?? null}
+          />
+
+          {/* ───── Fase 2 · Extracción SIRE + comparativo mensual (requiere API) ───── */}
+          <FaseHeader n="2" titulo="Extracción SIRE y comparativo mensual" detalle="Requiere colocar y bloquear la API." />
+
           <SunatPanel
             clienteId={cliente.id}
             inicialSire={cliente.sire ?? []}
@@ -188,18 +236,13 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             inicialSire={cliente.sire ?? []}
           />
 
-          {/* DJ anual (Formulario 710): comparativo año vs año */}
+          {/* ───── Fase 3 · Comparativo anual (subida de PDF) ───── */}
+          <FaseHeader n="3" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
+
           <DeclaracionesAnualesPanel
             clienteId={cliente.id}
             clienteRuc={cliente.ruc}
             inicial={cliente.declaracionesAnuales ?? []}
-          />
-
-          {/* Deudas tributarias: extracción directa de SUNAT (Fraccionamiento F36) */}
-          <DeudasF36Panel
-            clienteId={cliente.id}
-            solUserGuardado={cliente.credSire?.solUser ?? ""}
-            inicial={cliente.deudasF36 ?? null}
           />
         </div>
 
@@ -270,6 +313,20 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             )}
           </section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FaseHeader({ n, titulo, detalle }: { n: string; titulo: string; detalle: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
+        {n}
+      </span>
+      <div>
+        <h2 className="font-semibold text-slate-800">{titulo}</h2>
+        <p className="text-xs text-slate-500">{detalle}</p>
       </div>
     </div>
   );
