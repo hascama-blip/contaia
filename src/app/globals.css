@@ -108,4 +108,10 @@ body {
     break-after: avoid;
     page-break-after: avoid;
   }
+  /* "Isla": cada sección es una tarjeta que NO se parte entre hojas, para
+     cuadrarla limpia en la página (si excede una hoja, el navegador la parte). */
+  .isla {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

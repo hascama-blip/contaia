@@ -8,7 +8,6 @@ import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
-import { SireBarChart, HallazgosDonut } from "@/components/ReporteCharts";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
 
@@ -19,13 +18,6 @@ const RIESGO_LABEL: Record<NivelRiesgo, string> = {
   medio: "MEDIO",
   alto: "ALTO",
   critico: "CRÍTICO",
-};
-
-const SEV_DOT: Record<NivelRiesgo, string> = {
-  bajo: "bg-emerald-500",
-  medio: "bg-amber-500",
-  alto: "bg-orange-500",
-  critico: "bg-red-500",
 };
 
 export default async function InformePage({ params }: { params: { id: string } }) {
@@ -98,22 +90,6 @@ export default async function InformePage({ params }: { params: { id: string } }
   const igvComprasAcum = sire.reduce((a, s) => a + s.compras.igv, 0);
   const igvPorPagar = igvVentasAcum - igvComprasAcum;
   const nPeriodos = sire.length;
-
-  // Serie de periodos (ascendente) para el gráfico de barras.
-  const sireChartData = [...sire]
-    .sort((a, b) => a.periodo.localeCompare(b.periodo))
-    .slice(-12)
-    .map((s) => ({
-      name: `${s.periodo.slice(4, 6)}/${s.periodo.slice(2, 4)}`,
-      ventas: s.ventas.importeTotal,
-      compras: s.compras.importeTotal,
-    }));
-
-  const niveles: NivelRiesgo[] = ["bajo", "medio", "alto", "critico"];
-  const hallazgosData = niveles.map((n) => ({
-    name: n,
-    value: d.hallazgos.filter((h) => h.severidad === n).length,
-  }));
 
   const scoreColor =
     d.score >= 85 ? "#10b981" : d.score >= 65 ? "#f59e0b" : d.score >= 40 ? "#f97316" : "#ef4444";
@@ -241,81 +217,33 @@ export default async function InformePage({ params }: { params: { id: string } }
           </div>
         </section>
 
-        {/* ===================== DASHBOARD ===================== */}
-        {/* Fila 1: puntaje (anillo) + KPIs */}
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
-          {/* Tarjeta puntaje con anillo */}
-          <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
-            <div
-              className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
-              style={{ background: `conic-gradient(${scoreColor} ${scoreDeg}deg, #e2e8f0 ${scoreDeg}deg)` }}
-            >
-              <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-white">
-                <span className="text-2xl font-bold text-slate-800">{d.score}</span>
-                <span className="text-[10px] text-slate-400">/100</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">
-                Salud tributaria
-              </p>
-              <p className="text-lg font-bold" style={{ color: scoreColor }}>
-                {RIESGO_LABEL[d.nivelRiesgo]}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {d.hallazgos.length} hallazgo(s)
-              </p>
-            </div>
-          </div>
-
-          {/* KPIs acumulados (suma de todos los periodos consultados) */}
-          <Kpi
-            label={nPeriodos ? `Ventas acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Ventas acumuladas"}
-            value={fmtSoles(ventasAcum)}
-            tone="emerald"
-          />
-          <Kpi
-            label={nPeriodos ? `Compras acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Compras acumuladas"}
-            value={fmtSoles(comprasAcum)}
-            tone="blue"
-          />
+        {/* ===== DATOS DE CONSULTA RUC (primero) ===== */}
+        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="sec-h">
+            Situación registral SUNAT (consulta RUC)
+          </h3>
+          {sunat ? (
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-slate-100">
+                <Row k="Razón social" v={sunat.razonSocial} />
+                <Row k="Estado del contribuyente" v={sunat.estado} />
+                <Row k="Condición de domicilio" v={sunat.condicion} />
+                <Row k="Tipo de contribuyente" v={sunat.tipoContribuyente} />
+                <Row k="Domicilio fiscal" v={sunat.direccion} />
+                {sunat.fechaInscripcion && <Row k="Fecha de inscripción" v={sunat.fechaInscripcion} />}
+                {sunat.fechaInicioActividades && <Row k="Inicio de actividades" v={sunat.fechaInicioActividades} />}
+                <Row k="Emisor electrónico" v={sunat.comprobanteElectronico ? "Sí" : "No"} />
+                <Row k="Tributos / régimen" v={sunat.tributos.join(", ") || "—"} />
+                <Row k="Fuente del dato" v={sunat.fuente === "oficial" ? "API oficial SUNAT" : "Simulado (demo)"} />
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-slate-400">No se realizó consulta SUNAT.</p>
+          )}
         </section>
 
-        {/* Fila 2: KPIs secundarios */}
-        <section className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KpiSmall label="IGV ventas (acum.)" value={fmtSoles(igvVentasAcum)} />
-          <KpiSmall label="IGV compras (acum.)" value={fmtSoles(igvComprasAcum)} />
-          <KpiSmall
-            label="IGV por pagar (aprox.)"
-            value={fmtSoles(Math.max(0, igvPorPagar))}
-            tone={igvPorPagar > 0 ? "amber" : "emerald"}
-          />
-          <KpiSmall
-            label="Declaraciones c/ diferencias"
-            value={`${periodosConDiferencia} / ${totalDeclaraciones}`}
-            tone={periodosConDiferencia > 0 ? "red" : "emerald"}
-          />
-        </section>
-
-        {/* Fila 3: gráficos — en su propia hoja al imprimir, juntos */}
-        <section className="grafico-hoja mt-4 grid gap-4 md:grid-cols-2">
-          <div className="break-inside-avoid rounded-xl border border-slate-200 p-4">
-            <h3 className="mb-1 text-sm font-semibold text-slate-700">
-              Ventas vs Compras por periodo
-            </h3>
-            <SireBarChart data={sireChartData} />
-          </div>
-          <div className="break-inside-avoid rounded-xl border border-slate-200 p-4">
-            <h3 className="mb-1 text-sm font-semibold text-slate-700">
-              Hallazgos por severidad
-            </h3>
-            <HallazgosDonut data={hallazgosData} />
-          </div>
-        </section>
-        {/* =================== FIN DASHBOARD =================== */}
-
-        {/* Contingencias y alertas */}
-        <section className="mt-6">
+        {/* ===== Contingencias y alertas (después del RUC) ===== */}
+        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">
             Contingencias y alertas
           </h3>
@@ -340,35 +268,47 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* Situación SUNAT */}
-        <section className="mt-6">
-          <h3 className="sec-h">
-            Situación registral SUNAT
-          </h3>
-          {sunat ? (
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                <Row k="Estado del contribuyente" v={sunat.estado} />
-                <Row k="Condición de domicilio" v={sunat.condicion} />
-                <Row k="Tipo de contribuyente" v={sunat.tipoContribuyente} />
-                <Row k="Domicilio fiscal" v={sunat.direccion} />
-                {sunat.fechaInscripcion && <Row k="Fecha de inscripción" v={sunat.fechaInscripcion} />}
-                {sunat.fechaInicioActividades && <Row k="Inicio de actividades" v={sunat.fechaInicioActividades} />}
-                <Row k="Emisor electrónico" v={sunat.comprobanteElectronico ? "Sí" : "No"} />
-                <Row k="Tributos / régimen" v={sunat.tributos.join(", ") || "—"} />
-                <Row k="Fuente del dato" v={sunat.fuente === "oficial" ? "API oficial SUNAT" : "Simulado (demo)"} />
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-sm text-slate-400">No se realizó consulta SUNAT.</p>
-          )}
+        {/* ===== Resumen (puntaje + acumulados) ===== */}
+        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="sec-h">Resumen</h3>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
+              <div
+                className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
+                style={{ background: `conic-gradient(${scoreColor} ${scoreDeg}deg, #e2e8f0 ${scoreDeg}deg)` }}
+              >
+                <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-white">
+                  <span className="text-2xl font-bold text-slate-800">{d.score}</span>
+                  <span className="text-[10px] text-slate-400">/100</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Salud tributaria</p>
+                <p className="text-lg font-bold" style={{ color: scoreColor }}>{RIESGO_LABEL[d.nivelRiesgo]}</p>
+              </div>
+            </div>
+            <Kpi
+              label={nPeriodos ? `Ventas acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Ventas acumuladas"}
+              value={fmtSoles(ventasAcum)}
+              tone="emerald"
+            />
+            <Kpi
+              label={nPeriodos ? `Compras acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Compras acumuladas"}
+              value={fmtSoles(comprasAcum)}
+              tone="blue"
+            />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <KpiSmall label="IGV ventas (acum.)" value={fmtSoles(igvVentasAcum)} />
+            <KpiSmall label="IGV compras (acum.)" value={fmtSoles(igvComprasAcum)} />
+          </div>
         </section>
 
         {/* ===== 1) BUZÓN — todos los mensajes ===== */}
         {buzon && (
-          <section className="mt-6 print-full">
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">
-              Buzón electrónico SUNAT
+              Consulta de buzón electrónico
             </h3>
             <p className="mb-3 text-xs text-slate-500">
               {peligrosos.length} más peligroso(s) · {urgentes.length} urgente(s) ·{" "}
@@ -406,9 +346,9 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* ===== 2) ESTADO DE PRESENTACIÓN SIRE (aparte de los montos) ===== */}
         {cliente.sire && cliente.sire.length > 0 && (
-          <section className="mt-6 print-full">
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">
-              Estado de presentación SIRE (RVIE / RCE)
+              Consulta de presentación SIRE (RVIE / RCE)
             </h3>
             <p className="mb-3 text-xs text-slate-500">
               Estado de presentación por periodo de los registros de ventas (RVIE) y compras (RCE).
@@ -437,8 +377,8 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* ===== 3) FRACCIONAMIENTO / DEUDAS TRIBUTARIAS (SUNAT) ===== */}
         {/* Mensaje de bloqueo de SUNAT (p.ej. "Tiene deuda pendiente por Perdida") */}
         {cliente.deudasF36?.nota && (
-          <section className="mt-6 evitar-corte">
-            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="sec-h">Deuda tributaria y/o fraccionamiento</h3>
             <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               ⚠ SUNAT: {cliente.deudasF36.nota}
             </p>
@@ -446,8 +386,8 @@ export default async function InformePage({ params }: { params: { id: string } }
         )}
         {/* Sin deudas: mensaje positivo si se consultó y no hay pendientes */}
         {cliente.deudasF36?.at && nDeudas === 0 && !cliente.deudasF36?.nota && (
-          <section className="mt-6 evitar-corte">
-            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="sec-h">Deuda tributaria y/o fraccionamiento</h3>
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               Esta empresa no cuenta con deudas pendientes de acoger al fraccionamiento (consultado {fmtFecha(cliente.deudasF36.at)}).
             </p>
@@ -455,8 +395,8 @@ export default async function InformePage({ params }: { params: { id: string } }
         )}
         {/* Deudas tributarias (Fraccionamiento F36, por sección) */}
         {nDeudas > 0 && (
-          <section className="mt-6 print-full">
-            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="sec-h">Deuda tributaria y/o fraccionamiento</h3>
             {deudasF36.filter((t) => t.filas.length > 0).map((t) => (
               <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
                 <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
@@ -485,7 +425,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* ===== 4) COMPRAS Y VENTAS (SIRE) — MONTOS ===== */}
         {cliente.sire && cliente.sire.length > 0 && (
-          <section className="mt-6 print-full">
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">
               Compras y Ventas (SIRE) — montos
             </h3>
@@ -519,7 +459,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* ===== 5) COMPARATIVO MENSUAL — Declaración vs SIRE ===== */}
         {totalDeclaraciones > 0 && (
-          <section className="mt-6 print-full">
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">
               Declaración mensual vs SIRE
             </h3>
@@ -592,7 +532,7 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* DJ Anual — comparativo año vs año (Formulario 710) */}
         {compAnual && (
-          <section className="mt-6 print-full">
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">
               DJ Anual — comparativo año vs año
             </h3>
@@ -640,33 +580,10 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
-        {/* ===== 7) Hallazgos del análisis ===== */}
-        <section className="mt-6">
+        {/* ===== Acción (recomendaciones) ===== */}
+        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">
-            Hallazgos del análisis
-          </h3>
-          <ul className="space-y-2">
-            {d.hallazgos.map((h, i) => (
-              <li key={i} className="flex gap-3 rounded-md border border-slate-200 p-3">
-                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${SEV_DOT[h.severidad]}`} />
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {h.titulo}
-                    <span className="ml-2 text-xs font-normal text-slate-400">
-                      ({RIESGO_LABEL[h.severidad].toLowerCase()})
-                    </span>
-                  </p>
-                  <p className="text-sm text-slate-600">{h.detalle}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Recomendaciones */}
-        <section className="mt-6">
-          <h3 className="sec-h">
-            Recomendaciones
+            Acción
           </h3>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
             {d.recomendaciones.map((r, i) => (
@@ -675,10 +592,10 @@ export default async function InformePage({ params }: { params: { id: string } }
           </ol>
         </section>
 
-        {/* Detalle de observaciones para la toma de decisiones */}
-        <section className="mt-6 print-full">
+        {/* ===== Ejecución (observaciones para la toma de decisiones) ===== */}
+        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">
-            Observaciones para la toma de decisiones
+            Ejecución
           </h3>
           {observacionesFinal.length === 0 ? (
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
