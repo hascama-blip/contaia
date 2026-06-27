@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
-import { getUserById, getClienteDeUsuario } from "./db";
+import { getUserById, getClienteDeUsuario, getUserByEmail, createUser } from "./db";
 import { verifySessionToken, SESSION_COOKIE } from "./authToken";
 import type { Usuario, Cliente } from "./types";
 
@@ -28,6 +28,26 @@ export function verifyPassword(pw: string, stored: string): boolean {
 export function publicUser(u: Usuario): UsuarioPublico {
   const { passHash, ...rest } = u;
   return rest;
+}
+
+// Credenciales del usuario supremo (dueño de la plataforma). Se pueden
+// sobreescribir por entorno; si no, usa los valores iniciales acordados.
+const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "dascama@gmail.com").trim().toLowerCase();
+const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "D2n6a0d92000@";
+const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador supremo";
+
+/** Crea el usuario supremo si aún no existe (idempotente). Se llama al entrar
+ *  a /login y al panel del supremo, para garantizar que la cuenta exista. */
+export async function ensureSupremo(): Promise<void> {
+  const existente = await getUserByEmail(SUPREMO_EMAIL);
+  if (existente) return;
+  await createUser({
+    nombre: SUPREMO_NOMBRE,
+    email: SUPREMO_EMAIL,
+    passHash: hashPassword(SUPREMO_PASSWORD),
+    rol: "supremo",
+    estado: "aprobado",
+  });
 }
 
 /** Usuario de la sesión actual (o null si no hay sesión válida). */
@@ -56,11 +76,33 @@ export function studioId(u: Usuario): string {
   return u.parentId ?? u.id;
 }
 
+/** ¿Es el usuario supremo (dueño de la plataforma)? */
+export function esSupremo(u: Usuario | null | undefined): boolean {
+  return Boolean(u) && u!.rol === "supremo";
+}
+
+/** ¿Puede ingresar a la plataforma? El supremo siempre; un operador si su
+ *  estudio está aprobado; un admin si su estado es aprobado (o antiguo). */
+export function puedeIngresar(u: Usuario, parent?: Usuario | null): boolean {
+  if (esSupremo(u)) return true;
+  const ok = (e?: Usuario["estado"]) => e === undefined || e === "aprobado";
+  if (u.parentId) return ok(parent?.estado); // operador: depende de su admin
+  return ok(u.estado); // admin/estudio
+}
+
 /** Exige sesión Y rol admin (para acciones reservadas al dueño del estudio). */
 export async function requireAdmin(): Promise<Usuario | null> {
   const u = await getCurrentUser();
   if (!u) return null;
   return esAdmin(u) ? u : null;
+}
+
+/** Exige sesión Y rol supremo. Redirige a inicio si no lo es. */
+export async function requireSupremo(): Promise<Usuario> {
+  const u = await getCurrentUser();
+  if (!u) redirect("/login");
+  if (!esSupremo(u)) redirect("/");
+  return u;
 }
 
 /**

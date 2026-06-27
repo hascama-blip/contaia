@@ -6,7 +6,7 @@ interface Sub {
   id: string;
   nombre: string;
   email: string;
-  rol?: "admin" | "operador";
+  rol?: "supremo" | "admin" | "operador";
   createdAt: string;
 }
 

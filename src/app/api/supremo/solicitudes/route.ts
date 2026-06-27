@@ -1,0 +1,35 @@
+import { NextRequest, NextResponse } from "next/server";
+import { esSupremo, getCurrentUser, publicUser } from "@/lib/auth";
+import { listSolicitudes, setEstadoUsuario } from "@/lib/db";
+
+export const runtime = "nodejs";
+
+const ESTADOS = ["pendiente", "aprobado", "rechazado"] as const;
+type Estado = (typeof ESTADOS)[number];
+
+// Lista las solicitudes/estudios (solo el supremo). Filtro opcional ?estado=.
+export async function GET(req: NextRequest) {
+  if (!esSupremo(await getCurrentUser())) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
+  const e = req.nextUrl.searchParams.get("estado");
+  const estado = ESTADOS.includes(e as Estado) ? (e as Estado) : undefined;
+  const solicitudes = (await listSolicitudes(estado)).map(publicUser);
+  return NextResponse.json({ solicitudes });
+}
+
+// Aprueba o rechaza el acceso de un estudio (solo el supremo).
+export async function PATCH(req: NextRequest) {
+  if (!esSupremo(await getCurrentUser())) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const userId = String(body?.userId ?? "");
+  const estado = body?.estado as Estado;
+  if (!userId || !ESTADOS.includes(estado)) {
+    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+  }
+  const u = await setEstadoUsuario(userId, estado);
+  if (!u) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
+  return NextResponse.json({ ok: true, usuario: publicUser(u) });
+}

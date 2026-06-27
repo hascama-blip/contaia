@@ -87,10 +87,16 @@ export interface Usuario {
   email: string;
   passHash: string;
   createdAt: string;
-  /** Rol: "admin" (dueño del estudio) u "operador" (sub-usuario limitado). */
-  rol?: "admin" | "operador";
+  /** Rol: "supremo" (dueño de la plataforma), "admin" (dueño de un estudio)
+   *  u "operador" (sub-usuario limitado). */
+  rol?: "supremo" | "admin" | "operador";
   /** Id del admin del estudio al que pertenece (vacío = es admin/dueño). */
   parentId?: string;
+  /** Estado de acceso de un estudio (admin): pendiente de aprobación del
+   *  supremo, aprobado o rechazado. undefined = cuenta antigua (aprobada). */
+  estado?: "pendiente" | "aprobado" | "rechazado";
+  /** Fecha en que el supremo decidió (aprobó/rechazó). */
+  decididoAt?: string;
 }
 
 export interface Cliente {

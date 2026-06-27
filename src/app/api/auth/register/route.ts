@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, getUserByEmail } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/authToken";
+import { hashPassword, ensureSupremo } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+// Registro = SOLICITUD DE ACCESO. Crea la cuenta en estado "pendiente" y NO
+// inicia sesión: el usuario supremo debe aprobarla antes de poder ingresar.
 export async function POST(req: NextRequest) {
+  await ensureSupremo();
   const body = await req.json().catch(() => null);
   const nombre = String(body?.nombre ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
@@ -24,12 +26,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ya existe una cuenta con ese correo." }, { status: 409 });
   }
 
-  const user = await createUser({ nombre, email, passHash: hashPassword(password) });
-  const token = await createSessionToken(user.id);
-  const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true, sameSite: "lax", path: "/", maxAge: SESSION_MAX_AGE,
-    secure: process.env.NODE_ENV === "production",
+  await createUser({ nombre, email, passHash: hashPassword(password), estado: "pendiente" });
+  return NextResponse.json({
+    ok: true,
+    pendiente: true,
+    mensaje: "Tu solicitud de acceso fue enviada. Un administrador la revisará y te habilitará el ingreso.",
   });
-  return res;
 }

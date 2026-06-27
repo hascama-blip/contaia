@@ -90,8 +90,9 @@ export async function createUser(data: {
   nombre: string;
   email: string;
   passHash: string;
-  rol?: "admin" | "operador";
+  rol?: "supremo" | "admin" | "operador";
   parentId?: string;
+  estado?: "pendiente" | "aprobado" | "rechazado";
 }): Promise<Usuario> {
   const store = await readStore();
   if (!store.users) store.users = [];
@@ -103,10 +104,38 @@ export async function createUser(data: {
     createdAt: new Date().toISOString(),
     rol: data.rol ?? (data.parentId ? "operador" : "admin"),
     parentId: data.parentId,
+    estado: data.estado,
   };
   store.users.push(user);
   await writeStore(store);
   return user;
+}
+
+// ---- Solicitudes de acceso (las gestiona el usuario supremo) ---------------
+
+/** Estudios (admins) por estado de acceso. Excluye operadores y al supremo. */
+export async function listSolicitudes(
+  estado?: "pendiente" | "aprobado" | "rechazado"
+): Promise<Usuario[]> {
+  const store = await readStore();
+  return (store.users ?? [])
+    .filter((u) => !u.parentId && u.rol !== "supremo")
+    .filter((u) => (estado ? (u.estado ?? "aprobado") === estado : true))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** El supremo aprueba o rechaza el acceso de un estudio. */
+export async function setEstadoUsuario(
+  userId: string,
+  estado: "pendiente" | "aprobado" | "rechazado"
+): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
+  if (!u) return null;
+  u.estado = estado;
+  u.decididoAt = new Date().toISOString();
+  await writeStore(store);
+  return u;
 }
 
 /** Sub-usuarios (operadores) de un admin/estudio. */

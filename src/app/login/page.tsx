@@ -14,11 +14,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setAviso(null);
     try {
       const url = modo === "login" ? "/api/auth/login" : "/api/auth/register";
       const res = await fetch(url, {
@@ -29,6 +31,13 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "No se pudo continuar.");
+        return;
+      }
+      // El registro NO inicia sesión: queda pendiente de aprobación del supremo.
+      if (modo === "registro" && data.pendiente) {
+        setModo("login");
+        setPassword("");
+        setAviso(data.mensaje ?? "Tu solicitud de acceso fue enviada. Espera la aprobación.");
         return;
       }
       router.replace(next);
@@ -45,14 +54,17 @@ export default function LoginPage() {
       </div>
       <div className="card p-6">
         <h1 className="text-xl font-bold text-slate-800">
-          {modo === "login" ? "Iniciar sesión" : "Crear cuenta"}
+          {modo === "login" ? "Iniciar sesión" : "Solicitar acceso"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {modo === "login"
             ? "Entra a tu espacio de trabajo."
-            : "Tu espacio es privado: solo tú verás tus empresas."}
+            : "Solicita acceso: un administrador revisará tu pedido y te habilitará el ingreso."}
         </p>
 
+        {aviso && (
+          <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{aviso}</div>
+        )}
         {error && (
           <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
         )}
@@ -93,7 +105,7 @@ export default function LoginPage() {
             />
           </div>
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Un momento…" : modo === "login" ? "Entrar" : "Crear cuenta"}
+            {busy ? "Un momento…" : modo === "login" ? "Entrar" : "Solicitar acceso"}
           </button>
         </form>
 
@@ -101,8 +113,8 @@ export default function LoginPage() {
           {modo === "login" ? (
             <>
               ¿No tienes cuenta?{" "}
-              <button className="font-semibold text-brand-600 hover:underline" onClick={() => { setModo("registro"); setError(null); }}>
-                Crear una
+              <button className="font-semibold text-brand-600 hover:underline" onClick={() => { setModo("registro"); setError(null); setAviso(null); }}>
+                Solicitar acceso
               </button>
             </>
           ) : (
