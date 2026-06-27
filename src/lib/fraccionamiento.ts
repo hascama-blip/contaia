@@ -34,6 +34,9 @@ export interface FraccResultado {
   tablas?: TablaDeuda[];
   /** Mensaje de SUNAT (texto en rojo) cuando bloquea el trámite. */
   nota?: string;
+  /** Nº y fecha del pedido de deuda recién generado (TESORO). */
+  numPedido?: string;
+  fechaPedido?: string;
   error?: string;
   diag?: { pasos: any[] };
 }
@@ -774,9 +777,11 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     if (tesoroVigente) {
       return {
         ok: true,
+        numPedido: tesoroVigente.numero || undefined,
+        fechaPedido: tesoroVigente.fecha || undefined,
         mensaje:
           `Pedido de deuda generado (TESORO, N° ${tesoroVigente.numero || "s/n"}). ` +
-          `Estado: ${tesoroVigente.estado || "en proceso"}. Espera ~5 minutos y usa “Consultar y extraer”.`,
+          `SUNAT lo está procesando ("Esperar unos minutos"). Usa “Verificar estado” hasta que quede “Pendiente de Elaborar Solicitud”.`,
         diag: { pasos },
       };
     }

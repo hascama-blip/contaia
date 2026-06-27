@@ -83,6 +83,8 @@ export default function DeudasF36Panel({
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
       if (!res.ok) { setError(data.error ?? "No se pudo generar."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
       setEstado("en-proceso");
+      if (data.numPedido) setNumPedido(data.numPedido);
+      if (data.fechaPedido) setFechaPedido(data.fechaPedido);
       setInfo((data.mensaje ?? "Pedido generado.") + " Usa “Verificar estado” hasta que diga Listo.");
     } catch { setError("Se cortó la conexión con SUNAT."); }
     finally { setBusy(null); }

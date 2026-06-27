@@ -71,7 +71,7 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
         if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         return;
       }
-      if (fase === "generar") setEstado("en-proceso");
+      if (fase === "generar") { setEstado("en-proceso"); if (data.numPedido) setNumPedido(data.numPedido); }
       if (fase === "estado" && data.estado) { setEstado(data.estado); setNumPedido(data.numPedido ?? null); }
       if (fase === "extraer") {
         if (Array.isArray(data.tablas)) setTablas(data.tablas);

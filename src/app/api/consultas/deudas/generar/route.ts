@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
 
   const r = await generarPedidoDeuda({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
-  if (r.ok && !body.diagnostico) await setDeudaGenerado(cliente.id).catch(() => {});
+  if (r.ok && !body.diagnostico) {
+    await setDeudaGenerado(cliente.id, { numPedido: r.numPedido, fechaPedido: r.fechaPedido }).catch(() => {});
+  }
   return NextResponse.json(r, { status: r.ok || body.diagnostico ? 200 : 400 });
 }
