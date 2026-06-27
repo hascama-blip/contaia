@@ -118,7 +118,20 @@ export interface Cliente {
   /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
   deudas: Deuda[];
   /** Deudas del F36 (fraccionamiento Art. 36) extraídas del portal SOL. */
-  deudasF36?: { tablas: DeudaF36Tabla[]; at: string; generadoAt?: string; nota?: string } | null;
+  deudasF36?: {
+    tablas: DeudaF36Tabla[];
+    /** Fecha de la última extracción (las 5 pestañas). */
+    at?: string;
+    generadoAt?: string;
+    nota?: string;
+    /** Trazabilidad del pedido de deuda (proceso asíncrono de SUNAT). */
+    numPedido?: string;
+    fechaPedido?: string;
+    estado?: "sin-pedido" | "en-proceso" | "listo" | "extraido" | "vencido";
+    estadoTexto?: string;
+    accion?: string;
+    verificadoAt?: string;
+  } | null;
   /** Credenciales de la API SIRE guardadas (la Clave SOL NO se guarda). */
   credSire?: CredencialesSire | null;
   /** Seguimientos de mensajes del buzón (plazo de atención + comentario). */

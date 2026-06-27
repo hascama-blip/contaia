@@ -5,6 +5,15 @@ import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 
 interface ClienteOpt { id: string; razonSocial: string; ruc: string; solUser: string }
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
+type Estado = "sin-pedido" | "en-proceso" | "listo" | "extraido" | "vencido";
+
+const BADGE: Record<Estado, { txt: string; cls: string }> = {
+  "sin-pedido": { txt: "Sin pedido", cls: "bg-slate-100 text-slate-500" },
+  "en-proceso": { txt: "⏳ En proceso (SUNAT calculando)", cls: "bg-amber-100 text-amber-700" },
+  listo: { txt: "✅ Listo para extraer", cls: "bg-emerald-100 text-emerald-700" },
+  extraido: { txt: "📥 Extraído", cls: "bg-sky-100 text-sky-700" },
+  vencido: { txt: "⚠ Vencido — genera de nuevo", cls: "bg-red-100 text-red-700" },
+};
 
 export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) {
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? "");
@@ -12,26 +21,23 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
   const [solPass, setSolPass] = useState("");
   const [tablas, setTablas] = useState<Tabla[]>([]);
   const [at, setAt] = useState<string | null>(null);
-  const [puedeActualizar, setPuedeActualizar] = useState(true);
-  const [diasParaActualizar, setDiasParaActualizar] = useState(0);
-  const [busy, setBusy] = useState<"gen" | "ext" | null>(null);
+  const [estado, setEstado] = useState<Estado>("sin-pedido");
+  const [numPedido, setNumPedido] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"gen" | "ver" | "ext" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
-  const [forzar, setForzar] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
   const cargarGuardadas = useCallback(async (id: string) => {
     if (!id) return;
     try {
-      const res = await fetch(`/api/consultas/deudas/extraer?clienteId=${encodeURIComponent(id)}`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setTablas(data.tablas ?? []);
-        setAt(data.at ?? null);
-        setPuedeActualizar(data.puedeActualizar ?? true);
-        setDiasParaActualizar(data.diasParaActualizar ?? 0);
-      }
+      const [x, e] = await Promise.all([
+        fetch(`/api/consultas/deudas/extraer?clienteId=${encodeURIComponent(id)}`).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/consultas/deudas/estado?clienteId=${encodeURIComponent(id)}`).then((r) => r.json()).catch(() => ({})),
+      ]);
+      if (Array.isArray(x?.tablas)) { setTablas(x.tablas); setAt(x.at ?? null); }
+      if (e?.estado) { setEstado(e.estado); setNumPedido(e.numPedido ?? null); }
     } catch { /* */ }
   }, []);
 
@@ -44,19 +50,19 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
   function elegir(id: string) {
     setClienteId(id);
     setSolUser(clientes.find((c) => c.id === id)?.solUser ?? "");
-    setTablas([]); setAt(null); setError(null); setInfo(null);
+    setTablas([]); setAt(null); setError(null); setInfo(null); setEstado("sin-pedido"); setNumPedido(null);
   }
 
-  async function llamar(fase: "generar" | "extraer") {
+  async function llamar(fase: "generar" | "extraer" | "estado") {
     if (!clienteId) return setError("Elige una empresa.");
     if (!solPass) return setError("Ingresa la Clave SOL.");
-    setBusy(fase === "generar" ? "gen" : "ext"); setError(null); setDiag(null);
-    setInfo(fase === "generar" ? "Generando el pedido de deuda en SUNAT…" : "Consultando el estado y extrayendo las deudas…");
+    setBusy(fase === "generar" ? "gen" : fase === "estado" ? "ver" : "ext"); setError(null); setDiag(null);
+    setInfo(fase === "generar" ? "Generando el pedido de deuda…" : fase === "estado" ? "Verificando el estado del pedido…" : "Extrayendo las deudas…");
     try {
       const res = await fetch(`/api/consultas/deudas/${fase}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, diagnostico: modoDiag, forzar }),
+        body: JSON.stringify({ clienteId, solUser, solPass, diagnostico: modoDiag, forzar: true }),
       });
       const data = await res.json().catch(() => ({}));
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
@@ -65,10 +71,12 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
         if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         return;
       }
+      if (fase === "generar") setEstado("en-proceso");
+      if (fase === "estado" && data.estado) { setEstado(data.estado); setNumPedido(data.numPedido ?? null); }
       if (fase === "extraer") {
         if (Array.isArray(data.tablas)) setTablas(data.tablas);
         if (data.at) setAt(data.at);
-        if (!data.desdeCache) { setPuedeActualizar(false); setDiasParaActualizar(3); }
+        setEstado("extraido");
       }
       setInfo(data.mensaje ?? "Listo.");
     } catch {
@@ -78,12 +86,16 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Deudas tributarias (Fraccionamiento Art. 36)</h2>
-        <p className="text-sm text-slate-500">
-          Genera el pedido de deuda en SUNAT, espera ~5 minutos y extrae las deudas (Valores,
-          Autoliquidadas/Reliquidadas, Otras y No acogibles).
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Deudas tributarias (Fraccionamiento Art. 36)</h2>
+          <p className="text-sm text-slate-500">
+            Generas el pedido, SUNAT lo procesa (tarda distinto por empresa) y, cuando queda
+            “Pendiente de Elaborar Solicitud”, recién se extraen las deudas. Verifica el estado
+            hasta que diga <b>Listo</b>.
+          </p>
+        </div>
+        <span className={`badge ${BADGE[estado].cls}`}>{BADGE[estado].txt}{numPedido ? ` · N° ${numPedido}` : ""}</span>
       </div>
 
       {info && <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
@@ -119,27 +131,24 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button className="btn-primary" onClick={() => llamar("generar")} disabled={busy !== null}>
-              {busy === "gen" ? "Generando…" : "1) Generar pedido de deuda"}
+            <button className="btn-ghost" onClick={() => llamar("generar")} disabled={busy !== null}>
+              {busy === "gen" ? "Generando…" : "1) Generar pedido"}
             </button>
-            <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null || (!puedeActualizar && !forzar)}>
-              {busy === "ext" ? "Extrayendo…" : puedeActualizar ? "2) Consultar y extraer" : `2) Actualizar (en ~${diasParaActualizar} día(s))`}
+            <button className="btn-ghost" onClick={() => llamar("estado")} disabled={busy !== null}>
+              {busy === "ver" ? "Verificando…" : "🔄 Verificar estado"}
+            </button>
+            <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null || !(estado === "listo" || estado === "extraido")} title={estado === "listo" || estado === "extraido" ? "" : "Disponible cuando el pedido esté Listo"}>
+              {busy === "ext" ? "Extrayendo…" : "2) Extraer deudas"}
             </button>
             <label className="flex items-center gap-2 text-xs text-slate-500">
               <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
               Modo diagnóstico
             </label>
-            {!puedeActualizar && (
-              <label className="flex items-center gap-2 text-xs text-amber-600">
-                <input type="checkbox" checked={forzar} onChange={(e) => setForzar(e.target.checked)} />
-                Forzar ahora (ignora el límite de 3 días)
-              </label>
-            )}
           </div>
-          <p className="mt-2 text-xs text-amber-600">
-            ⏱️ Para no saturar SUNAT (te bloquea por “spam”), las deudas se actualizan <b>cada 3 días</b>.
-            Dentro de ese plazo se muestran las guardadas. La nueva extracción <b>reemplaza</b> la anterior.
-            {at && !puedeActualizar ? ` Última: ${new Date(at).toLocaleString("es-PE")}.` : ""}
+          <p className="mt-2 text-xs text-slate-400">
+            Flujo: <b>Generar</b> → <b>Verificar estado</b> (las veces que haga falta, cada empresa
+            tarda distinto) → cuando diga <b>Listo</b>, <b>Extraer deudas</b>.
+            {at ? ` Última extracción: ${new Date(at).toLocaleString("es-PE")}.` : ""}
           </p>
         </div>
       )}

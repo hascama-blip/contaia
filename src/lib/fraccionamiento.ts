@@ -610,6 +610,80 @@ async function abrirConsultaPedidos(ctx: any, page: any, pasos: any[]) {
 const esTesoroVigente = (p: { entidad: string; estado: string }) =>
   /tesoro/i.test(p.entidad) && !/cancelado|vencido|anulad|rechazad/i.test(p.estado);
 
+// ---- Trazabilidad: verificar ESTADO del pedido (consulta liviana) ----------
+export type EstadoF36 = "sin-pedido" | "en-proceso" | "listo" | "vencido";
+
+export interface EstadoPedidoResultado {
+  ok: boolean;
+  estado?: EstadoF36;
+  numPedido?: string;
+  fechaPedido?: string;
+  estadoTexto?: string;
+  accion?: string;
+  mensaje?: string;
+  error?: string;
+  diag?: { pasos: any[] };
+}
+
+function derivarEstadoF36(p?: { estado: string; accion: string }): EstadoF36 {
+  if (!p) return "sin-pedido";
+  const blob = `${p.accion || ""} ${p.estado || ""}`.toLowerCase();
+  if (/elaborar/.test(blob)) return "listo";
+  if (/generar nuevo|cancelad|vencid|anulad|rechazad/.test(blob)) return "vencido";
+  return "en-proceso";
+}
+
+/**
+ * Verifica el estado del pedido de deuda TESORO SIN extraer (rápido). Sirve para
+ * la trazabilidad del proceso asíncrono: tras generar, se va "verificando" hasta
+ * que SUNAT lo deja "Pendiente de Elaborar Solicitud" (= listo para extraer).
+ */
+export async function verificarEstadoPedidoF36(params: FraccParams): Promise<EstadoPedidoResultado> {
+  const { ruc, solUser, solPass } = params;
+  if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
+  if (!solUser || !solPass) return { ok: false, error: "Ingresa el Usuario y la Clave SOL." };
+  const diagnostico = params.diagnostico === true;
+  const pasos: any[] = [];
+  let browser: any = null;
+  try {
+    const s = await loginSol(params, pasos);
+    browser = s.browser;
+    if (s.loginError) return { ok: false, error: MSG_LOGIN_ERROR, diag: { pasos } };
+    await cerrarPantallas(s.ctx, s.page);
+
+    const pedidos = await abrirConsultaPedidos(s.ctx, s.page, pasos);
+    const tesoros = pedidos.filter((p) => /tesoro/i.test(p.entidad));
+    const tesoro =
+      tesoros.find((p) => /elaborar/i.test(p.accion)) ||
+      tesoros.find((p) => !/cancelad|vencid/i.test(p.estado) && !/generar nuevo/i.test(p.accion)) ||
+      tesoros[0];
+    const estado = derivarEstadoF36(tesoro);
+    const mensaje =
+      estado === "listo"
+        ? "Listo para extraer las deudas."
+        : estado === "en-proceso"
+        ? "SUNAT aún está procesando el pedido. Vuelve a verificar en unos minutos."
+        : estado === "vencido"
+        ? "El pedido venció o fue cancelado. Genera un nuevo pedido."
+        : "No hay un pedido de deuda generado. Genera el pedido primero.";
+    return {
+      ok: true,
+      estado,
+      numPedido: tesoro?.numero,
+      fechaPedido: tesoro?.fecha,
+      estadoTexto: tesoro?.estado,
+      accion: tesoro?.accion,
+      mensaje,
+      diag: diagnostico ? { pasos } : undefined,
+    };
+  } catch (err) {
+    pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
 // ---- FASE 1: generar pedido de deuda ---------------------------------------
 // Flujo del portal: Fracc Art 36 → "Generación de pedido de deuda" → marcar
 // TESORO → generar. (También se puede desde "Consulta estado de pedido de

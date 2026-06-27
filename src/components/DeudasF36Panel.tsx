@@ -4,6 +4,31 @@ import { useEffect, useState, useCallback } from "react";
 import { getSolPass } from "@/lib/solSession";
 
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
+type Estado = "sin-pedido" | "en-proceso" | "listo" | "extraido" | "vencido";
+
+interface Inicial {
+  tablas?: Tabla[];
+  at?: string;
+  nota?: string;
+  estado?: Estado;
+  numPedido?: string;
+  fechaPedido?: string;
+  generadoAt?: string;
+  verificadoAt?: string;
+}
+
+const BADGE: Record<Estado, { txt: string; cls: string }> = {
+  "sin-pedido": { txt: "Sin pedido", cls: "bg-slate-100 text-slate-500" },
+  "en-proceso": { txt: "⏳ En proceso (SUNAT calculando)", cls: "bg-amber-100 text-amber-700" },
+  listo: { txt: "✅ Listo para extraer", cls: "bg-emerald-100 text-emerald-700" },
+  extraido: { txt: "📥 Extraído", cls: "bg-sky-100 text-sky-700" },
+  vencido: { txt: "⚠ Vencido — genera de nuevo", cls: "bg-red-100 text-red-700" },
+};
+
+function fmt(iso?: string | null) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleString("es-PE"); } catch { return iso; }
+}
 
 export default function DeudasF36Panel({
   clienteId,
@@ -12,99 +37,130 @@ export default function DeudasF36Panel({
 }: {
   clienteId: string;
   solUserGuardado: string;
-  inicial: { tablas: Tabla[]; at: string } | null | undefined;
+  inicial: Inicial | null | undefined;
 }) {
   const [tablas, setTablas] = useState<Tabla[]>(inicial?.tablas ?? []);
   const [at, setAt] = useState<string | null>(inicial?.at ?? null);
-  const [puedeActualizar, setPuedeActualizar] = useState(true);
-  const [diasParaActualizar, setDiasParaActualizar] = useState(0);
-  const [nota, setNota] = useState<string | null>((inicial as any)?.nota ?? null);
-  const [busy, setBusy] = useState<"gen" | "ext" | null>(null);
+  const [nota, setNota] = useState<string | null>(inicial?.nota ?? null);
+  const [estado, setEstado] = useState<Estado>(inicial?.estado ?? "sin-pedido");
+  const [numPedido, setNumPedido] = useState<string | null>(inicial?.numPedido ?? null);
+  const [fechaPedido, setFechaPedido] = useState<string | null>(inicial?.fechaPedido ?? null);
+  const [verificadoAt, setVerificadoAt] = useState<string | null>(inicial?.verificadoAt ?? null);
+  const [busy, setBusy] = useState<"gen" | "ver" | "ext" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [forzar, setForzar] = useState(false);
   const [modoDiag, setModoDiag] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     try {
-      const res = await fetch(`/api/consultas/deudas/extraer?clienteId=${encodeURIComponent(clienteId)}`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setTablas(data.tablas ?? []);
-        setAt(data.at ?? null);
-        setNota(data.nota ?? null);
-        setPuedeActualizar(data.puedeActualizar ?? true);
-        setDiasParaActualizar(data.diasParaActualizar ?? 0);
-      }
+      const [e, x] = await Promise.all([
+        fetch(`/api/consultas/deudas/estado?clienteId=${encodeURIComponent(clienteId)}`).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/consultas/deudas/extraer?clienteId=${encodeURIComponent(clienteId)}`).then((r) => r.json()).catch(() => ({})),
+      ]);
+      if (e?.estado) { setEstado(e.estado); setNumPedido(e.numPedido ?? null); setFechaPedido(e.fechaPedido ?? null); setVerificadoAt(e.verificadoAt ?? null); }
+      if (Array.isArray(x?.tablas)) { setTablas(x.tablas); setAt(x.at ?? null); setNota(x.nota ?? null); }
     } catch { /* */ }
   }, [clienteId]);
   useEffect(() => { cargar(); }, [cargar]);
 
-  async function llamar(fase: "generar" | "extraer") {
+  function accesos() {
     const solUser = solUserGuardado;
     const solPass = getSolPass(clienteId);
-    if (!solUser || !solPass) return setError("Carga tus accesos SOL (arriba) para continuar.");
-    setBusy(fase === "generar" ? "gen" : "ext"); setError(null); setDiag(null);
-    setInfo(fase === "generar" ? "Generando el pedido de deuda en SUNAT…" : "Consultando y extrayendo las deudas…");
+    if (!solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para continuar."); return null; }
+    return { solUser, solPass };
+  }
+
+  async function generar() {
+    const a = accesos(); if (!a) return;
+    setBusy("gen"); setError(null); setDiag(null); setInfo("Generando el pedido de deuda en SUNAT…");
     try {
-      const res = await fetch(`/api/consultas/deudas/${fase}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, solUser, solPass, forzar, diagnostico: modoDiag }),
+      const res = await fetch("/api/consultas/deudas/generar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, ...a, forzar: true, diagnostico: modoDiag }),
       });
       const data = await res.json().catch(() => ({}));
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
-      if (!res.ok) {
-        setError(data.error ?? "No se pudo completar.");
-        if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-        return;
-      }
-      if (fase === "extraer" && Array.isArray(data.tablas)) {
-        setTablas(data.tablas);
-        setNota(data.nota ?? null);
-        if (data.at) setAt(data.at);
-        if (!data.desdeCache) { setPuedeActualizar(false); setDiasParaActualizar(3); }
-      }
+      if (!res.ok) { setError(data.error ?? "No se pudo generar."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
+      setEstado("en-proceso");
+      setInfo((data.mensaje ?? "Pedido generado.") + " Usa “Verificar estado” hasta que diga Listo.");
+    } catch { setError("Se cortó la conexión con SUNAT."); }
+    finally { setBusy(null); }
+  }
+
+  async function verificar() {
+    const a = accesos(); if (!a) return;
+    setBusy("ver"); setError(null); setDiag(null); setInfo("Verificando el estado del pedido en SUNAT…");
+    try {
+      const res = await fetch("/api/consultas/deudas/estado", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, ...a, diagnostico: modoDiag }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
+      if (!res.ok) { setError(data.error ?? "No se pudo verificar."); return; }
+      if (data.estado) { setEstado(data.estado); setNumPedido(data.numPedido ?? null); setFechaPedido(data.fechaPedido ?? null); setVerificadoAt(new Date().toISOString()); }
+      setInfo(data.mensaje ?? "Estado actualizado.");
+    } catch { setError("Se cortó la conexión con SUNAT."); }
+    finally { setBusy(null); }
+  }
+
+  async function extraer() {
+    const a = accesos(); if (!a) return;
+    setBusy("ext"); setError(null); setDiag(null); setInfo("Extrayendo las deudas (las pestañas)…");
+    try {
+      const res = await fetch("/api/consultas/deudas/extraer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, ...a, forzar: true, diagnostico: modoDiag }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
+      if (!res.ok) { setError(data.error ?? "No se pudo extraer."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
+      if (Array.isArray(data.tablas)) { setTablas(data.tablas); setNota(data.nota ?? null); if (data.at) setAt(data.at); setEstado("extraido"); }
       setInfo(data.mensaje ?? "Listo.");
-    } catch {
-      setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
-    } finally { setBusy(null); }
+    } catch { setError("Se cortó la conexión con SUNAT."); }
+    finally { setBusy(null); }
   }
 
   const totalRegistros = tablas.reduce((a, t) => a + t.filas.length, 0);
+  const puedeExtraer = estado === "listo" || estado === "extraido";
+  const b = BADGE[estado];
 
   return (
     <section className="card p-5">
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold text-slate-800">Deudas tributarias (Fraccionamiento Art. 36)</h2>
-        <p className="text-xs text-slate-500">
-          Extrae las deudas directo de SUNAT (Valores, Autoliquidadas/Reliquidadas, Otras y No acogibles).
-          Se actualiza cada 3 días para no saturar SUNAT.
-        </p>
+        <span className={`badge ${b.cls}`}>{b.txt}</span>
       </div>
+      <p className="mb-3 text-xs text-slate-500">
+        Es un proceso en 2 fases: <b>generas</b> el pedido, SUNAT lo procesa (tarda distinto por empresa),
+        y cuando queda <b>“Pendiente de Elaborar Solicitud”</b> recién se pueden <b>extraer</b> las deudas.
+        Usa <b>“Verificar estado”</b> hasta que diga <b>Listo</b>.
+      </p>
 
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-      {nota && (
-        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          ⚠ <b>SUNAT:</b> {nota}
-        </div>
+      {nota && <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">⚠ <b>SUNAT:</b> {nota}</div>}
+
+      {(numPedido || fechaPedido || verificadoAt) && (
+        <p className="mb-3 text-xs text-slate-400">
+          {numPedido ? <>Pedido N° <b className="text-slate-600">{numPedido}</b> </> : null}
+          {fechaPedido ? <>· {fechaPedido} </> : null}
+          {verificadoAt ? <>· verificado {fmt(verificadoAt)} </> : null}
+          {at ? <>· extraído {fmt(at)}</> : null}
+        </p>
       )}
 
-      <div className="mt-1 flex flex-wrap items-center gap-3">
-        <button className="btn-ghost" onClick={() => llamar("generar")} disabled={busy !== null}>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn-ghost" onClick={generar} disabled={busy !== null}>
           {busy === "gen" ? "Generando…" : "1) Generar pedido"}
         </button>
-        <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null || (!puedeActualizar && !forzar)}>
-          {busy === "ext" ? "Extrayendo…" : puedeActualizar ? "2) Consultar y extraer" : `2) Actualizar (en ~${diasParaActualizar} día/s)`}
+        <button className="btn-ghost" onClick={verificar} disabled={busy !== null}>
+          {busy === "ver" ? "Verificando…" : "🔄 Verificar estado"}
         </button>
-        {!puedeActualizar && (
-          <label className="flex items-center gap-2 text-xs text-amber-600">
-            <input type="checkbox" checked={forzar} onChange={(e) => setForzar(e.target.checked)} />
-            Forzar (ignora el límite de 3 días)
-          </label>
-        )}
+        <button className="btn-primary" onClick={extraer} disabled={busy !== null || !puedeExtraer} title={puedeExtraer ? "" : "Disponible cuando el pedido esté Listo"}>
+          {busy === "ext" ? "Extrayendo…" : "2) Extraer deudas"}
+        </button>
         <label className="flex items-center gap-2 text-xs text-slate-500">
           <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
           Modo diagnóstico
@@ -117,10 +173,6 @@ export default function DeudasF36Panel({
           <pre className="max-h-80 overflow-auto text-[11px] leading-relaxed text-emerald-300">{diag}</pre>
         </div>
       )}
-      <p className="mt-2 text-xs text-amber-600">
-        ⏱️ Tras “Generar pedido”, espera ~5 min antes de “Consultar y extraer”.
-        {at ? ` Última extracción: ${new Date(at).toLocaleString("es-PE")}.` : ""}
-      </p>
 
       {tablas.length > 0 ? (
         <div className="mt-4 space-y-4">
@@ -152,7 +204,7 @@ export default function DeudasF36Panel({
             </div>
           ))}
         </div>
-      ) : at ? (
+      ) : estado === "extraido" && at ? (
         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
           ✅ Esta empresa <b>no cuenta con deudas pendientes</b> de acoger al fraccionamiento.
         </div>

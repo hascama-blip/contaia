@@ -455,22 +455,57 @@ export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[], n
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
-  const generadoAt = cliente.deudasF36?.generadoAt;
-  cliente.deudasF36 = { tablas, at: new Date().toISOString(), generadoAt, nota: nota || undefined };
+  cliente.deudasF36 = {
+    ...(cliente.deudasF36 ?? {}),
+    tablas,
+    at: new Date().toISOString(),
+    nota: nota || undefined,
+    estado: "extraido",
+    verificadoAt: new Date().toISOString(),
+  };
   await writeStore(store);
 }
 
-/** Marca cuándo se generó el pedido de deuda (para el límite de 3 días). */
-export async function setDeudaGenerado(clienteId: string): Promise<void> {
+/** Marca el pedido de deuda recién generado (queda "en proceso" en SUNAT). */
+export async function setDeudaGenerado(
+  clienteId: string,
+  info?: { numPedido?: string; fechaPedido?: string }
+): Promise<void> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
   cliente.deudasF36 = {
+    ...(cliente.deudasF36 ?? {}),
     tablas: cliente.deudasF36?.tablas ?? [],
-    at: cliente.deudasF36?.at ?? "",
     generadoAt: new Date().toISOString(),
+    numPedido: info?.numPedido ?? cliente.deudasF36?.numPedido,
+    fechaPedido: info?.fechaPedido ?? cliente.deudasF36?.fechaPedido,
+    estado: "en-proceso",
+    verificadoAt: new Date().toISOString(),
   };
   await writeStore(store);
+}
+
+/** Actualiza el ESTADO del pedido (trazabilidad de la fase asíncrona). */
+export async function setDeudaEstadoF36(
+  clienteId: string,
+  info: { estado: "sin-pedido" | "en-proceso" | "listo" | "vencido"; numPedido?: string; fechaPedido?: string; estadoTexto?: string; accion?: string }
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.deudasF36 = {
+    ...(cliente.deudasF36 ?? {}),
+    tablas: cliente.deudasF36?.tablas ?? [],
+    estado: info.estado,
+    numPedido: info.numPedido ?? cliente.deudasF36?.numPedido,
+    fechaPedido: info.fechaPedido ?? cliente.deudasF36?.fechaPedido,
+    estadoTexto: info.estadoTexto,
+    accion: info.accion,
+    verificadoAt: new Date().toISOString(),
+  };
+  await writeStore(store);
+  return cliente;
 }
 
 export async function clearSire(clienteId: string): Promise<Cliente | null> {
