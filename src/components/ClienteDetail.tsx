@@ -25,11 +25,31 @@ const SEV_STYLE: Record<string, string> = {
   critico: "border-l-red-400 bg-red-50",
 };
 
-export default function ClienteDetail({ inicial, puedeApi = true }: { inicial: Cliente; puedeApi?: boolean }) {
+export default function ClienteDetail({
+  inicial,
+  puedeApi = true,
+  puedeEliminar = false,
+}: {
+  inicial: Cliente;
+  puedeApi?: boolean;
+  puedeEliminar?: boolean;
+}) {
   const router = useRouter();
   const [cliente, setCliente] = useState<Cliente>(inicial);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  async function eliminarCliente() {
+    if (!window.confirm(`¿Eliminar la empresa "${cliente.razonSocial}" (RUC ${cliente.ruc})? Esta acción no se puede deshacer.`)) return;
+    setBusy("del");
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { notify("err", data.error ?? "No se pudo eliminar la empresa."); return; }
+      router.push("/clientes");
+      router.refresh();
+    } finally { setBusy(null); }
+  }
 
   function notify(type: "ok" | "err", text: string) {
     setMsg({ type, text });
@@ -116,6 +136,16 @@ export default function ClienteDetail({ inicial, puedeApi = true }: { inicial: C
             <Link href={`/clientes/${cliente.id}/informe`} className="btn-primary">
               📄 Generar informe
             </Link>
+          )}
+          {puedeEliminar && (
+            <button
+              onClick={eliminarCliente}
+              disabled={busy === "del"}
+              className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              title="Eliminar esta empresa (solo líder/supremo)"
+            >
+              {busy === "del" ? "Eliminando…" : "🗑 Eliminar empresa"}
+            </button>
           )}
         </div>
       </div>

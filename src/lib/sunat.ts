@@ -240,6 +240,15 @@ async function consultarRepresentantes(ruc: string, cfg: SunatConfig): Promise<R
 
 // ---- Fuente externa: decolecta.com -----------------------------------------
 
+/** Busca el primer valor cuya CLAVE coincide con el patrón (cubre nombres de
+ *  campo no previstos: "fecha_inicio_actividades", "inicioActividades", etc.). */
+function buscarFechaPorClave(d: Record<string, any>, re: RegExp): string | undefined {
+  for (const k of Object.keys(d || {})) {
+    if (re.test(k) && d[k] != null && String(d[k]).trim()) return String(d[k]).trim();
+  }
+  return undefined;
+}
+
 async function consultarDecolecta(
   ruc: string,
   cfg: SunatConfig
@@ -284,9 +293,11 @@ async function consultarDecolecta(
     condicion: String(d.condicion ?? "DESCONOCIDO").toUpperCase(),
     tipoContribuyente: d.tipo_contribuyente ?? d.tipo ?? "",
     direccion: direccion || "",
-    fechaInscripcion: d.fecha_inscripcion ?? d.fechaInscripcion ?? d.fecha_de_inscripcion ?? undefined,
+    fechaInscripcion:
+      d.fecha_inscripcion ?? d.fechaInscripcion ?? d.fecha_de_inscripcion ?? buscarFechaPorClave(d, /inscrip/i),
     fechaInicioActividades:
-      d.fecha_inicio_actividades ?? d.fechaInicioActividades ?? d.inicio_actividades ?? d.fecha_de_inicio_de_actividades ?? undefined,
+      d.fecha_inicio_actividades ?? d.fechaInicioActividades ?? d.inicio_actividades ??
+      d.fecha_de_inicio_de_actividades ?? buscarFechaPorClave(d, /inicio.*activ|activ.*inicio|inicio.*oper/i),
     tributos,
     representantes,
     comprobanteElectronico: true,
