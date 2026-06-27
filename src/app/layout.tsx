@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
 import { UserMenu } from "@/components/UserMenu";
-import { getCurrentUser, esAdmin, esSupremo } from "@/lib/auth";
+import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +16,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Garantiza/reconcilia la cuenta supremo en cada carga: si la cuenta del
+  // correo supremo ya existía (p. ej. registrada antes), aquí se le asigna el
+  // rol supremo aunque la sesión sea anterior al cambio. Nunca rompe el render.
+  await ensureSupremo().catch(() => {});
   const user = await getCurrentUser();
   const admin = esAdmin(user);
   const supremo = esSupremo(user);
