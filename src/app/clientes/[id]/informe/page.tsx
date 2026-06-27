@@ -196,7 +196,7 @@ export default async function InformePage({ params }: { params: { id: string } }
       <article className="card print-full overflow-hidden p-0">
         {/* Membrete corporativo */}
         <header className="evitar-corte">
-          <div className="hero-gradient flex items-start justify-between p-6 text-white">
+          <div className="hero-gradient flex flex-col gap-3 p-4 text-white sm:flex-row sm:items-start sm:justify-between sm:p-6">
             <div className="flex items-center gap-3">
               <LogoAsenco dark />
               <div className="border-l border-white/25 pl-3">
@@ -204,7 +204,7 @@ export default async function InformePage({ params }: { params: { id: string } }
                 <p className="text-xs text-white/80">Diagnóstico tributario SUNAT</p>
               </div>
             </div>
-            <div className="text-right text-xs text-white/80">
+            <div className="text-xs text-white/80 sm:text-right">
               <p>Emitido: {fmtFecha(d.generatedAt)}</p>
               <p>Documento confidencial</p>
             </div>
@@ -212,7 +212,7 @@ export default async function InformePage({ params }: { params: { id: string } }
           <div className="h-1.5 bg-accent-400" />
         </header>
 
-        <div className="p-8 pt-6">
+        <div className="p-4 pt-5 sm:p-8 sm:pt-6">
         {/* Datos del cliente */}
         <section className="evitar-corte rounded-xl border border-slate-200 bg-slate-50 p-4">
           <h2 className="text-lg font-bold text-brand-800">{cliente.razonSocial}</h2>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
-import { UserMenu } from "@/components/UserMenu";
+import { HeaderNav } from "@/components/HeaderNav";
 import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
 
@@ -27,49 +27,22 @@ export default async function RootLayout({
     <html lang="es">
       <body>
         {user && (
-          <header className="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-              <Link href="/" className="flex items-center">
+          <header className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+              <Link href="/" className="flex shrink-0 items-center" translate="no">
                 <LogoAsenco />
               </Link>
-              <nav className="flex items-center gap-1 text-sm">
-                <Link href="/" className="rounded-lg px-3 py-2 hover:bg-slate-100">
-                  Inicio
-                </Link>
-                <Link href="/dashboard" className="rounded-lg px-3 py-2 hover:bg-slate-100">
-                  Dashboard
-                </Link>
-                <Link href="/clientes" className="rounded-lg px-3 py-2 hover:bg-slate-100">
-                  Clientes
-                </Link>
-                {admin && (
-                  <Link href="/equipo" className="rounded-lg px-3 py-2 hover:bg-slate-100">
-                    Equipo
-                  </Link>
-                )}
-                {admin && (
-                  <Link href="/actividad" className="rounded-lg px-3 py-2 hover:bg-slate-100">
-                    Actividad
-                  </Link>
-                )}
-                {supremo && (
-                  <Link href="/supremo" className="rounded-lg px-3 py-2 font-semibold text-brand-700 hover:bg-slate-100">
-                    Supremo
-                  </Link>
-                )}
-                {admin && (
-                  <Link href="/clientes/nuevo" className="btn-primary ml-2">
-                    + Nuevo cliente
-                  </Link>
-                )}
-                <UserMenu nombre={user.nombre + (admin ? "" : " · operador")} />
-              </nav>
+              <HeaderNav
+                nombre={user.nombre + (admin ? "" : " · operador")}
+                admin={admin}
+                supremo={supremo}
+              />
             </div>
           </header>
         )}
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">{children}</main>
         <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
-          RADAR TRIBUTAR IA · by <span className="font-bold text-brand-600">ASENCO</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
+          <span translate="no">RADAR TRIBUTAR IA · by <span className="font-bold text-brand-600">ASENCO</span></span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
         </footer>
       </body>
     </html>

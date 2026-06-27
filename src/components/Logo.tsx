@@ -18,7 +18,7 @@ export function LogoAsenco({
   const iaPill = dark ? "bg-accent-300 text-brand-900" : "bg-accent-400 text-brand-900";
 
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span translate="no" className={`inline-flex items-center gap-2 ${className}`}>
       {/* Ícono de radar */}
       <svg viewBox="0 0 24 24" className="h-8 w-8 shrink-0" fill="none" aria-hidden>
         <circle cx="12" cy="12" r="9.5" className={strokeMain} strokeWidth="1.5" opacity="0.4" />
