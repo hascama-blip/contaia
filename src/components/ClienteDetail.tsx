@@ -211,8 +211,9 @@ export default function ClienteDetail({
                 {/* Fechas que decolecta no entrega: editables a mano (se guardan). */}
                 <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="mb-2 text-xs text-slate-500">
-                    SUNAT (decolecta) no entrega estas fechas. Ingrésalas a mano (tal como en
-                    Consulta RUC); se guardan y salen en el informe.
+                    <b>Opcional.</b> SUNAT (decolecta) no entrega estas fechas. Si las anotas
+                    (tal como en Consulta RUC) se guardan y salen en el informe; si no, no pasa
+                    nada — no bloquea ningún otro paso.
                   </p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>

@@ -18,6 +18,8 @@ export default function NuevoClientePage() {
     solPass: "",
     clientId: "",
     clientSecret: "",
+    // Opcional: SUNAT (decolecta) no entrega esta fecha; se anota a mano.
+    inicioActividades: "",
   });
   const [sunat, setSunat] = useState<SunatInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,10 @@ export default function NuevoClientePage() {
           ruc: form.ruc,
           email: form.email,
           telefono: form.telefono,
-          sunat,
+          // Inyecta la fecha opcional de inicio de actividades en el SUNAT.
+          sunat: sunat
+            ? { ...sunat, fechaInicioActividades: form.inicioActividades.trim() || sunat.fechaInicioActividades }
+            : sunat,
           cred: {
             solUser: form.solUser,
             clientId: form.clientId,
@@ -203,16 +208,22 @@ export default function NuevoClientePage() {
                 {sunat.direccion}
               </p>
             )}
-            {(sunat.fechaInscripcion || sunat.fechaInicioActividades) && (
-              <p className="mt-1 text-xs text-slate-500">
-                {sunat.fechaInscripcion && (
-                  <><span className="font-semibold text-slate-600">Inscripción:</span> {sunat.fechaInscripcion}{"  "}</>
-                )}
-                {sunat.fechaInicioActividades && (
-                  <><span className="font-semibold text-slate-600">Inicio de actividades:</span> {sunat.fechaInicioActividades}</>
-                )}
+            {/* SUNAT (decolecta) no entrega esta fecha: campo OPCIONAL, no bloquea. */}
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-slate-600">
+                Inicio de actividades <span className="font-normal text-slate-400">(opcional)</span>
+              </label>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                placeholder="dd/mm/aaaa — déjalo vacío si no lo sabes"
+                value={form.inicioActividades}
+                onChange={(e) => set("inicioActividades", e.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-slate-400">
+                SUNAT (vía decolecta) no devuelve esta fecha. Puedes anotarla ahora o
+                después; no es obligatoria para crear la empresa.
               </p>
-            )}
+            </div>
             {sunat.representantes && sunat.representantes.length > 0 && (
               <div className="mt-3">
                 <p className="mb-1 text-xs font-semibold text-slate-600">
