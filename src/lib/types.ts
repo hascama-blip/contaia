@@ -11,6 +11,10 @@ export interface SunatInfo {
   condicion: string;
   tipoContribuyente: string;
   direccion: string;
+  /** Fecha de inscripción en el RUC (tal como la entrega SUNAT). */
+  fechaInscripcion?: string;
+  /** Fecha de inicio de actividades. */
+  fechaInicioActividades?: string;
   /** Regímenes / afectaciones tributarias declaradas. */
   tributos: string[];
   /** Indica si emite comprobantes electrónicos. */

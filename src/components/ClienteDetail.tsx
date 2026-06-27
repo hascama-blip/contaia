@@ -159,6 +159,12 @@ export default function ClienteDetail({ inicial, puedeApi = true }: { inicial: C
                   value={cliente.sunat.comprobanteElectronico ? "Sí" : "No"}
                 />
                 <Field label="Domicilio fiscal" value={cliente.sunat.direccion} />
+                {cliente.sunat.fechaInscripcion && (
+                  <Field label="Fecha de inscripción" value={cliente.sunat.fechaInscripcion} />
+                )}
+                {cliente.sunat.fechaInicioActividades && (
+                  <Field label="Inicio de actividades" value={cliente.sunat.fechaInicioActividades} />
+                )}
                 <div className="sm:col-span-2">
                   <p className="text-xs uppercase text-slate-400">Tributos / régimen</p>
                   <div className="mt-1 flex flex-wrap gap-1">

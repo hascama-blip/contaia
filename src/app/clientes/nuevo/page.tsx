@@ -203,6 +203,16 @@ export default function NuevoClientePage() {
                 {sunat.direccion}
               </p>
             )}
+            {(sunat.fechaInscripcion || sunat.fechaInicioActividades) && (
+              <p className="mt-1 text-xs text-slate-500">
+                {sunat.fechaInscripcion && (
+                  <><span className="font-semibold text-slate-600">Inscripción:</span> {sunat.fechaInscripcion}{"  "}</>
+                )}
+                {sunat.fechaInicioActividades && (
+                  <><span className="font-semibold text-slate-600">Inicio de actividades:</span> {sunat.fechaInicioActividades}</>
+                )}
+              </p>
+            )}
             {sunat.representantes && sunat.representantes.length > 0 && (
               <div className="mt-3">
                 <p className="mb-1 text-xs font-semibold text-slate-600">

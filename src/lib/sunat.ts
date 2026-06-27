@@ -284,6 +284,9 @@ async function consultarDecolecta(
     condicion: String(d.condicion ?? "DESCONOCIDO").toUpperCase(),
     tipoContribuyente: d.tipo_contribuyente ?? d.tipo ?? "",
     direccion: direccion || "",
+    fechaInscripcion: d.fecha_inscripcion ?? d.fechaInscripcion ?? d.fecha_de_inscripcion ?? undefined,
+    fechaInicioActividades:
+      d.fecha_inicio_actividades ?? d.fechaInicioActividades ?? d.inicio_actividades ?? d.fecha_de_inicio_de_actividades ?? undefined,
     tributos,
     representantes,
     comprobanteElectronico: true,
@@ -348,6 +351,8 @@ async function consultarApisNet(
     condicion: String(d.condicion ?? "DESCONOCIDO").toUpperCase(),
     tipoContribuyente: d.tipo ?? d.tipoContribuyente ?? "",
     direccion: direccion || "",
+    fechaInscripcion: d.fechaInscripcion ?? d.fecha_inscripcion ?? undefined,
+    fechaInicioActividades: d.fechaInicioActividades ?? d.fecha_inicio_actividades ?? d.inicio_actividades ?? undefined,
     tributos: Array.isArray(d.tributos) ? d.tributos : [],
     // apis.net.pe no expone afiliación a comprobante electrónico; lo asumimos.
     comprobanteElectronico: true,

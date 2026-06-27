@@ -352,6 +352,8 @@ export default async function InformePage({ params }: { params: { id: string } }
                 <Row k="Condición de domicilio" v={sunat.condicion} />
                 <Row k="Tipo de contribuyente" v={sunat.tipoContribuyente} />
                 <Row k="Domicilio fiscal" v={sunat.direccion} />
+                {sunat.fechaInscripcion && <Row k="Fecha de inscripción" v={sunat.fechaInscripcion} />}
+                {sunat.fechaInicioActividades && <Row k="Inicio de actividades" v={sunat.fechaInicioActividades} />}
                 <Row k="Emisor electrónico" v={sunat.comprobanteElectronico ? "Sí" : "No"} />
                 <Row k="Tributos / régimen" v={sunat.tributos.join(", ") || "—"} />
                 <Row k="Fuente del dato" v={sunat.fuente === "oficial" ? "API oficial SUNAT" : "Simulado (demo)"} />
