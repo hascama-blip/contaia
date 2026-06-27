@@ -137,6 +137,16 @@ export async function listSolicitudes(
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Borra TODOS los usuarios (cuentas). Devuelve cuántos eliminó. Luego se debe
+ *  recrear el supremo con ensureSupremo(). Acción destructiva del supremo. */
+export async function eliminarTodosLosUsuarios(): Promise<number> {
+  const store = await readStore();
+  const n = (store.users ?? []).length;
+  store.users = [];
+  await writeStore(store);
+  return n;
+}
+
 /** El supremo aprueba o rechaza el acceso de un estudio. */
 export async function setEstadoUsuario(
   userId: string,

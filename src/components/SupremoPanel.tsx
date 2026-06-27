@@ -30,6 +30,7 @@ export default function SupremoPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reseteando, setReseteando] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -58,6 +59,24 @@ export default function SupremoPanel() {
       if (!res.ok) { setError(data.error ?? "No se pudo actualizar."); return; }
       await cargar();
     } finally { setBusy(null); }
+  }
+
+  async function resetTodo() {
+    if (!window.confirm("¿Eliminar TODAS las cuentas registradas? Esta acción no se puede deshacer. El usuario supremo se recreará y tendrás que iniciar sesión de nuevo.")) return;
+    const txt = window.prompt('Para confirmar, escribe ELIMINAR (en mayúsculas):');
+    if (txt !== "ELIMINAR") { setError("Confirmación incorrecta. No se eliminó nada."); return; }
+    setReseteando(true); setError(null);
+    try {
+      const res = await fetch("/api/supremo/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmar: "ELIMINAR" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo reiniciar."); return; }
+      // La sesión se cerró en el servidor: volvemos al login.
+      window.location.href = "/login";
+    } finally { setReseteando(false); }
   }
 
   const FILTROS: { k: Filtro; t: string }[] = [
@@ -146,6 +165,21 @@ export default function SupremoPanel() {
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <h3 className="text-sm font-semibold text-red-700">Zona de peligro</h3>
+        <p className="mt-1 text-xs text-red-600">
+          Elimina <b>todas las cuentas registradas</b> (estudios y operadores) y recrea el
+          usuario supremo desde cero. No se puede deshacer.
+        </p>
+        <button
+          onClick={resetTodo}
+          disabled={reseteando}
+          className="mt-3 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {reseteando ? "Eliminando…" : "Eliminar todas las cuentas y recrear supremo"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
-import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById } from "./db";
+import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById, eliminarTodosLosUsuarios } from "./db";
 import { verifySessionToken, SESSION_COOKIE } from "./authToken";
 import type { Usuario, Cliente } from "./types";
 
@@ -61,6 +61,14 @@ export async function ensureSupremo(): Promise<void> {
     patch.passHash = hashPassword(SUPREMO_PASSWORD);
   }
   if (Object.keys(patch).length > 0) await updateUserById(existente.id, patch);
+}
+
+/** Borra TODAS las cuentas y recrea el usuario supremo desde cero. Devuelve
+ *  cuántas cuentas se eliminaron. Acción destructiva (solo el supremo). */
+export async function resetUsuarios(): Promise<number> {
+  const n = await eliminarTodosLosUsuarios();
+  await ensureSupremo(); // recrea el supremo fresco
+  return n;
 }
 
 /** Usuario de la sesión actual (o null si no hay sesión válida). */
