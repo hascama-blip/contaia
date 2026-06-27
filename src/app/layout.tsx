@@ -6,7 +6,7 @@ import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RADAR TRIBUTARIO — by ASENCO",
+  title: "RADAR TRIBUTAR IA — by ASENCO",
   description:
     "Plataforma para consultar el estado tributario SUNAT de clientes, analizar documentos y generar informes.",
 };
@@ -69,7 +69,7 @@ export default async function RootLayout({
         )}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
         <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
-          RADAR TRIBUTARIO · by ASENCO · Diagnóstico tributario asistido · {new Date().getFullYear()}
+          RADAR TRIBUTAR IA · by <span className="font-bold text-brand-600">ASENCO</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
         </footer>
       </body>
     </html>

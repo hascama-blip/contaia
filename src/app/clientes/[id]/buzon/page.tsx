@@ -113,7 +113,7 @@ export default async function BuzonPdfPage({ params }: { params: { id: string } 
           )}
 
           <footer className="mt-8 border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-            Reporte generado por RADAR TRIBUTARIO · by asenco — uso interno del estudio.
+            Reporte generado por RADAR TRIBUTAR IA · by ASENCO — uso interno del estudio.
           </footer>
         </div>
       </article>

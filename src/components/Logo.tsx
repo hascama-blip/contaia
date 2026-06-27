@@ -1,4 +1,5 @@
-// Marca "RADAR TRIBUTARIO · by asenco" con ícono de radar.
+// Marca "RADAR TRIBUTAR·IA · by ASENCO" con ícono de radar.
+// "IA" resaltada (la inteligencia artificial) y ASENCO bien visible.
 // `dark` = para fondos azul marino (texto en blanco).
 
 export function LogoAsenco({
@@ -9,11 +10,12 @@ export function LogoAsenco({
   dark?: boolean;
 }) {
   const main = dark ? "text-white" : "text-brand-800";
-  const sub = dark ? "text-white/70" : "text-slate-400";
+  const sub = dark ? "text-white/60" : "text-slate-400";
   const gold = dark ? "text-accent-300" : "text-accent-600";
-  const azul = dark ? "text-brand-200" : "text-brand-600";
+  const azul = dark ? "text-white" : "text-brand-700";
   const strokeMain = dark ? "stroke-white" : "stroke-brand-700";
   const fillGold = dark ? "fill-accent-300" : "fill-accent-500";
+  const iaPill = dark ? "bg-accent-300 text-brand-900" : "bg-accent-400 text-brand-900";
 
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
@@ -28,10 +30,12 @@ export function LogoAsenco({
       <span className="inline-flex flex-col leading-none">
         <span className="text-lg font-black tracking-tight">
           <span className={main}>RADAR </span>
-          <span className={gold}>TRIBUTARIO</span>
+          <span className={gold}>TRIBUTAR</span>
+          <span className={`ml-0.5 rounded px-1 font-black ${iaPill}`}>IA</span>
         </span>
-        <span className={`mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${sub}`}>
-          by <span className={`font-bold ${azul}`}>asenco</span>
+        <span className="mt-1 flex items-center gap-1">
+          <span className={`text-[11px] font-semibold uppercase tracking-[0.25em] ${sub}`}>by</span>
+          <span className={`text-base font-extrabold uppercase tracking-[0.15em] ${azul}`}>ASENCO</span>
         </span>
       </span>
     </span>
