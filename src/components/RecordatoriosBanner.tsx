@@ -15,6 +15,7 @@ interface Recordatorio {
   comentario: string;
   fechaLimite: string;
   vencido: boolean;
+  creadoPorNombre?: string;
 }
 
 function fmtDia(iso: string): string {
@@ -83,6 +84,7 @@ export default function RecordatoriosBanner() {
               <p className="text-xs text-slate-500">
                 {r.razonSocial} · {r.ruc}
                 {r.comentario ? ` · “${r.comentario}”` : ""}
+                {r.creadoPorNombre ? ` · por ${r.creadoPorNombre}` : ""}
               </p>
             </div>
             <div className="flex items-center gap-3">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClienteDeUsuario } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, studioId } from "@/lib/auth";
 import { PrintButton } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
 import { fmtFecha } from "@/components/ui";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // botón "Imprimir / Guardar PDF" (window.print) + estilos de impresión.
 export default async function BuzonPdfPage({ params }: { params: { id: string } }) {
   const user = await requireUser();
-  const cliente = await getClienteDeUsuario(params.id, user.id);
+  const cliente = await getClienteDeUsuario(params.id, studioId(user));
   if (!cliente) notFound();
 
   const buzon = cliente.buzon;

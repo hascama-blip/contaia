@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, studioId } from "@/lib/auth";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +49,7 @@ const OPCIONES: Opcion[] = [
 
 export default async function MenuPage() {
   const user = await requireUser();
-  const clientes = await listClientes(user.id);
+  const clientes = await listClientes(studioId(user));
 
   return (
     <div className="space-y-6">

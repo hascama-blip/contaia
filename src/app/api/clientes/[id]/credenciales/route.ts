@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setCredSire } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -16,10 +16,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     (typeof body.solUser === "string" && body.solUser.trim()) ||
     cliente.credSire?.solUser ||
     "";
-  const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
-  const clientSecret = typeof body.clientSecret === "string" ? body.clientSecret.trim() : "";
+  // El API (client_id/secret) se PRESERVA si no viene en el body, para que
+  // guardar solo el usuario (AccesosSol) no borre el API ya configurado.
+  const traeApi = typeof body.clientId === "string" || typeof body.clientSecret === "string";
+  const clientId = typeof body.clientId === "string" ? body.clientId.trim() : (cliente.credSire?.clientId ?? "");
+  const clientSecret = typeof body.clientSecret === "string" ? body.clientSecret.trim() : (cliente.credSire?.clientSecret ?? "");
 
   if (!solUser) return NextResponse.json({ error: "Falta el Usuario SOL." }, { status: 400 });
+
+  // Editar/borrar el API (client_id/secret) es solo del admin del estudio.
+  const cambiaApi = traeApi && (clientId !== (cliente.credSire?.clientId ?? "") || clientSecret !== (cliente.credSire?.clientSecret ?? ""));
+  if (cambiaApi) {
+    const u = await getCurrentUser();
+    if (!esAdmin(u)) {
+      return NextResponse.json({ error: "Solo el administrador del estudio puede editar el API (client_id/secret)." }, { status: 403 });
+    }
+  }
 
   const actualizado = await setCredSire(cliente.id, {
     solUser,

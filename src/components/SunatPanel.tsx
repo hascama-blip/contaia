@@ -24,10 +24,13 @@ export default function SunatPanel({
   clienteId,
   inicialSire,
   inicialCred,
+  puedeApi = true,
 }: {
   clienteId: string;
   inicialSire: SireResumen[];
   inicialCred?: { solUser: string; clientId: string; clientSecret: string } | null;
+  /** Si false (operador), no puede editar/guardar el API (solo el admin). */
+  puedeApi?: boolean;
 }) {
   const router = useRouter();
   const hoy = new Date();
@@ -181,16 +184,20 @@ export default function SunatPanel({
             <label className="label">
               client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
             </label>
-            <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} value={clientId} onChange={(e) => setClientId(e.target.value)} readOnly={apiBloqueada} autoComplete="off" />
+            <input className={`input ${apiBloqueada || !puedeApi ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} value={puedeApi ? clientId : (clientId ? "••••••••" : "")} onChange={(e) => setClientId(e.target.value)} readOnly={apiBloqueada || !puedeApi} autoComplete="off" />
           </div>
           <div>
             <label className="label">
               client_secret {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
             </label>
-            <input className={`input ${apiBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} readOnly={apiBloqueada} autoComplete="new-password" />
+            <input className={`input ${apiBloqueada || !puedeApi ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} readOnly={apiBloqueada || !puedeApi} autoComplete="new-password" />
           </div>
         </div>
-        {apiBloqueada ? (
+        {!puedeApi ? (
+          <p className="mt-2 text-xs text-slate-400">
+            🔒 Solo el <b>administrador</b> del estudio puede editar el API. Tú puedes extraer con la <b>Clave SOL</b>.
+          </p>
+        ) : apiBloqueada ? (
           <p className="mt-2 text-xs text-slate-400">
             API guardada y bloqueada. Para extraer solo se pide la <b>Clave SOL</b>.{" "}
             <button type="button" className="text-brand-600 hover:underline" onClick={() => setApiBloqueada(false)}>Editar API</button>

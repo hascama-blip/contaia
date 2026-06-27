@@ -86,6 +86,8 @@ export async function createUser(data: {
   nombre: string;
   email: string;
   passHash: string;
+  rol?: "admin" | "operador";
+  parentId?: string;
 }): Promise<Usuario> {
   const store = await readStore();
   if (!store.users) store.users = [];
@@ -95,10 +97,30 @@ export async function createUser(data: {
     email: data.email.trim().toLowerCase(),
     passHash: data.passHash,
     createdAt: new Date().toISOString(),
+    rol: data.rol ?? (data.parentId ? "operador" : "admin"),
+    parentId: data.parentId,
   };
   store.users.push(user);
   await writeStore(store);
   return user;
+}
+
+/** Sub-usuarios (operadores) de un admin/estudio. */
+export async function listSubUsuarios(adminId: string): Promise<Usuario[]> {
+  const store = await readStore();
+  return (store.users ?? [])
+    .filter((u) => u.parentId === adminId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Elimina un sub-usuario, solo si pertenece a ese admin. */
+export async function deleteSubUsuario(adminId: string, userId: string): Promise<boolean> {
+  const store = await readStore();
+  const i = (store.users ?? []).findIndex((u) => u.id === userId && u.parentId === adminId);
+  if (i < 0) return false;
+  store.users!.splice(i, 1);
+  await writeStore(store);
+  return true;
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */
@@ -466,7 +488,7 @@ const MS_DIA = 24 * 60 * 60 * 1000;
 
 export async function setSeguimientoBuzon(
   clienteId: string,
-  datos: { codMensaje: string; asunto: string; fecha: string; origen?: "notificaciones" | "mensajes"; diasAtencion: number; comentario: string }
+  datos: { codMensaje: string; asunto: string; fecha: string; origen?: "notificaciones" | "mensajes"; diasAtencion: number; comentario: string; creadoPorId?: string; creadoPorNombre?: string }
 ): Promise<SeguimientoBuzon | null> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
@@ -483,6 +505,8 @@ export async function setSeguimientoBuzon(
     creadoAt,
     fechaLimite: new Date(Date.now() + datos.diasAtencion * MS_DIA).toISOString(),
     atendido: false,
+    creadoPorId: datos.creadoPorId,
+    creadoPorNombre: datos.creadoPorNombre,
   };
   const i = cliente.seguimientosBuzon.findIndex((s) => s.codMensaje === datos.codMensaje);
   if (i >= 0) cliente.seguimientosBuzon[i] = seg;

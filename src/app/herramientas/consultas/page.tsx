@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, studioId } from "@/lib/auth";
 import ConsultasFlow from "@/components/ConsultasFlow";
 import DeudasF36Flow from "@/components/DeudasF36Flow";
 
@@ -9,7 +9,7 @@ export const metadata = { title: "Consultas tributarias — Radar Tributario" };
 
 export default async function Page() {
   const user = await requireUser();
-  const clientes = await listClientes(user.id);
+  const clientes = await listClientes(studioId(user));
   const lista = clientes.map((c) => ({
     id: c.id,
     razonSocial: c.razonSocial,

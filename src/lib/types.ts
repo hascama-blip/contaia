@@ -87,6 +87,10 @@ export interface Usuario {
   email: string;
   passHash: string;
   createdAt: string;
+  /** Rol: "admin" (dueño del estudio) u "operador" (sub-usuario limitado). */
+  rol?: "admin" | "operador";
+  /** Id del admin del estudio al que pertenece (vacío = es admin/dueño). */
+  parentId?: string;
 }
 
 export interface Cliente {
@@ -313,6 +317,9 @@ export interface SeguimientoBuzon {
   fechaLimite: string;
   /** Si ya se atendió (quita el recordatorio). */
   atendido?: boolean;
+  /** Quién lo puso (para que el admin identifique al autor). */
+  creadoPorId?: string;
+  creadoPorNombre?: string;
 }
 
 /** Buzón persistido en el cliente (para el informe). */

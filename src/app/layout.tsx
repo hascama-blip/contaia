@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
 import { UserMenu } from "@/components/UserMenu";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, esAdmin } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +17,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
+  const admin = esAdmin(user);
   return (
     <html lang="es">
       <body>
@@ -36,10 +37,17 @@ export default async function RootLayout({
                 <Link href="/clientes" className="rounded-lg px-3 py-2 hover:bg-slate-100">
                   Clientes
                 </Link>
-                <Link href="/clientes/nuevo" className="btn-primary ml-2">
-                  + Nuevo cliente
-                </Link>
-                <UserMenu nombre={user.nombre} />
+                {admin && (
+                  <Link href="/equipo" className="rounded-lg px-3 py-2 hover:bg-slate-100">
+                    Equipo
+                  </Link>
+                )}
+                {admin && (
+                  <Link href="/clientes/nuevo" className="btn-primary ml-2">
+                    + Nuevo cliente
+                  </Link>
+                )}
+                <UserMenu nombre={user.nombre + (admin ? "" : " · operador")} />
               </nav>
             </div>
           </header>

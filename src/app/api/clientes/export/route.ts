@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listClientes } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, studioId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // celular) en CSV — la "data" de contactos para descargar.
 export async function GET() {
   const user = await requireUser();
-  const clientes = await listClientes(user.id);
+  const clientes = await listClientes(studioId(user));
   const esc = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const filas = [
     ["Razon Social", "RUC", "Correo", "Celular", "Estado SUNAT", "Condicion", "Creado"],

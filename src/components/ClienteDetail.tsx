@@ -25,7 +25,7 @@ const SEV_STYLE: Record<string, string> = {
   critico: "border-l-red-400 bg-red-50",
 };
 
-export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
+export default function ClienteDetail({ inicial, puedeApi = true }: { inicial: Cliente; puedeApi?: boolean }) {
   const router = useRouter();
   const [cliente, setCliente] = useState<Cliente>(inicial);
   const [busy, setBusy] = useState<string | null>(null);
@@ -239,6 +239,7 @@ export default function ClienteDetail({ inicial }: { inicial: Cliente }) {
             clienteId={cliente.id}
             inicialSire={cliente.sire ?? []}
             inicialCred={cliente.credSire ?? null}
+            puedeApi={puedeApi}
           />
 
           {/* ───── 5 · Comparativo mensual (DJ 621 vs SIRE) ───── */}

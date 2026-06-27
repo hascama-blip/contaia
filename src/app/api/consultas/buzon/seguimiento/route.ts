@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
 import { setSeguimientoBuzon, atenderSeguimientoBuzon } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El plazo debe ser 5, 10 o 15 días." }, { status: 400 });
   }
 
+  const autor = await getCurrentUser();
   const seg = await setSeguimientoBuzon(cliente.id, {
     codMensaje,
     asunto: String(body?.asunto ?? ""),
@@ -26,6 +27,8 @@ export async function POST(req: NextRequest) {
     origen: body?.origen === "mensajes" ? "mensajes" : body?.origen === "notificaciones" ? "notificaciones" : undefined,
     diasAtencion,
     comentario: String(body?.comentario ?? ""),
+    creadoPorId: autor?.id,
+    creadoPorNombre: autor?.nombre,
   });
   return NextResponse.json({ seguimiento: seg });
 }

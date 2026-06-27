@@ -24,6 +24,7 @@ interface Seguimiento {
   comentario: string;
   fechaLimite: string;
   atendido?: boolean;
+  creadoPorNombre?: string;
 }
 
 export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) {
@@ -370,6 +371,7 @@ function SeguimientoCell({
       {inicial && (
         <span className={`text-[11px] ${vencido ? "font-semibold text-red-600" : "text-slate-400"}`}>
           {vencido ? "⏰ Venció" : "Vence"} {fmtDia(inicial.fechaLimite)}
+          {inicial.creadoPorNombre ? ` · por ${inicial.creadoPorNombre}` : ""}
           {inicial.atendido ? " · atendido" : ""}
         </span>
       )}

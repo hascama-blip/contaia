@@ -46,12 +46,29 @@ export async function requireUser(): Promise<Usuario> {
   return u;
 }
 
+/** ¿El usuario es admin (dueño del estudio)? Los que tienen parentId son operadores. */
+export function esAdmin(u: Usuario | null | undefined): boolean {
+  return Boolean(u) && !u!.parentId && u!.rol !== "operador";
+}
+
+/** Id del ESTUDIO al que pertenece el usuario (el admin). Define qué empresas ve. */
+export function studioId(u: Usuario): string {
+  return u.parentId ?? u.id;
+}
+
+/** Exige sesión Y rol admin (para acciones reservadas al dueño del estudio). */
+export async function requireAdmin(): Promise<Usuario | null> {
+  const u = await getCurrentUser();
+  if (!u) return null;
+  return esAdmin(u) ? u : null;
+}
+
 /**
- * Empresa por id SOLO si pertenece al usuario de la sesión (para API routes):
- * devuelve null si no hay sesión o la empresa no es del usuario.
+ * Empresa por id SOLO si pertenece al ESTUDIO del usuario (admin u operador):
+ * devuelve null si no hay sesión o la empresa no es del estudio.
  */
 export async function getClienteAutorizado(id: string): Promise<Cliente | null> {
   const u = await getCurrentUser();
   if (!u) return null;
-  return getClienteDeUsuario(id, u.id);
+  return getClienteDeUsuario(id, studioId(u));
 }
