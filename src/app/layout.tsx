@@ -6,7 +6,7 @@ import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RADAR TRIBUTAR IA — by ASENCO",
+  title: "Radar Tributar IA",
   description:
     "Plataforma para consultar el estado tributario SUNAT de clientes, analizar documentos y generar informes.",
 };
