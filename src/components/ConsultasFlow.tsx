@@ -124,8 +124,13 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo leer el buzón."); return; }
       setMensajes(data.mensajes ?? []);
-      setConsultadoAt(new Date().toISOString());
-      setInfo(`Se encontraron ${data.mensajes?.length ?? 0} mensaje(s). Quedaron guardados.`);
+      if (data.limitado) {
+        setConsultadoAt(data.consultadoAt ?? null);
+        setInfo(data.mensaje ?? "El buzón ya se consultó hoy (límite 1 vez al día).");
+      } else {
+        setConsultadoAt(new Date().toISOString());
+        setInfo(`Se encontraron ${data.mensajes?.length ?? 0} mensaje(s). Quedaron guardados.`);
+      }
     } catch {
       setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
     } finally { setBusy(false); }

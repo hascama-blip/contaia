@@ -45,6 +45,7 @@ export default function BuzonPanel({
       setBuzon(data.mensajes ?? []);
       setPeligrosos(data.peligrosos ?? []);
       setUrgentes(data.urgentes ?? []);
+      if (data.limitado && data.mensaje) setError(data.mensaje); // aviso del límite 1/día
       router.refresh();
     } catch {
       setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
