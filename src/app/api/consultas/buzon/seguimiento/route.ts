@@ -15,8 +15,9 @@ export async function POST(req: NextRequest) {
 
   const codMensaje = String(body?.codMensaje ?? "");
   if (!codMensaje) return NextResponse.json({ error: "Falta el mensaje." }, { status: 400 });
-  const diasAtencion = Number(body?.diasAtencion);
-  if (!DIAS_VALIDOS.includes(diasAtencion)) {
+  // diasAtencion 0 = comentario sin plazo (reporte analítico, solo comentario).
+  const diasAtencion = Number(body?.diasAtencion) || 0;
+  if (diasAtencion !== 0 && !DIAS_VALIDOS.includes(diasAtencion)) {
     return NextResponse.json({ error: "El plazo debe ser 5, 10 o 15 días." }, { status: 400 });
   }
 

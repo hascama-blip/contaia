@@ -140,25 +140,62 @@ export default function BuzonPanel({
       {diag && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
       {mensajes && mensajes.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 space-y-5">
+          <TablaBuzon
+            titulo="Notificaciones"
+            lista={mensajes.filter((m) => m.origen !== "mensajes")}
+            segs={segs}
+            guardandoSeg={guardandoSeg}
+            onGuardar={guardarSeguimiento}
+          />
+          <TablaBuzon
+            titulo="Mensajes"
+            lista={mensajes.filter((m) => m.origen === "mensajes")}
+            segs={segs}
+            guardandoSeg={guardandoSeg}
+            onGuardar={guardarSeguimiento}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Tabla de una sección del buzón (Notificaciones o Mensajes), solo comentario.
+function TablaBuzon({
+  titulo,
+  lista,
+  segs,
+  guardandoSeg,
+  onGuardar,
+}: {
+  titulo: string;
+  lista: Mensaje[];
+  segs: Record<string, Seguimiento>;
+  guardandoSeg: string | null;
+  onGuardar: (m: Mensaje, dias: number, comentario: string) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-700">
+        {titulo} ({lista.length})
+      </p>
+      {lista.length === 0 ? (
+        <p className="text-xs text-slate-400">Sin {titulo.toLowerCase()}.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-400">
               <tr>
-                <th className="px-3 py-2">Módulo</th>
                 <th className="px-3 py-2">Fecha</th>
-                <th className="px-3 py-2">Categoría</th>
+                <th className="px-3 py-2">Tipo</th>
                 <th className="px-3 py-2">Asunto</th>
-                <th className="px-3 py-2">Atención / comentario</th>
+                <th className="px-3 py-2">Comentario</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mensajes.map((m) => (
+              {lista.map((m) => (
                 <tr key={m.id}>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <span className={`badge ${m.origen === "mensajes" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
-                      {m.origen === "mensajes" ? "Mensajes" : "Notificaciones"}
-                    </span>
-                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-500">{m.fecha}</td>
                   <td className="px-3 py-2">
                     {m.nivel === "otro" ? (
@@ -175,7 +212,8 @@ export default function BuzonPanel({
                       codMensaje={m.id}
                       inicial={segs[m.id]}
                       guardando={guardandoSeg === m.id}
-                      onGuardar={(dias, comentario) => guardarSeguimiento(m, dias, comentario)}
+                      soloComentario
+                      onGuardar={(dias, comentario) => onGuardar(m, dias, comentario)}
                     />
                   </td>
                 </tr>
@@ -184,6 +222,6 @@ export default function BuzonPanel({
           </table>
         </div>
       )}
-    </section>
+    </div>
   );
 }

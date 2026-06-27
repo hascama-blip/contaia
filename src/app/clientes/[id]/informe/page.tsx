@@ -105,6 +105,13 @@ export default async function InformePage({ params }: { params: { id: string } }
   const noContenciosas = peligrosos.filter((m) => m.tipo === "No Contenciosa");
   // TODOS los mensajes del buzón (no solo los de riesgo) para listarlos completos.
   const todosMensajes = buzon?.mensajes?.length ? buzon.mensajes : [...peligrosos, ...urgentes];
+  // Comentarios (seguimiento) por mensaje, para dar alcance en el informe.
+  const comentariosBuzon = new Map<string, string>();
+  for (const s of cliente.seguimientosBuzon ?? []) {
+    if (s.comentario && s.comentario.trim()) comentariosBuzon.set(s.codMensaje, s.comentario.trim());
+  }
+  const buzonNotificaciones = todosMensajes.filter((m) => m.origen !== "mensajes");
+  const buzonMensajes = todosMensajes.filter((m) => m.origen === "mensajes");
 
   type Contingencia = { nivel: NivelRiesgo; titulo: string; detalle: string };
   const contingencias: Contingencia[] = [];
@@ -332,15 +339,27 @@ export default async function InformePage({ params }: { params: { id: string } }
               </div>
             )}
 
-            {/* Listado COMPLETO de todos los mensajes del buzón */}
-            <p className="mb-1 text-xs font-bold uppercase text-slate-500">
-              Todos los mensajes ({todosMensajes.length})
-            </p>
-            {todosMensajes.length > 0 ? (
-              <BuzonTablaCompleta mensajes={todosMensajes} />
-            ) : (
-              <p className="text-sm text-slate-400">No se encontraron mensajes en el buzón.</p>
-            )}
+            {/* Dividido en secciones: Notificaciones y Mensajes, con comentario */}
+            <div className="mb-3">
+              <p className="mb-1 text-xs font-bold uppercase text-brand-700">
+                Notificaciones ({buzonNotificaciones.length})
+              </p>
+              {buzonNotificaciones.length > 0 ? (
+                <BuzonTablaCompleta mensajes={buzonNotificaciones} comentarios={comentariosBuzon} />
+              ) : (
+                <p className="text-sm text-slate-400">Sin notificaciones.</p>
+              )}
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-bold uppercase text-brand-700">
+                Mensajes ({buzonMensajes.length})
+              </p>
+              {buzonMensajes.length > 0 ? (
+                <BuzonTablaCompleta mensajes={buzonMensajes} comentarios={comentariosBuzon} />
+              ) : (
+                <p className="text-sm text-slate-400">Sin mensajes.</p>
+              )}
+            </div>
           </section>
         )}
 
@@ -742,26 +761,27 @@ function BuzonTabla({ mensajes }: { mensajes: BuzonMensaje[] }) {
   );
 }
 
-function BuzonTablaCompleta({ mensajes }: { mensajes: BuzonMensaje[] }) {
+function BuzonTablaCompleta({
+  mensajes,
+  comentarios,
+}: {
+  mensajes: BuzonMensaje[];
+  comentarios?: Map<string, string>;
+}) {
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
           <th className="py-1.5">Fecha</th>
-          <th className="py-1.5">Módulo</th>
-          <th className="py-1.5">Categoría</th>
+          <th className="py-1.5">Tipo</th>
           <th className="py-1.5">Asunto</th>
+          <th className="py-1.5">Comentario</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
         {mensajes.map((m) => (
           <tr key={m.id}>
             <td className="py-1.5 pr-2 align-top whitespace-nowrap text-slate-500">{m.fecha}</td>
-            <td className="py-1.5 pr-2 align-top whitespace-nowrap">
-              <span className={`badge ${m.origen === "mensajes" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
-                {m.origen === "mensajes" ? "Mensajes" : "Notificaciones"}
-              </span>
-            </td>
             <td className="py-1.5 pr-2 align-top">
               {m.nivel === "otro" ? (
                 <span className="text-xs text-slate-400">Informativa</span>
@@ -771,7 +791,8 @@ function BuzonTablaCompleta({ mensajes }: { mensajes: BuzonMensaje[] }) {
                 </span>
               )}
             </td>
-            <td className="py-1.5 text-slate-700">{m.asunto}</td>
+            <td className="py-1.5 pr-2 align-top text-slate-700">{m.asunto}</td>
+            <td className="py-1.5 align-top text-slate-600">{comentarios?.get(m.id) || "—"}</td>
           </tr>
         ))}
       </tbody>

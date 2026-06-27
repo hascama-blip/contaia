@@ -687,7 +687,8 @@ export async function getRecordatorios(
   for (const c of store.clientes) {
     if (c.ownerId && c.ownerId !== ownerId) continue;
     for (const s of c.seguimientosBuzon ?? []) {
-      if (s.atendido) continue;
+      // Comentario sin plazo (diasAtencion=0) NO genera recordatorio.
+      if (s.atendido || !(s.diasAtencion > 0)) continue;
       out.push({ ...s, clienteId: c.id, razonSocial: c.razonSocial, ruc: c.ruc, vencido: new Date(s.fechaLimite).getTime() <= now });
     }
   }
