@@ -32,8 +32,8 @@ export function publicUser(u: Usuario): UsuarioPublico {
 
 // Credenciales del usuario supremo (dueño de la plataforma). Se pueden
 // sobreescribir por entorno; si no, usa los valores iniciales acordados.
-const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "diegodelgado260917@gmail.com").trim().toLowerCase();
-const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "D2n6a0d92000@";
+const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "supremo@radartributaria.com").trim().toLowerCase();
+const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "Supremo2026@";
 const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador supremo";
 
 /** Garantiza la cuenta supremo (idempotente y AUTO-REPARADORA). Se llama al
