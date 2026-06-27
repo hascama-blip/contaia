@@ -127,6 +127,8 @@ export default async function InformePage({ params }: { params: { id: string } }
   const valores = urgentes.filter((m) => m.tipo === "Valor");
   const fiscalizacion = peligrosos.filter((m) => m.tipo === "Fiscalización");
   const noContenciosas = peligrosos.filter((m) => m.tipo === "No Contenciosa");
+  // TODOS los mensajes del buzón (no solo los de riesgo) para listarlos completos.
+  const todosMensajes = buzon?.mensajes?.length ? buzon.mensajes : [...peligrosos, ...urgentes];
 
   type Contingencia = { nivel: NivelRiesgo; titulo: string; detalle: string };
   const contingencias: Contingencia[] = [];
@@ -338,41 +340,6 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* Buzón electrónico SUNAT (mes en curso) */}
-        {buzon && (
-          <section className="mt-6">
-            <h3 className="sec-h">
-              Buzón electrónico SUNAT — mes en curso
-            </h3>
-            <p className="mb-3 text-xs text-slate-500">
-              {peligrosos.length} más peligroso(s) · {urgentes.length} urgente(s) ·{" "}
-              {buzon.totalMensajes} mensaje(s) revisados · consultado {fmtFecha(buzon.consultadoAt)}
-            </p>
-
-            {peligrosos.length > 0 && (
-              <div className="mb-3">
-                <p className="mb-1 text-xs font-bold uppercase text-red-700">
-                  🚨 Más peligroso — fiscalización / no contenciosas
-                </p>
-                <BuzonTabla mensajes={peligrosos} />
-              </div>
-            )}
-            {urgentes.length > 0 && (
-              <div className="mb-1">
-                <p className="mb-1 text-xs font-bold uppercase text-orange-700">
-                  ⚠ Urgente — cobranza / valores
-                </p>
-                <BuzonTabla mensajes={urgentes} />
-              </div>
-            )}
-            {peligrosos.length === 0 && urgentes.length === 0 && (
-              <p className="text-sm text-slate-400">
-                Sin notificaciones de riesgo en el mes en curso.
-              </p>
-            )}
-          </section>
-        )}
-
         {/* Situación SUNAT */}
         <section className="mt-6">
           <h3 className="sec-h">
@@ -395,30 +362,160 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* Hallazgos */}
-        <section className="mt-6">
-          <h3 className="sec-h">
-            Hallazgos del análisis
-          </h3>
-          <ul className="space-y-2">
-            {d.hallazgos.map((h, i) => (
-              <li key={i} className="flex gap-3 rounded-md border border-slate-200 p-3">
-                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${SEV_DOT[h.severidad]}`} />
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {h.titulo}
-                    <span className="ml-2 text-xs font-normal text-slate-400">
-                      ({RIESGO_LABEL[h.severidad].toLowerCase()})
-                    </span>
-                  </p>
-                  <p className="text-sm text-slate-600">{h.detalle}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {/* ===== 1) BUZÓN — todos los mensajes ===== */}
+        {buzon && (
+          <section className="mt-6 print-full">
+            <h3 className="sec-h">
+              Buzón electrónico SUNAT
+            </h3>
+            <p className="mb-3 text-xs text-slate-500">
+              {peligrosos.length} más peligroso(s) · {urgentes.length} urgente(s) ·{" "}
+              {todosMensajes.length} mensaje(s) en total · consultado {fmtFecha(buzon.consultadoAt)}
+            </p>
 
-        {/* Comparativo Declaración mensual vs SIRE */}
+            {peligrosos.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-bold uppercase text-red-700">
+                  🚨 Más peligroso — fiscalización / no contenciosas
+                </p>
+                <BuzonTabla mensajes={peligrosos} />
+              </div>
+            )}
+            {urgentes.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-bold uppercase text-orange-700">
+                  ⚠ Urgente — cobranza / valores
+                </p>
+                <BuzonTabla mensajes={urgentes} />
+              </div>
+            )}
+
+            {/* Listado COMPLETO de todos los mensajes del buzón */}
+            <p className="mb-1 text-xs font-bold uppercase text-slate-500">
+              Todos los mensajes ({todosMensajes.length})
+            </p>
+            {todosMensajes.length > 0 ? (
+              <BuzonTablaCompleta mensajes={todosMensajes} />
+            ) : (
+              <p className="text-sm text-slate-400">No se encontraron mensajes en el buzón.</p>
+            )}
+          </section>
+        )}
+
+        {/* ===== 2) ESTADO DE PRESENTACIÓN SIRE (aparte de los montos) ===== */}
+        {cliente.sire && cliente.sire.length > 0 && (
+          <section className="mt-6 print-full">
+            <h3 className="sec-h">
+              Estado de presentación SIRE (RVIE / RCE)
+            </h3>
+            <p className="mb-3 text-xs text-slate-500">
+              Estado de presentación por periodo de los registros de ventas (RVIE) y compras (RCE).
+            </p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <th className="py-1.5">Periodo</th>
+                  <th className="py-1.5 text-center">Ventas (RVIE)</th>
+                  <th className="py-1.5 text-center">Compras (RCE)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cliente.sire.map((s) => (
+                  <tr key={s.periodo}>
+                    <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
+                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoVentas} /></td>
+                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoCompras} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ===== 3) FRACCIONAMIENTO / DEUDAS TRIBUTARIAS (SUNAT) ===== */}
+        {/* Mensaje de bloqueo de SUNAT (p.ej. "Tiene deuda pendiente por Perdida") */}
+        {cliente.deudasF36?.nota && (
+          <section className="mt-6 evitar-corte">
+            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ⚠ SUNAT: {cliente.deudasF36.nota}
+            </p>
+          </section>
+        )}
+        {/* Sin deudas: mensaje positivo si se consultó y no hay pendientes */}
+        {cliente.deudasF36?.at && nDeudas === 0 && !cliente.deudasF36?.nota && (
+          <section className="mt-6 evitar-corte">
+            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              Esta empresa no cuenta con deudas pendientes de acoger al fraccionamiento (consultado {fmtFecha(cliente.deudasF36.at)}).
+            </p>
+          </section>
+        )}
+        {/* Deudas tributarias (Fraccionamiento F36, por sección) */}
+        {nDeudas > 0 && (
+          <section className="mt-6 print-full">
+            <h3 className="sec-h">Deudas tributarias (Fraccionamiento Art. 36)</h3>
+            {deudasF36.filter((t) => t.filas.length > 0).map((t) => (
+              <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-400">
+                        {t.headers.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-1">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {t.filas.map((f, r) => (
+                        <tr key={r}>{f.map((c, i) => <td key={i} className="whitespace-nowrap px-3 py-1 text-slate-700">{c}</td>)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+            <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA A ACOGERSE: {fmtSoles(totalDeuda)}</p>
+            {cliente.deudasF36?.at && (
+              <p className="text-right text-[11px] text-slate-400">Extraído de SUNAT: {fmtFecha(cliente.deudasF36.at)}</p>
+            )}
+          </section>
+        )}
+
+        {/* ===== 4) COMPRAS Y VENTAS (SIRE) — MONTOS ===== */}
+        {cliente.sire && cliente.sire.length > 0 && (
+          <section className="mt-6 print-full">
+            <h3 className="sec-h">
+              Compras y Ventas (SIRE) — montos
+            </h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <th className="py-1.5">Periodo</th>
+                  <th className="py-1.5 text-right">Ventas</th>
+                  <th className="py-1.5 text-right">Compras</th>
+                  <th className="py-1.5 text-right">Diferencia</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cliente.sire.map((s) => {
+                  const dif = s.ventas.importeTotal - s.compras.importeTotal;
+                  return (
+                    <tr key={s.periodo}>
+                      <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
+                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.ventas.importeTotal)}</td>
+                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.compras.importeTotal)}</td>
+                      <td className={`py-1.5 text-right font-medium ${dif >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {fmtSoles(dif)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ===== 5) COMPARATIVO MENSUAL — Declaración vs SIRE ===== */}
         {totalDeclaraciones > 0 && (
           <section className="mt-6 print-full">
             <h3 className="sec-h">
@@ -541,97 +638,28 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
-        {/* Mensaje de bloqueo de SUNAT (p.ej. "Tiene deuda pendiente por Perdida") */}
-        {cliente.deudasF36?.nota && (
-          <section className="mt-6 evitar-corte">
-            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
-            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              ⚠ SUNAT: {cliente.deudasF36.nota}
-            </p>
-          </section>
-        )}
-
-        {/* Sin deudas: mensaje positivo si se consultó y no hay pendientes */}
-        {cliente.deudasF36?.at && nDeudas === 0 && !cliente.deudasF36?.nota && (
-          <section className="mt-6 evitar-corte">
-            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              Esta empresa no cuenta con deudas pendientes de acoger al fraccionamiento (consultado {fmtFecha(cliente.deudasF36.at)}).
-            </p>
-          </section>
-        )}
-
-        {/* Deudas tributarias (Fraccionamiento F36, por sección) */}
-        {nDeudas > 0 && (
-          <section className="mt-6 print-full">
-            <h3 className="sec-h">Deudas tributarias (SUNAT)</h3>
-            {deudasF36.filter((t) => t.filas.length > 0).map((t) => (
-              <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
-                <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-400">
-                        {t.headers.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-1">{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {t.filas.map((f, r) => (
-                        <tr key={r}>{f.map((c, i) => <td key={i} className="whitespace-nowrap px-3 py-1 text-slate-700">{c}</td>)}</tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {/* ===== 7) Hallazgos del análisis ===== */}
+        <section className="mt-6">
+          <h3 className="sec-h">
+            Hallazgos del análisis
+          </h3>
+          <ul className="space-y-2">
+            {d.hallazgos.map((h, i) => (
+              <li key={i} className="flex gap-3 rounded-md border border-slate-200 p-3">
+                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${SEV_DOT[h.severidad]}`} />
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {h.titulo}
+                    <span className="ml-2 text-xs font-normal text-slate-400">
+                      ({RIESGO_LABEL[h.severidad].toLowerCase()})
+                    </span>
+                  </p>
+                  <p className="text-sm text-slate-600">{h.detalle}</p>
                 </div>
-              </div>
+              </li>
             ))}
-            <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA A ACOGERSE: {fmtSoles(totalDeuda)}</p>
-            {cliente.deudasF36?.at && (
-              <p className="text-right text-[11px] text-slate-400">Extraído de SUNAT: {fmtFecha(cliente.deudasF36.at)}</p>
-            )}
-          </section>
-        )}
-
-        {/* Compras y Ventas (SIRE) */}
-        {cliente.sire && cliente.sire.length > 0 && (
-          <section className="mt-6">
-            <h3 className="sec-h">
-              Compras y Ventas (SIRE)
-            </h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
-                  <th className="py-1.5">Periodo</th>
-                  <th className="py-1.5 text-right">Ventas</th>
-                  <th className="py-1.5 text-right">Compras</th>
-                  <th className="py-1.5 text-right">Diferencia</th>
-                  <th className="py-1.5 text-center">Ventas (RVIE)</th>
-                  <th className="py-1.5 text-center">Compras (RCE)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {cliente.sire.map((s) => {
-                  const dif = s.ventas.importeTotal - s.compras.importeTotal;
-                  return (
-                    <tr key={s.periodo}>
-                      <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
-                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.ventas.importeTotal)}</td>
-                      <td className="py-1.5 text-right text-slate-700">{fmtSoles(s.compras.importeTotal)}</td>
-                      <td className={`py-1.5 text-right font-medium ${dif >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                        {fmtSoles(dif)}
-                      </td>
-                      <td className="py-1.5 text-center">
-                        <EstadoPresentacion ok={s.presentadoVentas} />
-                      </td>
-                      <td className="py-1.5 text-center">
-                        <EstadoPresentacion ok={s.presentadoCompras} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </section>
-        )}
+          </ul>
+        </section>
 
         {/* Recomendaciones */}
         <section className="mt-6">
@@ -786,6 +814,43 @@ function BuzonTabla({ mensajes }: { mensajes: BuzonMensaje[] }) {
               >
                 {m.tipo || "—"}
               </span>
+            </td>
+            <td className="py-1.5 text-slate-700">{m.asunto}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function BuzonTablaCompleta({ mensajes }: { mensajes: BuzonMensaje[] }) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+          <th className="py-1.5">Fecha</th>
+          <th className="py-1.5">Módulo</th>
+          <th className="py-1.5">Categoría</th>
+          <th className="py-1.5">Asunto</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {mensajes.map((m) => (
+          <tr key={m.id}>
+            <td className="py-1.5 pr-2 align-top whitespace-nowrap text-slate-500">{m.fecha}</td>
+            <td className="py-1.5 pr-2 align-top whitespace-nowrap">
+              <span className={`badge ${m.origen === "mensajes" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
+                {m.origen === "mensajes" ? "Mensajes" : "Notificaciones"}
+              </span>
+            </td>
+            <td className="py-1.5 pr-2 align-top">
+              {m.nivel === "otro" ? (
+                <span className="text-xs text-slate-400">Informativa</span>
+              ) : (
+                <span className={`badge ${m.nivel === "peligroso" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
+                  {m.tipo || "—"}
+                </span>
+              )}
             </td>
             <td className="py-1.5 text-slate-700">{m.asunto}</td>
           </tr>
