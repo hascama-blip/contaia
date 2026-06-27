@@ -416,7 +416,8 @@ export async function setBuzonAdjunto(
   clienteId: string,
   codMensaje: string,
   pdf: Buffer,
-  nombre: string
+  nombre: string,
+  usuario?: { id: string; nombre: string }
 ): Promise<void> {
   await ensureDirs();
   const archivo = `buzon_${clienteId}_${codMensaje}.pdf`;
@@ -425,13 +426,36 @@ export async function setBuzonAdjunto(
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
   if (!cliente.buzonAdjuntos) cliente.buzonAdjuntos = {};
+  const ahora = new Date().toISOString();
   cliente.buzonAdjuntos[codMensaje] = {
     archivo,
     nombre: nombre || `mensaje-${codMensaje}.pdf`,
-    at: new Date().toISOString(),
+    at: ahora,
     size: pdf.length,
+    descargadaAt: ahora,
+    descargadoPorId: usuario?.id,
+    descargadoPorNombre: usuario?.nombre,
   };
   await writeStore(store);
+}
+
+/** Registra una descarga (incluida la servida desde caché): actualiza la fecha
+ *  y quién la hizo. Devuelve la metadata actualizada (o null si no existe). */
+export async function registrarDescargaBuzon(
+  clienteId: string,
+  codMensaje: string,
+  usuario?: { id: string; nombre: string }
+): Promise<{ descargadaAt: string; descargadoPorNombre?: string } | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  const meta = cliente?.buzonAdjuntos?.[codMensaje];
+  if (!cliente || !meta) return null;
+  const ahora = new Date().toISOString();
+  meta.descargadaAt = ahora;
+  meta.descargadoPorId = usuario?.id;
+  meta.descargadoPorNombre = usuario?.nombre;
+  await writeStore(store);
+  return { descargadaAt: ahora, descargadoPorNombre: usuario?.nombre };
 }
 
 /** Lee el PDF cacheado de un mensaje (o null si no está). */

@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClienteAutorizado } from "@/lib/auth";
-import { getBuzonAdjunto, setBuzonAdjunto } from "@/lib/db";
+import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
+import { getBuzonAdjunto, setBuzonAdjunto, registrarDescargaBuzon } from "@/lib/db";
 import { descargarAdjuntoBuzon } from "@/lib/buzon";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-function pdfResponse(buf: Buffer, nombre: string, cacheado: boolean) {
-  return new NextResponse(buf as unknown as BodyInit, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${nombre || "adjunto.pdf"}"`,
-      "Cache-Control": "no-store",
-      "X-Desde-Cache": cacheado ? "1" : "0",
-    },
-  });
+function pdfResponse(
+  buf: Buffer,
+  nombre: string,
+  cacheado: boolean,
+  descarga?: { at: string; por?: string } | null
+) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="${nombre || "adjunto.pdf"}"`,
+    "Cache-Control": "no-store",
+    "X-Desde-Cache": cacheado ? "1" : "0",
+  };
+  if (descarga?.at) headers["X-Descarga-At"] = descarga.at;
+  if (descarga?.por) headers["X-Descarga-Por"] = encodeURIComponent(descarga.por);
+  return new NextResponse(buf as unknown as BodyInit, { headers });
 }
 
 // Descarga el PDF adjunto de UN mensaje del buzón (por codMensaje).
@@ -27,11 +33,17 @@ export async function POST(req: NextRequest) {
   const codMensaje = String(body?.codMensaje ?? "");
   const forzar = body?.forzar === true;
   const diagnostico = body?.diagnostico === true;
+  const actual = await getCurrentUser();
+  const quien = actual ? { id: actual.id, nombre: actual.nombre } : undefined;
 
   // 1) Caché: si ya está guardado y no se fuerza, devolver al instante (sin clave).
   if (!forzar && !diagnostico && codMensaje) {
     const cache = await getBuzonAdjunto(cliente.id, codMensaje);
-    if (cache) return pdfResponse(cache.pdf, cache.nombre, true);
+    if (cache) {
+      // Aun sirviéndolo desde caché, registramos quién lo abrió y cuándo.
+      const reg = await registrarDescargaBuzon(cliente.id, codMensaje, quien).catch(() => null);
+      return pdfResponse(cache.pdf, cache.nombre, true, reg ? { at: reg.descargadaAt, por: reg.descargadoPorNombre } : null);
+    }
   }
 
   // 2) Descarga en vivo (requiere Clave SOL).
@@ -65,7 +77,7 @@ export async function POST(req: NextRequest) {
   }
 
   const buf = Buffer.from(r.pdfBase64, "base64");
-  // Guardar en caché para próximas veces (no re-loguear).
-  await setBuzonAdjunto(cliente.id, codMensaje, buf, r.filename ?? `mensaje-${codMensaje}.pdf`).catch(() => {});
-  return pdfResponse(buf, r.filename ?? "adjunto.pdf", false);
+  // Guardar en caché para próximas veces (no re-loguear) + registrar la descarga.
+  await setBuzonAdjunto(cliente.id, codMensaje, buf, r.filename ?? `mensaje-${codMensaje}.pdf`, quien).catch(() => {});
+  return pdfResponse(buf, r.filename ?? "adjunto.pdf", false, quien ? { at: new Date().toISOString(), por: quien.nombre } : null);
 }

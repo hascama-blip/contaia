@@ -27,6 +27,8 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null);
   const [consultadoAt, setConsultadoAt] = useState<string | null>(null);
   const [cacheados, setCacheados] = useState<Set<string>>(new Set());
+  // Por codMensaje: última descarga del PDF (fecha + quién).
+  const [descargas, setDescargas] = useState<Record<string, { at: string; por?: string }>>({});
   const [busy, setBusy] = useState(false);
   const [bajando, setBajando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
         setMensajes(msgs.length ? msgs : null);
         setConsultadoAt(data.consultadoAt ?? null);
         setCacheados(new Set<string>(data.cacheados ?? []));
+        setDescargas(data.descargas ?? {});
         if (msgs.length) setInfo(`Mostrando ${msgs.length} mensaje(s) guardado(s)${data.consultadoAt ? "" : ""}. Usa “Actualizar” para traer lo último.`);
       }
     } catch {
@@ -100,6 +103,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
     setSolUser(clientes.find((c) => c.id === id)?.solUser ?? "");
     setMensajes(null);
     setCacheados(new Set());
+    setDescargas({});
     setInfo(null);
     setError(null);
   }
@@ -149,6 +153,8 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
         return;
       }
       const desdeCache = res.headers.get("X-Desde-Cache") === "1";
+      const descAt = res.headers.get("X-Descarga-At");
+      const descPor = res.headers.get("X-Descarga-Por");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -156,8 +162,20 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       a.download = `${(m.asunto || "adjunto").slice(0, 40).replace(/[^\w\s-]/g, "")}.pdf`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       setCacheados((prev) => new Set(prev).add(m.id)); // ahora queda guardado
+      // Registrar la última descarga (fecha + quién) para mostrarla en la fila.
+      setDescargas((prev) => ({
+        ...prev,
+        [m.id]: { at: descAt ?? new Date().toISOString(), por: descPor ? decodeURIComponent(descPor) : prev[m.id]?.por },
+      }));
       setInfo(desdeCache ? "PDF abierto desde lo guardado (sin reingresar a SUNAT)." : "PDF descargado y guardado para próximas veces.");
     } finally { setBajando(null); }
+  }
+
+  function fmtDescarga(d?: { at: string; por?: string }) {
+    if (!d?.at) return null;
+    let cuando = d.at;
+    try { cuando = new Date(d.at).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" }); } catch { /* */ }
+    return `${cuando}${d.por ? ` · ${d.por}` : ""}`;
   }
 
   return (
@@ -297,6 +315,11 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                             </button>
                           )}
                         </div>
+                        {descargas[m.id] && (
+                          <p className="mt-1 text-[10px] leading-tight text-slate-400" title="Última descarga del PDF">
+                            ⬇ {fmtDescarga(descargas[m.id])}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-2">
                         <BuzonSeguimientoCell

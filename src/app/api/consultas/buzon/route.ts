@@ -19,13 +19,20 @@ export async function GET(req: NextRequest) {
   const clienteId = req.nextUrl.searchParams.get("clienteId") ?? "";
   const cliente = await getClienteAutorizado(clienteId);
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
-  const cacheados = Object.keys(cliente.buzonAdjuntos ?? {});
+  const adj = cliente.buzonAdjuntos ?? {};
+  const cacheados = Object.keys(adj);
+  // Por mensaje: fecha/hora de la última descarga + quién la hizo.
+  const descargas: Record<string, { at: string; por?: string }> = {};
+  for (const [cod, m] of Object.entries(adj)) {
+    descargas[cod] = { at: m.descargadaAt ?? m.at, por: m.descargadoPorNombre };
+  }
   return NextResponse.json({
     razonSocial: cliente.razonSocial,
     ruc: cliente.ruc,
     mensajes: mensajesGuardados(cliente),
     consultadoAt: cliente.buzon?.consultadoAt ?? null,
     cacheados,
+    descargas,
   });
 }
 

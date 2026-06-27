@@ -311,8 +311,14 @@ export interface AdjuntoCache {
   archivo: string;
   /** Nombre para descargar (sugerido por SUNAT). */
   nombre: string;
+  /** Fecha en que se trajo el PDF de SUNAT por primera vez. */
   at: string;
   size: number;
+  /** Última vez que ALGUIEN descargó/abrió este PDF (incluye desde caché). */
+  descargadaAt?: string;
+  /** Quién hizo la última descarga (para el estudio principal). */
+  descargadoPorId?: string;
+  descargadoPorNombre?: string;
 }
 
 /** Seguimiento de un mensaje del buzón: plazo de atención + comentario. */
