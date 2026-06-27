@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setBuzon } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -87,6 +88,13 @@ export async function POST(req: NextRequest) {
         totalMensajes: r.mensajes.length,
         consultadoAt: new Date().toISOString(),
       }).catch(() => {});
+      await logAccion({
+        area: "Buzón",
+        accion: "Consultó el buzón electrónico",
+        clienteId: cliente.id,
+        clienteNombre: cliente.razonSocial,
+        detalle: `${r.mensajes.length} mensaje(s)`,
+      });
     }
     return NextResponse.json({
       razonSocial: cliente.razonSocial,

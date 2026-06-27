@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { setDeudaGenerado } from "@/lib/db";
 import { generarPedidoDeuda } from "@/lib/fraccionamiento";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -36,6 +37,13 @@ export async function POST(req: NextRequest) {
   const r = await generarPedidoDeuda({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
   if (r.ok && !body.diagnostico) {
     await setDeudaGenerado(cliente.id, { numPedido: r.numPedido, fechaPedido: r.fechaPedido }).catch(() => {});
+    await logAccion({
+      area: "Fraccionamiento F36",
+      accion: "Generó un pedido de deuda",
+      clienteId: cliente.id,
+      clienteNombre: cliente.razonSocial,
+      detalle: r.numPedido ? `N° ${r.numPedido}` : undefined,
+    });
   }
   return NextResponse.json(r, { status: r.ok || body.diagnostico ? 200 : 400 });
 }

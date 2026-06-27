@@ -16,6 +16,7 @@ import type {
   Usuario,
   DeudaF36Tabla,
   SeguimientoBuzon,
+  AccionAuditoria,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -39,6 +40,8 @@ interface Store {
   cuentasProveedor?: Record<string, ProveedorCuenta>;
   /** Caché de rubro por RUC (para consultar decolecta 1 sola vez por RUC). */
   rubrosProveedor?: Record<string, { razonSocial: string; actividad: string; at: string }>;
+  /** Bitácora de auditoría: acciones de todos los usuarios (la ve el líder). */
+  acciones?: AccionAuditoria[];
 }
 
 async function ensureDirs() {
@@ -54,6 +57,7 @@ async function readStore(): Promise<Store> {
     if (!store.cuentasProveedor) store.cuentasProveedor = {};
     if (!store.rubrosProveedor) store.rubrosProveedor = {};
     if (!Array.isArray(store.users)) store.users = [];
+    if (!Array.isArray(store.acciones)) store.acciones = [];
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
@@ -65,7 +69,7 @@ async function readStore(): Promise<Store> {
     }
     return store;
   } catch {
-    return { clientes: [], users: [], cuentasProveedor: {}, rubrosProveedor: {} };
+    return { clientes: [], users: [], cuentasProveedor: {}, rubrosProveedor: {}, acciones: [] };
   }
 }
 
@@ -121,6 +125,38 @@ export async function deleteSubUsuario(adminId: string, userId: string): Promise
   store.users!.splice(i, 1);
   await writeStore(store);
   return true;
+}
+
+// ---- Bitácora de auditoría -------------------------------------------------
+
+const MAX_ACCIONES = 5000; // tope para no inflar el store.json indefinidamente.
+
+/** Registra una acción en la bitácora (la ve el líder del estudio). */
+export async function registrarAccion(
+  data: Omit<AccionAuditoria, "id" | "at">
+): Promise<void> {
+  const store = await readStore();
+  if (!Array.isArray(store.acciones)) store.acciones = [];
+  store.acciones.push({ id: newId(), at: new Date().toISOString(), ...data });
+  // Conserva solo las más recientes (poda las más viejas si excede el tope).
+  if (store.acciones.length > MAX_ACCIONES) {
+    store.acciones = store.acciones.slice(store.acciones.length - MAX_ACCIONES);
+  }
+  await writeStore(store);
+}
+
+/** Lista las acciones de un estudio (más recientes primero), con filtros. */
+export async function listarAcciones(
+  studioId: string,
+  opts?: { limite?: number; usuarioId?: string; area?: string; clienteId?: string }
+): Promise<AccionAuditoria[]> {
+  const store = await readStore();
+  let arr = (store.acciones ?? []).filter((a) => a.studioId === studioId);
+  if (opts?.usuarioId) arr = arr.filter((a) => a.usuarioId === opts.usuarioId);
+  if (opts?.area) arr = arr.filter((a) => a.area === opts.area);
+  if (opts?.clienteId) arr = arr.filter((a) => a.clienteId === opts.clienteId);
+  arr = arr.sort((a, b) => b.at.localeCompare(a.at));
+  return typeof opts?.limite === "number" ? arr.slice(0, opts.limite) : arr;
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */

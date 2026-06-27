@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
 import { setSeguimientoBuzon, atenderSeguimientoBuzon } from "@/lib/db";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,13 @@ export async function POST(req: NextRequest) {
     creadoPorId: autor?.id,
     creadoPorNombre: autor?.nombre,
   });
+  await logAccion({
+    area: "Buzón",
+    accion: "Guardó un seguimiento (plazo / comentario)",
+    clienteId: cliente.id,
+    clienteNombre: cliente.razonSocial,
+    detalle: `Plazo ${diasAtencion} día(s)${body?.comentario ? ` · "${String(body.comentario).slice(0, 60)}"` : ""}`,
+  });
   return NextResponse.json({ seguimiento: seg });
 }
 
@@ -45,6 +53,15 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
-  const ok = await atenderSeguimientoBuzon(cliente.id, String(body?.codMensaje ?? ""), body?.atendido !== false);
+  const atendido = body?.atendido !== false;
+  const ok = await atenderSeguimientoBuzon(cliente.id, String(body?.codMensaje ?? ""), atendido);
+  if (ok) {
+    await logAccion({
+      area: "Buzón",
+      accion: atendido ? "Marcó un seguimiento como atendido" : "Reabrió un seguimiento",
+      clienteId: cliente.id,
+      clienteNombre: cliente.razonSocial,
+    });
+  }
   return NextResponse.json({ ok });
 }

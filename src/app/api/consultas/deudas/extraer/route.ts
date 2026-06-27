@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerDeudasF36 } from "@/lib/fraccionamiento";
 import { setDeudasF36 } from "@/lib/db";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
   const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
   if (r.ok && r.tablas && !body.diagnostico) {
     await setDeudasF36(cliente.id, r.tablas, r.nota).catch(() => {}); // reemplaza lo anterior
+    const total = r.tablas.reduce((a, t) => a + (t.filas?.length ?? 0), 0);
+    await logAccion({
+      area: "Fraccionamiento F36",
+      accion: "Extrajo las deudas (pestañas)",
+      clienteId: cliente.id,
+      clienteNombre: cliente.razonSocial,
+      detalle: `${total} deuda(s)`,
+    });
   }
   return NextResponse.json(r, { status: r.ok || body.diagnostico ? 200 : 400 });
 }

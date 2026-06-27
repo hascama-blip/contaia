@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createCliente, getClienteByRuc, listClientes, setCredSire } from "@/lib/db";
 import { requireUser, studioId, esAdmin } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 
@@ -66,5 +67,12 @@ export async function POST(req: NextRequest) {
     });
     if (actualizado) cliente.credSire = actualizado.credSire;
   }
+  await logAccion({
+    area: "Cliente",
+    accion: "Creó una empresa",
+    clienteId: cliente.id,
+    clienteNombre: cliente.razonSocial,
+    detalle: `RUC ${cliente.ruc}`,
+  });
   return NextResponse.json({ cliente }, { status: 201 });
 }

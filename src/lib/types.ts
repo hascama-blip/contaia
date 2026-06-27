@@ -321,6 +321,28 @@ export interface AdjuntoCache {
   descargadoPorNombre?: string;
 }
 
+/** Entrada de la bitácora de auditoría: quién hizo qué, cuándo y dónde.
+ *  La ve el usuario líder (admin) del estudio. */
+export interface AccionAuditoria {
+  id: string;
+  /** Fecha/hora de la acción (ISO). */
+  at: string;
+  /** Estudio (admin dueño) al que pertenece la acción. */
+  studioId: string;
+  usuarioId: string;
+  usuarioNombre: string;
+  rol?: "admin" | "operador";
+  /** Sección donde ocurrió (Buzón, Fraccionamiento, Cliente, Credenciales…). */
+  area: string;
+  /** Qué hizo (verbo + objeto), legible. */
+  accion: string;
+  /** Empresa afectada (si aplica). */
+  clienteId?: string;
+  clienteNombre?: string;
+  /** Texto libre opcional con más contexto. */
+  detalle?: string;
+}
+
 /** Seguimiento de un mensaje del buzón: plazo de atención + comentario. */
 export interface SeguimientoBuzon {
   codMensaje: string;

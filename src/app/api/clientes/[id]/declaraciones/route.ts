@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addDeclaracion, deleteDeclaracion, newId } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
+import { logAccion } from "@/lib/auditoria";
 import { extraerTextoPdf, parseDeclaracion } from "@/lib/declaracion";
 import type { DeclaracionMensual } from "@/lib/types";
 
@@ -47,6 +48,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       cargadoAt: new Date().toISOString(),
     };
     const actualizado = await addDeclaracion(cliente.id, decl);
+    await logAccion({
+      area: "Declaración mensual",
+      accion: d.fuente === "manual" ? "Guardó una declaración (manual)" : "Guardó una declaración (PDF)",
+      clienteId: cliente.id,
+      clienteNombre: cliente.razonSocial,
+      detalle: `Periodo ${decl.periodo}`,
+    });
     return NextResponse.json({ cliente: actualizado, declaracion: decl }, { status: 201 });
   }
 
@@ -138,9 +146,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     resultados.push({ archivo: file.name, ok: true, declaracion: decl });
   }
 
+  const guardadas = resultados.filter((r) => r.ok).length;
+  if (guardadas > 0) {
+    await logAccion({
+      area: "Declaración mensual",
+      accion: "Cargó declaraciones (PDF en bloque)",
+      clienteId: cliente.id,
+      clienteNombre: cliente.razonSocial,
+      detalle: `${guardadas} declaración(es)`,
+    });
+  }
   return NextResponse.json({
     resultados,
-    guardadas: resultados.filter((r) => r.ok).length,
+    guardadas,
     ...(primerDiag ? { diag: primerDiag } : {}),
   });
 }

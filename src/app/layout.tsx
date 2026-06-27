@@ -43,6 +43,11 @@ export default async function RootLayout({
                   </Link>
                 )}
                 {admin && (
+                  <Link href="/actividad" className="rounded-lg px-3 py-2 hover:bg-slate-100">
+                    Actividad
+                  </Link>
+                )}
+                {admin && (
                   <Link href="/clientes/nuevo" className="btn-primary ml-2">
                     + Nuevo cliente
                   </Link>

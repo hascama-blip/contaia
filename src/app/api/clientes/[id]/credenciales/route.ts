@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setCredSire } from "@/lib/db";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     clientId,
     clientSecret,
     guardadoAt: new Date().toISOString(),
+  });
+  await logAccion({
+    area: "Credenciales",
+    accion: cambiaApi ? "Configuró/editó el API SIRE" : "Guardó el Usuario SOL",
+    clienteId: cliente.id,
+    clienteNombre: cliente.razonSocial,
   });
   return NextResponse.json({ cliente: actualizado, credSire: actualizado?.credSire ?? null });
 }

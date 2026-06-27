@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
 import { getBuzonAdjunto, setBuzonAdjunto, registrarDescargaBuzon } from "@/lib/db";
 import { descargarAdjuntoBuzon } from "@/lib/buzon";
+import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -42,6 +43,13 @@ export async function POST(req: NextRequest) {
     if (cache) {
       // Aun sirviéndolo desde caché, registramos quién lo abrió y cuándo.
       const reg = await registrarDescargaBuzon(cliente.id, codMensaje, quien).catch(() => null);
+      await logAccion({
+        area: "Buzón",
+        accion: "Abrió un PDF del buzón (guardado)",
+        clienteId: cliente.id,
+        clienteNombre: cliente.razonSocial,
+        detalle: body?.asunto ? String(body.asunto).slice(0, 80) : `Mensaje ${codMensaje}`,
+      });
       return pdfResponse(cache.pdf, cache.nombre, true, reg ? { at: reg.descargadaAt, por: reg.descargadoPorNombre } : null);
     }
   }
@@ -79,5 +87,12 @@ export async function POST(req: NextRequest) {
   const buf = Buffer.from(r.pdfBase64, "base64");
   // Guardar en caché para próximas veces (no re-loguear) + registrar la descarga.
   await setBuzonAdjunto(cliente.id, codMensaje, buf, r.filename ?? `mensaje-${codMensaje}.pdf`, quien).catch(() => {});
+  await logAccion({
+    area: "Buzón",
+    accion: "Descargó un PDF del buzón (desde SUNAT)",
+    clienteId: cliente.id,
+    clienteNombre: cliente.razonSocial,
+    detalle: body?.asunto ? String(body.asunto).slice(0, 80) : `Mensaje ${codMensaje}`,
+  });
   return pdfResponse(buf, r.filename ?? "adjunto.pdf", false, quien ? { at: new Date().toISOString(), por: quien.nombre } : null);
 }
