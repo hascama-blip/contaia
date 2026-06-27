@@ -57,12 +57,15 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
     if (!clienteId) return setError("Elige una empresa.");
     if (!solPass) return setError("Ingresa la Clave SOL.");
     setBusy(fase === "generar" ? "gen" : fase === "estado" ? "ver" : "ext"); setError(null); setDiag(null);
-    setInfo(fase === "generar" ? "Generando el pedido de deuda…" : fase === "estado" ? "Verificando el estado del pedido…" : "Extrayendo las deudas…");
+    setInfo(fase === "generar" ? "Generando el pedido de deuda… (puede tardar 1-3 min)" : fase === "estado" ? "Verificando el estado del pedido…" : "Extrayendo las deudas…");
+    const ctrl = new AbortController();
+    const tope = setTimeout(() => ctrl.abort(), 240000); // 4 min máx
     try {
       const res = await fetch(`/api/consultas/deudas/${fase}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clienteId, solUser, solPass, diagnostico: modoDiag, forzar: true }),
+        signal: ctrl.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
@@ -79,9 +82,10 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
         setEstado("extraido");
       }
       setInfo(data.mensaje ?? "Listo.");
-    } catch {
-      setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
-    } finally { setBusy(null); }
+    } catch (e: any) {
+      if (e?.name === "AbortError") setError("Tardó demasiado (SUNAT puede estar lento o bloqueado). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”.");
+      else setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
+    } finally { clearTimeout(tope); setBusy(null); }
   }
 
   return (

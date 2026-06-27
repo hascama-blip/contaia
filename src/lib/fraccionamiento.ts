@@ -648,6 +648,10 @@ export async function verificarEstadoPedidoF36(params: FraccParams): Promise<Est
   const diagnostico = params.diagnostico === true;
   const pasos: any[] = [];
   let browser: any = null;
+  // Tope de tiempo: si SUNAT cuelga, cerramos el navegador para que la función
+  // SIEMPRE devuelva (la operación en curso lanza "Target closed" → catch).
+  let cerradoPorTiempo = false;
+  const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
@@ -680,9 +684,13 @@ export async function verificarEstadoPedidoF36(params: FraccParams): Promise<Est
       diag: diagnostico ? { pasos } : undefined,
     };
   } catch (err) {
+    if (cerradoPorTiempo) {
+      return { ok: false, error: "SUNAT tardó demasiado (puede estar lento o bloqueado por varios ingresos). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”.", diag: { pasos } };
+    }
     pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
     return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
   } finally {
+    clearTimeout(tope);
     if (browser) await browser.close().catch(() => {});
   }
 }
@@ -701,6 +709,10 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
   const diagnostico = params.diagnostico === true;
   const pasos: any[] = [];
   let browser: any = null;
+  // Tope de tiempo: si SUNAT cuelga, cerramos el navegador para que la función
+  // SIEMPRE devuelva (la operación en curso lanza "Target closed" → catch).
+  let cerradoPorTiempo = false;
+  const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
@@ -794,9 +806,13 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
       diag: { pasos },
     };
   } catch (err) {
+    if (cerradoPorTiempo) {
+      return { ok: false, error: "SUNAT tardó demasiado (puede estar lento o bloqueado por varios ingresos). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”.", diag: { pasos } };
+    }
     pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
     return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
   } finally {
+    clearTimeout(tope);
     if (browser) await browser.close().catch(() => {});
   }
 }
@@ -977,6 +993,10 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
   const diagnostico = params.diagnostico === true;
   const pasos: any[] = [];
   let browser: any = null;
+  // Tope de tiempo: si SUNAT cuelga, cerramos el navegador para que la función
+  // SIEMPRE devuelva (la operación en curso lanza "Target closed" → catch).
+  let cerradoPorTiempo = false;
+  const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
@@ -1113,9 +1133,13 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       diag: { pasos },
     };
   } catch (err) {
+    if (cerradoPorTiempo) {
+      return { ok: false, error: "SUNAT tardó demasiado (puede estar lento o bloqueado por varios ingresos). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”.", diag: { pasos } };
+    }
     pasos.push({ paso: "error", respuesta: err instanceof Error ? err.message : String(err) });
     return { ok: false, error: err instanceof Error ? err.message : String(err), diag: { pasos } };
   } finally {
+    clearTimeout(tope);
     if (browser) await browser.close().catch(() => {});
   }
 }

@@ -30,6 +30,25 @@ function fmt(iso?: string | null) {
   try { return new Date(iso).toLocaleString("es-PE"); } catch { return iso; }
 }
 
+// POST con tope de 4 min: si SUNAT cuelga, no deja la pantalla esperando para siempre.
+async function postF36(fase: string, body: any): Promise<{ ok: boolean; data: any }> {
+  const ctrl = new AbortController();
+  const tope = setTimeout(() => ctrl.abort(), 240000);
+  try {
+    const res = await fetch(`/api/consultas/deudas/${fase}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body), signal: ctrl.signal,
+    });
+    return { ok: res.ok, data: await res.json().catch(() => ({})) };
+  } finally { clearTimeout(tope); }
+}
+
+function msgError(e: any): string {
+  return e?.name === "AbortError"
+    ? "Tardó demasiado (SUNAT puede estar lento o bloqueado). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”."
+    : "Se cortó la conexión con SUNAT.";
+}
+
 export default function DeudasF36Panel({
   clienteId,
   solUserGuardado,
@@ -73,20 +92,16 @@ export default function DeudasF36Panel({
 
   async function generar() {
     const a = accesos(); if (!a) return;
-    setBusy("gen"); setError(null); setDiag(null); setInfo("Generando el pedido de deuda en SUNAT…");
+    setBusy("gen"); setError(null); setDiag(null); setInfo("Generando el pedido de deuda en SUNAT… (puede tardar 1-3 min)");
     try {
-      const res = await fetch("/api/consultas/deudas/generar", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, ...a, forzar: true, diagnostico: modoDiag }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const { ok, data } = await postF36("generar", { clienteId, ...a, forzar: true, diagnostico: modoDiag });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
-      if (!res.ok) { setError(data.error ?? "No se pudo generar."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
+      if (!ok) { setError(data.error ?? "No se pudo generar."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
       setEstado("en-proceso");
       if (data.numPedido) setNumPedido(data.numPedido);
       if (data.fechaPedido) setFechaPedido(data.fechaPedido);
       setInfo((data.mensaje ?? "Pedido generado.") + " Usa “Verificar estado” hasta que diga Listo.");
-    } catch { setError("Se cortó la conexión con SUNAT."); }
+    } catch (e) { setError(msgError(e)); }
     finally { setBusy(null); }
   }
 
@@ -94,16 +109,12 @@ export default function DeudasF36Panel({
     const a = accesos(); if (!a) return;
     setBusy("ver"); setError(null); setDiag(null); setInfo("Verificando el estado del pedido en SUNAT…");
     try {
-      const res = await fetch("/api/consultas/deudas/estado", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, ...a, diagnostico: modoDiag }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const { ok, data } = await postF36("estado", { clienteId, ...a, diagnostico: modoDiag });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
-      if (!res.ok) { setError(data.error ?? "No se pudo verificar."); return; }
+      if (!ok) { setError(data.error ?? "No se pudo verificar."); return; }
       if (data.estado) { setEstado(data.estado); setNumPedido(data.numPedido ?? null); setFechaPedido(data.fechaPedido ?? null); setVerificadoAt(new Date().toISOString()); }
       setInfo(data.mensaje ?? "Estado actualizado.");
-    } catch { setError("Se cortó la conexión con SUNAT."); }
+    } catch (e) { setError(msgError(e)); }
     finally { setBusy(null); }
   }
 
@@ -111,16 +122,12 @@ export default function DeudasF36Panel({
     const a = accesos(); if (!a) return;
     setBusy("ext"); setError(null); setDiag(null); setInfo("Extrayendo las deudas (las pestañas)…");
     try {
-      const res = await fetch("/api/consultas/deudas/extraer", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteId, ...a, forzar: true, diagnostico: modoDiag }),
-      });
-      const data = await res.json().catch(() => ({}));
+      const { ok, data } = await postF36("extraer", { clienteId, ...a, forzar: true, diagnostico: modoDiag });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
-      if (!res.ok) { setError(data.error ?? "No se pudo extraer."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
+      if (!ok) { setError(data.error ?? "No se pudo extraer."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
       if (Array.isArray(data.tablas)) { setTablas(data.tablas); setNota(data.nota ?? null); if (data.at) setAt(data.at); setEstado("extraido"); }
       setInfo(data.mensaje ?? "Listo.");
-    } catch { setError("Se cortó la conexión con SUNAT."); }
+    } catch (e) { setError(msgError(e)); }
     finally { setBusy(null); }
   }
 
