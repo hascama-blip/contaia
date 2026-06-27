@@ -75,6 +75,19 @@ async function readStore(): Promise<Store> {
 
 // ---- Usuarios --------------------------------------------------------------
 
+/** Actualiza campos de un usuario por id (parche superficial). */
+export async function updateUserById(
+  id: string,
+  patch: Partial<Pick<Usuario, "passHash" | "rol" | "estado" | "nombre" | "parentId" | "decididoAt">>
+): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === id);
+  if (!u) return null;
+  Object.assign(u, patch);
+  await writeStore(store);
+  return u;
+}
+
 export async function getUserById(id: string): Promise<Usuario | null> {
   const store = await readStore();
   return store.users?.find((u) => u.id === id) ?? null;

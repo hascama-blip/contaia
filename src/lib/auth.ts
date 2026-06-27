@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
-import { getUserById, getClienteDeUsuario, getUserByEmail, createUser } from "./db";
+import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById } from "./db";
 import { verifySessionToken, SESSION_COOKIE } from "./authToken";
 import type { Usuario, Cliente } from "./types";
 
@@ -36,18 +36,31 @@ const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "dascama@gmail.com").trim().
 const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "D2n6a0d92000@";
 const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador supremo";
 
-/** Crea el usuario supremo si aún no existe (idempotente). Se llama al entrar
- *  a /login y al panel del supremo, para garantizar que la cuenta exista. */
+/** Garantiza la cuenta supremo (idempotente y AUTO-REPARADORA). Se llama al
+ *  entrar a /login, /register y al panel del supremo. Si la cuenta no existe la
+ *  crea; si existe pero no es supremo, no está aprobada o su contraseña no
+ *  coincide con la configurada, la reconcilia (rol + estado + contraseña). */
 export async function ensureSupremo(): Promise<void> {
   const existente = await getUserByEmail(SUPREMO_EMAIL);
-  if (existente) return;
-  await createUser({
-    nombre: SUPREMO_NOMBRE,
-    email: SUPREMO_EMAIL,
-    passHash: hashPassword(SUPREMO_PASSWORD),
-    rol: "supremo",
-    estado: "aprobado",
-  });
+  if (!existente) {
+    await createUser({
+      nombre: SUPREMO_NOMBRE,
+      email: SUPREMO_EMAIL,
+      passHash: hashPassword(SUPREMO_PASSWORD),
+      rol: "supremo",
+      estado: "aprobado",
+    });
+    return;
+  }
+  const patch: Record<string, unknown> = {};
+  if (existente.rol !== "supremo") patch.rol = "supremo";
+  if (existente.estado !== "aprobado") patch.estado = "aprobado";
+  if (existente.parentId) patch.parentId = undefined;
+  // Si la contraseña configurada no abre la cuenta, la reponemos.
+  if (!verifyPassword(SUPREMO_PASSWORD, existente.passHash)) {
+    patch.passHash = hashPassword(SUPREMO_PASSWORD);
+  }
+  if (Object.keys(patch).length > 0) await updateUserById(existente.id, patch);
 }
 
 /** Usuario de la sesión actual (o null si no hay sesión válida). */
