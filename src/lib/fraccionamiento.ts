@@ -695,13 +695,32 @@ export async function verificarEstadoPedidoF36(params: FraccParams): Promise<Est
   }
 }
 
+/** Lee la pantalla de confirmación "Número de Pedido F36" (tras Enviar Solicitud). */
+async function leerConfirmacionPedido(ctx: any): Promise<{ numPedido: string; fecha: string; entidad: string } | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const r = await fr
+        .evaluate(() => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+          const body = document.body?.innerText || "";
+          if (!/n[uú]mero de pedido f36|registrado satisfactoriamente|se generar[aá] en unos minutos/i.test(body)) return null;
+          const num = body.match(/n[uú]mero de pedido\s*:?\s*(\d{6,})/i);
+          const fec = body.match(/fecha\s*:?\s*([\d/]{8,10}(?:\s+[\d:]+)?)/i);
+          const ent = body.match(/entidad\s*:?\s*([A-Za-zÁÉÍÓÚ]+)/i);
+          return { numPedido: num ? num[1] : "", fecha: fec ? norm(fec[1]) : "", entidad: ent ? norm(ent[1]) : "" };
+        })
+        .catch(() => null);
+      if (r && r.numPedido) return r;
+    }
+  }
+  return null;
+}
+
 // ---- FASE 1: generar pedido de deuda ---------------------------------------
-// Flujo del portal: Fracc Art 36 → "Generación de pedido de deuda" → marcar
-// TESORO → generar. (También se puede desde "Consulta estado de pedido de
-// deuda", acción "Generar Nuevo Número Pedido" de la fila TESORO.) Luego de
-// ~5 min el pedido queda "Pendiente de Elaborar Solicitud" y se puede extraer.
-// Sólo reporta éxito si, al re-consultar, hay un pedido TESORO VIGENTE
-// (no "Cancelado por plazo Vencido").
+// Camino del PDF oficial: Fracc Art 36 → "Generación de pedido de deuda" →
+// Entidad = TESORO → "Enviar Solicitud" → pantalla "Número de Pedido F36" (se
+// procesa en unos minutos). Se lee el N° de la confirmación; luego se rastrea
+// con "Verificar estado" hasta "Pendiente de Elaborar Solicitud".
 export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResultado> {
   const { ruc, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) return { ok: false, error: "RUC inválido." };
@@ -723,77 +742,59 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
       pasos.push({ paso: "menu-completo", links: await dumpEjecuta(s.ctx) });
     }
 
-    // Estado inicial: ¿ya hay un pedido TESORO vigente / listo para elaborar?
-    const antes = await abrirConsultaPedidos(s.ctx, s.page, pasos);
-    const numsAntes = new Set(antes.filter((p) => /tesoro/i.test(p.entidad)).map((p) => p.numero));
-    const yaListo = antes.find((p) => /tesoro/i.test(p.entidad) && /elaborar/i.test(p.accion));
-    if (yaListo) {
-      return { ok: true, mensaje: "Ya hay un pedido de deuda (TESORO) listo. Usa “Consultar y extraer”.", diag: { pasos } };
-    }
-
-    // 1) Intento por la acción de la fila TESORO: "Generar Nuevo Número Pedido".
-    let via = "";
-    let gen = await clicAccionPedido(s.ctx, "TESORO", "Generar Nuevo Número Pedido");
-    if (gen) via = "accion-fila";
+    // Ir al formulario dedicado "Generación de pedido de deuda".
+    await irAFraccArt36(s.ctx, s.page, pasos);
+    await cerrarPantallas(s.ctx, s.page);
+    const gp = await clicNativoEspera(
+      s.ctx, s.page,
+      ["Generación de pedido de deuda", "Generacion de pedido de deuda"],
+      6, 1500
+    );
     await s.page.waitForTimeout(2500);
     await cerrarPantallas(s.ctx, s.page);
+    pasos.push({ paso: "abrir-generacion", clico: gp });
+    if (diagnostico) pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
 
-    // 2) Si no, ir al formulario dedicado "Generación de pedido de deuda".
-    if (!gen) {
-      await irAFraccArt36(s.ctx, s.page, pasos);
-      const gp = await clicNativoEspera(
-        s.ctx, s.page,
-        ["Generación de pedido de deuda", "Generacion de pedido de deuda"],
-        6, 1500
-      );
-      await s.page.waitForTimeout(2500);
-      await cerrarPantallas(s.ctx, s.page);
-      pasos.push({ paso: "abrir-generacion", clico: gp });
-      if (gp) { gen = gp; via = "form-dedicado"; }
-    }
-
-    // Formulario de generación: capturarlo (para calibrar) y completarlo.
-    pasos.push({ paso: "form-generacion", formularios: await dumpFormularios(s.ctx) });
+    // Marcar Entidad TESORO (suele venir por defecto en el <select>).
     const ent = await marcarEntidad(s.ctx, ["Tesoro", "TESORO"]);
-    await s.page.waitForTimeout(1000);
+    await s.page.waitForTimeout(800);
     pasos.push({ paso: "marcar-tesoro", via: ent });
 
-    const env = await clicTextoEspera(
-      s.ctx, s.page,
-      ["Generar Pedido", "Generar pedido", "Generar", "Solicitar", "Enviar solicitud", "Enviar", "Grabar", "Aceptar", "Confirmar", "Continuar"],
-      4, 1200
-    );
-    await s.page.waitForTimeout(3500);
+    // "Enviar Solicitud" (etiqueta específica: NO clicar botones de la campaña).
+    const env = await clicTextoEspera(s.ctx, s.page, ["Enviar Solicitud", "Enviar solicitud", "Generar Pedido"], 5, 1200);
+    await s.page.waitForTimeout(4000);
     await cerrarPantallas(s.ctx, s.page);
-    // Segundo paso de confirmación si lo hubiera.
-    const conf = await clicTextoEspera(s.ctx, s.page, ["Aceptar", "Confirmar", "Sí", "Si", "Continuar", "Finalizar"], 2, 1000);
-    await s.page.waitForTimeout(2500);
-    await cerrarPantallas(s.ctx, s.page);
-    pasos.push({ paso: "enviar", via, env, conf });
+    pasos.push({ paso: "enviar", clico: env });
 
-    // VERIFICAR de verdad: re-consultar y comprobar un TESORO VIGENTE
-    // (nuevo número o estado distinto de cancelado/vencido).
-    let despues: { entidad: string; numero: string; fecha: string; estado: string; accion: string }[] = [];
-    let tesoroVigente: any = null;
-    for (let i = 0; i < 4; i++) {
-      despues = await abrirConsultaPedidos(s.ctx, s.page, pasos);
-      tesoroVigente =
-        despues.find((p) => /tesoro/i.test(p.entidad) && p.numero && !numsAntes.has(p.numero)) ||
-        despues.find(esTesoroVigente);
-      if (tesoroVigente) break;
-      await s.page.waitForTimeout(2500);
+    // Leer la pantalla de confirmación "Número de Pedido F36".
+    let confirmacion: { numPedido: string; fecha: string; entidad: string } | null = null;
+    for (let i = 0; i < 5 && !confirmacion; i++) {
+      confirmacion = await leerConfirmacionPedido(s.ctx);
+      if (!confirmacion) await s.page.waitForTimeout(2000);
     }
-    pasos.push({ paso: "verificar", tesoroVigente: tesoroVigente ?? null });
-    if (diagnostico) pasos.push({ paso: "resultado", formularios: await dumpFormularios(s.ctx) });
+    pasos.push({ paso: "confirmacion", confirmacion });
 
-    if (tesoroVigente) {
+    if (confirmacion && confirmacion.numPedido) {
       return {
         ok: true,
-        numPedido: tesoroVigente.numero || undefined,
-        fechaPedido: tesoroVigente.fecha || undefined,
-        mensaje:
-          `Pedido de deuda generado (TESORO, N° ${tesoroVigente.numero || "s/n"}). ` +
-          `SUNAT lo está procesando ("Esperar unos minutos"). Usa “Verificar estado” hasta que quede “Pendiente de Elaborar Solicitud”.`,
+        numPedido: confirmacion.numPedido,
+        fechaPedido: confirmacion.fecha || undefined,
+        mensaje: `Pedido de deuda generado (TESORO, N° ${confirmacion.numPedido}). SUNAT lo está procesando ("se generará en unos minutos"). Usa “Verificar estado” hasta que quede “Pendiente de Elaborar Solicitud”.`,
+        diag: { pasos },
+      };
+    }
+
+    // Respaldo: UNA sola consulta para ver si quedó un TESORO vigente.
+    const pedidos = await abrirConsultaPedidos(s.ctx, s.page, pasos);
+    const vigente = pedidos.find(
+      (p) => /tesoro/i.test(p.entidad) && !/cancelad|vencid/i.test(p.estado) && !/generar nuevo/i.test(p.accion)
+    );
+    if (vigente) {
+      return {
+        ok: true,
+        numPedido: vigente.numero || undefined,
+        fechaPedido: vigente.fecha || undefined,
+        mensaje: `Pedido de deuda generado (TESORO, N° ${vigente.numero || "s/n"}). Usa “Verificar estado” hasta que quede “Pendiente de Elaborar Solicitud”.`,
         diag: { pasos },
       };
     }
@@ -801,8 +802,7 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     return {
       ok: false,
       error:
-        "No pude confirmar la generación: SUNAT sigue mostrando los pedidos TESORO como “Cancelado por plazo Vencido”. " +
-        "Marca “Modo diagnóstico” y vuelve a darle a “Generar pedido”, y pásame el resultado (paso “form-generacion”) para calibrar el formulario.",
+        "No pude confirmar la generación. Si aparece la campaña “Valida tus datos de contacto”, ciérrala una vez (Continuar sin confirmar / Finalizar) y reintenta. Con Modo diagnóstico, pásame los pasos “abrir-generacion”, “marcar-tesoro” y “enviar”.",
       diag: { pasos },
     };
   } catch (err) {
