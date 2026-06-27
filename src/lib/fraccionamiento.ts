@@ -1123,13 +1123,19 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       }
       prevSig = firma(t);
       tablas.push({ pestana: pd.label, headers: t?.headers ?? [], filas: t?.filas ?? [] });
-      pasos.push({ paso: "pestana", nombre: pd.label, via: porApi ? "dojo" : clicado ? "clic" : "no", filas: t?.filas?.length ?? 0 });
+      pasos.push({ paso: "pestana", nombre: pd.label, via: porApi ? "dojo" : clicado ? "clic" : "no", cabeceras: t?.headers?.length ?? 0, filas: t?.filas?.length ?? 0 });
     }
 
+    // Llegamos aquí = el formulario de deudas ABRIÓ (pasó el guard valores/acogibles).
+    // Por tanto SIEMPRE es éxito: si las 4 pestañas vienen vacías, la empresa no
+    // tiene deudas acogibles (estado válido, NO un error que bloquee la pantalla).
+    const totalFilas = tablas.reduce((a, t) => a + t.filas.length, 0);
     return {
-      ok: tablas.some((t) => t.filas.length > 0),
+      ok: true,
       tablas,
-      mensaje: `Extraídas ${tablas.reduce((a, t) => a + t.filas.length, 0)} fila(s) en ${tablas.length} pestaña(s).`,
+      mensaje: totalFilas > 0
+        ? `Extraídas ${totalFilas} deuda(s) en ${tablas.length} pestaña(s).`
+        : "Formulario abierto: esta empresa no tiene deudas acogibles al fraccionamiento (las 4 pestañas están vacías).",
       diag: { pasos },
     };
   } catch (err) {
