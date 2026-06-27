@@ -38,6 +38,25 @@ export default function ClienteDetail({
   const [cliente, setCliente] = useState<Cliente>(inicial);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  // Fechas que decolecta NO entrega: se ingresan a mano y se guardan.
+  const [fInscripcion, setFInscripcion] = useState(inicial.sunat?.fechaInscripcion ?? "");
+  const [fInicio, setFInicio] = useState(inicial.sunat?.fechaInicioActividades ?? "");
+
+  async function guardarFechasSunat() {
+    setBusy("fechas");
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}/sunat`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fechaInscripcion: fInscripcion, fechaInicioActividades: fInicio }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { notify("err", data.error ?? "No se pudo guardar."); return; }
+      setCliente(data.cliente);
+      notify("ok", "Fechas SUNAT guardadas.");
+      router.refresh();
+    } finally { setBusy(null); }
+  }
 
   async function eliminarCliente() {
     if (!window.confirm(`¿Eliminar la empresa "${cliente.razonSocial}" (RUC ${cliente.ruc})? Esta acción no se puede deshacer.`)) return;
@@ -189,12 +208,40 @@ export default function ClienteDetail({
                   value={cliente.sunat.comprobanteElectronico ? "Sí" : "No"}
                 />
                 <Field label="Domicilio fiscal" value={cliente.sunat.direccion} />
-                {cliente.sunat.fechaInscripcion && (
-                  <Field label="Fecha de inscripción" value={cliente.sunat.fechaInscripcion} />
-                )}
-                {cliente.sunat.fechaInicioActividades && (
-                  <Field label="Inicio de actividades" value={cliente.sunat.fechaInicioActividades} />
-                )}
+                {/* Fechas que decolecta no entrega: editables a mano (se guardan). */}
+                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs text-slate-500">
+                    SUNAT (decolecta) no entrega estas fechas. Ingrésalas a mano (tal como en
+                    Consulta RUC); se guardan y salen en el informe.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600">Fecha de inscripción</label>
+                      <input
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                        placeholder="dd/mm/aaaa"
+                        value={fInscripcion}
+                        onChange={(e) => setFInscripcion(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600">Inicio de actividades</label>
+                      <input
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                        placeholder="dd/mm/aaaa"
+                        value={fInicio}
+                        onChange={(e) => setFInicio(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={guardarFechasSunat}
+                    disabled={busy === "fechas"}
+                    className="mt-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {busy === "fechas" ? "Guardando…" : "Guardar fechas"}
+                  </button>
+                </div>
                 <div className="sm:col-span-2">
                   <p className="text-xs uppercase text-slate-400">Tributos / régimen</p>
                   <div className="mt-1 flex flex-wrap gap-1">

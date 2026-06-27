@@ -370,7 +370,28 @@ export async function setSunatInfo(
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
-  cliente.sunat = sunat;
+  // Preserva las fechas ingresadas a mano (decolecta no las entrega): si la
+  // nueva consulta no trae inscripción/inicio, conserva las que ya había.
+  cliente.sunat = {
+    ...sunat,
+    fechaInscripcion: sunat.fechaInscripcion ?? cliente.sunat?.fechaInscripcion,
+    fechaInicioActividades: sunat.fechaInicioActividades ?? cliente.sunat?.fechaInicioActividades,
+  };
+  await writeStore(store);
+  return cliente;
+}
+
+/** Actualiza SOLO las fechas (inscripción / inicio de actividades) del SUNAT del
+ *  cliente, sin re-consultar. decolecta no las entrega → se ingresan a mano. */
+export async function setFechasSunat(
+  clienteId: string,
+  fechas: { fechaInscripcion?: string; fechaInicioActividades?: string }
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente || !cliente.sunat) return null;
+  if (fechas.fechaInscripcion !== undefined) cliente.sunat.fechaInscripcion = fechas.fechaInscripcion || undefined;
+  if (fechas.fechaInicioActividades !== undefined) cliente.sunat.fechaInicioActividades = fechas.fechaInicioActividades || undefined;
   await writeStore(store);
   return cliente;
 }
