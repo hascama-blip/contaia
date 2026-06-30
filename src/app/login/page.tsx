@@ -126,13 +126,15 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* "¿Olvidaste tu contraseña?" oculto por ahora (hasta configurar el correo).
+            Para reactivarlo, descomentar este bloque:
         {modo === "login" && (
           <div className="mt-3 text-center">
             <button className="text-sm text-brand-600 hover:underline" onClick={() => { setModo("olvido"); setError(null); setAviso(null); }}>
               ¿Olvidaste tu contraseña?
             </button>
           </div>
-        )}
+        )} */}
 
         <div className="mt-4 text-center text-sm text-slate-500">
           {modo === "login" ? (
