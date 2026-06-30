@@ -147,6 +147,28 @@ export async function eliminarTodosLosUsuarios(): Promise<number> {
   return n;
 }
 
+/** Cambia la contraseña (hash) de un usuario y limpia cualquier token de reset. */
+export async function setPasswordUsuario(userId: string, passHash: string): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return null;
+  u.passHash = passHash;
+  u.resetTokenHash = undefined;
+  u.resetTokenExp = undefined;
+  await writeStore(store);
+  return u;
+}
+
+/** Guarda el token de recuperación (hash + expiración) de un usuario. */
+export async function setResetTokenUsuario(userId: string, hash: string, exp: string): Promise<void> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return;
+  u.resetTokenHash = hash;
+  u.resetTokenExp = exp;
+  await writeStore(store);
+}
+
 /** El supremo desbloquea/bloquea los módulos de paga de un estudio. */
 export async function setModulosUsuario(
   userId: string,

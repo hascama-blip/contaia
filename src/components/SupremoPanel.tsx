@@ -84,6 +84,23 @@ export default function SupremoPanel() {
     } finally { setBusy(null); }
   }
 
+  async function cambiarPassword(s: Solicitud) {
+    const nueva = window.prompt(`Nueva contraseña para ${s.nombre} (${s.email}):`);
+    if (nueva == null) return;
+    if (nueva.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+    setBusy(s.id); setError(null);
+    try {
+      const res = await fetch("/api/supremo/solicitudes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: s.id, password: nueva }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo cambiar la contraseña."); return; }
+      window.alert("Contraseña actualizada.");
+    } finally { setBusy(null); }
+  }
+
   async function resetTodo() {
     if (!window.confirm("¿Eliminar TODAS las cuentas registradas? Esta acción no se puede deshacer. El usuario supremo se recreará y tendrás que iniciar sesión de nuevo.")) return;
     const txt = window.prompt('Para confirmar, escribe ELIMINAR (en mayúsculas):');
@@ -198,6 +215,14 @@ export default function SupremoPanel() {
                               {busy === s.id ? "…" : "Rechazar"}
                             </button>
                           )}
+                          <button
+                            onClick={() => cambiarPassword(s)}
+                            disabled={busy !== null}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            title="Cambiar la contraseña de esta cuenta"
+                          >
+                            🔑 Contraseña
+                          </button>
                         </div>
                       </td>
                     </tr>

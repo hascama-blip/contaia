@@ -103,6 +103,9 @@ export interface Usuario {
   decididoAt?: string;
   /** Módulos de paga desbloqueados por el supremo (keys: "m2","m3","m4"). */
   modulos?: string[];
+  /** Recuperación de contraseña: hash del token + expiración (un solo uso). */
+  resetTokenHash?: string;
+  resetTokenExp?: string;
 }
 
 export interface Cliente {

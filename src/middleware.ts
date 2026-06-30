@@ -6,7 +6,11 @@ import { verifySessionToken, SESSION_COOKIE } from "./lib/authToken";
 // Excepciones: /login y /api/auth/* (para poder entrar/registrarse).
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/reset") ||
+    pathname.startsWith("/api/auth")
+  ) {
     return NextResponse.next();
   }
 

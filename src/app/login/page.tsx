@@ -8,7 +8,7 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/";
-  const [modo, setModo] = useState<"login" | "registro">("login");
+  const [modo, setModo] = useState<"login" | "registro" | "olvido">("login");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +22,19 @@ export default function LoginPage() {
     setError(null);
     setAviso(null);
     try {
+      // "Olvidé mi contraseña": pide el enlace por correo.
+      if (modo === "olvido") {
+        const res = await fetch("/api/auth/forgot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setError(data.error ?? "No se pudo enviar el enlace."); return; }
+        setModo("login");
+        setAviso(data.mensaje ?? "Si el correo está registrado, te enviamos un enlace para cambiar la contraseña.");
+        return;
+      }
       const url = modo === "login" ? "/api/auth/login" : "/api/auth/register";
       const res = await fetch(url, {
         method: "POST",
@@ -54,12 +67,14 @@ export default function LoginPage() {
       </div>
       <div className="card p-6">
         <h1 className="text-xl font-bold text-slate-800">
-          {modo === "login" ? "Iniciar sesión" : "Solicitar acceso"}
+          {modo === "login" ? "Iniciar sesión" : modo === "registro" ? "Solicitar acceso" : "Recuperar contraseña"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {modo === "login"
             ? "Entra a tu espacio de trabajo."
-            : "Solicita acceso: un administrador revisará tu pedido y te habilitará el ingreso."}
+            : modo === "registro"
+              ? "Solicita acceso: un administrador revisará tu pedido y te habilitará el ingreso."
+              : "Pon tu correo y te enviaremos un enlace para crear una nueva contraseña."}
         </p>
 
         {aviso && (
@@ -93,21 +108,31 @@ export default function LoginPage() {
               required
             />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Contraseña</label>
-            <input
-              type="password"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={modo === "login" ? "current-password" : "new-password"}
-              required
-            />
-          </div>
+          {modo !== "olvido" && (
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Contraseña</label>
+              <input
+                type="password"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={modo === "login" ? "current-password" : "new-password"}
+                required
+              />
+            </div>
+          )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Un momento…" : modo === "login" ? "Entrar" : "Solicitar acceso"}
+            {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Solicitar acceso" : "Enviar enlace"}
           </button>
         </form>
+
+        {modo === "login" && (
+          <div className="mt-3 text-center">
+            <button className="text-sm text-brand-600 hover:underline" onClick={() => { setModo("olvido"); setError(null); setAviso(null); }}>
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 text-center text-sm text-slate-500">
           {modo === "login" ? (
@@ -120,7 +145,7 @@ export default function LoginPage() {
           ) : (
             <>
               ¿Ya tienes cuenta?{" "}
-              <button className="font-semibold text-brand-600 hover:underline" onClick={() => { setModo("login"); setError(null); }}>
+              <button className="font-semibold text-brand-600 hover:underline" onClick={() => { setModo("login"); setError(null); setAviso(null); }}>
                 Iniciar sesión
               </button>
             </>

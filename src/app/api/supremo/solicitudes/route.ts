@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { esSupremo, getCurrentUser, publicUser } from "@/lib/auth";
-import { listSolicitudes, setEstadoUsuario, setModulosUsuario } from "@/lib/db";
+import { esSupremo, getCurrentUser, publicUser, hashPassword } from "@/lib/auth";
+import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPasswordUsuario } from "@/lib/db";
 import { MODULO_KEYS } from "@/lib/modulos";
 
 export const runtime = "nodejs";
@@ -27,6 +27,16 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const userId = String(body?.userId ?? "");
   if (!userId) return NextResponse.json({ error: "Falta el usuario." }, { status: 400 });
+
+  // Cambio de contraseña por el supremo (cuenta olvidada).
+  if (typeof body?.password === "string") {
+    if (body.password.length < 6) {
+      return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+    }
+    const u = await setPasswordUsuario(userId, hashPassword(body.password));
+    if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
+    return NextResponse.json({ ok: true, usuario: publicUser(u) });
+  }
 
   // Desbloqueo de módulos de paga (m2/m3/m4).
   if (Array.isArray(body?.modulos)) {
