@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 
 interface Solicitud {
   id: string;
@@ -39,6 +39,21 @@ export default function SupremoPanel() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reseteando, setReseteando] = useState(false);
+  // Detalle de operadores por cuenta (expandible).
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [opsDetalle, setOpsDetalle] = useState<Record<string, { id: string; nombre: string; email: string; createdAt: string }[]>>({});
+
+  async function toggleOperadores(s: Solicitud) {
+    if (expandido === s.id) { setExpandido(null); return; }
+    setExpandido(s.id);
+    if (!opsDetalle[s.id]) {
+      try {
+        const res = await fetch(`/api/supremo/operadores?adminId=${encodeURIComponent(s.id)}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setOpsDetalle((p) => ({ ...p, [s.id]: data.operadores ?? [] }));
+      } catch { /* */ }
+    }
+  }
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -168,13 +183,18 @@ export default function SupremoPanel() {
                   const est = s.estado ?? "aprobado";
                   const b = BADGE[est] ?? BADGE.aprobado;
                   return (
-                    <tr key={s.id}>
+                    <Fragment key={s.id}>
+                    <tr>
                       <td className="px-4 py-2 font-medium text-slate-700">
                         {s.nombre}
                         <p className="text-[11px] font-normal text-slate-400">{fmt(s.createdAt)}</p>
-                        <p className="mt-0.5 text-[11px] font-normal text-brand-600">
-                          👥 {s.operadores ?? 0} operador{(s.operadores ?? 0) === 1 ? "" : "es"}
-                        </p>
+                        <button
+                          onClick={() => toggleOperadores(s)}
+                          className="mt-0.5 text-[11px] font-normal text-brand-600 hover:underline"
+                          title="Ver operadores"
+                        >
+                          {expandido === s.id ? "▼" : "▶"} 👥 {s.operadores ?? 0} operador{(s.operadores ?? 0) === 1 ? "" : "es"}
+                        </button>
                       </td>
                       <td className="px-4 py-2 text-slate-600">{s.email}</td>
                       <td className="px-4 py-2">
@@ -230,6 +250,28 @@ export default function SupremoPanel() {
                         </div>
                       </td>
                     </tr>
+                    {expandido === s.id && (
+                      <tr className="bg-slate-50">
+                        <td colSpan={5} className="px-6 py-3">
+                          {!opsDetalle[s.id] ? (
+                            <p className="text-xs text-slate-400">Cargando operadores…</p>
+                          ) : opsDetalle[s.id].length === 0 ? (
+                            <p className="text-xs text-slate-500">Esta cuenta no tiene operadores.</p>
+                          ) : (
+                            <ul className="space-y-1">
+                              {opsDetalle[s.id].map((o) => (
+                                <li key={o.id} className="flex flex-wrap items-center gap-x-3 text-xs text-slate-600">
+                                  <span className="font-medium text-slate-700">{o.nombre}</span>
+                                  <span className="text-slate-500">{o.email}</span>
+                                  <span className="text-slate-400">· desde {fmt(o.createdAt)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                   );
                 })}
               </tbody>
