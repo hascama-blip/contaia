@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import VerificarSunatBtn from "./VerificarSunatBtn";
 
 interface FilaRes { fila: number; ruc: string; estado: "creado" | "duplicado" | "error"; razonSocial?: string; motivo?: string }
 interface Resumen { creados: number; duplicados: number; errores: number; resultados: FilaRes[] }
@@ -78,6 +79,14 @@ export default function ImportarClientes() {
             <span className="rounded-lg bg-amber-100 px-3 py-1 font-semibold text-amber-700">↺ {res.duplicados} duplicada(s)</span>
             <span className="rounded-lg bg-red-100 px-3 py-1 font-semibold text-red-700">⚠ {res.errores} con error</span>
           </div>
+          {res.creados > 0 && (
+            <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-3">
+              <p className="mb-2 text-sm text-slate-700">
+                Ahora <b>verifica en SUNAT</b> para traer estado, condición y razón social de las empresas importadas:
+              </p>
+              <VerificarSunatBtn pendientes={res.creados} />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-400">
