@@ -204,6 +204,16 @@ export async function listSubUsuarios(adminId: string): Promise<Usuario[]> {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
+/** Cuántos operadores tiene cada estudio (parentId → cantidad). */
+export async function conteoOperadores(): Promise<Record<string, number>> {
+  const store = await readStore();
+  const out: Record<string, number> = {};
+  for (const u of store.users ?? []) {
+    if (u.parentId) out[u.parentId] = (out[u.parentId] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** Elimina un sub-usuario, solo si pertenece a ese admin. */
 export async function deleteSubUsuario(adminId: string, userId: string): Promise<boolean> {
   const store = await readStore();

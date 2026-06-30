@@ -10,6 +10,7 @@ interface Solicitud {
   estado?: "pendiente" | "aprobado" | "rechazado";
   decididoAt?: string;
   modulos?: string[];
+  operadores?: number;
 }
 
 const MODULOS = [
@@ -171,6 +172,9 @@ export default function SupremoPanel() {
                       <td className="px-4 py-2 font-medium text-slate-700">
                         {s.nombre}
                         <p className="text-[11px] font-normal text-slate-400">{fmt(s.createdAt)}</p>
+                        <p className="mt-0.5 text-[11px] font-normal text-brand-600">
+                          👥 {s.operadores ?? 0} operador{(s.operadores ?? 0) === 1 ? "" : "es"}
+                        </p>
                       </td>
                       <td className="px-4 py-2 text-slate-600">{s.email}</td>
                       <td className="px-4 py-2">

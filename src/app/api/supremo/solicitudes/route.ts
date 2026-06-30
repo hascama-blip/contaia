@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { esSupremo, getCurrentUser, publicUser, hashPassword } from "@/lib/auth";
-import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPasswordUsuario } from "@/lib/db";
+import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPasswordUsuario, conteoOperadores } from "@/lib/db";
 import { MODULO_KEYS } from "@/lib/modulos";
 
 export const runtime = "nodejs";
@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
   }
   const e = req.nextUrl.searchParams.get("estado");
   const estado = ESTADOS.includes(e as Estado) ? (e as Estado) : undefined;
-  const solicitudes = (await listSolicitudes(estado)).map(publicUser);
+  const ops = await conteoOperadores();
+  const solicitudes = (await listSolicitudes(estado)).map((u) => ({
+    ...publicUser(u),
+    operadores: ops[u.id] ?? 0,
+  }));
   return NextResponse.json({ solicitudes });
 }
 
