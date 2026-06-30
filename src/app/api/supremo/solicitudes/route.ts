@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { esSupremo, getCurrentUser, publicUser } from "@/lib/auth";
-import { listSolicitudes, setEstadoUsuario } from "@/lib/db";
+import { listSolicitudes, setEstadoUsuario, setModulosUsuario } from "@/lib/db";
+import { MODULO_KEYS } from "@/lib/modulos";
 
 export const runtime = "nodejs";
 
@@ -25,8 +26,19 @@ export async function PATCH(req: NextRequest) {
   }
   const body = await req.json().catch(() => ({}));
   const userId = String(body?.userId ?? "");
+  if (!userId) return NextResponse.json({ error: "Falta el usuario." }, { status: 400 });
+
+  // Desbloqueo de módulos de paga (m2/m3/m4).
+  if (Array.isArray(body?.modulos)) {
+    const mods = body.modulos.map((m: any) => String(m)).filter((m: string) => MODULO_KEYS.includes(m));
+    const u = await setModulosUsuario(userId, mods);
+    if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
+    return NextResponse.json({ ok: true, usuario: publicUser(u) });
+  }
+
+  // Aprobar / rechazar acceso.
   const estado = body?.estado as Estado;
-  if (!userId || !ESTADOS.includes(estado)) {
+  if (!ESTADOS.includes(estado)) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
   const u = await setEstadoUsuario(userId, estado);

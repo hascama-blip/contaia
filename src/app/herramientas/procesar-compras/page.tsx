@@ -1,9 +1,15 @@
 import Link from "next/link";
 import MasivoFlow from "@/components/MasivoFlow";
+import { requireUser, modulosDelEstudio } from "@/lib/auth";
+import { ModuloBloqueado } from "@/components/ModuloBloqueado";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Masivo SIRE → Contabilidad — Radar Tributario" };
 
-export default function Page() {
+export default async function Page() {
+  const user = await requireUser();
+  const mods = await modulosDelEstudio(user);
+  if (!mods.has("m3")) return <ModuloBloqueado nombre="Masivo SIRE → Contabilidad (Contasis)" />;
   return (
     <div className="space-y-5">
       <div>

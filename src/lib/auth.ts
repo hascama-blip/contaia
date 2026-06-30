@@ -102,6 +102,15 @@ export function esSupremo(u: Usuario | null | undefined): boolean {
   return Boolean(u) && u!.rol === "supremo";
 }
 
+/** Módulos de paga habilitados para el estudio del usuario. El supremo tiene
+ *  todos; el resto hereda los del admin del estudio (operadores incluidos). */
+export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
+  const { MODULO_KEYS } = await import("./modulos");
+  if (esSupremo(u)) return new Set(MODULO_KEYS);
+  const admin = u.parentId ? await getUserById(u.parentId) : u;
+  return new Set(admin?.modulos ?? []);
+}
+
 /** ¿Puede ingresar a la plataforma? El supremo siempre; un operador si su
  *  estudio está aprobado; un admin si su estado es aprobado (o antiguo). */
 export function puedeIngresar(u: Usuario, parent?: Usuario | null): boolean {

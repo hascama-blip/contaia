@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId } from "@/lib/auth";
+import { requireUser, studioId, modulosDelEstudio } from "@/lib/auth";
+import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ const OPCIONES: Opcion[] = [
 export default async function MenuPage() {
   const user = await requireUser();
   const clientes = await listClientes(studioId(user));
+  const mods = await modulosDelEstudio(user);
 
   return (
     <div className="space-y-6">
@@ -81,28 +83,52 @@ export default async function MenuPage() {
 
       {/* Menú de tarjetas */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {OPCIONES.map((o) => (
-          <Link
-            key={o.titulo}
-            href={o.href}
-            className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-              o.destacado ? "border-accent-300" : "border-slate-200 hover:border-brand-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-2xl">
-                {o.icono}
+        {OPCIONES.map((o) => {
+          const mod = moduloPorHref(o.href);
+          const bloqueado = mod ? !mods.has(mod.key) : false;
+          if (bloqueado) {
+            return (
+              <div
+                key={o.titulo}
+                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 opacity-90"
+                title="Módulo de paga — pídelo al administrador"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-slate-200 text-2xl grayscale">
+                    {o.icono}
+                  </span>
+                  <h2 className="text-base font-bold text-slate-500">{o.titulo}</h2>
+                </div>
+                <p className="mt-3 text-sm text-slate-400">{o.detalle}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-400">
+                  🔒 Bloqueado (de paga)
+                </span>
+              </div>
+            );
+          }
+          return (
+            <Link
+              key={o.titulo}
+              href={o.href}
+              className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                o.destacado ? "border-accent-300" : "border-slate-200 hover:border-brand-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-2xl">
+                  {o.icono}
+                </span>
+                <h2 className="text-base font-bold text-slate-800 group-hover:text-brand-700">
+                  {o.titulo}
+                </h2>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">{o.detalle}</p>
+              <span className="mt-4 text-sm font-semibold text-brand-600 group-hover:underline">
+                Entrar →
               </span>
-              <h2 className="text-base font-bold text-slate-800 group-hover:text-brand-700">
-                {o.titulo}
-              </h2>
-            </div>
-            <p className="mt-3 text-sm text-slate-500">{o.detalle}</p>
-            <span className="mt-4 text-sm font-semibold text-brand-600 group-hover:underline">
-              Entrar →
-            </span>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
 
       <p className="text-center text-xs text-slate-400">

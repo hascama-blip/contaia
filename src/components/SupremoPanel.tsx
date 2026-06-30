@@ -9,7 +9,14 @@ interface Solicitud {
   createdAt: string;
   estado?: "pendiente" | "aprobado" | "rechazado";
   decididoAt?: string;
+  modulos?: string[];
 }
+
+const MODULOS = [
+  { key: "m2", label: "Mód. 2 · Comparativo SIRE" },
+  { key: "m3", label: "Mód. 3 · Masivo Contasis" },
+  { key: "m4", label: "Mód. 4 · Consultas tributarias" },
+];
 
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";
 
@@ -57,6 +64,22 @@ export default function SupremoPanel() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo actualizar."); return; }
+      await cargar();
+    } finally { setBusy(null); }
+  }
+
+  async function toggleModulo(s: Solicitud, key: string) {
+    const actuales = new Set(s.modulos ?? []);
+    if (actuales.has(key)) actuales.delete(key); else actuales.add(key);
+    setBusy(s.id); setError(null);
+    try {
+      const res = await fetch("/api/supremo/solicitudes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: s.id, modulos: Array.from(actuales) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo actualizar los módulos."); return; }
       await cargar();
     } finally { setBusy(null); }
   }
@@ -117,8 +140,8 @@ export default function SupremoPanel() {
                 <tr>
                   <th className="px-4 py-2">Solicitante</th>
                   <th className="px-4 py-2">Correo</th>
-                  <th className="px-4 py-2">Solicitó</th>
                   <th className="px-4 py-2">Estado</th>
+                  <th className="px-4 py-2">Módulos de paga</th>
                   <th className="px-4 py-2 text-right">Acción</th>
                 </tr>
               </thead>
@@ -128,12 +151,32 @@ export default function SupremoPanel() {
                   const b = BADGE[est] ?? BADGE.aprobado;
                   return (
                     <tr key={s.id}>
-                      <td className="px-4 py-2 font-medium text-slate-700">{s.nombre}</td>
+                      <td className="px-4 py-2 font-medium text-slate-700">
+                        {s.nombre}
+                        <p className="text-[11px] font-normal text-slate-400">{fmt(s.createdAt)}</p>
+                      </td>
                       <td className="px-4 py-2 text-slate-600">{s.email}</td>
-                      <td className="whitespace-nowrap px-4 py-2 text-slate-500">{fmt(s.createdAt)}</td>
                       <td className="px-4 py-2">
                         <span className={`badge ${b.cls}`}>{b.txt}</span>
                         {s.decididoAt && <span className="ml-1 text-[10px] text-slate-400">{fmt(s.decididoAt)}</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex flex-col gap-1">
+                          {MODULOS.map((m) => {
+                            const on = (s.modulos ?? []).includes(m.key);
+                            return (
+                              <label key={m.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  disabled={busy !== null}
+                                  onChange={() => toggleModulo(s, m.key)}
+                                />
+                                <span className={on ? "font-semibold text-emerald-700" : ""}>{m.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex justify-end gap-2">

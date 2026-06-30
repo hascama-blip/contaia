@@ -101,6 +101,8 @@ export interface Usuario {
   estado?: "pendiente" | "aprobado" | "rechazado";
   /** Fecha en que el supremo decidió (aprobó/rechazó). */
   decididoAt?: string;
+  /** Módulos de paga desbloqueados por el supremo (keys: "m2","m3","m4"). */
+  modulos?: string[];
 }
 
 export interface Cliente {

@@ -147,6 +147,19 @@ export async function eliminarTodosLosUsuarios(): Promise<number> {
   return n;
 }
 
+/** El supremo desbloquea/bloquea los módulos de paga de un estudio. */
+export async function setModulosUsuario(
+  userId: string,
+  modulos: string[]
+): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
+  if (!u) return null;
+  u.modulos = Array.from(new Set(modulos));
+  await writeStore(store);
+  return u;
+}
+
 /** El supremo aprueba o rechaza el acceso de un estudio. */
 export async function setEstadoUsuario(
   userId: string,

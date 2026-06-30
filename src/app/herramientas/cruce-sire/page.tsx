@@ -1,9 +1,15 @@
 import Link from "next/link";
 import CruceSirePanel from "@/components/CruceSirePanel";
+import { requireUser, modulosDelEstudio } from "@/lib/auth";
+import { ModuloBloqueado } from "@/components/ModuloBloqueado";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Comparativo SIRE vs Contabilidad — Radar Tributario" };
 
-export default function Page() {
+export default async function Page() {
+  const user = await requireUser();
+  const mods = await modulosDelEstudio(user);
+  if (!mods.has("m2")) return <ModuloBloqueado nombre="Comparativo SIRE vs sistema contable" />;
   return (
     <div className="space-y-4">
       <div>
