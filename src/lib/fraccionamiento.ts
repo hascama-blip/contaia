@@ -385,7 +385,19 @@ async function loginSol(params: FraccParams, pasos: any[]) {
   });
   autoAceptarDialogos(ctx);
   const page = await ctx.newPage();
-  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+  // SUNAT a veces tarda en responder: reintentar la navegación evita que un
+  // pico de lentitud (page.goto Timeout) tumbe toda la extracción.
+  let navOk = false;
+  for (let i = 0; i < 3 && !navOk; i++) {
+    try {
+      await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+      navOk = true;
+    } catch (e) {
+      pasos.push({ paso: "nav-reintento", intento: i + 1, motivo: e instanceof Error ? e.message.slice(0, 80) : "" });
+      await page.waitForTimeout(2000);
+    }
+  }
+  if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 }); // último intento laxo
   await page.waitForTimeout(2500);
   await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
   await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
@@ -784,6 +796,19 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
       };
     }
 
+    // ¿SUNAT bloqueó con "La aplicación ha retornado…" (p. ej. "Tiene deuda
+    // pendiente por Perdida")? Mostramos el texto en rojo en vez de un error.
+    const msgGen = await detectarMensajeApp(s.ctx).catch(() => null);
+    if (msgGen) {
+      pasos.push({ paso: "mensaje-sunat", ...msgGen });
+      return {
+        ok: false,
+        error: `SUNAT: ${msgGen.mensaje}${msgGen.accion ? " — " + msgGen.accion : ""}`,
+        nota: msgGen.mensaje,
+        diag: { pasos },
+      };
+    }
+
     // Respaldo: UNA sola consulta para ver si quedó un TESORO vigente.
     const pedidos = await abrirConsultaPedidos(s.ctx, s.page, pasos);
     const vigente = pedidos.find(
@@ -993,6 +1018,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
   const diagnostico = params.diagnostico === true;
   const pasos: any[] = [];
   let browser: any = null;
+  let ctxRef: any = null; // para detectar el mensaje de SUNAT aun si algo falla
   // Tope de tiempo: si SUNAT cuelga, cerramos el navegador para que la función
   // SIEMPRE devuelva (la operación en curso lanza "Target closed" → catch).
   let cerradoPorTiempo = false;
@@ -1000,6 +1026,7 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
   try {
     const s = await loginSol(params, pasos);
     browser = s.browser;
+    ctxRef = s.ctx;
     if (s.loginError) return { ok: false, error: MSG_LOGIN_ERROR, diag: { pasos } };
     await cerrarPantallas(s.ctx, s.page);
 
@@ -1139,6 +1166,20 @@ export async function extraerDeudasF36(params: FraccParams): Promise<FraccResult
       diag: { pasos },
     };
   } catch (err) {
+    // Aunque algo falle, ¿SUNAT mostró el mensaje "La aplicación ha retornado…"
+    // (p. ej. "Tiene deuda pendiente por Perdida")? Lo surfaceamos como nota.
+    if (!cerradoPorTiempo && ctxRef) {
+      const msg = await detectarMensajeApp(ctxRef).catch(() => null);
+      if (msg) {
+        return {
+          ok: true,
+          tablas: [],
+          nota: msg.mensaje,
+          mensaje: `⚠ SUNAT: ${msg.mensaje}${msg.accion ? " — " + msg.accion : ""}`,
+          diag: { pasos },
+        };
+      }
+    }
     if (cerradoPorTiempo) {
       return { ok: false, error: "SUNAT tardó demasiado (puede estar lento o bloqueado por varios ingresos). Reintenta en unos minutos; si ya se generó, usa “Verificar estado”.", diag: { pasos } };
     }
