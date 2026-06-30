@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId } from "@/lib/auth";
+import { requireUser, studioId, esAdmin } from "@/lib/auth";
 import { CondicionBadge, EstadoBadge, RiesgoBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -8,20 +8,28 @@ export const dynamic = "force-dynamic";
 export default async function ClientesPage() {
   const user = await requireUser();
   const clientes = await listClientes(studioId(user));
+  const admin = esAdmin(user);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {clientes.length > 0 && (
             <a href="/api/clientes/export" className="btn-ghost" download>
               ⬇ Descargar contactos (CSV)
             </a>
           )}
-          <Link href="/clientes/nuevo" className="btn-primary">
-            + Nuevo cliente
-          </Link>
+          {admin && (
+            <Link href="/clientes/importar" className="btn-ghost">
+              ⬆ Importar Excel
+            </Link>
+          )}
+          {admin && (
+            <Link href="/clientes/nuevo" className="btn-primary">
+              + Nuevo cliente
+            </Link>
+          )}
         </div>
       </div>
 
