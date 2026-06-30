@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { getSolPass } from "@/lib/solSession";
 import BuzonSeguimientoCell, { type Seguimiento } from "./BuzonSeguimientoCell";
+import { usePuedeDiag } from "./SupremoContext";
 
 interface Mensaje {
   id: string;
@@ -34,6 +35,7 @@ export default function BuzonPanel({
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const puedeDiag = usePuedeDiag();
   const [segs, setSegs] = useState<Record<string, Seguimiento>>({});
   const [guardandoSeg, setGuardandoSeg] = useState<string | null>(null);
 
@@ -128,10 +130,12 @@ export default function BuzonPanel({
         <button className="btn-primary" onClick={extraer} disabled={busy}>
           {busy ? "Consultando…" : mensajes ? "Actualizar buzón" : "Consultar buzón"}
         </button>
-        <label className="flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
-          Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
+            Modo diagnóstico
+          </label>
+        )}
         {consultadoAt && <span className="text-xs text-slate-400">Última consulta: {new Date(consultadoAt).toLocaleString("es-PE")}</span>}
       </div>
 

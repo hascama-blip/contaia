@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
+import { usePuedeDiag } from "./SupremoContext";
 
 interface ClienteOpt { id: string; razonSocial: string; ruc: string; solUser: string }
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
@@ -28,6 +29,7 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const puedeDiag = usePuedeDiag();
 
   const cargarGuardadas = useCallback(async (id: string) => {
     if (!id) return;
@@ -144,10 +146,12 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
             <button className="btn-primary" onClick={() => llamar("extraer")} disabled={busy !== null || !(estado === "listo" || estado === "extraido")} title={estado === "listo" || estado === "extraido" ? "" : "Disponible cuando el pedido esté Listo"}>
               {busy === "ext" ? "Extrayendo…" : "2) Extraer deudas"}
             </button>
-            <label className="flex items-center gap-2 text-xs text-slate-500">
-              <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
-              Modo diagnóstico
-            </label>
+            {puedeDiag && (
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
+                Modo diagnóstico
+              </label>
+            )}
           </div>
           <p className="mt-2 text-xs text-slate-400">
             Flujo: <b>Generar</b> → <b>Verificar estado</b> (las veces que haga falta, cada empresa

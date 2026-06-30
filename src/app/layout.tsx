@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
 import { HeaderNav } from "@/components/HeaderNav";
+import { SupremoProvider } from "@/components/SupremoContext";
 import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
 
@@ -40,7 +41,9 @@ export default async function RootLayout({
             </div>
           </header>
         )}
-        <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">
+          <SupremoProvider value={supremo}>{children}</SupremoProvider>
+        </main>
         <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
           <span translate="no">RADAR TRIBUTAR IA · by <span className="font-bold text-brand-600">ASENCO</span></span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
         </footer>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DeclaracionAnual } from "@/lib/types";
 import { compararAnual, type FilaAnual, type ComparativoAnual } from "@/lib/declaracionAnual";
+import { usePuedeDiag } from "./SupremoContext";
 
 function fmtInt(n: number): string {
   const abs = Math.abs(Math.round(n)).toLocaleString("es-PE");
@@ -26,6 +27,7 @@ export default function DeclaracionesAnualesPanel({
   const [resumen, setResumen] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const puedeDiag = usePuedeDiag();
   const fileRef = useRef<HTMLInputElement>(null);
 
   function merge(prev: DeclaracionAnual[], d: DeclaracionAnual) {
@@ -132,10 +134,12 @@ export default function DeclaracionesAnualesPanel({
         <button className="btn-primary" onClick={() => fileRef.current?.click()} disabled={trabajando}>
           {busy === "upload" ? "Leyendo…" : "⬆ Subir DJ anual (una o varias)"}
         </button>
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
-          Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
+            Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {resumen && (

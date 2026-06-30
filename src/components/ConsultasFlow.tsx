@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 import BuzonSeguimientoCell, { type Seguimiento } from "./BuzonSeguimientoCell";
+import { usePuedeDiag } from "./SupremoContext";
 
 interface ClienteOpt {
   id: string;
@@ -39,6 +40,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   const [segs, setSegs] = useState<Record<string, Seguimiento>>({});
   const [guardandoSeg, setGuardandoSeg] = useState<string | null>(null);
 
+  const puedeDiag = usePuedeDiag();
   const cliente = clientes.find((c) => c.id === clienteId);
 
   const cargarSeguimientos = useCallback(async (id: string) => {
@@ -233,10 +235,12 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
             <button className="btn-primary" onClick={extraer} disabled={busy}>
               {busy ? "Extrayendo…" : mensajes ? "🔄 Actualizar buzón" : "📨 Extraer buzón"}
             </button>
-            <label className="flex items-center gap-2 text-xs text-slate-500">
-              <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
-              Modo diagnóstico
-            </label>
+            {puedeDiag && (
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
+                Modo diagnóstico
+              </label>
+            )}
           </div>
           <p className="mt-2 text-xs text-slate-400">
             Los mensajes y los PDF que descargues quedan <b>guardados</b>: la próxima vez se abren al

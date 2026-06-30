@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SireResumen } from "@/lib/types";
 import { fmtFecha, fmtSoles } from "./ui";
 import { getSolPass } from "@/lib/solSession";
+import { usePuedeDiag } from "./SupremoContext";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -52,6 +53,7 @@ export default function SunatPanel({
   const [error, setError] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag();
   const [sire, setSire] = useState<SireResumen[]>(inicialSire ?? []);
 
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
@@ -244,10 +246,12 @@ export default function SunatPanel({
         </p>
       </div>
 
-      <label className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-        <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
-        Modo diagnóstico (para soporte)
-      </label>
+      {puedeDiag && (
+        <label className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
+          Modo diagnóstico (para soporte)
+        </label>
+      )}
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {progreso && <div className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">Extrayendo… {progreso}</div>}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getSolPass } from "@/lib/solSession";
+import { usePuedeDiag } from "./SupremoContext";
 
 interface EstadoP { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }
 
@@ -33,6 +34,7 @@ export default function EstadoSirePanel({
   const [error, setError] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag();
   const [estados, setEstados] = useState<EstadoP[] | null>(null);
 
   const apiLista = Boolean(inicialCred?.clientId && inicialCred?.clientSecret);
@@ -125,10 +127,12 @@ export default function EstadoSirePanel({
         <button className="btn-primary" onClick={consultar} disabled={busy || !apiLista}>
           {busy ? "Consultando…" : "Ver estado SIRE"}
         </button>
-        <label className="flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
-          Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
+            Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}

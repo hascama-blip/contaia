@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { DeclaracionMensual, SireResumen } from "@/lib/types";
 import { compararDeclaracionSire } from "@/lib/declaracion";
 import { fmtSoles } from "./ui";
+import { usePuedeDiag } from "./SupremoContext";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -67,6 +68,7 @@ export default function DeclaracionesPanel({
   const [resumen, setResumen] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const puedeDiag = usePuedeDiag();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const sirePorPeriodo = new Map(sire.map((s) => [s.periodo, s]));
@@ -215,14 +217,16 @@ export default function DeclaracionesPanel({
         >
           ✎ Ingresar manual
         </button>
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <input
-            type="checkbox"
-            checked={diagModo}
-            onChange={(e) => setDiagModo(e.target.checked)}
-          />
-          Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={diagModo}
+              onChange={(e) => setDiagModo(e.target.checked)}
+            />
+            Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {resumen && (

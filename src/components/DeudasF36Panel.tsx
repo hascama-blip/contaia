@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getSolPass } from "@/lib/solSession";
+import { usePuedeDiag } from "./SupremoContext";
 
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
 type Estado = "sin-pedido" | "en-proceso" | "listo" | "extraido" | "vencido";
@@ -70,6 +71,7 @@ export default function DeudasF36Panel({
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const puedeDiag = usePuedeDiag();
 
   const cargar = useCallback(async () => {
     try {
@@ -170,10 +172,12 @@ export default function DeudasF36Panel({
         <button className="btn-primary" onClick={extraer} disabled={busy !== null || !puedeExtraer} title={puedeExtraer ? "" : "Disponible cuando el pedido esté Listo"}>
           {busy === "ext" ? "Extrayendo…" : "2) Extraer deudas"}
         </button>
-        <label className="flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
-          Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
+            Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {diag && (
