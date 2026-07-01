@@ -1,4 +1,5 @@
 import type { BuzonMensaje, BuzonResultado } from "./types";
+import { lanzarNavegador, bloquearRecursos } from "./navegador";
 
 // ============================================================
 //  Buzón electrónico SUNAT (vía portal SOL con navegador Playwright)
@@ -179,29 +180,6 @@ function mapearMensajes(body: string): BuzonMensaje[] {
   });
 }
 
-async function lanzarNavegador() {
-  const { chromium } = await import("playwright-core");
-  // En Render (Node) usamos el Chromium de @sparticuz, que corre sin
-  // dependencias del sistema. En local usa el Chromium instalado.
-  try {
-    const sparticuz = (await import("@sparticuz/chromium")).default as any;
-    const executablePath = await sparticuz.executablePath();
-    if (executablePath) {
-      return chromium.launch({
-        headless: true,
-        executablePath,
-        args: [...(sparticuz.args ?? []), "--no-sandbox", "--disable-dev-shm-usage"],
-      });
-    }
-  } catch {
-    /* fallback al Chromium local */
-  }
-  return chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
-}
-
 export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultado> {
   const { ruc, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
@@ -217,6 +195,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     });
+    await bloquearRecursos(ctx);
     const page = await ctx.newPage();
 
     await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -406,6 +385,7 @@ async function abrirVisor(params: { ruc: string; solUser: string; solPass: strin
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
   });
+  await bloquearRecursos(ctx);
   const page = await ctx.newPage();
 
   await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });

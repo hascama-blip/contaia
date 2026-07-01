@@ -11,6 +11,8 @@
 // Como es navegación por menús SOL, hay MODO DIAGNÓSTICO que vuelca menús y DOM
 // para calibrar selectores (igual que se hizo con SIRE/buzón).
 
+import { lanzarNavegador, bloquearRecursos } from "./navegador";
+
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
   "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?exe=01.04.00.00.000000";
@@ -39,27 +41,6 @@ export interface FraccResultado {
   fechaPedido?: string;
   error?: string;
   diag?: { pasos: any[] };
-}
-
-async function lanzarNavegador() {
-  const { chromium } = await import("playwright-core");
-  try {
-    const sparticuz = (await import("@sparticuz/chromium")).default as any;
-    const executablePath = await sparticuz.executablePath();
-    if (executablePath) {
-      return chromium.launch({
-        headless: true,
-        executablePath,
-        args: [...(sparticuz.args ?? []), "--no-sandbox", "--disable-dev-shm-usage"],
-      });
-    }
-  } catch {
-    /* fallback local */
-  }
-  return chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
 }
 
 async function rellenar(page: any, selectores: string[], valor: string) {
@@ -383,6 +364,7 @@ async function loginSol(params: FraccParams, pasos: any[]) {
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
   });
+  await bloquearRecursos(ctx);
   autoAceptarDialogos(ctx);
   const page = await ctx.newPage();
   // SUNAT a veces tarda en responder: reintentar la navegación evita que un

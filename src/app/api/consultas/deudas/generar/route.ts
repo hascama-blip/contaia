@@ -7,8 +7,8 @@ import { logAccion } from "@/lib/auditoria";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// Periodo de prueba: límite desactivado (0). Para reactivarlo, usar 3*24*60*60*1000.
-const COOLDOWN_MS = 0;
+// Fraccionamiento: 1 generación cada 3 días (ahorra memoria y evita bloqueos SUNAT).
+const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
 // FASE 1: genera el pedido de deuda (Art. 36, Tesoro). Máx. 1 vez cada 3 días.
 export async function POST(req: NextRequest) {

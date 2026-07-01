@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
+import { setSireEstado } from "@/lib/db";
 import { consultarEstadoSire } from "@/lib/sire";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+// Cooldown: el estado SIRE se actualiza 1 vez por semana (se muestra lo guardado
+// mientras tanto). El admin puede forzar.
+const UNA_SEMANA = 7 * 24 * 60 * 60 * 1000;
+
+// GET: estado SIRE guardado (sin clave/API), para mostrarlo sin re-consultar.
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const cliente = await getClienteAutorizado(params.id);
+  if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  return NextResponse.json({
+    estados: cliente.sireEstado?.estados ?? [],
+    at: cliente.sireEstado?.at ?? null,
+  });
+}
 
 // Estado SIRE (presentado / no presentado) de un rango de periodos, SIN bajar
 // montos. Usa la API guardada del cliente + la Clave SOL (que NO se persiste).
@@ -12,6 +27,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  // Cooldown semanal (salvo diagnóstico o admin que fuerza).
+  const ultima = cliente.sireEstado?.at ? new Date(cliente.sireEstado.at).getTime() : 0;
+  if (ultima && Date.now() - ultima < UNA_SEMANA && !body.diagnostico) {
+    const puedeForzar = body.forzar === true && esAdmin(await getCurrentUser());
+    if (!puedeForzar) {
+      const dias = Math.ceil((UNA_SEMANA - (Date.now() - ultima)) / (24 * 60 * 60 * 1000));
+      return NextResponse.json({
+        estados: cliente.sireEstado?.estados ?? [],
+        at: cliente.sireEstado?.at ?? null,
+        limitado: true,
+        mensaje: `El estado SIRE se actualiza 1 vez por semana. Mostrando lo guardado; podrás actualizar en ~${dias} día(s).`,
+      });
+    }
+  }
   const periodos: string[] = Array.isArray(body.periodos)
     ? body.periodos.map((p: any) => String(p))
     : [];
@@ -38,7 +68,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       diagnostico: body.diagnostico === true,
     });
     if (r.diag && !r.estados) return NextResponse.json({ diag: r.diag });
-    return NextResponse.json({ estados: r.estados ?? [] });
+    // Persistir el estado para no re-consultar hasta la próxima semana.
+    if (r.estados && r.estados.length && !body.diagnostico) {
+      await setSireEstado(cliente.id, r.estados).catch(() => {});
+    }
+    return NextResponse.json({ estados: r.estados ?? [], at: new Date().toISOString() });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "Error consultando el estado del SIRE" },

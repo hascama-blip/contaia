@@ -7,8 +7,8 @@ import { logAccion } from "@/lib/auditoria";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// Periodo de prueba: límite desactivado (0). Para reactivarlo, usar 3*24*60*60*1000.
-const COOLDOWN_MS = 0;
+// Fraccionamiento: se actualiza cada 3 días (muestra lo guardado mientras tanto).
+const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 
 function diasRestantes(at: string) {
   return Math.ceil((COOLDOWN_MS - (Date.now() - new Date(at).getTime())) / (24 * 60 * 60 * 1000));

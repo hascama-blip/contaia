@@ -774,6 +774,19 @@ export async function setBuzon(
   return cliente;
 }
 
+/** Guarda el estado de presentación SIRE (presentado/no presentado por periodo). */
+export async function setSireEstado(
+  clienteId: string,
+  estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]
+): Promise<Cliente | null> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.sireEstado = { estados, at: new Date().toISOString() };
+  await writeStore(store);
+  return cliente;
+}
+
 export async function setDiagnostico(
   clienteId: string,
   diagnostico: Diagnostico

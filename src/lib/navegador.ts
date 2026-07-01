@@ -1,0 +1,64 @@
+// Lanzamiento de Chromium headless de BAJO CONSUMO + bloqueo de recursos.
+// Reutilizado por el buzón y el fraccionamiento (scraping SOL). El objetivo es
+// gastar la menor RAM/CPU posible SIN cambiar qué se extrae:
+//  - flags de bajo consumo,
+//  - bloqueo de imágenes/fuentes/media/tracking (no afectan el texto ni el PDF).
+
+// Flags que bajan el uso de CPU/RAM sin romper el login de SUNAT. NO se usa
+// --single-process (inestable). Se conserva CSS/JS para no romper la lógica.
+const ARGS_LIGEROS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-renderer-backgrounding",
+  "--disable-features=TranslateUI,BackForwardCache,MediaRouter",
+  "--mute-audio",
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--js-flags=--max-old-space-size=256",
+];
+
+export async function lanzarNavegador() {
+  const { chromium } = await import("playwright-core");
+  // En Render (Node) usa el Chromium de @sparticuz; en local, el instalado.
+  try {
+    const sparticuz = (await import("@sparticuz/chromium")).default as any;
+    const executablePath = await sparticuz.executablePath();
+    if (executablePath) {
+      return chromium.launch({
+        headless: true,
+        executablePath,
+        args: [...(sparticuz.args ?? []), ...ARGS_LIGEROS],
+      });
+    }
+  } catch {
+    /* fallback al Chromium local */
+  }
+  return chromium.launch({ headless: true, args: ARGS_LIGEROS });
+}
+
+/** Bloquea recursos pesados que NO afectan la extracción (imágenes, fuentes,
+ *  media y tracking). Se conservan CSS/JS/XHR/documento para no romper nada.
+ *  Reduce RAM, CPU y ancho de banda — y suele ACELERAR la navegación. */
+export async function bloquearRecursos(ctx: any): Promise<void> {
+  await ctx
+    .route("**/*", (route: any) => {
+      try {
+        const req = route.request();
+        const tipo = req.resourceType();
+        if (tipo === "image" || tipo === "font" || tipo === "media") return route.abort();
+        // Bloquea trackers/analytics comunes (no son de SUNAT).
+        const url = req.url();
+        if (/google-analytics|googletagmanager|doubleclick|facebook\.net|hotjar/i.test(url)) return route.abort();
+        return route.continue();
+      } catch {
+        return route.continue();
+      }
+    })
+    .catch(() => {});
+}

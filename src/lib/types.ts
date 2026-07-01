@@ -124,6 +124,8 @@ export interface Cliente {
   sire: SireResumen[];
   /** Buzón electrónico (urgentes) del mes en curso. */
   buzon: BuzonResumen | null;
+  /** Estado de presentación SIRE guardado (presentado/no presentado por periodo). */
+  sireEstado?: { estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]; at: string } | null;
   /** Caché de PDFs descargados del buzón, por codMensaje (para no re-bajarlos). */
   buzonAdjuntos?: Record<string, AdjuntoCache>;
   /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */

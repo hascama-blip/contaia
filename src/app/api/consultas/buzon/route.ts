@@ -7,7 +7,9 @@ import { logAccion } from "@/lib/auditoria";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const UN_DIA = 24 * 60 * 60 * 1000;
+// Cooldown del buzón: 1 vez por SEMANA (ahorra memoria/CPU y evita saturar
+// SUNAT). El admin puede forzar. Los datos guardados se muestran mientras tanto.
+const UNA_SEMANA = 7 * 24 * 60 * 60 * 1000;
 
 function mensajesGuardados(cliente: { buzon?: { mensajes?: any[]; peligrosos?: any[]; urgentes?: any[] } | null }) {
   const b = cliente.buzon;
@@ -45,21 +47,21 @@ export async function POST(req: NextRequest) {
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 
-  // Límite de 1 consulta al día. Solo el admin puede forzar.
+  // Límite de 1 consulta por semana. Solo el admin puede forzar.
   const ultima = cliente.buzon?.consultadoAt ? new Date(cliente.buzon.consultadoAt).getTime() : 0;
-  const dentroDelDia = ultima && Date.now() - ultima < UN_DIA;
-  if (dentroDelDia && !body.diagnostico) {
+  const dentroDelPlazo = ultima && Date.now() - ultima < UNA_SEMANA;
+  if (dentroDelPlazo && !body.diagnostico) {
     const usuario = await getCurrentUser();
     const puedeForzar = body.forzar === true && esAdmin(usuario);
     if (!puedeForzar) {
-      const horas = Math.ceil((UN_DIA - (Date.now() - ultima)) / (60 * 60 * 1000));
+      const dias = Math.ceil((UNA_SEMANA - (Date.now() - ultima)) / (24 * 60 * 60 * 1000));
       return NextResponse.json({
         razonSocial: cliente.razonSocial,
         ruc: cliente.ruc,
         mensajes: mensajesGuardados(cliente),
         consultadoAt: cliente.buzon?.consultadoAt ?? null,
         limitado: true,
-        mensaje: `El buzón ya se consultó hoy (${new Date(cliente.buzon!.consultadoAt).toLocaleString("es-PE")}). Para no saturar SUNAT, se puede consultar 1 vez al día. Vuelve en ~${horas} h.`,
+        mensaje: `El buzón se actualiza 1 vez por semana (última: ${new Date(cliente.buzon!.consultadoAt).toLocaleString("es-PE")}). Mostrando lo guardado. Podrás actualizar en ~${dias} día(s).`,
       });
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getSolPass } from "@/lib/solSession";
 import { usePuedeDiag } from "./SupremoContext";
 
@@ -36,6 +36,15 @@ export default function EstadoSirePanel({
   const [diagModo, setDiagModo] = useState(false);
   const puedeDiag = usePuedeDiag();
   const [estados, setEstados] = useState<EstadoP[] | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  // Carga el estado guardado al abrir (sin re-consultar SUNAT).
+  useEffect(() => {
+    fetch(`/api/clientes/${clienteId}/sire-estado`)
+      .then((r) => r.json()).catch(() => ({}))
+      .then((d) => { if (Array.isArray(d?.estados) && d.estados.length) { setEstados(d.estados); setAt(d.at ?? null); } });
+  }, [clienteId]);
 
   const apiLista = Boolean(inicialCred?.clientId && inicialCred?.clientSecret);
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
@@ -74,6 +83,8 @@ export default function EstadoSirePanel({
       if (!res.ok) { setError(data.error ?? "No se pudo consultar el estado."); return; }
       if (data.diag) { setDiag(JSON.stringify(data.diag, null, 2)); return; }
       setEstados(data.estados ?? []);
+      setAt(data.at ?? null);
+      setInfo(data.limitado ? (data.mensaje ?? null) : null);
     } catch {
       setError("Error de red al consultar el estado del SIRE.");
     } finally {
@@ -89,7 +100,9 @@ export default function EstadoSirePanel({
       </div>
       <p className="mb-3 text-xs text-slate-500">
         Revisa por periodo si el RVIE (ventas) y el RCE (compras) están presentados. No baja montos.
+        Se actualiza 1 vez por semana{at ? ` · última: ${new Date(at).toLocaleString("es-PE")}` : ""}.
       </p>
+      {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{info}</div>}
 
       {!apiLista && (
         <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
