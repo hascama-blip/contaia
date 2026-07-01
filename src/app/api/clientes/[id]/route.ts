@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteCliente, updateCliente } from "@/lib/db";
+import { deleteCliente, updateCliente, liberarRucGlobal } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { logAccion } from "@/lib/auditoria";
 
@@ -30,6 +30,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
   const ok = await deleteCliente(params.id);
   if (!ok) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  await liberarRucGlobal(propio.ruc).catch(() => {}); // el RUC vuelve a estar libre
   await logAccion({
     area: "Cliente",
     accion: "Eliminó una empresa",

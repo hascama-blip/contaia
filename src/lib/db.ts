@@ -42,6 +42,9 @@ interface Store {
   rubrosProveedor?: Record<string, { razonSocial: string; actividad: string; at: string }>;
   /** Bitácora de auditoría: acciones de todos los usuarios (la ve el líder). */
   acciones?: AccionAuditoria[];
+  /** Registro GLOBAL de RUCs tomados: cada empresa pertenece a un solo estudio
+   *  en toda la plataforma (evita crear cuentas falsas para reconsultar). */
+  rucsRegistrados?: Record<string, { studioId: string; clienteId: string; ownerNombre?: string; at: string }>;
 }
 
 async function ensureDirs() {
@@ -58,6 +61,7 @@ async function readStore(): Promise<Store> {
     if (!store.rubrosProveedor) store.rubrosProveedor = {};
     if (!Array.isArray(store.users)) store.users = [];
     if (!Array.isArray(store.acciones)) store.acciones = [];
+    if (!store.rucsRegistrados) store.rucsRegistrados = {};
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
       if (!Array.isArray(c.sire)) c.sire = [];
@@ -340,6 +344,45 @@ export async function getClienteByRuc(
       (c) => c.ruc === r && (ownerId ? c.ownerId === ownerId : true)
     ) ?? null
   );
+}
+
+// ---- Registro GLOBAL de RUCs (unicidad en toda la plataforma) --------------
+
+/** ¿Quién tiene tomado este RUC en toda la plataforma? Devuelve el estudio dueño
+ *  o null si está libre. Considera el registro global y, por compatibilidad, los
+ *  clientes ya existentes (aunque sean previos al registro). */
+export async function duenoDeRuc(
+  ruc: string
+): Promise<{ studioId: string; ownerNombre?: string } | null> {
+  const store = await readStore();
+  const r = ruc.trim();
+  const reg = store.rucsRegistrados?.[r];
+  if (reg) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
+  const c = store.clientes.find((x) => x.ruc === r);
+  if (c && c.ownerId) return { studioId: c.ownerId };
+  return null;
+}
+
+/** Marca el RUC como tomado por un estudio (idempotente). */
+export async function registrarRucGlobal(
+  ruc: string,
+  studioId: string,
+  clienteId: string,
+  ownerNombre?: string
+): Promise<void> {
+  const store = await readStore();
+  if (!store.rucsRegistrados) store.rucsRegistrados = {};
+  store.rucsRegistrados[ruc.trim()] = { studioId, clienteId, ownerNombre, at: new Date().toISOString() };
+  await writeStore(store);
+}
+
+/** Libera un RUC del registro global (al eliminar la empresa). */
+export async function liberarRucGlobal(ruc: string): Promise<void> {
+  const store = await readStore();
+  if (store.rucsRegistrados) {
+    delete store.rucsRegistrados[ruc.trim()];
+    await writeStore(store);
+  }
 }
 
 /** Guarda las credenciales SIRE del cliente (sin la Clave SOL). */

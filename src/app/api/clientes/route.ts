@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCliente, getClienteByRuc, listClientes, setCredSire } from "@/lib/db";
+import { createCliente, getClienteByRuc, listClientes, setCredSire, duenoDeRuc, registrarRucGlobal } from "@/lib/db";
 import { requireUser, studioId, esAdmin } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
 import { logAccion } from "@/lib/auditoria";
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (!body.razonSocial.trim()) {
     return NextResponse.json({ error: "La razón social es obligatoria." }, { status: 400 });
   }
-  // Un solo cliente por RUC EN EL ESPACIO DEL USUARIO (evita duplicados).
+  // Un solo cliente por RUC en el ESPACIO DEL USUARIO.
   const existente = await getClienteByRuc(body.ruc, studioId(user));
   if (existente) {
     return NextResponse.json(
@@ -39,6 +39,15 @@ export async function POST(req: NextRequest) {
         error: `Ya existe un cliente con el RUC ${body.ruc.trim()} (${existente.razonSocial}).`,
         clienteId: existente.id,
       },
+      { status: 409 }
+    );
+  }
+  // Unicidad GLOBAL: si el RUC ya lo tomó OTRO estudio, no se puede registrar
+  // (evita crear cuentas falsas para reconsultar la misma empresa).
+  const dueno = await duenoDeRuc(body.ruc);
+  if (dueno && dueno.studioId !== studioId(user)) {
+    return NextResponse.json(
+      { error: `El RUC ${body.ruc.trim()} ya está registrado en la plataforma por otro usuario. No se puede volver a agregar.` },
       { status: 409 }
     );
   }
@@ -67,6 +76,7 @@ export async function POST(req: NextRequest) {
     });
     if (actualizado) cliente.credSire = actualizado.credSire;
   }
+  await registrarRucGlobal(cliente.ruc, studioId(user), cliente.id, user.nombre).catch(() => {});
   await logAccion({
     area: "Cliente",
     accion: "Creó una empresa",
