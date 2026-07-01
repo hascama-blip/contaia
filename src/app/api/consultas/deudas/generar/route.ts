@@ -3,6 +3,7 @@ import { getClienteAutorizado } from "@/lib/auth";
 import { setDeudaGenerado } from "@/lib/db";
 import { generarPedidoDeuda } from "@/lib/fraccionamiento";
 import { logAccion } from "@/lib/auditoria";
+import { chequearUso, registrarUso } from "@/lib/usos";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -34,9 +35,16 @@ export async function POST(req: NextRequest) {
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
 
+  // Cupo del módulo gratis.
+  const uso = await chequearUso();
+  if (!uso.ok && !body.diagnostico) {
+    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
+  }
+
   const r = await generarPedidoDeuda({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
   if (r.ok && !body.diagnostico) {
     await setDeudaGenerado(cliente.id, { numPedido: r.numPedido, fechaPedido: r.fechaPedido }).catch(() => {});
+    if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
     await logAccion({
       area: "Fraccionamiento F36",
       accion: "Generó un pedido de deuda",

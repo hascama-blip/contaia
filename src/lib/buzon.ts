@@ -218,6 +218,23 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       textoVisible: cuerpoLogin.slice(0, 300),
     });
 
+    // ¿Login rechazado por clave/usuario incorrecto? SUNAT deja el mensaje en la
+    // misma página. En ese caso NO se debe consumir un uso ni guardar consulta.
+    const claveMal =
+      /(usuario|clave|contrase).{0,40}(incorrect|no es v[aá]lid|inv[aá]lid|no coincide|err[oó]ne)/i.test(cuerpoLogin) ||
+      /(usuario|clave) (y|o) (clave|contrase).{0,20}(incorrect|no v[aá]lid)/i.test(cuerpoLogin) ||
+      /ingres[oó] mal|datos de acceso incorrect|no se pudo autenticar/i.test(cuerpoLogin) ||
+      /oauth2\/error|autenticamenuinternet\?error|loginmenusol.*error/i.test(page.url());
+    if (claveMal && !diagnostico) {
+      return {
+        mensajes: [],
+        peligrosos: [],
+        urgentes: [],
+        loginError: true,
+        error: "Usuario o Clave SOL incorrectos. Verifica tus accesos y vuelve a intentar (no se consumió ninguna consulta).",
+      };
+    }
+
     // 1) Cerrar la campaña "VALIDA TUS DATOS DE CONTACTO" (clic JS dentro de su
     // iframe en los botones reales: "Finalizar" y "Continuar sin confirmar").
     let cerrarCampania = "";

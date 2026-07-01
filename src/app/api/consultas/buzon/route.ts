@@ -3,6 +3,7 @@ import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setBuzon } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
 import { logAccion } from "@/lib/auditoria";
+import { chequearUso, registrarUso } from "@/lib/usos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -73,6 +74,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
   }
 
+  // Cupo del módulo gratis: 3 consultas cada 7 días (salvo diagnóstico).
+  const uso = await chequearUso();
+  if (!uso.ok && !body.diagnostico) {
+    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
+  }
+
   try {
     const r = await consultarBuzon({
       ruc: cliente.ruc,
@@ -81,6 +88,10 @@ export async function POST(req: NextRequest) {
       dias: typeof body.dias === "number" ? body.dias : 30,
       diagnostico: body.diagnostico === true,
     });
+    // Clave/usuario SOL incorrectos: avisar y NO consumir uso (no persistir).
+    if (r.loginError) {
+      return NextResponse.json({ error: r.error ?? "Usuario o Clave SOL incorrectos." }, { status: 401 });
+    }
     // Persistir (salvo en modo diagnóstico) para que sobreviva al refresco.
     if (!r.diag) {
       await setBuzon(cliente.id, {
@@ -97,6 +108,8 @@ export async function POST(req: NextRequest) {
         clienteNombre: cliente.razonSocial,
         detalle: `${r.mensajes.length} mensaje(s)`,
       });
+      // Consumir 1 uso del cupo gratis SOLO tras una extracción exitosa.
+      if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
     }
     return NextResponse.json({
       razonSocial: cliente.razonSocial,

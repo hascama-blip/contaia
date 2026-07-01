@@ -128,6 +128,45 @@ export async function createUser(data: {
   return user;
 }
 
+// ---- Cupo del módulo gratis: 3 consultas por ventana de 7 días -------------
+
+const LIMITE_USOS = 3;
+const VENTANA_USOS = 7 * 24 * 60 * 60 * 1000;
+
+function calcUsos(u: Usuario) {
+  const pago = (u.modulos?.length ?? 0) > 0; // con módulos de paga = ilimitado
+  const desde = u.usosGratis?.desde ?? "";
+  const t = desde ? new Date(desde).getTime() : 0;
+  const expirado = !t || Date.now() - t >= VENTANA_USOS;
+  const usados = expirado ? 0 : (u.usosGratis?.usados ?? 0);
+  const restantes = Math.max(0, LIMITE_USOS - usados);
+  const renuevaAt = t && !expirado ? new Date(t + VENTANA_USOS).toISOString() : null;
+  return { pago, usados, restantes, renuevaAt, expirado };
+}
+
+/** Estado del cupo gratis de un estudio (sin consumir). */
+export async function estadoUsos(
+  adminId: string
+): Promise<{ ilimitado: boolean; restantes: number; renuevaAt: string | null }> {
+  const u = await getUserById(adminId);
+  if (!u) return { ilimitado: true, restantes: LIMITE_USOS, renuevaAt: null };
+  const c = calcUsos(u);
+  return { ilimitado: c.pago, restantes: c.restantes, renuevaAt: c.renuevaAt };
+}
+
+/** Consume 1 uso del cupo gratis (los pagos no consumen). */
+export async function consumirUso(adminId: string): Promise<void> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === adminId);
+  if (!u) return;
+  if ((u.modulos?.length ?? 0) > 0) return; // ilimitado
+  const c = calcUsos(u);
+  const desde = c.expirado ? new Date().toISOString() : (u.usosGratis?.desde as string);
+  const usados = c.expirado ? 1 : (u.usosGratis?.usados ?? 0) + 1;
+  u.usosGratis = { usados, desde };
+  await writeStore(store);
+}
+
 // ---- Solicitudes de acceso (las gestiona el usuario supremo) ---------------
 
 /** Estudios (admins) por estado de acceso. Excluye operadores y al supremo. */

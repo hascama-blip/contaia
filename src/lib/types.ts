@@ -106,6 +106,8 @@ export interface Usuario {
   /** Recuperación de contraseña: hash del token + expiración (un solo uso). */
   resetTokenHash?: string;
   resetTokenExp?: string;
+  /** Cupo del módulo gratis: 3 consultas por ventana de 7 días. */
+  usosGratis?: { usados: number; desde: string };
 }
 
 export interface Cliente {
@@ -313,6 +315,9 @@ export interface BuzonResultado {
   /** Cobranza y valores. */
   urgentes: BuzonMensaje[];
   diag?: { pasos: any[] };
+  /** SUNAT rechazó el login (clave/usuario incorrecto): NO se debe consumir uso. */
+  loginError?: boolean;
+  error?: string;
 }
 
 /** Una pestaña de deudas del F36 (Valores, Otras Deudas, etc.). */

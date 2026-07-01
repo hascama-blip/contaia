@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setSireEstado } from "@/lib/db";
 import { consultarEstadoSire } from "@/lib/sire";
+import { chequearUso, registrarUso } from "@/lib/usos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -57,6 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     cliente.credSire?.clientSecret ||
     "";
 
+  // Cupo del módulo gratis (salvo diagnóstico).
+  const uso = await chequearUso();
+  if (!uso.ok && !body.diagnostico) {
+    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
+  }
+
   try {
     const r = await consultarEstadoSire({
       ruc: cliente.ruc,
@@ -71,6 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Persistir el estado para no re-consultar hasta la próxima semana.
     if (r.estados && r.estados.length && !body.diagnostico) {
       await setSireEstado(cliente.id, r.estados).catch(() => {});
+      if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
     }
     return NextResponse.json({ estados: r.estados ?? [], at: new Date().toISOString() });
   } catch (err: any) {
