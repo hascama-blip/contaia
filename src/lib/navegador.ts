@@ -25,6 +25,16 @@ const ARGS_LIGEROS = [
 
 export async function lanzarNavegador() {
   const { chromium } = await import("playwright-core");
+
+  // NAVEGADOR REMOTO (Browserless / Browserbase): si está configurado, los
+  // Chromium corren en OTRA máquina (no consumen RAM del servidor web) y ese
+  // servicio maneja el pool, la cola y la concurrencia. Cambio mínimo: solo la
+  // conexión; la lógica de extracción no cambia.
+  const wsUrl = process.env.BROWSER_WS_URL;
+  if (wsUrl) {
+    return chromium.connectOverCDP(wsUrl);
+  }
+
   // En Render (Node) usa el Chromium de @sparticuz; en local, el instalado.
   try {
     const sparticuz = (await import("@sparticuz/chromium")).default as any;
