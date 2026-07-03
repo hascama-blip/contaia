@@ -9,16 +9,9 @@ import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton, DescargarPdfBtn } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
 import { fmtFecha, fmtSoles } from "@/components/ui";
-import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
+import type { BuzonMensaje } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const RIESGO_LABEL: Record<NivelRiesgo, string> = {
-  bajo: "BAJO",
-  medio: "MEDIO",
-  alto: "ALTO",
-  critico: "CRÍTICO",
-};
 
 export default async function InformePage({ params }: { params: { id: string } }) {
   const user = await requireUser();
@@ -97,10 +90,6 @@ export default async function InformePage({ params }: { params: { id: string } }
     ventas: s.ventas.importeTotal,
     compras: s.compras.importeTotal,
   }));
-
-  const scoreColor =
-    d.score >= 85 ? "#10b981" : d.score >= 65 ? "#f59e0b" : d.score >= 40 ? "#f97316" : "#ef4444";
-  const scoreDeg = (d.score / 100) * 360;
 
   // --- Buzón ---
   const buzon = cliente.buzon;
@@ -187,22 +176,7 @@ export default async function InformePage({ params }: { params: { id: string } }
         {/* ===== Resumen (puntaje + acumulados) ===== */}
         <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">Resumen</h3>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
-              <div
-                className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
-                style={{ background: `conic-gradient(${scoreColor} ${scoreDeg}deg, #e2e8f0 ${scoreDeg}deg)` }}
-              >
-                <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-white">
-                  <span className="text-2xl font-bold text-slate-800">{d.score}</span>
-                  <span className="text-[10px] text-slate-400">/100</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Salud tributaria</p>
-                <p className="text-lg font-bold" style={{ color: scoreColor }}>{RIESGO_LABEL[d.nivelRiesgo]}</p>
-              </div>
-            </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <Kpi
               label={nPeriodos ? `Ventas acumuladas (${nPeriodos} mes${nPeriodos > 1 ? "es" : ""})` : "Ventas acumuladas"}
               value={fmtSoles(ventasAcum)}
