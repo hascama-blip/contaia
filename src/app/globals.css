@@ -56,9 +56,11 @@ body {
   .step-num {
     @apply grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-accent-300 to-accent-500 text-base font-bold text-brand-900 shadow-md;
   }
-  /* Título de sección del informe: azul marino con barra dorada. */
+  /* Título de sección del informe: barra azul marino con degradado y borde
+     dorado a la izquierda (mismo diseño del encabezado del informe, para dar
+     vida). Autocontenida: se ve bien dentro y fuera de una tarjeta. */
   .sec-h {
-    @apply mb-2 flex items-center gap-2 border-l-4 border-accent-400 pl-2 text-sm font-bold uppercase tracking-wide text-brand-700;
+    @apply mb-3 flex items-center gap-2 rounded-lg border-l-4 border-accent-400 bg-gradient-to-r from-brand-900 via-brand-800 to-brand-700 px-3 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-sm;
   }
 }
 

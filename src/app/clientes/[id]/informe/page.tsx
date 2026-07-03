@@ -6,7 +6,7 @@ import { generarDiagnostico } from "@/lib/diagnostico";
 import { compararDeclaracionSire } from "@/lib/declaracion";
 import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
-import { PrintButton } from "@/components/PrintButton";
+import { PrintButton, DescargarPdfBtn } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
@@ -88,21 +88,24 @@ export default async function InformePage({ params }: { params: { id: string } }
   const comprasAcum = sire.reduce((a, s) => a + s.compras.importeTotal, 0);
   const igvVentasAcum = sire.reduce((a, s) => a + s.ventas.igv, 0);
   const igvComprasAcum = sire.reduce((a, s) => a + s.compras.igv, 0);
-  const igvPorPagar = igvVentasAcum - igvComprasAcum;
   const nPeriodos = sire.length;
+
+  // Serie cronológica (ascendente) para el gráfico de ingresos vs gastos.
+  const serieCron = [...sire].sort((a, b) => a.periodo.localeCompare(b.periodo));
+  const datosGrafico = serieCron.map((s) => ({
+    periodo: s.periodo,
+    ventas: s.ventas.importeTotal,
+    compras: s.compras.importeTotal,
+  }));
 
   const scoreColor =
     d.score >= 85 ? "#10b981" : d.score >= 65 ? "#f59e0b" : d.score >= 40 ? "#f97316" : "#ef4444";
   const scoreDeg = (d.score / 100) * 360;
 
-  // --- Buzón y contingencias ---
+  // --- Buzón ---
   const buzon = cliente.buzon;
   const peligrosos = buzon?.peligrosos ?? [];
   const urgentes = buzon?.urgentes ?? [];
-  const cobranzas = urgentes.filter((m) => m.tipo === "Resolución de Cobranza");
-  const valores = urgentes.filter((m) => m.tipo === "Valor");
-  const fiscalizacion = peligrosos.filter((m) => m.tipo === "Fiscalización");
-  const noContenciosas = peligrosos.filter((m) => m.tipo === "No Contenciosa");
   // TODOS los mensajes del buzón (no solo los de riesgo) para listarlos completos.
   const todosMensajes = buzon?.mensajes?.length ? buzon.mensajes : [...peligrosos, ...urgentes];
   // Comentarios (seguimiento) por mensaje, para dar alcance en el informe.
@@ -113,84 +116,16 @@ export default async function InformePage({ params }: { params: { id: string } }
   const buzonNotificaciones = todosMensajes.filter((m) => m.origen !== "mensajes");
   const buzonMensajes = todosMensajes.filter((m) => m.origen === "mensajes");
 
-  type Contingencia = { nivel: NivelRiesgo; titulo: string; detalle: string };
-  const contingencias: Contingencia[] = [];
-  if (fiscalizacion.length > 0)
-    contingencias.push({
-      nivel: "critico",
-      titulo: `${fiscalizacion.length} notificación(es) de FISCALIZACIÓN`,
-      detalle:
-        "Procedimiento de fiscalización en curso. Máxima prioridad: responder requerimientos en plazo para evitar reparos y multas.",
-    });
-  if (noContenciosas.length > 0)
-    contingencias.push({
-      nivel: "critico",
-      titulo: `${noContenciosas.length} resolución(es) NO CONTENCIOSA(S)`,
-      detalle:
-        "Incluye ingreso como recaudación de detracciones, devoluciones, etc. Atender con urgencia para no perder fondos/derechos.",
-    });
-  if (cobranzas.length > 0)
-    contingencias.push({
-      nivel: "critico",
-      titulo: `${cobranzas.length} resolución(es) de cobranza coactiva notificada(s)`,
-      detalle:
-        "Riesgo inminente de embargo/medidas cautelares. Atender de inmediato (pago o fraccionamiento).",
-    });
-  if (valores.length > 0)
-    contingencias.push({
-      nivel: "alto",
-      titulo: `${valores.length} valor(es) notificado(s) (órdenes de pago, multas, determinaciones)`,
-      detalle: "Deuda exigible. Revisar y pagar o reclamar dentro del plazo legal.",
-    });
-  if (sunat && sunat.condicion.toUpperCase() !== "HABIDO")
-    contingencias.push({
-      nivel: "alto",
-      titulo: `Condición de domicilio: ${sunat.condicion}`,
-      detalle: "Restringe crédito fiscal y comprobantes; señal de riesgo ante fiscalización.",
-    });
-  if (sunat && sunat.estado.toUpperCase() !== "ACTIVO")
-    contingencias.push({
-      nivel: sunat.estado.toUpperCase().includes("BAJA") ? "critico" : "alto",
-      titulo: `Estado del contribuyente: ${sunat.estado}`,
-      detalle: "No permite operar/emitir con normalidad. Regularizar ante SUNAT.",
-    });
-  if (igvPorPagar > 0)
-    contingencias.push({
-      nivel: igvPorPagar > 10000 ? "alto" : "medio",
-      titulo: `IGV por pagar acumulado aprox. ${fmtSoles(igvPorPagar)}`,
-      detalle: "Verificar provisión y pago oportuno del IGV para evitar multas e intereses.",
-    });
-  // Periodos pasados con registro SIRE no presentado (omiso).
-  const hoyPer = new Date();
-  const periodoActual = `${hoyPer.getFullYear()}${String(hoyPer.getMonth() + 1).padStart(2, "0")}`;
-  const omisos = sire.filter(
-    (s) => s.periodo < periodoActual && (!s.presentadoVentas || !s.presentadoCompras)
-  );
-  if (omisos.length > 0)
-    contingencias.push({
-      nivel: "alto",
-      titulo: `${omisos.length} periodo(s) con registro SIRE no presentado`,
-      detalle:
-        "Riesgo de infracción por no generar/presentar el RVIE/RCE en el plazo. Regularizar.",
-    });
-
-  const NIVEL_PESO: Record<NivelRiesgo, number> = { critico: 4, alto: 3, medio: 2, bajo: 1 };
-  contingencias.sort((a, b) => NIVEL_PESO[b.nivel] - NIVEL_PESO[a.nivel]);
-
-  const CONT_STYLE: Record<NivelRiesgo, string> = {
-    critico: "border-l-red-500 bg-red-50",
-    alto: "border-l-orange-500 bg-orange-50",
-    medio: "border-l-amber-500 bg-amber-50",
-    bajo: "border-l-emerald-500 bg-emerald-50",
-  };
-
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="no-print mb-4 flex items-center justify-between">
+      <div className="no-print mb-4 flex items-center justify-between gap-3">
         <Link href={`/clientes/${cliente.id}`} className="text-sm text-brand-600 hover:underline">
           ← Volver al cliente
         </Link>
-        <PrintButton />
+        <div className="flex items-center gap-2">
+          <PrintButton />
+          <DescargarPdfBtn clienteId={cliente.id} />
+        </div>
       </div>
 
       <article className="card print-full overflow-hidden p-0">
@@ -249,32 +184,6 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* ===== Contingencias y alertas (después del RUC) ===== */}
-        <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="sec-h">
-            Contingencias y alertas
-          </h3>
-          {contingencias.length === 0 ? (
-            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-              No se detectaron contingencias relevantes con la información disponible.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {contingencias.map((c, i) => (
-                <li key={i} className={`rounded-md border-l-4 p-3 ${CONT_STYLE[c.nivel]}`}>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {c.titulo}
-                    <span className="ml-2 text-xs font-normal uppercase text-slate-500">
-                      ({c.nivel})
-                    </span>
-                  </p>
-                  <p className="text-sm text-slate-600">{c.detalle}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
         {/* ===== Resumen (puntaje + acumulados) ===== */}
         <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">Resumen</h3>
@@ -310,6 +219,17 @@ export default async function InformePage({ params }: { params: { id: string } }
             <KpiSmall label="IGV compras (acum.)" value={fmtSoles(igvComprasAcum)} />
           </div>
         </section>
+
+        {/* ===== Gráfico de ingresos (ventas) vs gastos (compras) por periodo ===== */}
+        {datosGrafico.length >= 2 && (
+          <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="sec-h">Ingresos y gastos por periodo</h3>
+            <p className="mb-3 text-xs text-slate-500">
+              Evolución de las ventas (ingresos) y las compras (gastos) según el SIRE.
+            </p>
+            <GraficoIngresosGastos datos={datosGrafico} />
+          </section>
+        )}
 
         {/* ===== 1) BUZÓN — todos los mensajes ===== */}
         {buzon && (
@@ -659,9 +579,13 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
           <p>
-            Informe generado automáticamente by <span translate="no">RADAR TRIBUTAR IA · by ASENCO</span> a partir de la información de
-            SUNAT y los documentos cargados. Debe ser validado por un contador o auditor
-            colegiado antes de su uso formal.
+            Informe generado automáticamente por{" "}
+            <span translate="no" className="font-semibold text-slate-500">RADAR TRIBUTAR·IA</span>{" "}
+            <span translate="no">· by </span>
+            <span translate="no" className="font-semibold text-slate-500">ASENCO</span>{" "}
+            a partir de la información de SUNAT y los documentos cargados.{" "}
+            <span className="font-semibold text-slate-500">Este informe es confidencial</span>{" "}
+            y debe ser validado por un contador o auditor colegiado antes de su uso formal.
           </p>
           {/* Fuente: logo de SUNAT a color, pequeño (~20% del tamaño anterior) */}
           <div className="mt-3 flex items-center gap-2">
@@ -679,6 +603,79 @@ export default async function InformePage({ params }: { params: { id: string } }
 function fmtInt(n: number): string {
   const abs = Math.abs(Math.round(n)).toLocaleString("es-PE");
   return n < 0 ? `(${abs})` : abs;
+}
+
+// "YYYYMM" -> "Ene 26" (etiqueta corta para el eje X del gráfico).
+function perCorto(periodo: string): string {
+  const meses = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const m = Number(periodo.slice(4, 6));
+  return `${meses[m] ?? periodo.slice(4, 6)} ${periodo.slice(2, 4)}`;
+}
+
+// Gráfico de líneas Ventas (ingresos) vs Compras (gastos) por periodo.
+// SVG puro (sin librerías) para que imprima limpio en el informe.
+function GraficoIngresosGastos({
+  datos,
+}: {
+  datos: { periodo: string; ventas: number; compras: number }[];
+}) {
+  const W = 760, H = 280;
+  const M = { t: 16, r: 18, b: 44, l: 68 };
+  const iw = W - M.l - M.r;
+  const ih = H - M.t - M.b;
+  const maxV = Math.max(1, ...datos.map((d) => Math.max(d.ventas, d.compras)));
+  const pow = Math.pow(10, Math.floor(Math.log10(maxV)));
+  const maxY = Math.ceil(maxV / pow) * pow || 1;
+  const n = datos.length;
+  const x = (i: number) => M.l + (n <= 1 ? iw / 2 : (iw * i) / (n - 1));
+  const y = (v: number) => M.t + ih * (1 - v / maxY);
+  const path = (key: "ventas" | "compras") =>
+    datos.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(d[key]).toFixed(1)}`).join(" ");
+  const ticks = 4;
+  const gridY = Array.from({ length: ticks + 1 }, (_, i) => (maxY / ticks) * i);
+  const fmtEje = (v: number) =>
+    v >= 1000 ? `${(v / 1000).toLocaleString("es-PE", { maximumFractionDigits: 1 })}k` : String(Math.round(v));
+
+  const VENTAS = "#059669"; // emerald-600 (ingresos)
+  const COMPRAS = "#2563eb"; // blue-600 (gastos)
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="mb-2 flex flex-wrap gap-4 text-xs">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: VENTAS }} />
+          <span className="text-slate-600">Ventas (ingresos)</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: COMPRAS }} />
+          <span className="text-slate-600">Compras (gastos)</span>
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Ingresos y gastos por periodo">
+        {gridY.map((v, i) => (
+          <g key={i}>
+            <line x1={M.l} y1={y(v)} x2={W - M.r} y2={y(v)} stroke="#e2e8f0" strokeWidth={1} />
+            <text x={M.l - 8} y={y(v) + 3} textAnchor="end" fontSize={10} fill="#94a3b8">
+              S/ {fmtEje(v)}
+            </text>
+          </g>
+        ))}
+        {datos.map((d, i) => (
+          <text key={i} x={x(i)} y={H - M.b + 18} textAnchor="middle" fontSize={10} fill="#64748b">
+            {perCorto(d.periodo)}
+          </text>
+        ))}
+        <path d={path("compras")} fill="none" stroke={COMPRAS} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={path("ventas")} fill="none" stroke={VENTAS} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+        {datos.map((d, i) => (
+          <g key={i}>
+            <circle cx={x(i)} cy={y(d.compras)} r={3} fill={COMPRAS} />
+            <circle cx={x(i)} cy={y(d.ventas)} r={3} fill={VENTAS} />
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
 }
 
 function MiniTablaInforme({
