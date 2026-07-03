@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
   // En el masivo solo se necesita la glosa (la cuenta ya viene del SIRE), así
   // que se puede saltar la clasificación por decolecta: más rápido y sin gasto.
   const soloGlosa = form.get("soloGlosa") === "1";
+  // Modo "detalle completo": devuelve TODO lo que trae el XML (cabecera + ítems),
+  // sin clasificar cuentas ni tocar decolecta. Es lo que usa el panel de detalle.
+  const soloDetalle = form.get("soloDetalle") === "1";
 
   // Lee cada archivo: si es ZIP, saca todos los XML de adentro (subcarpetas
   // incluidas); si es XML, se usa directo.
@@ -79,6 +82,12 @@ export async function POST(req: NextRequest) {
       moneda: p.moneda, base: p.base, igv: p.igv, total: p.total, cuenta: "", lineas: p.lineas,
     }));
     return NextResponse.json({ facturas, proveedores: [], nuevos: 0, leidas: facturas.length, errores });
+  }
+
+  // Modo detalle completo: devuelve el objeto parseado tal cual (toda la cabecera
+  // y todas las líneas), sin clasificar cuentas.
+  if (soloDetalle) {
+    return NextResponse.json({ facturas: parsed, leidas: parsed.length, errores });
   }
 
   // Clasifica por proveedor (memoria > caché de rubro > decolecta una vez).

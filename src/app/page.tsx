@@ -49,9 +49,9 @@ const OPCIONES: Opcion[] = [
   {
     href: "/herramientas/facturas-xml",
     icono: "🧾",
-    titulo: "Facturas XML → detalle + cuenta",
+    titulo: "Detalle completo de facturas (XML)",
     detalle:
-      "Sube los XML de las facturas (en bloque o en ZIP) y extrae descripción (glosa), montos, serie‑número y RUC, con la cuenta contable por rubro. Descarga listo para Contasis.",
+      "Sube los XML de los comprobantes (en bloque o en ZIP) y extrae toda la información: emisor, receptor, montos por afectación (gravado, IGV, ISC…) y el detalle de cada ítem. Descárgalo en Excel.",
   },
 ];
 

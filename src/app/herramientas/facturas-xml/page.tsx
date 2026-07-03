@@ -8,9 +8,10 @@ export default function Page() {
     <div className="space-y-4">
       <div>
         <Link href="/" className="text-sm text-brand-600 hover:underline">← Menú</Link>
-        <h1 className="mt-1 text-2xl font-bold text-slate-800">Facturas XML → detalle + cuenta</h1>
+        <h1 className="mt-1 text-2xl font-bold text-slate-800">Detalle completo de facturas (XML)</h1>
         <p className="text-sm text-slate-500">
-          Sube los XML de las facturas y obtén la descripción (glosa), montos y la cuenta automática.
+          Sube los XML de los comprobantes y obtén toda la información: emisor, receptor, montos por
+          afectación y el detalle de cada ítem. Descárgalo en Excel.
         </p>
       </div>
       <FacturasXmlPanel />
