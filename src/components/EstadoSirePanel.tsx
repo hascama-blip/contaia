@@ -38,6 +38,9 @@ export default function EstadoSirePanel({
   const [estados, setEstados] = useState<EstadoP[] | null>(null);
   const [at, setAt] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // API SIRE (client_id/secret) editable aquí mismo: el estado SIRE la necesita.
+  const [cid, setCid] = useState(inicialCred?.clientId ?? "");
+  const [csec, setCsec] = useState(inicialCred?.clientSecret ?? "");
 
   // Carga el estado guardado al abrir (sin re-consultar SUNAT).
   useEffect(() => {
@@ -46,7 +49,7 @@ export default function EstadoSirePanel({
       .then((d) => { if (Array.isArray(d?.estados) && d.estados.length) { setEstados(d.estados); setAt(d.at ?? null); } });
   }, [clienteId]);
 
-  const apiLista = Boolean(inicialCred?.clientId && inicialCred?.clientSecret);
+  const apiLista = Boolean(cid.trim() && csec.trim());
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
   const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
 
@@ -77,7 +80,7 @@ export default function EstadoSirePanel({
       const res = await fetch(`/api/clientes/${clienteId}/sire-estado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodos: rangoPeriodos(periodoDesde, periodoHasta), solPass, diagnostico: diagModo }),
+        body: JSON.stringify({ periodos: rangoPeriodos(periodoDesde, periodoHasta), solPass, clientId: cid.trim(), clientSecret: csec.trim(), diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo consultar el estado."); return; }
@@ -104,11 +107,26 @@ export default function EstadoSirePanel({
       </p>
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{info}</div>}
 
-      {!apiLista && (
-        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Necesita el <b>API (client_id/secret)</b>. Colócala en <b>“Extracción SIRE”</b> (más abajo) y vuelve aquí.
+      <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          API SIRE (obligatoria para el estado)
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <label className="label">client_id</label>
+            <input className="input" value={cid} onChange={(e) => setCid(e.target.value)} placeholder="client_id de la app SIRE" />
+          </div>
+          <div>
+            <label className="label">client_secret</label>
+            <input className="input" type="password" value={csec} onChange={(e) => setCsec(e.target.value)} placeholder="client_secret" />
+          </div>
         </div>
-      )}
+        {!apiLista && (
+          <p className="mt-2 text-[11px] text-amber-700">
+            El estado SIRE usa la API OAuth de SUNAT (no scraping). Ingresa el client_id y client_secret para habilitar el botón.
+          </p>
+        )}
+      </div>
 
       <div className="rounded-lg border border-slate-200 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Rango (desde → hasta)</p>
