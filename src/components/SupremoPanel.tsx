@@ -42,6 +42,9 @@ export default function SupremoPanel() {
   // Detalle de operadores por cuenta (expandible).
   const [expandido, setExpandido] = useState<string | null>(null);
   const [opsDetalle, setOpsDetalle] = useState<Record<string, { id: string; nombre: string; email: string; createdAt: string }[]>>({});
+  // Diagnóstico del navegador (Browserless).
+  const [diag, setDiag] = useState<any>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -115,6 +118,20 @@ export default function SupremoPanel() {
       if (!res.ok) { setError(data.error ?? "No se pudo cambiar la contraseña."); return; }
       window.alert("Contraseña actualizada.");
     } finally { setBusy(null); }
+  }
+
+  async function probarNavegador(n: number) {
+    setDiagBusy(true);
+    setDiag(null);
+    try {
+      const res = await fetch(`/api/diagnostico/navegador?n=${n}`);
+      const data = await res.json().catch(() => ({}));
+      setDiag(res.ok ? data : { error: data.error ?? "No se pudo ejecutar la prueba." });
+    } catch {
+      setDiag({ error: "Error de red al ejecutar la prueba." });
+    } finally {
+      setDiagBusy(false);
+    }
   }
 
   async function resetTodo() {
@@ -279,6 +296,71 @@ export default function SupremoPanel() {
           </div>
         </div>
       )}
+
+      {/* Diagnóstico del navegador remoto (Browserless) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-800">Prueba de navegador (Browserless)</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Abre varios navegadores a la vez para verificar la conexión y la concurrencia. Consume
+          unidades de Browserless.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => probarNavegador(1)}
+            disabled={diagBusy}
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {diagBusy ? "Probando…" : "Probar conexión (1)"}
+          </button>
+          <button
+            onClick={() => probarNavegador(2)}
+            disabled={diagBusy}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Probar multiuso (2)
+          </button>
+          <button
+            onClick={() => probarNavegador(5)}
+            disabled={diagBusy}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Probar multiuso (5)
+          </button>
+        </div>
+
+        {diag && (
+          <div className="mt-3 space-y-2 text-sm">
+            {diag.error ? (
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-red-600">{diag.error}</div>
+            ) : (
+              <>
+                <div
+                  className={`rounded-lg px-3 py-2 font-semibold ${
+                    diag.destinoReal?.includes("remoto")
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {diag.destinoReal}
+                </div>
+                <p className="text-xs text-slate-600">{diag.aviso}</p>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+                  <span>Solicitadas: <b>{diag.solicitadas}</b></span>
+                  <span className="text-emerald-600">Exitosas: <b>{diag.exitosas}</b></span>
+                  <span className="text-red-600">Fallidas: <b>{diag.fallidas}</b></span>
+                  <span>Tiempo: <b>{diag.msTotal} ms</b></span>
+                  <span>
+                    Concurrencia:{" "}
+                    <b className={diag.concurrenciaOk ? "text-emerald-600" : "text-red-600"}>
+                      {diag.concurrenciaOk ? "OK ✅" : "con fallos ⚠️"}
+                    </b>
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border border-red-200 bg-red-50 p-4">
         <h3 className="text-sm font-semibold text-red-700">Zona de peligro</h3>
