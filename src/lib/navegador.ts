@@ -23,25 +23,15 @@ const ARGS_LIGEROS = [
   "--js-flags=--max-old-space-size=256",
 ];
 
-export async function lanzarNavegador() {
-  const { chromium } = await import("playwright-core");
+/** Resultado de la conexión: el navegador + si de verdad conectó al remoto. */
+export interface ConexionNavegador {
+  browser: any;
+  remoto: boolean;        // true = corrió en Browserless; false = Chromium local
+  errorRemoto?: string;   // por qué falló el remoto (si estaba configurado)
+}
 
-  // NAVEGADOR REMOTO (Browserless / Browserbase): si está configurado, los
-  // Chromium corren en OTRA máquina (no consumen RAM del servidor web) y ese
-  // servicio maneja el pool, la cola y la concurrencia. Cambio mínimo: solo la
-  // conexión; la lógica de extracción no cambia.
-  const wsUrl = process.env.BROWSER_WS_URL;
-  if (wsUrl) {
-    try {
-      return await chromium.connectOverCDP(wsUrl);
-    } catch (e) {
-      // Si el navegador remoto (Browserless) está caído o mal configurado, NO
-      // rompemos la extracción: caemos al Chromium local como respaldo.
-      console.error("[navegador] Falló la conexión a BROWSER_WS_URL, uso Chromium local:", e);
-    }
-  }
-
-  // En Render (Node) usa el Chromium de @sparticuz; en local, el instalado.
+// Lanza el Chromium local (@sparticuz en Render; el instalado en local).
+async function lanzarLocal(chromium: any) {
   try {
     const sparticuz = (await import("@sparticuz/chromium")).default as any;
     const executablePath = await sparticuz.executablePath();
@@ -53,9 +43,36 @@ export async function lanzarNavegador() {
       });
     }
   } catch {
-    /* fallback al Chromium local */
+    /* fallback al Chromium local instalado */
   }
   return chromium.launch({ headless: true, args: ARGS_LIGEROS });
+}
+
+/** Conecta al navegador y dice si fue remoto (Browserless) o local. */
+export async function conectarNavegador(): Promise<ConexionNavegador> {
+  const { chromium } = await import("playwright-core");
+
+  // NAVEGADOR REMOTO (Browserless / Browserbase): si está configurado, los
+  // Chromium corren en OTRA máquina (no consumen RAM del servidor web) y ese
+  // servicio maneja el pool, la cola y la concurrencia.
+  const wsUrl = process.env.BROWSER_WS_URL;
+  if (wsUrl) {
+    try {
+      const browser = await chromium.connectOverCDP(wsUrl);
+      return { browser, remoto: true };
+    } catch (e: any) {
+      // Si el remoto está caído o mal configurado, NO rompemos la extracción:
+      // caemos al Chromium local como respaldo (y lo reportamos).
+      const errorRemoto = String(e?.message ?? e);
+      console.error("[navegador] Falló la conexión a BROWSER_WS_URL, uso Chromium local:", errorRemoto);
+      return { browser: await lanzarLocal(chromium), remoto: false, errorRemoto };
+    }
+  }
+  return { browser: await lanzarLocal(chromium), remoto: false };
+}
+
+export async function lanzarNavegador() {
+  return (await conectarNavegador()).browser;
 }
 
 /** Bloquea recursos pesados que NO afectan la extracción (imágenes, fuentes,
