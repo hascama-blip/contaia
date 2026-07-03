@@ -390,6 +390,26 @@ export default function SupremoPanel() {
                   {diag.destinoReal}
                 </div>
                 <p className="text-xs text-slate-600">{diag.aviso}</p>
+                {diag.envDebug && (
+                  <div className="rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                    <p>
+                      Variable en el servidor:{" "}
+                      <b className={diag.envDebug.longitudValor > 0 ? "text-emerald-600" : "text-red-600"}>
+                        {diag.envDebug.longitudValor > 0
+                          ? `sí llegó (${diag.envDebug.longitudValor} caracteres${diag.envDebug.empiezaConWss ? ", empieza con wss ✅" : ", NO empieza con wss ⚠️"})`
+                          : "NO llegó (vacía)"}
+                      </b>
+                    </p>
+                    <p className="mt-0.5">
+                      Nombres de variables que ve el servidor:{" "}
+                      <b>
+                        {diag.envDebug.clavesParecidas?.length
+                          ? diag.envDebug.clavesParecidas.map((k: string) => `"${k}"`).join(", ")
+                          : "ninguna parecida a BROWSER"}
+                      </b>
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-4 text-xs text-slate-600">
                   <span>Solicitadas: <b>{diag.solicitadas}</b></span>
                   <span className="text-emerald-600">Exitosas: <b>{diag.exitosas}</b></span>

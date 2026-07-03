@@ -28,9 +28,20 @@ export async function GET(req: NextRequest) {
   const corrioRemoto = detalles.some((d) => d.remoto);
   const errorRemoto = detalles.find((d) => d.errorRemoto)?.errorRemoto;
 
+  // Detalle de entorno (SOLO nombres de variables, sin valores): revela si el
+  // nombre quedó con un espacio/typo o si de plano no llegó ninguna.
+  const wsRaw = process.env.BROWSER_WS_URL ?? "";
+  const envDebug = {
+    existeExacta: Object.prototype.hasOwnProperty.call(process.env, "BROWSER_WS_URL"),
+    longitudValor: wsRaw.length, // 0 = no llegó; >0 = sí llegó
+    empiezaConWss: wsRaw.startsWith("wss://") || wsRaw.startsWith("ws://"),
+    clavesParecidas: Object.keys(process.env).filter((k) => /browser|_ws_|wss|less/i.test(k)),
+  };
+
   return NextResponse.json({
     variableConfigurada: configurado,
     destinoReal: corrioRemoto ? "Browserless (remoto) ✅" : "Chromium local ⚠️",
+    envDebug,
     aviso:
       configurado && !corrioRemoto
         ? `La variable BROWSER_WS_URL está puesta, pero NO se pudo conectar a Browserless (se usó el navegador local). Revisa la URL/token. Error: ${errorRemoto ?? "desconocido"}`
