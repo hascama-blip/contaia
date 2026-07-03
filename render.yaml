@@ -25,6 +25,12 @@ services:
       # pestaña Environment). Sin este token la consulta mostrará error.
       - key: DECOLECTA_TOKEN
         sync: false
+      # Navegador remoto (Browserless): si se define, el buzón, el F36 y el PDF
+      # del informe corren en Browserless en vez del Chromium local del servidor.
+      # Formato: wss://production-sfo.browserless.io?token=TU_CLAVE
+      # El valor se pega en el panel de Render (Environment); NO va al código.
+      - key: BROWSER_WS_URL
+        sync: false
       # En FREE no hay disco persistente: los datos viven en ./data (efímeros).
       # Al pasar a un plan con disco, descomenta DATA_DIR y el bloque "disk".
       # - key: DATA_DIR
