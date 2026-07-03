@@ -657,18 +657,18 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* Marca de agua: logo de SUNAT al final del informe */}
-        <div className="mt-8 flex items-center justify-center opacity-20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-sunat.png" alt="SUNAT" className="h-24 w-auto" />
-        </div>
-
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
           <p>
             Informe generado automáticamente by <span translate="no">RADAR TRIBUTAR IA · by ASENCO</span> a partir de la información de
             SUNAT y los documentos cargados. Debe ser validado por un contador o auditor
             colegiado antes de su uso formal.
           </p>
+          {/* Fuente: logo de SUNAT a color, pequeño (~20% del tamaño anterior) */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="font-semibold text-slate-500">Fuente:</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-sunat.png" alt="SUNAT" className="h-5 w-auto" />
+          </div>
         </footer>
         </div>
       </article>
