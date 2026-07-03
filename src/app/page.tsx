@@ -46,6 +46,13 @@ const OPCIONES: Opcion[] = [
     detalle:
       "Extrae los mensajes del buzón electrónico SUNAT con sus asuntos y descarga, mensaje por mensaje, el PDF adjunto de cada notificación.",
   },
+  {
+    href: "/herramientas/facturas-xml",
+    icono: "🧾",
+    titulo: "Facturas XML → detalle + cuenta",
+    detalle:
+      "Sube los XML de las facturas (en bloque o en ZIP) y extrae descripción (glosa), montos, serie‑número y RUC, con la cuenta contable por rubro. Descarga listo para Contasis.",
+  },
 ];
 
 export default async function MenuPage() {
