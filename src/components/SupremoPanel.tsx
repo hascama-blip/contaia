@@ -440,22 +440,11 @@ export default function SupremoPanel() {
                 <p className="text-xs text-slate-600">{diag.aviso}</p>
                 {diag.envDebug && (
                   <div className="rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                    <p>
-                      Variable en el servidor:{" "}
-                      <b className={diag.envDebug.longitudValor > 0 ? "text-emerald-600" : "text-red-600"}>
-                        {diag.envDebug.longitudValor > 0
-                          ? `sí llegó (${diag.envDebug.longitudValor} caracteres${diag.envDebug.empiezaConWss ? ", empieza con wss ✅" : ", NO empieza con wss ⚠️"})`
-                          : "NO llegó (vacía)"}
-                      </b>
-                    </p>
-                    <p className="mt-0.5">
-                      Nombres de variables que ve el servidor:{" "}
-                      <b>
-                        {diag.envDebug.clavesParecidas?.length
-                          ? diag.envDebug.clavesParecidas.map((k: string) => `"${k}"`).join(", ")
-                          : "ninguna parecida a BROWSER"}
-                      </b>
-                    </p>
+                    {diag.fuente && diag.fuente !== "—" && (
+                      <p>Fuente de la conexión: <b className="text-emerald-700">{diag.fuente}</b></p>
+                    )}
+                    <p>Variable de entorno (Render): <b>{diag.envDebug.variableEntorno}</b></p>
+                    <p>URL guardada en la app: <b>{diag.envDebug.urlGuardadaEnApp}</b></p>
                   </div>
                 )}
                 <div className="flex flex-wrap gap-4 text-xs text-slate-600">

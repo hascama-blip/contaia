@@ -27,6 +27,7 @@ const ARGS_LIGEROS = [
 export interface ConexionNavegador {
   browser: any;
   remoto: boolean;        // true = corrió en Browserless; false = Chromium local
+  fuente?: "env" | "guardada"; // de dónde salió la URL del remoto
   errorRemoto?: string;   // por qué falló el remoto (si estaba configurado)
 }
 
@@ -58,10 +59,15 @@ export async function conectarNavegador(): Promise<ConexionNavegador> {
   // Prioridad: variable de entorno; si el hosting no la inyecta, se usa la URL
   // guardada en la app (la configura el supremo desde su panel).
   let wsUrl = process.env.BROWSER_WS_URL;
+  let fuente: "env" | "guardada" | undefined = wsUrl ? "env" : undefined;
   if (!wsUrl) {
     try {
       const { getBrowserWsUrl } = await import("./db");
-      wsUrl = (await getBrowserWsUrl()) || undefined;
+      const guardada = (await getBrowserWsUrl()) || undefined;
+      if (guardada) {
+        wsUrl = guardada;
+        fuente = "guardada";
+      }
     } catch {
       /* si no se puede leer el store, sigue con el navegador local */
     }
@@ -69,13 +75,13 @@ export async function conectarNavegador(): Promise<ConexionNavegador> {
   if (wsUrl) {
     try {
       const browser = await chromium.connectOverCDP(wsUrl);
-      return { browser, remoto: true };
+      return { browser, remoto: true, fuente };
     } catch (e: any) {
       // Si el remoto está caído o mal configurado, NO rompemos la extracción:
       // caemos al Chromium local como respaldo (y lo reportamos).
       const errorRemoto = String(e?.message ?? e);
-      console.error("[navegador] Falló la conexión a BROWSER_WS_URL, uso Chromium local:", errorRemoto);
-      return { browser: await lanzarLocal(chromium), remoto: false, errorRemoto };
+      console.error("[navegador] Falló la conexión al navegador remoto, uso Chromium local:", errorRemoto);
+      return { browser: await lanzarLocal(chromium), remoto: false, fuente, errorRemoto };
     }
   }
   return { browser: await lanzarLocal(chromium), remoto: false };

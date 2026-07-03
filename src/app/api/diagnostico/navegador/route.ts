@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esSupremo } from "@/lib/auth";
 import { conectarNavegador } from "@/lib/navegador";
+import { getBrowserWsUrl } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -26,28 +27,27 @@ export async function GET(req: NextRequest) {
 
   const exitosas = detalles.filter((d) => d.ok).length;
   const corrioRemoto = detalles.some((d) => d.remoto);
+  const fuente = detalles.find((d) => d.fuente)?.fuente; // "env" | "guardada"
   const errorRemoto = detalles.find((d) => d.errorRemoto)?.errorRemoto;
+  const guardadaConfig = Boolean((await getBrowserWsUrl()).trim());
 
-  // Detalle de entorno (SOLO nombres de variables, sin valores): revela si el
-  // nombre quedó con un espacio/typo o si de plano no llegó ninguna.
-  const wsRaw = process.env.BROWSER_WS_URL ?? "";
+  const fuenteTxt =
+    fuente === "guardada" ? "URL guardada en la app" : fuente === "env" ? "variable de entorno" : "—";
+
   const envDebug = {
-    existeExacta: Object.prototype.hasOwnProperty.call(process.env, "BROWSER_WS_URL"),
-    longitudValor: wsRaw.length, // 0 = no llegó; >0 = sí llegó
-    empiezaConWss: wsRaw.startsWith("wss://") || wsRaw.startsWith("ws://"),
-    clavesParecidas: Object.keys(process.env).filter((k) => /browser|_ws_|wss|less/i.test(k)),
+    variableEntorno: (process.env.BROWSER_WS_URL ?? "").length > 0 ? "sí llegó" : "no llegó (Render no la inyecta)",
+    urlGuardadaEnApp: guardadaConfig ? "sí (configurada en el panel)" : "no",
   };
 
   return NextResponse.json({
-    variableConfigurada: configurado,
     destinoReal: corrioRemoto ? "Browserless (remoto) ✅" : "Chromium local ⚠️",
+    fuente: fuenteTxt,
     envDebug,
-    aviso:
-      configurado && !corrioRemoto
-        ? `La variable BROWSER_WS_URL está puesta, pero NO se pudo conectar a Browserless (se usó el navegador local). Revisa la URL/token. Error: ${errorRemoto ?? "desconocido"}`
-        : !configurado
-          ? "No hay BROWSER_WS_URL: se está usando el Chromium local del servidor."
-          : "Conectado a Browserless correctamente.",
+    aviso: corrioRemoto
+      ? `Conectado a Browserless correctamente (usando la ${fuenteTxt}).`
+      : guardadaConfig || configurado
+        ? `Hay una URL configurada pero NO se pudo conectar a Browserless (se usó el navegador local). Revisa la URL/token. Error: ${errorRemoto ?? "desconocido"}`
+        : "No hay URL de Browserless (ni variable ni guardada): se usa el Chromium local del servidor.",
     solicitadas: n,
     exitosas,
     fallidas: n - exitosas,
@@ -97,11 +97,12 @@ export async function POST(req: NextRequest) {
 async function probarUno(
   i: number,
   wsOverride?: string
-): Promise<{ i: number; ok: boolean; remoto: boolean; ms: number; error?: string; errorRemoto?: string }> {
+): Promise<{ i: number; ok: boolean; remoto: boolean; fuente?: "env" | "guardada"; ms: number; error?: string; errorRemoto?: string }> {
   const t = Date.now();
   let browser: any;
   try {
     let remoto: boolean;
+    let fuente: "env" | "guardada" | undefined;
     let errorRemoto: string | undefined;
     if (wsOverride) {
       const { chromium } = await import("playwright-core");
@@ -111,6 +112,7 @@ async function probarUno(
       const con = await conectarNavegador();
       browser = con.browser;
       remoto = con.remoto;
+      fuente = con.fuente;
       errorRemoto = con.errorRemoto;
     }
     const ctx = await browser.newContext();
@@ -120,7 +122,7 @@ async function probarUno(
     await page.waitForTimeout(1200); // mantiene la sesión viva para que las N se solapen
     const title = await page.title();
     await ctx.close();
-    return { i, ok: title === `prueba-${i}`, remoto, ms: Date.now() - t, errorRemoto };
+    return { i, ok: title === `prueba-${i}`, remoto, fuente, ms: Date.now() - t, errorRemoto };
   } catch (e: any) {
     return { i, ok: false, remoto: false, ms: Date.now() - t, error: String(e?.message ?? e).slice(0, 200) };
   } finally {
