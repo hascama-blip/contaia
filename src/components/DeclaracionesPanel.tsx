@@ -33,6 +33,8 @@ interface Borrador {
   casillas: { codigo: string; monto: number }[];
   fuente: "pdf" | "manual";
   archivoNombre?: string;
+  /** Marca el periodo como NO presentado. */
+  noPresento?: boolean;
 }
 
 const BORRADOR_VACIO: Borrador = {
@@ -349,27 +351,42 @@ function BorradorForm({
           />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <NumField label="Ventas · Base (total)" value={borrador.ventasBase} onChange={(v) => setNum("ventasBase", v)} />
-        <NumField label="Ventas · IGV (total)" value={borrador.ventasIgv} onChange={(v) => setNum("ventasIgv", v)} />
-        <NumField label="Compras · Base (total)" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
-        <NumField label="Compras · IGV (total)" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
-      </div>
 
-      <DetalleConceptos
-        titulo="Detalle de ventas (cada concepto, sin netear)"
-        detalle={borrador.ventasDetalle}
-        totalBase={borrador.ventasBase}
-        totalIgv={borrador.ventasIgv}
-        totalLabel="TOTAL VENTAS"
-      />
-      <DetalleConceptos
-        titulo="Detalle de compras (cada concepto, sin netear)"
-        detalle={borrador.comprasDetalle}
-        totalBase={borrador.comprasBase}
-        totalIgv={borrador.comprasIgv}
-        totalLabel="TOTAL COMPRAS"
-      />
+      {/* Marcar el mes como NO presentado (no requiere montos). */}
+      <label className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <input
+          type="checkbox"
+          checked={Boolean(borrador.noPresento)}
+          onChange={(e) => onChange({ ...borrador, noPresento: e.target.checked })}
+        />
+        <b>No presentó</b> este mes (saldrá así en el informe)
+      </label>
+
+      {!borrador.noPresento && (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <NumField label="Ventas · Base (total)" value={borrador.ventasBase} onChange={(v) => setNum("ventasBase", v)} />
+            <NumField label="Ventas · IGV (total)" value={borrador.ventasIgv} onChange={(v) => setNum("ventasIgv", v)} />
+            <NumField label="Compras · Base (total)" value={borrador.comprasBase} onChange={(v) => setNum("comprasBase", v)} />
+            <NumField label="Compras · IGV (total)" value={borrador.comprasIgv} onChange={(v) => setNum("comprasIgv", v)} />
+          </div>
+
+          <DetalleConceptos
+            titulo="Detalle de ventas (cada concepto, sin netear)"
+            detalle={borrador.ventasDetalle}
+            totalBase={borrador.ventasBase}
+            totalIgv={borrador.ventasIgv}
+            totalLabel="TOTAL VENTAS"
+          />
+          <DetalleConceptos
+            titulo="Detalle de compras (cada concepto, sin netear)"
+            detalle={borrador.comprasDetalle}
+            totalBase={borrador.comprasBase}
+            totalIgv={borrador.comprasIgv}
+            totalLabel="TOTAL COMPRAS"
+          />
+        </>
+      )}
 
       <div className="mt-3 flex gap-2">
         <button className="btn-primary" onClick={onGuardar} disabled={guardando}>
@@ -467,6 +484,18 @@ function ComparativoCard({
 }) {
   const comp = compararDeclaracionSire(decl, sire);
   const inconsistencias = comp.filas.filter((f) => f.estado === "alerta");
+  // Periodo marcado como NO presentado: no se muestra comparativo.
+  if (decl.noPresento) {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4">
+        <h4 className="font-semibold text-slate-800">{etiqueta(decl.periodo)}</h4>
+        <div className="flex items-center gap-2">
+          <span className="badge bg-red-100 text-red-700">NO PRESENTÓ</span>
+          <button className="text-xs text-slate-400 hover:text-red-600" onClick={onEliminar} disabled={eliminando} title="Eliminar">✕</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="mb-3 flex items-center justify-between">

@@ -491,7 +491,17 @@ export default async function InformePage({ params }: { params: { id: string } }
               )}
             </p>
             <div className="space-y-4">
-              {comparativos.map((comp, idx) => (
+              {comparativos.map((comp, idx) => {
+                const noPresento = declaraciones[idx]?.noPresento;
+                if (noPresento) {
+                  return (
+                    <div key={comp.periodo + idx} className="evitar-corte flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3">
+                      <p className="text-sm font-semibold text-slate-700">{etiquetaPeriodo(comp.periodo)}</p>
+                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">NO PRESENTÓ</span>
+                    </div>
+                  );
+                }
+                return (
                 <div key={comp.periodo + idx} className="evitar-corte rounded-lg border border-slate-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-700">
@@ -544,7 +554,8 @@ export default async function InformePage({ params }: { params: { id: string } }
                     </tbody>
                   </table>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

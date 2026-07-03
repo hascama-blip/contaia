@@ -31,21 +31,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         { status: 400 }
       );
     }
+    const noPresento = d.noPresento === true;
     const decl: DeclaracionMensual = {
       id: newId(),
       periodo: d.periodo,
       ruc: typeof d.ruc === "string" ? d.ruc : undefined,
       formulario: typeof d.formulario === "string" ? d.formulario : undefined,
-      ventasBase: Number(d.ventasBase) || 0,
-      ventasIgv: Number(d.ventasIgv) || 0,
-      ventasDetalle: Array.isArray(d.ventasDetalle) ? d.ventasDetalle : [],
-      comprasBase: Number(d.comprasBase) || 0,
-      comprasIgv: Number(d.comprasIgv) || 0,
-      comprasDetalle: Array.isArray(d.comprasDetalle) ? d.comprasDetalle : [],
+      // "No presentó": montos en 0 (no aplican).
+      ventasBase: noPresento ? 0 : Number(d.ventasBase) || 0,
+      ventasIgv: noPresento ? 0 : Number(d.ventasIgv) || 0,
+      ventasDetalle: noPresento ? [] : (Array.isArray(d.ventasDetalle) ? d.ventasDetalle : []),
+      comprasBase: noPresento ? 0 : Number(d.comprasBase) || 0,
+      comprasIgv: noPresento ? 0 : Number(d.comprasIgv) || 0,
+      comprasDetalle: noPresento ? [] : (Array.isArray(d.comprasDetalle) ? d.comprasDetalle : []),
       casillas: Array.isArray(d.casillas) ? d.casillas : [],
       fuente: d.fuente === "manual" ? "manual" : "pdf",
       archivoNombre: typeof d.archivoNombre === "string" ? d.archivoNombre : undefined,
       cargadoAt: new Date().toISOString(),
+      noPresento: noPresento || undefined,
     };
     const actualizado = await addDeclaracion(cliente.id, decl);
     await logAccion({

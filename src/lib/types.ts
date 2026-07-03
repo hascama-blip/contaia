@@ -262,6 +262,8 @@ export interface DeclaracionMensual {
   fuente: "pdf" | "manual";
   archivoNombre?: string;
   cargadoAt: string;
+  /** Marca este periodo como NO presentado (sale así en el informe). */
+  noPresento?: boolean;
 }
 
 /** Una fila del comparativo declaración vs SIRE. */
