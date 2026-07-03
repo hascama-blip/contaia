@@ -45,6 +45,8 @@ interface Store {
   /** Registro GLOBAL de RUCs tomados: cada empresa pertenece a un solo estudio
    *  en toda la plataforma (evita crear cuentas falsas para reconsultar). */
   rucsRegistrados?: Record<string, { studioId: string; clienteId: string; ownerNombre?: string; at: string }>;
+  /** Configuración global de la plataforma (la administra el supremo). */
+  config?: { browserWsUrl?: string };
 }
 
 async function ensureDirs() {
@@ -297,6 +299,23 @@ export async function listarAcciones(
   if (opts?.clienteId) arr = arr.filter((a) => a.clienteId === opts.clienteId);
   arr = arr.sort((a, b) => b.at.localeCompare(a.at));
   return typeof opts?.limite === "number" ? arr.slice(0, opts.limite) : arr;
+}
+
+// ---- Configuración global (la administra el supremo) -----------------------
+
+/** URL del navegador remoto (Browserless) guardada en la app. Sirve como
+ *  alternativa a la variable de entorno BROWSER_WS_URL cuando el hosting no la
+ *  inyecta bien. La variable de entorno tiene prioridad si existe. */
+export async function getBrowserWsUrl(): Promise<string> {
+  const store = await readStore();
+  return store.config?.browserWsUrl?.trim() ?? "";
+}
+
+export async function setBrowserWsUrl(url: string): Promise<void> {
+  const store = await readStore();
+  if (!store.config) store.config = {};
+  store.config.browserWsUrl = url.trim();
+  await writeStore(store);
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */

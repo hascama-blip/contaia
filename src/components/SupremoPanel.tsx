@@ -46,6 +46,10 @@ export default function SupremoPanel() {
   const [diag, setDiag] = useState<any>(null);
   const [diagBusy, setDiagBusy] = useState(false);
   const [wsUrl, setWsUrl] = useState("");
+  // URL de Browserless guardada en la app (alternativa a la variable de Render).
+  const [urlGuardada, setUrlGuardada] = useState<{ configurada: boolean; preview: string } | null>(null);
+  const [guardarBusy, setGuardarBusy] = useState(false);
+  const [guardarMsg, setGuardarMsg] = useState<string | null>(null);
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -73,6 +77,34 @@ export default function SupremoPanel() {
   }, [filtro]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // Carga si ya hay una URL de Browserless guardada en la app.
+  useEffect(() => {
+    fetch("/api/supremo/navegador-url")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setUrlGuardada({ configurada: d.configurada, preview: d.preview }))
+      .catch(() => {});
+  }, []);
+
+  async function guardarUrl() {
+    setGuardarBusy(true);
+    setGuardarMsg(null);
+    try {
+      const res = await fetch("/api/supremo/navegador-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ws: wsUrl.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setGuardarMsg(data.error ?? "No se pudo guardar."); return; }
+      setUrlGuardada({ configurada: data.configurada, preview: data.preview });
+      setGuardarMsg(data.configurada ? "✅ URL guardada. Ahora prueba la conexión." : "URL borrada.");
+    } catch {
+      setGuardarMsg("Error de red al guardar.");
+    } finally {
+      setGuardarBusy(false);
+    }
+  }
 
   async function decidir(s: Solicitud, estado: "aprobado" | "rechazado") {
     setBusy(s.id); setError(null);
@@ -349,10 +381,16 @@ export default function SupremoPanel() {
           </button>
         </div>
 
-        {/* Probar una URL de Browserless directa (sin depender de la variable) */}
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-3">
-          <p className="mb-1 text-xs font-semibold text-slate-600">
-            ¿Dudas si el problema es Render o Browserless? Pega aquí tu URL de Browserless y pruébala directo:
+        {/* Configurar la URL de Browserless DENTRO de la app (sin depender de Render) */}
+        <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+          <p className="mb-1 text-xs font-semibold text-brand-800">
+            URL de Browserless (guardada en la app)
+          </p>
+          <p className="mb-2 text-[11px] text-slate-500">
+            Pega tu URL de Browserless. Se guarda aquí y se usa aunque el hosting no cargue la variable
+            de entorno. {urlGuardada?.configurada && (
+              <span className="font-semibold text-emerald-700">Actual: {urlGuardada.preview}</span>
+            )}
           </p>
           <div className="flex flex-wrap gap-2">
             <input
@@ -362,15 +400,25 @@ export default function SupremoPanel() {
               className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
             />
             <button
+              onClick={guardarUrl}
+              disabled={guardarBusy || !wsUrl.trim()}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {guardarBusy ? "Guardando…" : "💾 Guardar URL"}
+            </button>
+            <button
               onClick={probarUrl}
               disabled={diagBusy || !wsUrl.trim()}
-              className="rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              title="Prueba la URL sin guardarla"
             >
-              Probar esta URL
+              Solo probar
             </button>
           </div>
+          {guardarMsg && <p className="mt-1 text-[11px] text-slate-600">{guardarMsg}</p>}
           <p className="mt-1 text-[10px] text-slate-400">
-            Se envía de forma segura (no se guarda). Aun así, tras confirmar conviene rotar el token en Browserless.
+            Nota: en el plan Free (sin disco) esto puede borrarse al redesplegar; si pasa, vuelve a
+            guardarla aquí. Tras confirmar, conviene rotar el token en Browserless.
           </p>
         </div>
 

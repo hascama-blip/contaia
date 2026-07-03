@@ -55,7 +55,17 @@ export async function conectarNavegador(): Promise<ConexionNavegador> {
   // NAVEGADOR REMOTO (Browserless / Browserbase): si está configurado, los
   // Chromium corren en OTRA máquina (no consumen RAM del servidor web) y ese
   // servicio maneja el pool, la cola y la concurrencia.
-  const wsUrl = process.env.BROWSER_WS_URL;
+  // Prioridad: variable de entorno; si el hosting no la inyecta, se usa la URL
+  // guardada en la app (la configura el supremo desde su panel).
+  let wsUrl = process.env.BROWSER_WS_URL;
+  if (!wsUrl) {
+    try {
+      const { getBrowserWsUrl } = await import("./db");
+      wsUrl = (await getBrowserWsUrl()) || undefined;
+    } catch {
+      /* si no se puede leer el store, sigue con el navegador local */
+    }
+  }
   if (wsUrl) {
     try {
       const browser = await chromium.connectOverCDP(wsUrl);
