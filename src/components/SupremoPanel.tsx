@@ -45,6 +45,7 @@ export default function SupremoPanel() {
   // Diagnóstico del navegador (Browserless).
   const [diag, setDiag] = useState<any>(null);
   const [diagBusy, setDiagBusy] = useState(false);
+  const [wsUrl, setWsUrl] = useState("");
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -125,6 +126,26 @@ export default function SupremoPanel() {
     setDiag(null);
     try {
       const res = await fetch(`/api/diagnostico/navegador?n=${n}`);
+      const data = await res.json().catch(() => ({}));
+      setDiag(res.ok ? data : { error: data.error ?? "No se pudo ejecutar la prueba." });
+    } catch {
+      setDiag({ error: "Error de red al ejecutar la prueba." });
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
+  // Prueba una URL de Browserless pegada a mano (aísla si el problema es Render o Browserless).
+  async function probarUrl() {
+    if (!wsUrl.trim()) return;
+    setDiagBusy(true);
+    setDiag(null);
+    try {
+      const res = await fetch(`/api/diagnostico/navegador`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ws: wsUrl.trim(), n: 1 }),
+      });
       const data = await res.json().catch(() => ({}));
       setDiag(res.ok ? data : { error: data.error ?? "No se pudo ejecutar la prueba." });
     } catch {
@@ -326,6 +347,31 @@ export default function SupremoPanel() {
           >
             Probar multiuso (5)
           </button>
+        </div>
+
+        {/* Probar una URL de Browserless directa (sin depender de la variable) */}
+        <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-3">
+          <p className="mb-1 text-xs font-semibold text-slate-600">
+            ¿Dudas si el problema es Render o Browserless? Pega aquí tu URL de Browserless y pruébala directo:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={wsUrl}
+              onChange={(e) => setWsUrl(e.target.value)}
+              placeholder="wss://production-sfo.browserless.io?token=..."
+              className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+            />
+            <button
+              onClick={probarUrl}
+              disabled={diagBusy || !wsUrl.trim()}
+              className="rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              Probar esta URL
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] text-slate-400">
+            Se envía de forma segura (no se guarda). Aun así, tras confirmar conviene rotar el token en Browserless.
+          </p>
         </div>
 
         {diag && (
