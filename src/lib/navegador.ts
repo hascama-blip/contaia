@@ -32,7 +32,13 @@ export async function lanzarNavegador() {
   // conexión; la lógica de extracción no cambia.
   const wsUrl = process.env.BROWSER_WS_URL;
   if (wsUrl) {
-    return chromium.connectOverCDP(wsUrl);
+    try {
+      return await chromium.connectOverCDP(wsUrl);
+    } catch (e) {
+      // Si el navegador remoto (Browserless) está caído o mal configurado, NO
+      // rompemos la extracción: caemos al Chromium local como respaldo.
+      console.error("[navegador] Falló la conexión a BROWSER_WS_URL, uso Chromium local:", e);
+    }
   }
 
   // En Render (Node) usa el Chromium de @sparticuz; en local, el instalado.
