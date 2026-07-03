@@ -8,7 +8,6 @@ import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
-import { LogoSunat } from "@/components/LogoSunat";
 import { fmtFecha, fmtSoles } from "@/components/ui";
 import type { NivelRiesgo, BuzonMensaje } from "@/lib/types";
 
@@ -660,7 +659,8 @@ export default async function InformePage({ params }: { params: { id: string } }
 
         {/* Marca de agua: logo de SUNAT al final del informe */}
         <div className="mt-8 flex items-center justify-center opacity-20">
-          <LogoSunat className="scale-[1.6]" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-sunat.png" alt="SUNAT" className="h-24 w-auto" />
         </div>
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
