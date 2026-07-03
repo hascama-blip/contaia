@@ -667,7 +667,7 @@ export default async function InformePage({ params }: { params: { id: string } }
           <div className="mt-3 flex items-center gap-2">
             <span className="font-semibold text-slate-500">Fuente:</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-sunat.png" alt="SUNAT" className="h-5 w-auto" />
+            <img src="/logo-sunat.png" alt="SUNAT" className="h-[60px] w-auto" />
           </div>
         </footer>
         </div>
