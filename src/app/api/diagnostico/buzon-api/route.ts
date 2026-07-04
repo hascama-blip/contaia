@@ -92,15 +92,34 @@ export async function POST(req: NextRequest) {
       const res = await fetch(endpoint, init);
       const txt = await res.text();
       pasos.push({
-        paso: "2) Endpoint con Bearer",
+        paso: "2) Endpoint CON token",
         url: endpoint,
         metodo,
         httpStatus: res.status,
         contentType: res.headers.get("content-type") ?? "",
-        resultado: txt.slice(0, 2000),
+        resultado: txt.slice(0, 4000),
+      });
+
+      // 2b) Mismo endpoint SIN token: si da lo MISMO que con token, el Bearer no
+      // está autenticando (el endpoint necesita la sesión SOL/cookies del navegador).
+      const sinInit: RequestInit = { method: metodo, headers: { Accept: "application/json" } };
+      if (metodo === "POST" && cuerpo) {
+        (sinInit.headers as any)["Content-Type"] = cuerpo.trim().startsWith("{")
+          ? "application/json"
+          : "application/x-www-form-urlencoded";
+        sinInit.body = cuerpo;
+      }
+      const resSin = await fetch(endpoint, sinInit);
+      const txtSin = await resSin.text();
+      pasos.push({
+        paso: "2b) Mismo endpoint SIN token (comparación)",
+        httpStatus: resSin.status,
+        contentType: resSin.headers.get("content-type") ?? "",
+        resultado: txtSin.slice(0, 2000),
+        nota: "Si esto es igual al paso 2, el token NO está autenticando (haría falta la sesión SOL del navegador).",
       });
     } catch (e: any) {
-      pasos.push({ paso: "2) Endpoint con Bearer", url: endpoint, error: String(e?.message ?? e) });
+      pasos.push({ paso: "2) Endpoint con token", url: endpoint, error: String(e?.message ?? e) });
     }
   }
 

@@ -104,7 +104,7 @@ export default function LabBuzonApi() {
           )}
           {Array.isArray(res.pasos) &&
             res.pasos.map((p: any, i: number) => (
-              <pre key={i} className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+              <pre key={i} className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
                 {JSON.stringify(p, null, 2)}
               </pre>
             ))}
