@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
   const solPass = String(b.solPass ?? "");
   const clientId = String(b.clientId ?? "").trim();
   const clientSecret = String(b.clientSecret ?? "").trim();
-  const scope = String(b.scope ?? "https://api-sire.sunat.gob.pe").trim();
+  const preset = String(b.preset ?? "").trim(); // "controlmsg" = auto-probar API de mensajes
+  // Para Control de mensajes el scope es el gateway general api.sunat.gob.pe.
+  const scope = String(b.scope ?? (preset === "controlmsg" ? "https://api.sunat.gob.pe" : "https://api-sire.sunat.gob.pe")).trim();
   const endpoint = String(b.endpoint ?? "").trim();
   const metodo = String(b.metodo ?? "GET").toUpperCase() === "POST" ? "POST" : "GET";
   const cuerpo = String(b.cuerpo ?? "");
@@ -74,6 +76,46 @@ export async function POST(req: NextRequest) {
     token = json.access_token;
   } catch (e: any) {
     return NextResponse.json({ ok: false, conclusion: "Error de red pidiendo el token.", pasos: [...pasos, { error: String(e?.message ?? e) }] });
+  }
+
+  // PRESET: auto-probar la API oficial "Control de mensajes" (/v1/contribuyente/controlmsg).
+  // Prueba varios paths candidatos con el token y reporta cuál responde.
+  if (preset === "controlmsg") {
+    const BASE = "https://api.sunat.gob.pe/v1/contribuyente/controlmsg";
+    const p = "numPag=1&perPag=20&numMensaje=&codMensaje=&fecIniPub=&fecFinPub=&codEtiqueta=&indPaginacion=1";
+    const candidatos = [
+      `${BASE}/mensajes?${p}`,
+      `${BASE}/mensajes/consultar?${p}`,
+      `${BASE}/mensajes/listar?${p}`,
+      `${BASE}/consultamensajes?${p}`,
+      `${BASE}/notificaciones?${p}`,
+      `${BASE}/alertas?${p}`,
+      `${BASE}/mensaje?${p}`,
+      `${BASE}?${p}`,
+    ];
+    for (const u of candidatos) {
+      try {
+        const res = await fetch(u, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+        const txt = await res.text();
+        pasos.push({
+          endpoint: u.replace(/\?.*/, ""),
+          httpStatus: res.status,
+          contentType: res.headers.get("content-type") ?? "",
+          // 404 = no existe ese path; 400 = existe pero faltan params; 200 = ¡bingo!
+          resultado: txt.slice(0, 500),
+        });
+      } catch (e: any) {
+        pasos.push({ endpoint: u.replace(/\?.*/, ""), error: String(e?.message ?? e) });
+      }
+    }
+    const hit = pasos.find((x) => x.httpStatus === 200 || x.httpStatus === 400);
+    return NextResponse.json({
+      ok: true,
+      conclusion: hit
+        ? `Endpoint prometedor: ${hit.endpoint} (HTTP ${hit.httpStatus}). 200=funciona; 400=existe pero hay que ajustar parámetros. Pásame la respuesta.`
+        : "Ningún candidato respondió 200/400 (todos 404/401). Hace falta el path exacto del manual de SUNAT. Pero el token con scope api.sunat.gob.pe ¿salió? (mira el paso 1).",
+      pasos,
+    });
   }
 
   // 2) Llamar el endpoint indicado con el Bearer (si se indicó uno).

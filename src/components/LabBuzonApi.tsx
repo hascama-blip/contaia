@@ -21,14 +21,14 @@ export default function LabBuzonApi() {
 
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
-  async function probar() {
+  async function probar(preset?: string) {
     setBusy(true);
     setRes(null);
     try {
       const r = await fetch("/api/diagnostico/buzon-api", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
+        body: JSON.stringify(preset ? { ...f, preset } : f),
       });
       setRes(await r.json().catch(() => ({ error: "Respuesta inválida" })));
     } catch {
@@ -88,13 +88,23 @@ export default function LabBuzonApi() {
         </div>
       </div>
 
-      <button
-        onClick={probar}
-        disabled={busy}
-        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-      >
-        {busy ? "Probando…" : "🧪 Probar API"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => probar()}
+          disabled={busy}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {busy ? "Probando…" : "🧪 Probar el endpoint de arriba"}
+        </button>
+        <button
+          onClick={() => probar("controlmsg")}
+          disabled={busy}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          title="Pide el token con scope api.sunat.gob.pe y prueba varios endpoints de la API oficial de mensajes"
+        >
+          {busy ? "Probando…" : "🔎 Auto-probar API Control de Mensajes"}
+        </button>
+      </div>
 
       {res && (
         <div className="space-y-2">
