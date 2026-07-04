@@ -31,6 +31,61 @@ export interface ConexionNavegador {
   errorRemoto?: string;   // por qué falló el remoto (si estaba configurado)
 }
 
+// ============================================================
+//  COLA GLOBAL de navegadores LOCALES (protege la RAM del server)
+// ============================================================
+// Cada Chromium local pesa ~300–500 MB. Sin límite, varios usuarios extrayendo
+// a la vez tumban el servidor (OOM) y la WEB ENTERA se cae. Con la cola, solo
+// corren MAX_NAVEGADORES a la vez y el resto espera su turno; la web nunca se
+// ve afectada. (El navegador remoto NO pasa por la cola: no gasta RAM local.)
+const MAX_NAVEGADORES = Math.max(1, Number(process.env.MAX_NAVEGADORES ?? "2") || 2);
+const MAX_EN_COLA = 12;            // más de esto = rechazo inmediato con mensaje claro
+const ESPERA_MAX_MS = 120_000;     // máximo en cola antes de rendirse
+const LIBERACION_FORZADA_MS = 6 * 60_000; // red de seguridad si nadie cierra el navegador
+
+let navegadoresActivos = 0;
+const turnosEnEspera: { resolve: () => void; reject: (e: Error) => void; timer: any }[] = [];
+
+function adquirirTurno(): Promise<void> {
+  if (navegadoresActivos < MAX_NAVEGADORES) {
+    navegadoresActivos++;
+    return Promise.resolve();
+  }
+  if (turnosEnEspera.length >= MAX_EN_COLA) {
+    return Promise.reject(
+      new Error("El sistema está procesando muchas extracciones a la vez. Intenta de nuevo en 1–2 minutos.")
+    );
+  }
+  return new Promise<void>((resolve, reject) => {
+    const item = {
+      resolve: () => {
+        clearTimeout(item.timer);
+        navegadoresActivos++;
+        resolve();
+      },
+      reject,
+      timer: setTimeout(() => {
+        const i = turnosEnEspera.indexOf(item);
+        if (i >= 0) turnosEnEspera.splice(i, 1);
+        reject(new Error("Hay muchas extracciones en cola y se agotó la espera. Intenta de nuevo en unos minutos."));
+      }, ESPERA_MAX_MS),
+    };
+    item.timer?.unref?.();
+    turnosEnEspera.push(item);
+  });
+}
+
+function liberarTurno(): void {
+  navegadoresActivos = Math.max(0, navegadoresActivos - 1);
+  const siguiente = turnosEnEspera.shift();
+  if (siguiente) siguiente.resolve();
+}
+
+/** Estado de la cola (para el diagnóstico del supremo). */
+export function estadoNavegadores() {
+  return { activos: navegadoresActivos, enCola: turnosEnEspera.length, maximo: MAX_NAVEGADORES };
+}
+
 // Lanza el Chromium local (@sparticuz en Render; el instalado en local).
 async function lanzarLocal(chromium: any) {
   try {
@@ -47,6 +102,39 @@ async function lanzarLocal(chromium: any) {
     /* fallback al Chromium local instalado */
   }
   return chromium.launch({ headless: true, args: ARGS_LIGEROS });
+}
+
+// Lanza el Chromium local RESPETANDO la cola: espera turno, y libera el cupo
+// cuando el navegador se cierra (o a los 6 min como red de seguridad).
+async function lanzarLocalConTurno(chromium: any) {
+  await adquirirTurno();
+  let liberado = false;
+  const liberar = () => {
+    if (liberado) return;
+    liberado = true;
+    clearTimeout(seguro);
+    liberarTurno();
+  };
+  const seguro: any = setTimeout(liberar, LIBERACION_FORZADA_MS);
+  seguro?.unref?.();
+  try {
+    const browser = await lanzarLocal(chromium);
+    // El cupo se devuelve al cerrar: TODOS los consumidores cierran con
+    // browser.close() (buzón, F36, PDF, diagnóstico), así que basta envolverlo.
+    const closeOriginal = browser.close.bind(browser);
+    browser.close = async (...args: any[]) => {
+      try {
+        return await closeOriginal(...args);
+      } finally {
+        liberar();
+      }
+    };
+    browser.on?.("disconnected", liberar);
+    return browser;
+  } catch (e) {
+    liberar();
+    throw e;
+  }
 }
 
 /** Conecta al navegador y dice si fue remoto (Browserless) o local. */
@@ -81,10 +169,10 @@ export async function conectarNavegador(): Promise<ConexionNavegador> {
       // caemos al Chromium local como respaldo (y lo reportamos).
       const errorRemoto = String(e?.message ?? e);
       console.error("[navegador] Falló la conexión al navegador remoto, uso Chromium local:", errorRemoto);
-      return { browser: await lanzarLocal(chromium), remoto: false, fuente, errorRemoto };
+      return { browser: await lanzarLocalConTurno(chromium), remoto: false, fuente, errorRemoto };
     }
   }
-  return { browser: await lanzarLocal(chromium), remoto: false };
+  return { browser: await lanzarLocalConTurno(chromium), remoto: false };
 }
 
 export async function lanzarNavegador() {

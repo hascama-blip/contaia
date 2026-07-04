@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esSupremo } from "@/lib/auth";
-import { conectarNavegador } from "@/lib/navegador";
+import { conectarNavegador, estadoNavegadores } from "@/lib/navegador";
 import { getBrowserWsUrl } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
     fallidas: n - exitosas,
     concurrenciaOk: exitosas === n,
     msTotal: ms,
+    // Cola de navegadores locales (protección de RAM): cuántos corren y esperan.
+    colaNavegadores: estadoNavegadores(),
     detalles,
   });
 }

@@ -24,6 +24,9 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Commits terminan con `Co-Authored-By` y `Claude-Session` (ver git log).
 
 ## Arquitectura
+- **Diagnóstico y hoja de ruta**: ver `ARQUITECTURA.md` (veredicto: monolito OK; la
+  cola global de navegadores en `src/lib/navegador.ts` protege la web — `MAX_NAVEGADORES`
+  default 2; Fase 2 = migrar a Postgres antes de un lanzamiento masivo).
 - `src/lib/db.ts` — store JSON. Entidad `Cliente` con: sunat, documentos (legacy), diagnostico,
   sire[], buzon, declaraciones[]. Setters: setSunatInfo, setSireResumen, setBuzon,
   setDiagnostico, addDeclaracion, deleteDeclaracion.
