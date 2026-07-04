@@ -54,7 +54,8 @@ paralelo. Ninguna aplica aún.
 
 ## Reglas operativas
 
-- `MAX_NAVEGADORES` (env, default 2): subir a 3–4 solo si se sube a Pro (4 GB).
+- `MAX_NAVEGADORES` (env, default 2; fijado en `render.yaml`): regla ≈ 2 por cada
+  2 GB libres. Standard (2 GB) → 2 · Pro (4 GB) → 3–4 · Pro Max (16 GB) → 10–12.
 - El diagnóstico del supremo (`Probar conexión`) muestra `colaNavegadores`
   (activos / en cola / máximo).
 - `npm run build` debe pasar antes de push; deploy = push a `main`.

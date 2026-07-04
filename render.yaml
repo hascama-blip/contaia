@@ -8,8 +8,9 @@ services:
     name: contaia
     runtime: node
     # El buzón usa un navegador headless (@sparticuz/chromium) que consume RAM:
-    # plan "standard" (2 GB) para que el navegador sea estable y sin spin-down.
-    plan: standard
+    # plan "pro max" (16 GB, 4 CPU) para correr ~10 extracciones SUNAT a la vez.
+    # (Si se baja de plan, bajar también MAX_NAVEGADORES: ~2 por cada 2 GB libres.)
+    plan: pro max
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -18,6 +19,11 @@ services:
       # Fuente FIJA: decolecta.com (datos reales de SUNAT).
       - key: SUNAT_PROVIDER
         value: decolecta
+      # Cola de navegadores: cuántos Chromium locales pueden correr A LA VEZ.
+      # Regla: ~500 MB por navegador + ~1 GB de la app. Con 16 GB → 10 es seguro.
+      # (Va en el blueprint porque las variables del panel no siempre se inyectan.)
+      - key: MAX_NAVEGADORES
+        value: "10"
       # Token de decolecta.com: NO se guarda en el código.
       # Render te pedirá pegarlo al desplegar (queda guardado en su panel,
       # pestaña Environment). Sin este token la consulta mostrará error.
