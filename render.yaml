@@ -8,10 +8,8 @@ services:
     name: contaia
     runtime: node
     # El buzón usa un navegador headless (@sparticuz/chromium) que consume RAM:
-    # usa plan "standard" (2 GB). El SIRE y lo demás funcionan en planes menores.
-    # Plan FREE para pruebas (2–5 usuarios). El buzón (Chromium) y el OCR
-    # necesitan más RAM: para eso, cambia a "standard" y descomenta el disco.
-    plan: free
+    # plan "standard" (2 GB) para que el navegador sea estable y sin spin-down.
+    plan: standard
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -27,15 +25,14 @@ services:
         sync: false
       # NOTA: BROWSER_WS_URL (navegador remoto Browserless) se define como
       # variable NORMAL en el panel de Render (Environment) — NO en el blueprint,
-      # para que el sync no la sobrescriba. Formato:
-      #   wss://production-sfo.browserless.io?token=TU_CLAVE
-      # En FREE no hay disco persistente: los datos viven en ./data (efímeros).
-      # Al pasar a un plan con disco, descomenta DATA_DIR y el bloque "disk".
-      # - key: DATA_DIR
-      #   value: /var/data
+      # para que el sync no la sobrescriba.
+      # Datos persistentes: se guardan en el disco montado en /var/data (abajo),
+      # así los clientes y la configuración NO se borran en cada despliegue.
+      - key: DATA_DIR
+        value: /var/data
 
-    # --- Almacenamiento persistente (requiere plan de pago, no FREE) ----------
-    # disk:
-    #   name: contaia-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+    # --- Almacenamiento persistente (disco de Render, requiere plan de pago) ---
+    disk:
+      name: contaia-data
+      mountPath: /var/data
+      sizeGB: 1
