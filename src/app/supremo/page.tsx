@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSupremo, ensureSupremo } from "@/lib/auth";
 import SupremoPanel from "@/components/SupremoPanel";
 
@@ -19,6 +20,16 @@ export default async function SupremoPage() {
         </p>
       </div>
       <SupremoPanel />
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+        <p className="font-semibold text-slate-800">🧪 Laboratorio (experimental)</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Pruebas aisladas que no afectan producción.
+        </p>
+        <Link href="/supremo/lab-buzon" className="mt-2 inline-block text-brand-600 hover:underline">
+          → Buzón por API (sin navegador)
+        </Link>
+      </div>
     </div>
   );
 }
