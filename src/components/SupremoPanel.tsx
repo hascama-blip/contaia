@@ -86,19 +86,24 @@ export default function SupremoPanel() {
       .catch(() => {});
   }, []);
 
-  async function guardarUrl() {
+  async function guardarUrl(valor?: string) {
     setGuardarBusy(true);
     setGuardarMsg(null);
     try {
       const res = await fetch("/api/supremo/navegador-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ws: wsUrl.trim() }),
+        body: JSON.stringify({ ws: valor !== undefined ? valor : wsUrl.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setGuardarMsg(data.error ?? "No se pudo guardar."); return; }
       setUrlGuardada({ configurada: data.configurada, preview: data.preview });
-      setGuardarMsg(data.configurada ? "✅ URL guardada. Ahora prueba la conexión." : "URL borrada.");
+      setGuardarMsg(
+        data.configurada
+          ? "✅ URL guardada. Ahora prueba la conexión."
+          : "🗑️ URL borrada: el buzón/F36 volverán a usar el navegador local (Render), que sí entra a SUNAT."
+      );
+      if (!data.configurada) setWsUrl("");
     } catch {
       setGuardarMsg("Error de red al guardar.");
     } finally {
@@ -400,7 +405,7 @@ export default function SupremoPanel() {
               className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
             />
             <button
-              onClick={guardarUrl}
+              onClick={() => guardarUrl()}
               disabled={guardarBusy || !wsUrl.trim()}
               className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
             >
@@ -414,6 +419,16 @@ export default function SupremoPanel() {
             >
               Solo probar
             </button>
+            {urlGuardada?.configurada && (
+              <button
+                onClick={() => guardarUrl("")}
+                disabled={guardarBusy}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                title="Quita la URL guardada y vuelve al navegador local (Render), que sí entra a SUNAT"
+              >
+                🗑️ Quitar URL (usar local)
+              </button>
+            )}
           </div>
           {guardarMsg && <p className="mt-1 text-[11px] text-slate-600">{guardarMsg}</p>}
           <p className="mt-1 text-[10px] text-slate-400">
