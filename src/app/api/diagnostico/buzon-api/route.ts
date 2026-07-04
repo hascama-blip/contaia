@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
   const clientSecret = String(b.clientSecret ?? "").trim();
   const preset = String(b.preset ?? "").trim(); // "controlmsg" = auto-probar API de mensajes
   // Para Control de mensajes el scope es el gateway general api.sunat.gob.pe.
-  const scope = String(b.scope ?? (preset === "controlmsg" ? "https://api.sunat.gob.pe" : "https://api-sire.sunat.gob.pe")).trim();
+  // OJO: en el preset se FUERZA ese scope (aunque el formulario mande el del SIRE).
+  const scope =
+    preset === "controlmsg"
+      ? "https://api.sunat.gob.pe"
+      : String(b.scope ?? "https://api-sire.sunat.gob.pe").trim();
   const endpoint = String(b.endpoint ?? "").trim();
   const metodo = String(b.metodo ?? "GET").toUpperCase() === "POST" ? "POST" : "GET";
   const cuerpo = String(b.cuerpo ?? "");
@@ -82,16 +86,22 @@ export async function POST(req: NextRequest) {
   // Prueba varios paths candidatos con el token y reporta cuál responde.
   if (preset === "controlmsg") {
     const BASE = "https://api.sunat.gob.pe/v1/contribuyente/controlmsg";
-    const p = "numPag=1&perPag=20&numMensaje=&codMensaje=&fecIniPub=&fecFinPub=&codEtiqueta=&indPaginacion=1";
+    const p = "page=1&numPag=1&perPag=20&tipoMsj=2&codCarpeta=00";
     const candidatos = [
+      // Rutas planas
       `${BASE}/mensajes?${p}`,
-      `${BASE}/mensajes/consultar?${p}`,
-      `${BASE}/mensajes/listar?${p}`,
-      `${BASE}/consultamensajes?${p}`,
-      `${BASE}/notificaciones?${p}`,
-      `${BASE}/alertas?${p}`,
-      `${BASE}/mensaje?${p}`,
-      `${BASE}?${p}`,
+      `${BASE}/bandeja?${p}`,
+      `${BASE}/listamensajes?${p}`,
+      `${BASE}/consulta/mensajes?${p}`,
+      // Con el RUC en el path (patrón usado por otras APIs SUNAT)
+      `${BASE}/${ruc}/mensajes?${p}`,
+      `${BASE}/contribuyentes/${ruc}/mensajes?${p}`,
+      `https://api.sunat.gob.pe/v1/contribuyente/contribuyentes/${ruc}/mensajes?${p}`,
+      // Cantidad de no leídos (endpoint chico típico)
+      `${BASE}/mensajes/cantidad`,
+      `${BASE}/cantidadmensajes`,
+      // Visor del portal con Bearer (por descartar)
+      `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&codCarpeta=00&codEtiqueta=&page=1&des_asunto=&codMensaje=&tipoOrden=NADA`,
     ];
     for (const u of candidatos) {
       try {
