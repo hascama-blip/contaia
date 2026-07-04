@@ -105,37 +105,26 @@ export async function POST(req: NextRequest) {
   // PRESET: auto-probar la API oficial "Control de mensajes" (/v1/contribuyente/controlmsg).
   // Prueba varios paths candidatos con el token y reporta cuál responde.
   if (preset === "controlmsg") {
-    const BASE = "https://api.sunat.gob.pe/v1/contribuyente/controlmsg";
+    // El JWT del credencial concede: api-cpe.sunat.gob.pe /v1/contribuyente/controlmsg
+    // (confirmado decodificando el token). Probamos sub-rutas SOLO en ese host,
+    // reutilizando el MISMO token (pedir varios tokens bloquea el login SOL).
+    const BASE = "https://api-cpe.sunat.gob.pe/v1/contribuyente/controlmsg";
     const p = "page=1&numPag=1&perPag=20&tipoMsj=2&codCarpeta=00";
     const candidatos = [
-      // Rutas planas
+      BASE,
       `${BASE}/mensajes?${p}`,
+      `${BASE}/mensajes`,
+      `${BASE}/consultamensajes?${p}`,
+      `${BASE}/mensajes/consulta?${p}`,
       `${BASE}/bandeja?${p}`,
       `${BASE}/listamensajes?${p}`,
-      `${BASE}/consulta/mensajes?${p}`,
-      // Con el RUC en el path (patrón usado por otras APIs SUNAT)
-      `${BASE}/${ruc}/mensajes?${p}`,
-      `${BASE}/contribuyentes/${ruc}/mensajes?${p}`,
-      `https://api.sunat.gob.pe/v1/contribuyente/contribuyentes/${ruc}/mensajes?${p}`,
-      // Cantidad de no leídos (endpoint chico típico)
+      `${BASE}/notificaciones?${p}`,
+      `${BASE}/alertas?${p}`,
       `${BASE}/mensajes/cantidad`,
-      `${BASE}/cantidadmensajes`,
-      // Visor del portal con Bearer (por descartar)
-      `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&codCarpeta=00&codEtiqueta=&page=1&des_asunto=&codMensaje=&tipoOrden=NADA`,
+      `${BASE}/carpetas`,
+      `${BASE}/etiquetas`,
+      `${BASE}/${ruc}/mensajes?${p}`,
     ];
-
-    // HOSTS ALTERNOS (patrón SIRE). Reutilizamos el MISMO token (NO pedimos más
-    // tokens: pedir varios seguidos hace que SUNAT bloquee el login).
-    const hosts = [
-      "https://api-controlmsg.sunat.gob.pe",
-      "https://api-mensajes.sunat.gob.pe",
-      "https://api-buzon.sunat.gob.pe",
-      "https://api-cpe.sunat.gob.pe",
-    ];
-    for (const h of hosts) {
-      const u = `${h}/v1/contribuyente/controlmsg/mensajes?numPag=1&perPag=20`;
-      candidatos.push(u);
-    }
     for (const u of candidatos) {
       try {
         const res = await fetch(u, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
