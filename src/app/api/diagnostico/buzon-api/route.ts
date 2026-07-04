@@ -25,28 +25,6 @@ function decodeJwt(tok: string): any {
   }
 }
 
-// Pide un token con el scope dado. Devuelve { token, status, detalle }.
-async function pedirToken(
-  clientId: string, clientSecret: string, ruc: string, solUser: string, solPass: string, scope: string
-): Promise<{ token: string; status: number; detalle: string }> {
-  const res = await fetch(`${TOKEN_BASE}/${clientId}/oauth2/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "password",
-      scope,
-      client_id: clientId,
-      client_secret: clientSecret,
-      username: `${ruc}${solUser}`,
-      password: solPass,
-    }),
-  });
-  const txt = await res.text();
-  let json: any = {};
-  try { json = JSON.parse(txt); } catch {}
-  return { token: json.access_token ?? "", status: res.status, detalle: json.access_token ? "ok" : txt.slice(0, 300) };
-}
-
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!esSupremo(user)) {
@@ -146,8 +124,8 @@ export async function POST(req: NextRequest) {
       `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor/listNotiMenPag?tipoMsj=2&codCarpeta=00&codEtiqueta=&page=1&des_asunto=&codMensaje=&tipoOrden=NADA`,
     ];
 
-    // HOSTS ALTERNOS (patrón SIRE: cada servicio tiene su host y su scope, p.ej.
-    // api-sire.sunat.gob.pe). Probamos hosts candidatos con SU propio scope.
+    // HOSTS ALTERNOS (patrón SIRE). Reutilizamos el MISMO token (NO pedimos más
+    // tokens: pedir varios seguidos hace que SUNAT bloquee el login).
     const hosts = [
       "https://api-controlmsg.sunat.gob.pe",
       "https://api-mensajes.sunat.gob.pe",
@@ -155,27 +133,8 @@ export async function POST(req: NextRequest) {
       "https://api-cpe.sunat.gob.pe",
     ];
     for (const h of hosts) {
-      try {
-        const t = await pedirToken(clientId, clientSecret, ruc, solUser, solPass, h);
-        if (!t.token) {
-          pasos.push({ host: h, paso: "token con scope del host", httpStatus: t.status, resultado: t.detalle });
-          continue;
-        }
-        const jwtH = decodeJwt(t.token);
-        const u = `${h}/v1/contribuyente/controlmsg/mensajes?numPag=1&perPag=20`;
-        const r = await fetch(u, { headers: { Authorization: `Bearer ${t.token}`, Accept: "application/json" } });
-        const tx = await r.text();
-        pasos.push({
-          host: h,
-          paso: "token ✅ + endpoint",
-          endpoint: u,
-          httpStatus: r.status,
-          resultado: tx.slice(0, 500),
-          jwtPayload: jwtH ? JSON.stringify(jwtH).slice(0, 1500) : "-",
-        });
-      } catch (e: any) {
-        pasos.push({ host: h, error: String(e?.message ?? e).slice(0, 200) });
-      }
+      const u = `${h}/v1/contribuyente/controlmsg/mensajes?numPag=1&perPag=20`;
+      candidatos.push(u);
     }
     for (const u of candidatos) {
       try {
