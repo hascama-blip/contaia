@@ -50,6 +50,9 @@ export default function SupremoPanel() {
   const [urlGuardada, setUrlGuardada] = useState<{ configurada: boolean; preview: string } | null>(null);
   const [guardarBusy, setGuardarBusy] = useState(false);
   const [guardarMsg, setGuardarMsg] = useState<string | null>(null);
+  // Copia de seguridad (backup/restauración de la base de datos).
+  const [bkBusy, setBkBusy] = useState<string | null>(null);
+  const [bkMsg, setBkMsg] = useState<string | null>(null);
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -189,6 +192,60 @@ export default function SupremoPanel() {
       setDiag({ error: "Error de red al ejecutar la prueba." });
     } finally {
       setDiagBusy(false);
+    }
+  }
+
+  async function descargarBackup(soloDatos: boolean) {
+    setBkBusy(soloDatos ? "datos" : "zip");
+    setBkMsg(null);
+    try {
+      const res = await fetch(`/api/supremo/backup${soloDatos ? "?solo=datos" : ""}`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setBkMsg(d.error ?? "No se pudo generar el backup.");
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("content-disposition") ?? "";
+      const nombre = /filename="([^"]+)"/.exec(cd)?.[1] ?? (soloDatos ? "radar-datos.json" : "radar-backup.zip");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setBkMsg(`✅ Backup descargado (${nombre}). Guárdalo en un lugar seguro.`);
+    } catch {
+      setBkMsg("Error de red al descargar el backup.");
+    } finally {
+      setBkBusy(null);
+    }
+  }
+
+  async function restaurarBackup(file: File) {
+    const txt = window.prompt(
+      `Vas a RESTAURAR la base de datos desde "${file.name}". Esto REEMPLAZA los datos actuales (se guarda una copia del estado actual antes). Escribe RESTAURAR para confirmar:`
+    );
+    if (txt !== "RESTAURAR") {
+      setBkMsg("Restauración cancelada.");
+      return;
+    }
+    setBkBusy("restaurar");
+    setBkMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("confirmar", "RESTAURAR");
+      const res = await fetch("/api/supremo/backup", { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({}));
+      setBkMsg(res.ok ? `✅ ${d.mensaje}` : (d.error ?? "No se pudo restaurar."));
+      if (res.ok) cargar();
+    } catch {
+      setBkMsg("Error de red al restaurar.");
+    } finally {
+      setBkBusy(null);
     }
   }
 
@@ -478,6 +535,46 @@ export default function SupremoPanel() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Copia de seguridad (backup / restauración) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-800">💾 Copia de seguridad</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          La base de datos es <b>store.json</b> (clientes, usuarios, configuración) + los archivos
+          subidos. Además, el sistema guarda solo un <b>snapshot automático diario</b> (últimos 14) en el
+          disco. Descarga una copia periódicamente y guárdala fuera del servidor.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => descargarBackup(false)}
+            disabled={bkBusy !== null}
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {bkBusy === "zip" ? "Generando…" : "⬇ Backup completo (ZIP)"}
+          </button>
+          <button
+            onClick={() => descargarBackup(true)}
+            disabled={bkBusy !== null}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {bkBusy === "datos" ? "Generando…" : "⬇ Solo datos (JSON)"}
+          </button>
+          <label className={`rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-50 ${bkBusy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+            {bkBusy === "restaurar" ? "Restaurando…" : "⟲ Restaurar desde archivo"}
+            <input
+              type="file"
+              accept=".zip,.json,application/zip,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) restaurarBackup(f);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+        {bkMsg && <p className="mt-2 text-xs text-slate-600">{bkMsg}</p>}
       </div>
 
       <div className="rounded-xl border border-red-200 bg-red-50 p-4">

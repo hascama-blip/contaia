@@ -26,11 +26,12 @@ import type {
 // Directorio de datos. En producción se monta un DISCO PERSISTENTE de Render
 // y se apunta aquí con la variable DATA_DIR (p. ej. /var/data) para que los
 // clientes NO se borren en cada despliegue. En local cae a ./data.
-const DATA_DIR = process.env.DATA_DIR
+export const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(process.cwd(), "data");
-const STORE_PATH = path.join(DATA_DIR, "store.json");
+export const STORE_PATH = path.join(DATA_DIR, "store.json");
 export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+export const BACKUPS_DIR = path.join(DATA_DIR, "backups");
 
 interface Store {
   clientes: Cliente[];
@@ -358,9 +359,39 @@ export async function setCuentasProveedor(
   return store.cuentasProveedor;
 }
 
+// --- Backup automático: 1 snapshot del store por día (conserva los últimos 14) ---
+const SNAPSHOTS_A_CONSERVAR = 14;
+let ultimoSnapshotDia = "";
+async function snapshotDiario(raw: string): Promise<void> {
+  const dia = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  if (ultimoSnapshotDia === dia) return; // ya se hizo hoy (chequeo barato en memoria)
+  ultimoSnapshotDia = dia;
+  try {
+    await fs.mkdir(BACKUPS_DIR, { recursive: true });
+    const destino = path.join(BACKUPS_DIR, `store-${dia}.json`);
+    try {
+      await fs.access(destino); // ya existe (otro proceso/reinicio): no sobrescribir
+    } catch {
+      await fs.writeFile(destino, raw, "utf-8");
+    }
+    // Poda: conserva solo los últimos N snapshots.
+    const files = (await fs.readdir(BACKUPS_DIR))
+      .filter((f) => /^store-\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      .sort();
+    for (const f of files.slice(0, Math.max(0, files.length - SNAPSHOTS_A_CONSERVAR))) {
+      await fs.unlink(path.join(BACKUPS_DIR, f)).catch(() => {});
+    }
+  } catch {
+    ultimoSnapshotDia = ""; // reintenta en el próximo write
+  }
+}
+
 async function writeStore(store: Store): Promise<void> {
   await ensureDirs();
-  await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
+  const raw = JSON.stringify(store, null, 2);
+  await fs.writeFile(STORE_PATH, raw, "utf-8");
+  // Copia de seguridad diaria (no bloquea la operación si falla).
+  void snapshotDiario(raw);
 }
 
 export function newId(): string {
