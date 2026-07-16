@@ -310,25 +310,48 @@ export default async function InformePage({ params }: { params: { id: string } }
         {nDeudas > 0 && (
           <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">Deuda tributaria y/o fraccionamiento</h3>
-            {deudasF36.filter((t) => t.filas.length > 0).map((t) => (
-              <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
-                <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+            {deudasF36.filter((t) => t.filas.length > 0).map((t) => {
+              // Oculta columnas totalmente vacías (Documento sustentatorio / N° de
+              // orden suelen venir en blanco) para que la tabla quepa en la hoja.
+              const cols = t.headers
+                .map((_, i) => i)
+                .filter((i) => t.filas.some((f) => (f[i] ?? "").trim() !== ""));
+              const idxDeuda = t.headers.findIndex((h) => /deuda a acogerse|deuda|importe|monto/i.test(h));
+              return (
+                <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
+                  <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
+                  <table className="w-full table-fixed text-[11px]">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-400">
-                        {t.headers.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-1">{h}</th>)}
+                      <tr className="border-b border-slate-200 text-left uppercase text-slate-400">
+                        {cols.map((i) => (
+                          <th key={i} className={`px-2 py-1 align-top ${i === idxDeuda ? "text-right" : ""}`}>
+                            {t.headers[i]}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {t.filas.map((f, r) => (
-                        <tr key={r}>{f.map((c, i) => <td key={i} className="whitespace-nowrap px-3 py-1 text-slate-700">{c}</td>)}</tr>
+                        <tr key={r}>
+                          {cols.map((i) => (
+                            <td
+                              key={i}
+                              className={`px-2 py-1 align-top text-slate-700 ${
+                                i === idxDeuda
+                                  ? "whitespace-nowrap text-right tabular-nums font-medium"
+                                  : "break-words"
+                              }`}
+                            >
+                              {f[i] ?? ""}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <p className="text-right text-sm font-bold text-red-700">TOTAL DEUDA A ACOGERSE: {fmtSoles(totalDeuda)}</p>
             {cliente.deudasF36?.at && (
               <p className="text-right text-[11px] text-slate-400">Extraído de SUNAT: {fmtFecha(cliente.deudasF36.at)}</p>
