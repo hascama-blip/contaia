@@ -137,7 +137,8 @@ const LIMITE_USOS = 3;
 const VENTANA_USOS = 7 * 24 * 60 * 60 * 1000;
 
 function calcUsos(u: Usuario) {
-  const pago = (u.modulos?.length ?? 0) > 0; // con módulos de paga = ilimitado
+  // Ilimitado si es el supremo (dueño de la plataforma) o tiene módulos de paga.
+  const pago = u.rol === "supremo" || (u.modulos?.length ?? 0) > 0;
   const desde = u.usosGratis?.desde ?? "";
   const t = desde ? new Date(desde).getTime() : 0;
   const expirado = !t || Date.now() - t >= VENTANA_USOS;
