@@ -36,6 +36,7 @@ export default function EstadoSirePanel({
   const [diagModo, setDiagModo] = useState(false);
   const puedeDiag = usePuedeDiag();
   const [estados, setEstados] = useState<EstadoP[] | null>(null);
+  const [noObligado, setNoObligado] = useState(false);
   const [at, setAt] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   // API SIRE (client_id/secret) editable aquí mismo: el estado SIRE la necesita.
@@ -46,7 +47,7 @@ export default function EstadoSirePanel({
   useEffect(() => {
     fetch(`/api/clientes/${clienteId}/sire-estado`)
       .then((r) => r.json()).catch(() => ({}))
-      .then((d) => { if (Array.isArray(d?.estados) && d.estados.length) { setEstados(d.estados); setAt(d.at ?? null); } });
+      .then((d) => { if (Array.isArray(d?.estados) && d.estados.length) { setEstados(d.estados); setAt(d.at ?? null); setNoObligado(Boolean(d.noObligado)); } });
   }, [clienteId]);
 
   const apiLista = Boolean(cid.trim() && csec.trim());
@@ -86,6 +87,7 @@ export default function EstadoSirePanel({
       if (!res.ok) { setError(data.error ?? "No se pudo consultar el estado."); return; }
       if (data.diag) { setDiag(JSON.stringify(data.diag, null, 2)); return; }
       setEstados(data.estados ?? []);
+      setNoObligado(Boolean(data.noObligado));
       setAt(data.at ?? null);
       setInfo(data.limitado ? (data.mensaje ?? null) : null);
     } catch {
@@ -169,6 +171,12 @@ export default function EstadoSirePanel({
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {diag && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
+      {noObligado && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Este contribuyente <b>no está obligado a llevar el SIRE</b> (según SUNAT). El estado y los montos no aplican.
+        </div>
+      )}
+
       {estados && estados.length > 0 && (
         <div className="mt-5 overflow-hidden rounded-lg border border-slate-200">
           <table className="w-full text-sm">
@@ -183,8 +191,8 @@ export default function EstadoSirePanel({
               {estados.map((e) => (
                 <tr key={e.periodo}>
                   <td className="px-3 py-1.5 font-medium text-slate-700">{etiqueta(e.periodo)}</td>
-                  <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoVentas} /></td>
-                  <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoCompras} /></td>
+                  <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoVentas} noObligado={noObligado} /></td>
+                  <td className="px-3 py-1.5"><EstadoBadge ok={e.presentadoCompras} noObligado={noObligado} /></td>
                 </tr>
               ))}
             </tbody>
@@ -195,7 +203,8 @@ export default function EstadoSirePanel({
   );
 }
 
-function EstadoBadge({ ok }: { ok: boolean | null }) {
+function EstadoBadge({ ok, noObligado }: { ok: boolean | null; noObligado?: boolean }) {
+  if (noObligado) return <span className="badge bg-amber-100 text-amber-700">No obligado</span>;
   if (ok === null) return <span className="badge bg-slate-100 text-slate-500">? Desconocido</span>;
   return (
     <span className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>

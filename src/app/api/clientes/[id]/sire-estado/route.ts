@@ -17,6 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   return NextResponse.json({
     estados: cliente.sireEstado?.estados ?? [],
+    noObligado: cliente.sireEstado?.noObligado ?? false,
     at: cliente.sireEstado?.at ?? null,
   });
 }
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const dias = Math.ceil((UNA_SEMANA - (Date.now() - ultima)) / (24 * 60 * 60 * 1000));
       return NextResponse.json({
         estados: cliente.sireEstado?.estados ?? [],
+        noObligado: cliente.sireEstado?.noObligado ?? false,
         at: cliente.sireEstado?.at ?? null,
         limitado: true,
         mensaje: `El estado SIRE se actualiza 1 vez por semana. Mostrando lo guardado; podrás actualizar en ~${dias} día(s).`,
@@ -77,10 +79,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (r.diag && !r.estados) return NextResponse.json({ diag: r.diag });
     // Persistir el estado para no re-consultar hasta la próxima semana.
     if (r.estados && r.estados.length && !body.diagnostico) {
-      await setSireEstado(cliente.id, r.estados).catch(() => {});
+      await setSireEstado(cliente.id, r.estados, r.noObligado).catch(() => {});
       if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
     }
-    return NextResponse.json({ estados: r.estados ?? [], at: new Date().toISOString() });
+    return NextResponse.json({
+      estados: r.estados ?? [],
+      noObligado: r.noObligado ?? false,
+      at: new Date().toISOString(),
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "Error consultando el estado del SIRE" },

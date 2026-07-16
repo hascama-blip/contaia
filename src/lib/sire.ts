@@ -607,8 +607,10 @@ async function flujoOficial(
       periodo,
       ventas,
       compras,
-      presentadoVentas: presV ?? false,
-      presentadoCompras: presC ?? false,
+      presentadoVentas: presV === true,
+      presentadoCompras: presC === true,
+      // No obligado a llevar SIRE → los montos "no aplican".
+      noObligado: presV === "no-obligado" || presC === "no-obligado",
       fuente: "oficial",
       consultadoAt: new Date().toISOString(),
     },
@@ -632,13 +634,29 @@ async function estadoPresentado(
   periodo: string,
   etiqueta: string,
   diag?: SireDiag
-): Promise<boolean | null> {
+): Promise<boolean | "no-obligado" | null> {
   const url = `${cfg.apiBase}${cfg.omisosPath.replace("{codLibro}", codLibro)}`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
     const txt = await res.text();
+
+    // Contribuyente NO OBLIGADO a llevar SIRE (p. ej. persona natural sin
+    // negocio): SUNAT lo indica en la respuesta. No es "desconocido".
+    // (Ajustable con Modo diagnóstico si el texto exacto varía.)
+    if (/no\s+(se\s+encuentra\s+)?(est[aá]\s+)?obligad|no\s+afecto|sin\s+obligaci[oó]n|no\s+lleva\s+(el\s+)?registro/i.test(txt)) {
+      diag?.pasos.push({
+        paso: `presentacion-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: res.status,
+        ok: res.ok,
+        respuesta: trunc(`[NO OBLIGADO] ${txt}`, 1800),
+      });
+      return "no-obligado";
+    }
+
     let data: any = null;
     try {
       data = JSON.parse(txt);
@@ -790,7 +808,7 @@ export async function consultarEstadoSire(params: {
   clientId?: string;
   clientSecret?: string;
   diagnostico?: boolean;
-}): Promise<{ estados?: SireEstadoPeriodo[]; diag?: SireDiag }> {
+}): Promise<{ estados?: SireEstadoPeriodo[]; noObligado?: boolean; diag?: SireDiag }> {
   const { ruc, solUser, solPass } = params;
   if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
   const validos = (params.periodos ?? []).filter(periodoValido);
@@ -807,13 +825,19 @@ export async function consultarEstadoSire(params: {
   const diag: SireDiag = { periodo: validos.join(","), pasos: [] };
   const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
   const estados: SireEstadoPeriodo[] = [];
+  let noObligado = false;
   for (const periodo of validos) {
     const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo, "ventas", diag);
     const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo, "compras", diag);
-    estados.push({ periodo, presentadoVentas: presV, presentadoCompras: presC });
+    if (presV === "no-obligado" || presC === "no-obligado") noObligado = true;
+    estados.push({
+      periodo,
+      presentadoVentas: presV === "no-obligado" ? null : presV,
+      presentadoCompras: presC === "no-obligado" ? null : presC,
+    });
   }
   if (params.diagnostico) return { diag };
-  return { estados, diag };
+  return { estados, noObligado, diag };
 }
 
 export function etiquetaPeriodo(periodo: string): string {

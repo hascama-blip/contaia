@@ -24,6 +24,9 @@ export default async function InformePage({ params }: { params: { id: string } }
 
   // --- Datos para el dashboard del informe ---
   const sire = cliente.sire ?? [];
+  // Contribuyente NO obligado a llevar SIRE (persona natural sin negocio, etc.):
+  // el estado y los montos "no aplican".
+  const sireNoObligado = Boolean(cliente.sireEstado?.noObligado) || sire.some((s) => s.noObligado);
 
   // Comparativo declaración mensual vs SIRE (por periodo con declaración cargada).
   const declaraciones = cliente.declaraciones ?? [];
@@ -266,6 +269,11 @@ export default async function InformePage({ params }: { params: { id: string } }
             <p className="mb-3 text-xs text-slate-500">
               Estado de presentación por periodo de los registros de ventas (RVIE) y compras (RCE).
             </p>
+            {sireNoObligado && (
+              <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Contribuyente <b>no obligado a llevar el SIRE</b> según SUNAT.
+              </p>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
@@ -278,8 +286,8 @@ export default async function InformePage({ params }: { params: { id: string } }
                 {cliente.sire.map((s) => (
                   <tr key={s.periodo}>
                     <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
-                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoVentas} /></td>
-                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoCompras} /></td>
+                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoVentas} noObligado={sireNoObligado} /></td>
+                    <td className="py-1.5 text-center"><EstadoPresentacion ok={s.presentadoCompras} noObligado={sireNoObligado} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -377,6 +385,16 @@ export default async function InformePage({ params }: { params: { id: string } }
               <tbody className="divide-y divide-slate-100">
                 {cliente.sire.map((s) => {
                   const dif = s.ventas.importeTotal - s.compras.importeTotal;
+                  if (sireNoObligado) {
+                    return (
+                      <tr key={s.periodo}>
+                        <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
+                        <td className="py-1.5 text-right text-slate-400">No aplica</td>
+                        <td className="py-1.5 text-right text-slate-400">No aplica</td>
+                        <td className="py-1.5 text-right text-slate-400">No aplica</td>
+                      </tr>
+                    );
+                  }
                   return (
                     <tr key={s.periodo}>
                       <td className="py-1.5 text-slate-700">{etiquetaPeriodo(s.periodo)}</td>
@@ -390,6 +408,9 @@ export default async function InformePage({ params }: { params: { id: string } }
                 })}
               </tbody>
             </table>
+            {sireNoObligado && (
+              <p className="mt-2 text-xs text-amber-700">Contribuyente no obligado a llevar el SIRE: los montos no aplican.</p>
+            )}
           </section>
         )}
 
@@ -735,7 +756,8 @@ function MiniTablaInforme({
   );
 }
 
-function EstadoPresentacion({ ok }: { ok: boolean }) {
+function EstadoPresentacion({ ok, noObligado }: { ok: boolean; noObligado?: boolean }) {
+  if (noObligado) return <span className="badge bg-amber-100 text-amber-700">No obligado</span>;
   return (
     <span className={`badge ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
       {ok ? "Presentado" : "No presentado"}

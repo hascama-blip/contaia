@@ -127,7 +127,7 @@ export interface Cliente {
   /** Buzón electrónico (urgentes) del mes en curso. */
   buzon: BuzonResumen | null;
   /** Estado de presentación SIRE guardado (presentado/no presentado por periodo). */
-  sireEstado?: { estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]; at: string } | null;
+  sireEstado?: { estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]; noObligado?: boolean; at: string } | null;
   /** Caché de PDFs descargados del buzón, por codMensaje (para no re-bajarlos). */
   buzonAdjuntos?: Record<string, AdjuntoCache>;
   /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */
@@ -406,6 +406,8 @@ export interface SireResumen {
   /** Si el registro del periodo fue presentado/generado en SUNAT. */
   presentadoVentas: boolean;
   presentadoCompras: boolean;
+  /** Contribuyente NO obligado a llevar SIRE (los montos "no aplican"). */
+  noObligado?: boolean;
   /** Origen: "oficial" (API SIRE de SUNAT) o "simulado". */
   fuente: "oficial" | "simulado";
   consultadoAt: string;

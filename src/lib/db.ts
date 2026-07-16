@@ -910,12 +910,13 @@ export async function setBuzon(
 /** Guarda el estado de presentación SIRE (presentado/no presentado por periodo). */
 export async function setSireEstado(
   clienteId: string,
-  estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]
+  estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[],
+  noObligado?: boolean
 ): Promise<Cliente | null> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
-  cliente.sireEstado = { estados, at: new Date().toISOString() };
+  cliente.sireEstado = { estados, noObligado: Boolean(noObligado), at: new Date().toISOString() };
   await writeStore(store);
   return cliente;
 }
