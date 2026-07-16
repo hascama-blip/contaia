@@ -11,9 +11,8 @@ next-env.d.ts
 # production
 /build
 
-# datos locales y archivos subidos (no versionar)
-/data/store.json
-/data/uploads/
+# datos locales, archivos subidos y backups (no versionar)
+/data/
 
 # env
 .env
