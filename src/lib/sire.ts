@@ -609,8 +609,8 @@ async function flujoOficial(
       compras,
       presentadoVentas: presV === true,
       presentadoCompras: presC === true,
-      // No obligado a llevar SIRE → los montos "no aplican".
-      noObligado: presV === "no-obligado" || presC === "no-obligado",
+      // No obligado a llevar SIRE (ambos padrones vacíos) → montos "no aplican".
+      noObligado: presV === "no-obligado" && presC === "no-obligado",
       fuente: "oficial",
       consultadoAt: new Date().toISOString(),
     },
@@ -662,6 +662,25 @@ async function estadoPresentado(
       data = JSON.parse(txt);
     } catch {
       /* respuesta no-JSON; queda en diagnóstico */
+    }
+
+    // Padrón VACÍO (HTTP 200 con []) = contribuyente NO inscrito/obligado en el
+    // SIRE (p. ej. persona natural sin negocio). Se marca "no-obligado".
+    if (res.ok) {
+      const top0: any = Array.isArray(data)
+        ? data
+        : data?.registros ?? data?.lista ?? data?.periodos ?? data?.listaPeriodos ?? data?.detalle;
+      if (Array.isArray(top0) && top0.length === 0) {
+        diag?.pasos.push({
+          paso: `presentacion-${etiqueta}`,
+          url,
+          metodo: "GET",
+          httpStatus: res.status,
+          ok: true,
+          respuesta: trunc(`[periodo=${periodo} → padrón vacío = NO OBLIGADO] ${txt}`, 1800),
+        });
+        return "no-obligado";
+      }
     }
 
     let estado: boolean | null = null;
@@ -825,17 +844,21 @@ export async function consultarEstadoSire(params: {
   const diag: SireDiag = { periodo: validos.join(","), pasos: [] };
   const token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
   const estados: SireEstadoPeriodo[] = [];
-  let noObligado = false;
+  let ventasNoObl = false;
+  let comprasNoObl = false;
   for (const periodo of validos) {
     const presV = await estadoPresentado(cfg, token, cfg.codLibroVentas, periodo, "ventas", diag);
     const presC = await estadoPresentado(cfg, token, cfg.codLibroCompras, periodo, "compras", diag);
-    if (presV === "no-obligado" || presC === "no-obligado") noObligado = true;
+    if (presV === "no-obligado") ventasNoObl = true;
+    if (presC === "no-obligado") comprasNoObl = true;
     estados.push({
       periodo,
       presentadoVentas: presV === "no-obligado" ? null : presV,
       presentadoCompras: presC === "no-obligado" ? null : presC,
     });
   }
+  // No obligado solo si AMBOS padrones (RVIE y RCE) vienen vacíos (más seguro).
+  const noObligado = ventasNoObl && comprasNoObl;
   if (params.diagnostico) return { diag };
   return { estados, noObligado, diag };
 }
