@@ -970,15 +970,40 @@ async function leerTablaVisible(ctx: any): Promise<{ headers: string[]; filas: s
           const visHeaders = headers.slice(0, nVis);
 
           // 2) Filas de deuda del panel VISIBLE (excluye encabezado y form).
-          const filas: string[][] = [];
-          const seen = new Set<string>();
+          const rawRows: string[][] = [];
           for (const tr of Array.from(document.querySelectorAll("tr"))) {
             if (!visible(tr)) continue;
             const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
             if (tds.filter((c) => c).length < 2) continue;
             const joined = tds.join(" ");
             if (esJunk(joined) || !esDeuda(tds)) continue;
-            const fila = tds.slice(0, nVis);
+            rawRows.push(tds);
+          }
+
+          // 2b) Corregir DESFASE de columnas. Las cabeceras se filtraron sin
+          // celdas vacías, pero las filas conservan la columna de selección
+          // (checkbox) inicial de SUNAT → toda la data sale corrida a la derecha.
+          // Se detecta alineando el PERIODO (dd/aaaa) a la 1ª columna: si en las
+          // filas el periodo aparece de forma consistente en el índice k>0, se
+          // recortan k celdas al inicio para que todo calce con la cabecera.
+          let offset = 0;
+          if (/periodo/i.test(visHeaders[0] || "")) {
+            const idxs = rawRows
+              .map((r) => r.findIndex((c) => /^\d{1,2}\/\d{4}$/.test(c)))
+              .filter((i) => i > 0);
+            if (idxs.length) {
+              const cnt: Record<number, number> = {};
+              for (const i of idxs) cnt[i] = (cnt[i] || 0) + 1;
+              // moda de los índices; solo desfases razonables (1–2 celdas).
+              const modo = Number(Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0]);
+              if (modo >= 1 && modo <= 2) offset = modo;
+            }
+          }
+
+          const filas: string[][] = [];
+          const seen = new Set<string>();
+          for (const tds of rawRows) {
+            const fila = tds.slice(offset, offset + nVis);
             const key = fila.join("|");
             if (seen.has(key)) continue;
             seen.add(key);
