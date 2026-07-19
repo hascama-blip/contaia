@@ -189,7 +189,13 @@ export async function listSolicitudes(
 export async function eliminarTodosLosUsuarios(): Promise<number> {
   const store = await readStore();
   const n = (store.users ?? []).length;
+  // Reset total de cuentas: borra usuarios, clientes y el registro global de
+  // RUCs (si no, quedan huérfanos y al re-registrar sale "ya existe"). Se
+  // conserva la config de plataforma (p. ej. la URL del navegador remoto).
   store.users = [];
+  store.clientes = [];
+  store.rucsRegistrados = {};
+  store.acciones = [];
   await writeStore(store);
   return n;
 }
@@ -447,9 +453,20 @@ export async function duenoDeRuc(
   const store = await readStore();
   const r = ruc.trim();
   const reg = store.rucsRegistrados?.[r];
-  if (reg) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
+  if (reg) {
+    // Auto-limpieza: si el registro apunta a un estudio o cliente que ya NO
+    // existe (huérfano de una eliminación previa), se libera el RUC.
+    const estudioVive = (store.users ?? []).some((u) => u.id === reg.studioId);
+    const clienteVive = store.clientes.some((c) => c.id === reg.clienteId || c.ruc === r);
+    if (estudioVive && clienteVive) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
+    delete store.rucsRegistrados![r];
+    await writeStore(store);
+  }
   const c = store.clientes.find((x) => x.ruc === r);
-  if (c && c.ownerId) return { studioId: c.ownerId };
+  if (c && c.ownerId) {
+    const duenoVive = (store.users ?? []).some((u) => u.id === c.ownerId);
+    if (duenoVive) return { studioId: c.ownerId };
+  }
   return null;
 }
 
