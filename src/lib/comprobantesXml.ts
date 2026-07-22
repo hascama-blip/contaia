@@ -216,6 +216,50 @@ async function volcarEstructura(ctx: any): Promise<any> {
   return out;
 }
 
+/** Frame del formulario Angular de consulta de comprobantes. */
+function frameForm(ctx: any): any {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) if (/nuevaconsulta|consultacpe/i.test(fr.url())) return fr;
+  }
+  return ctx.pages()[0].mainFrame();
+}
+
+// Código de tipo (01/03/07/08) → texto del dropdown "Tipo de comprobante".
+const TIPO_LABEL: Record<string, string> = {
+  "01": "Factura",
+  "03": "Boleta",
+  "07": "Nota de Crédito",
+  "08": "Nota de Débito",
+};
+
+/** Llena el formulario (Recibido + RUC + tipo + serie/número) y da "Consultar". */
+async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise<any> {
+  const hecho: any = {};
+  try {
+    // 1) Marcar "Recibido".
+    const recibido = fr.locator("#recibido").first();
+    await recibido.check().catch(async () => { await recibido.click().catch(() => {}); });
+    hecho.recibido = true;
+    // 2) RUC Emisor.
+    await fr.locator('[formcontrolname="rucEmisor"]').first().fill(item.rucEmisor).catch(() => {});
+    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir por texto.
+    const label = TIPO_LABEL[item.tipo] ?? "Factura";
+    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(800).catch(() => {});
+    await fr.getByText(label, { exact: false }).last().click({ timeout: 3000 }).catch(() => {});
+    hecho.tipo = label;
+    // 4) Serie y Número.
+    await fr.locator('[formcontrolname="serieComprobante"]').first().fill(item.serie).catch(() => {});
+    await fr.locator('[formcontrolname="numeroComprobante"]').first().fill(item.numero).catch(() => {});
+    // 5) Consultar.
+    await fr.getByText("Consultar", { exact: false }).first().click({ timeout: 4000 }).catch(() => {});
+    hecho.consultado = true;
+  } catch (e: any) {
+    hecho.error = String(e?.message ?? e).slice(0, 150);
+  }
+  return hecho;
+}
+
 /**
  * Descarga los XML de comprobantes RECIBIDOS del periodo. Primera versión:
  * hace login, intenta llegar a "Consulta de comprobantes" (SEE-SOL) y SIEMPRE
@@ -277,19 +321,33 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       }
     }
 
-    // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
+    // Volcado del formulario (antes de llenar).
     const estructura = await volcarEstructura(s.ctx);
     pasos.push({ paso: "estructura", relacionRecibida: params.relacion?.length ?? 0, framesTodos: listarFrames(s.ctx), ...estructura });
 
-    // TODO (siguiente iteración, tras calibrar): por cada ítem de la relación,
-    // buscar el comprobante en SUNAT y descargar su XML → parseFacturaXml.
-    // La relación (params.relacion) ya llega lista con RUC/serie/número/fecha.
-    const facturas: FacturaXml[] = [];
+    const relacion = params.relacion ?? [];
+    if (!relacion.length) {
+      return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes (con la plantilla) para descargar.", diag: { pasos } };
+    }
 
+    // Llena el formulario y CONSULTA el primer comprobante de la relación, y
+    // vuelca el resultado (para calibrar la descarga del XML). En la próxima
+    // iteración se hace el bucle completo + descarga real.
+    const item = relacion[0];
+    const fr = frameForm(s.ctx);
+    const llenado = await llenarYConsultar(fr, s.page, item);
+    pasos.push({ paso: "llenar", item, ...llenado });
+
+    // Vuelca lo que aparece TRAS consultar (resultado + botones/enlaces de descarga).
+    await s.page.waitForTimeout(4000).catch(() => {});
+    const resultado = await volcarEstructura(s.ctx);
+    pasos.push({ paso: "resultado", framesTodos: listarFrames(s.ctx), ...resultado });
+
+    const facturas: FacturaXml[] = [];
     return {
       facturas,
-      descargados: facturas.length,
-      error: facturas.length ? undefined : "Aún no se descargan XML: falta calibrar la navegación de esta pantalla. Revisa el diagnóstico (estructura del menú) y pásamelo.",
+      descargados: 0,
+      error: "Formulario consultado. Revisa el 'resultado' del diagnóstico (botones/enlaces de descarga) para terminar de conectar la bajada del XML.",
       diag: { pasos },
     };
   } catch (err: any) {
