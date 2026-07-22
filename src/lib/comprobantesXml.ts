@@ -218,10 +218,27 @@ async function volcarEstructura(ctx: any): Promise<any> {
 
 /** Frame del formulario Angular de consulta de comprobantes. */
 function frameForm(ctx: any): any {
-  for (const pg of ctx.pages()) {
+  const pgs = ctx.pages();
+  for (const pg of pgs) {
     for (const fr of pg.frames()) if (/nuevaconsulta|consultacpe/i.test(fr.url())) return fr;
   }
-  return ctx.pages()[0].mainFrame();
+  return pgs[0]?.mainFrame() ?? null;
+}
+
+const APP_URL_CONSULTA = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=11.38.1.1.1&s=ww1";
+
+/** Navega al formulario limpio y espera a que cargue (RUC Emisor visible). */
+async function abrirFormulario(page: any, ctx: any): Promise<any> {
+  await page.goto(APP_URL_CONSULTA, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(1200).catch(() => {});
+    const fr = frameForm(ctx);
+    if (fr) {
+      const listo = await fr.getByText(/RUC\s*Emisor|Filtro de comprobante/i).first().count().catch(() => 0);
+      if (listo) return fr;
+    }
+  }
+  return frameForm(ctx);
 }
 
 // Código de tipo (01/03/07/08) → texto EXACTO del dropdown "Tipo de comprobante".
@@ -240,17 +257,24 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     const recibido = fr.locator("#recibido").first();
     await recibido.check().catch(async () => { await recibido.click().catch(() => {}); });
     hecho.recibido = true;
-    // 2) RUC Emisor.
+    // 2) RUC Emisor + esperar la validación async (aparece la razón social).
     await fr.locator('[formcontrolname="rucEmisor"]').first().fill(item.rucEmisor).catch(() => {});
-    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir por texto EXACTO
-    //    (hay "Factura" y "Factura - Nota de Crédito"; sin exact se confunden).
+    await page.waitForTimeout(1800).catch(() => {});
+    // 3) Tipo de comprobante (dropdown Angular): abrir, (buscar) y elegir EXACTO.
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
-    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(900).catch(() => {});
-    await fr.getByText(label, { exact: true }).first().click({ timeout: 3000 }).catch(async () => {
-      await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+    // Abrir: clic en el texto "Seleccionar" o el campo del tipo.
+    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(async () => {
+      await fr.locator('[formcontrolname="tipoComprobante"], .dropdown, select').first().click({ timeout: 2000 }).catch(() => {});
     });
+    await page.waitForTimeout(700).catch(() => {});
+    // Si el dropdown abrió con buscador, escribir para filtrar.
+    await fr.locator('input[type="text"]').last().fill(label).catch(() => {});
+    await page.waitForTimeout(500).catch(() => {});
+    const opt = fr.getByText(label, { exact: true }).first();
+    if (await opt.count().catch(() => 0)) await opt.click({ timeout: 3000 }).catch(() => {});
+    else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
     hecho.tipo = label;
+    await page.waitForTimeout(400).catch(() => {});
     // 4) Serie y Número.
     await fr.locator('[formcontrolname="serieComprobante"]').first().fill(item.serie).catch(() => {});
     await fr.locator('[formcontrolname="numeroComprobante"]').first().fill(item.numero).catch(() => {});
@@ -397,19 +421,21 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     }
     // Tope por tanda: cada comprobante toma ~5-8 s; con el límite de 220 s del
     // navegador conviene no pasar de ~20 por corrida (el resto en otra tanda).
-    const MAX_POR_TANDA = 20;
+    const MAX_POR_TANDA = 10;
     const relacion = relacionTotal.slice(0, MAX_POR_TANDA);
     const sobrantes = relacionTotal.length - relacion.length;
 
-    // BUCLE: por cada comprobante de la relación → llenar, consultar, descargar
-    // el XML del modal "Resultado", parsearlo (ZIP o XML) y cerrar el modal.
+    // BUCLE: por cada comprobante → navegar al formulario LIMPIO, llenar,
+    // consultar, descargar el XML del modal "Resultado" y parsearlo (ZIP/XML).
     const { esZip, extraerDeZip } = await import("./zip");
     const facturas: FacturaXml[] = [];
     const errores: any[] = [];
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
-        const fr = frameForm(s.ctx);
+        // Formulario fresco cada vez (evita estados colgados y cierres del navegador).
+        const fr = await abrirFormulario(s.page, s.ctx);
+        if (!fr) { errores.push({ item: `${item.serie}-${item.numero}`, motivo: "no se pudo abrir el formulario" }); continue; }
         const llenado = await llenarYConsultar(fr, s.page, item);
         // ¿Salió el modal Resultado (factura) o un aviso de error?
         const estado = await esperarResultado(fr, s.page);
