@@ -33,23 +33,26 @@ export async function plantillaRelacionXlsx(): Promise<Buffer> {
   ws.columns = COLS as any;
   ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } };
-  // Fila de ejemplo (se puede borrar).
-  ws.addRow({ rucEmisor: "20123456789", tipo: "01", serie: "F001", numero: "1234", fecha: "15/06/2026", monto: 118.0 });
   ws.getColumn("monto").numFmt = "#,##0.00";
-  // Deja algunas filas vacías con bordes para que sea cómodo pegar.
-  for (let i = 0; i < 30; i++) ws.addRow({});
+  // Filas vacías para pegar los datos reales. (NO se pone fila de ejemplo aquí
+  // a propósito: si el usuario sube la plantilla sin llenar, no se descarga
+  // nada — así no se cuela el comprobante de ejemplo por error.)
+  for (let i = 0; i < 40; i++) ws.addRow({});
 
   const ins = wb.addWorksheet("Instrucciones");
   ins.columns = [{ header: "Cómo llenar la plantilla", key: "t", width: 90 }] as any;
   ins.getRow(1).font = { bold: true };
   [
-    "1) Llena una fila por cada comprobante que quieras descargar.",
+    "1) Llena una fila por cada comprobante RECIBIDO (compra) que quieras descargar.",
     "2) RUC Emisor: el RUC del proveedor que te emitió la factura/boleta.",
     "3) Tipo: 01 = Factura · 03 = Boleta · 07 = Nota de Crédito · 08 = Nota de Débito.",
-    "4) Serie y Número: tal cual salen en el comprobante (ej. Serie F001, Número 1234).",
-    "5) Fecha Emisión: dd/mm/aaaa.",
-    "6) Monto Total: el importe total (con IGV). Ayuda a validar en SUNAT.",
-    "7) Puedes borrar la fila de ejemplo. Guarda el archivo y súbelo en la plataforma.",
+    "4) Serie y Número: tal cual salen en el comprobante (ej. Serie E001, Número 448).",
+    "5) Fecha Emisión: dd/mm/aaaa.  ·  6) Monto Total: el importe con IGV.",
+    "",
+    "EJEMPLO (una fila real): RUC 20126931680 | Tipo 01 | Serie E001 | Número 448 | 02/01/2026 | 2100.00",
+    "",
+    "IMPORTANTE: el comprobante debe EXISTIR en SUNAT (que puedas verlo en la",
+    "Consulta de Comprobantes). Si pones datos inventados, SUNAT no lo encuentra.",
   ].forEach((t) => ins.addRow({ t }));
 
   const buf = await wb.xlsx.writeBuffer();

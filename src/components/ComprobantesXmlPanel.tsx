@@ -164,6 +164,37 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         </label>
       </div>
 
+      {relacion.length > 0 && facturas.length === 0 && (
+        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+          <div className="bg-slate-50 px-3 py-1 text-[11px] font-bold uppercase text-slate-500">
+            Relación cargada ({relacion.length}) — esto es lo que se descargará
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[10px] uppercase text-slate-400">
+                <th className="px-3 py-1">RUC Emisor</th>
+                <th className="px-3 py-1">Tipo</th>
+                <th className="px-3 py-1">Serie</th>
+                <th className="px-3 py-1">Número</th>
+              </tr>
+            </thead>
+            <tbody>
+              {relacion.slice(0, 12).map((r: any, i: number) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="px-3 py-1 text-slate-600">{r.rucEmisor}</td>
+                  <td className="px-3 py-1 text-slate-600">{r.tipo}</td>
+                  <td className="px-3 py-1 text-slate-600">{r.serie}</td>
+                  <td className="px-3 py-1 text-slate-600">{r.numero}</td>
+                </tr>
+              ))}
+              {relacion.length > 12 && (
+                <tr><td className="px-3 py-1 text-slate-400" colSpan={4}>… y {relacion.length - 12} más</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
