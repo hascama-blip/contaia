@@ -118,8 +118,8 @@ async function loginSol(params: ComprobantesParams, pasos: any[]) {
   return { browser, ctx, page, loginError };
 }
 
-/** Vuelca la estructura visible (menú, frames, formularios, tablas, enlaces de
- *  descarga) para CALIBRAR la ruta a "Consulta de comprobantes recibidos". */
+/** Vuelca la estructura visible con DETALLE del formulario (ids/names, opciones
+ *  de los select, radios con su etiqueta y botones) para calibrar el llenado. */
 async function volcarEstructura(ctx: any): Promise<any> {
   const out: any = { frames: [] };
   for (const pg of ctx.pages()) {
@@ -127,21 +127,31 @@ async function volcarEstructura(ctx: any): Promise<any> {
       const info = await fr
         .evaluate(() => {
           const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-          const enlaces = (Array.from(document.querySelectorAll("a,[onclick],button,input[type=button],input[type=submit]")) as HTMLElement[])
+          const vis = (el: Element) => (el as HTMLElement).offsetParent !== null || el.tagName === "BODY";
+          const inputs = (Array.from(document.querySelectorAll("input,select,textarea")) as HTMLElement[])
+            .filter(vis)
+            .map((e) => {
+              const t = e.tagName.toLowerCase();
+              const tipo = (e as HTMLInputElement).type || "";
+              const base: any = { t, tipo, id: (e as any).id || "", name: (e as any).name || "" };
+              if (t === "select") base.opciones = Array.from((e as HTMLSelectElement).options).map((o) => norm(o.textContent)).slice(0, 20);
+              if (tipo === "radio") { base.value = (e as HTMLInputElement).value; base.cerca = norm((e.parentElement?.textContent || "").slice(0, 40)); }
+              return base;
+            })
+            .slice(0, 60);
+          const botones = (Array.from(document.querySelectorAll("button,input[type=button],input[type=submit],a[onclick]")) as HTMLElement[])
+            .filter(vis)
             .map((e) => norm(e.textContent) || norm((e as HTMLInputElement).value))
-            .filter((t) => t && t.length < 60)
-            .slice(0, 80);
-          const inputs = (Array.from(document.querySelectorAll("input,select")) as HTMLElement[])
-            .map((e) => `${e.tagName.toLowerCase()}#${(e as any).id || ""}[name=${(e as any).name || ""}]`)
-            .slice(0, 40);
+            .filter((t) => t && t.length < 40)
+            .slice(0, 30);
           const conXml = (Array.from(document.querySelectorAll("a,[href],[onclick]")) as HTMLElement[])
-            .map((e) => norm(e.getAttribute?.("href") || "") + " " + norm(e.getAttribute?.("onclick") || ""))
-            .filter((s) => /xml|descarga|archivo|comprobante/i.test(s))
-            .slice(0, 40);
-          return { titulo: norm(document.title), enlaces, inputs, conXml };
+            .map((e) => norm(e.getAttribute?.("href") || "") + " " + norm(e.getAttribute?.("onclick") || "") + " " + norm(e.textContent))
+            .filter((s) => /xml|descarg|archivo|\.zip|cdr/i.test(s))
+            .slice(0, 30);
+          return { titulo: norm(document.title), textoTop: norm((document.body?.innerText || "").slice(0, 200)), inputs, botones, conXml };
         })
         .catch(() => null);
-      if (info && (info.enlaces?.length || info.inputs?.length)) {
+      if (info && (info.inputs?.length || info.botones?.length)) {
         out.frames.push({ url: fr.url().slice(0, 120), ...info });
       }
     }
@@ -170,23 +180,19 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       };
     }
 
-    // Abre la app SEE-SOL de comprobantes. Se prueban los textos EXACTOS del
-    // menú (ya conocidos por el diagnóstico anterior), en orden de prioridad.
-    const rutas = [
-      "Consulta de Facturas y Notas Electrónicas",
-      "Consulta Integrada de Comprobantes",
-      "Consulta de Comprobantes",
-    ];
-    for (const t of rutas) {
+    // Ruta correcta (confirmada por el usuario): Comprobantes de Pago →
+    // Consulta de Comprobantes de Pago → Nueva Consulta de comprobantes de pago.
+    // Se expanden los padres y se abre la hoja del formulario.
+    for (const t of ["Comprobantes de Pago", "Consulta de Comprobantes de Pago"]) {
       const ok = await clicTexto(s.ctx, [t]);
       pasos.push({ paso: "menu", intento: t, clic: ok });
-      if (ok) {
-        // La app SEE abre en un iframe: dar tiempo a que cargue su formulario.
-        await s.page.waitForTimeout(6000).catch(() => {});
-        await s.page.waitForLoadState?.("networkidle", { timeout: 20000 }).catch(() => {});
-        break;
-      }
+      await s.page.waitForTimeout(1200).catch(() => {});
     }
+    const okHoja = await clicTexto(s.ctx, ["Nueva Consulta de comprobantes de pago"]);
+    pasos.push({ paso: "menu", intento: "Nueva Consulta de comprobantes de pago", clic: okHoja });
+    // El formulario abre en un iframe: dar tiempo a que cargue.
+    await s.page.waitForTimeout(6000).catch(() => {});
+    await s.page.waitForLoadState?.("networkidle", { timeout: 20000 }).catch(() => {});
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
     const estructura = await volcarEstructura(s.ctx);
