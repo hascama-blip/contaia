@@ -18,11 +18,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     (typeof body.solUser === "string" && body.solUser) || cliente.credSire?.solUser || "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   const periodo = String(body.periodo ?? "");
+  const relacion = Array.isArray(body.relacion) ? body.relacion : [];
   if (!solUser || !solPass) {
     return NextResponse.json({ error: "Ingresa el Usuario SOL y la Clave SOL." }, { status: 400 });
   }
-  if (!/^\d{6}$/.test(periodo)) {
-    return NextResponse.json({ error: "Periodo inválido (usa AAAAMM)." }, { status: 400 });
+  // Se acepta una relación (lista de comprobantes) o un periodo AAAAMM.
+  if (!relacion.length && !/^\d{6}$/.test(periodo)) {
+    return NextResponse.json({ error: "Sube una relación de comprobantes o indica un periodo (AAAAMM)." }, { status: 400 });
   }
 
   // Cupo del módulo gratis (salvo diagnóstico).
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     solUser,
     solPass,
     periodo,
+    relacion,
     diagnostico: body.diagnostico === true,
   });
 

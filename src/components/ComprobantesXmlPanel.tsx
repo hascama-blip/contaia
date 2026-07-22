@@ -17,6 +17,27 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const [facturas, setFacturas] = useState<any[]>([]);
+  const [relacion, setRelacion] = useState<any[]>([]);
+  const [relNombre, setRelNombre] = useState<string | null>(null);
+
+  async function subirRelacion(file: File) {
+    setError(null); setInfo(null);
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/comprobantes-xml/parsear", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo leer la relación."); return; }
+      setRelacion(data.items ?? []);
+      setRelNombre(file.name);
+      setInfo(`Relación cargada: ${data.total} comprobante(s) por descargar.`);
+    } catch {
+      setError("Error de red al subir la relación.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function extraer() {
     setError(null); setInfo(null); setDiag(null);
@@ -30,7 +51,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, periodo, diagnostico: diagModo }),
+        body: JSON.stringify({ solUser, solPass, periodo, relacion, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
@@ -78,10 +99,43 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         <span className="badge bg-slate-100 text-slate-500">Solo Usuario + Clave SOL</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Descarga los <strong>XML de las compras (comprobantes recibidos)</strong> del periodo directo de
-        SUNAT (Consulta de comprobantes, SEE-SOL) y los arma en un <strong>Excel</strong> con el detalle
-        de cada factura.
+        Sube una <strong>relación de comprobantes</strong> (o elige un periodo). El sistema descarga sus
+        <strong> XML de compras</strong> directo de SUNAT (Consulta de comprobantes, SEE-SOL) y los arma
+        en un <strong>Excel</strong> con el detalle de cada factura.
       </p>
+
+      {/* Relación de comprobantes: descargar plantilla + subir la llena */}
+      <div className="mb-4 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+        <p className="mb-2 text-xs font-semibold text-brand-800">Relación de comprobantes a descargar</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/api/comprobantes-xml/plantilla"
+            className="btn-ghost text-sm"
+            download
+          >
+            ⬇ Descargar plantilla (Excel)
+          </a>
+          <label className={`btn-primary cursor-pointer text-sm ${busy ? "pointer-events-none opacity-50" : ""}`}>
+            ⬆ Subir relación llena
+            <input
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirRelacion(f); e.currentTarget.value = ""; }}
+            />
+          </label>
+          {relNombre && (
+            <span className="text-xs text-emerald-700">
+              ✓ {relNombre} · {relacion.length} comprobante(s)
+              <button className="ml-2 text-slate-400 underline" onClick={() => { setRelacion([]); setRelNombre(null); }}>quitar</button>
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] text-slate-400">
+          Descarga la plantilla, complétala (RUC emisor, tipo, serie, número, fecha, monto) y súbela.
+          Si no subes relación, se usa el periodo de abajo.
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div>

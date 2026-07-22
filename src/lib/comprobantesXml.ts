@@ -9,6 +9,7 @@
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
 import { parseFacturaXml, type FacturaXml } from "./facturaXml";
+import type { ItemRelacion } from "./relacionComprobantes";
 
 const LOGIN_URL =
   "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?exe=01.04.00.00.000000";
@@ -18,6 +19,8 @@ export interface ComprobantesParams {
   solUser: string;
   solPass: string;
   periodo: string; // "YYYYMM"
+  /** Relación específica a descargar (si viene, se bajan SOLO estos). */
+  relacion?: ItemRelacion[];
   diagnostico?: boolean;
 }
 
@@ -183,10 +186,11 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
     const estructura = await volcarEstructura(s.ctx);
-    pasos.push({ paso: "estructura", ...estructura });
+    pasos.push({ paso: "estructura", relacionRecibida: params.relacion?.length ?? 0, ...estructura });
 
-    // TODO (siguiente iteración, tras calibrar): filtrar por periodo, listar
-    // los comprobantes recibidos y descargar cada XML → parseFacturaXml.
+    // TODO (siguiente iteración, tras calibrar): por cada ítem de la relación,
+    // buscar el comprobante en SUNAT y descargar su XML → parseFacturaXml.
+    // La relación (params.relacion) ya llega lista con RUC/serie/número/fecha.
     const facturas: FacturaXml[] = [];
 
     return {
