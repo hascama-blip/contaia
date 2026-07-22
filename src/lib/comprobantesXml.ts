@@ -183,7 +183,14 @@ async function volcarEstructura(ctx: any): Promise<any> {
             .map((e) => {
               const t = e.tagName.toLowerCase();
               const tipo = (e as HTMLInputElement).type || "";
-              const base: any = { t, tipo, id: (e as any).id || "", name: (e as any).name || "" };
+              const base: any = {
+                t, tipo,
+                id: (e as any).id || "",
+                name: (e as any).name || "",
+                fc: e.getAttribute("formcontrolname") || "",
+                ph: e.getAttribute("placeholder") || "",
+                aria: e.getAttribute("aria-label") || "",
+              };
               if (t === "select") base.opciones = Array.from((e as HTMLSelectElement).options).map((o) => norm(o.textContent)).slice(0, 20);
               if (tipo === "radio") { base.value = (e as HTMLInputElement).value; base.cerca = norm((e.parentElement?.textContent || "").slice(0, 40)); }
               return base;
@@ -230,31 +237,44 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       };
     }
 
-    // Ruta del árbol (confirmada), nivel por nivel con reintentos (método del
-    // F36). OJO: "Comprobantes de pago" (sección) y "Comprobantes de Pago"
-    // (submenú) casi iguales; se navega en orden.
-    const ruta = [
-      ["Comprobantes de pago", "Comprobantes de Pago"],
-      ["Comprobantes de Pago"],
-      ["Consulta de Comprobantes de Pago"],
-      ["Nueva Consulta de comprobantes de pago"],
-    ];
-    for (const opciones of ruta) {
-      const hit = await clicNativoEspera(s.ctx, s.page, opciones, 6, 1500);
-      pasos.push({ paso: "menu", buscaba: opciones[0], clico: hit });
-      await s.page.waitForTimeout(2000).catch(() => {});
+    // URL DIRECTA del formulario (descubierta por inspección): la opción del
+    // menú "Nueva Consulta de comprobantes de pago" es code=11.38.1.1.1 y carga
+    // una app Angular. Vamos directo, sin navegar el árbol del menú.
+    const APP_URL = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=11.38.1.1.1&s=ww1";
+    try {
+      await s.page.goto(APP_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+      pasos.push({ paso: "goto-app", url: APP_URL });
+    } catch (e: any) {
+      pasos.push({ paso: "goto-app", error: String(e?.message ?? e).slice(0, 120) });
     }
-    // Esperar a que cargue el formulario (aparece el texto "RUC Emisor").
-    for (let i = 0; i < 8; i++) {
-      const listo = await Promise.all(
+    // Esperar a que cargue el formulario Angular (aparece "RUC Emisor").
+    let formOk = false;
+    for (let i = 0; i < 12 && !formOk; i++) {
+      await s.page.waitForTimeout(1500).catch(() => {});
+      formOk = await Promise.all(
         s.ctx.pages().flatMap((pg: any) =>
           pg.frames().map((fr: any) =>
-            fr.getByText(/RUC\s*Emisor|Filtro de comprobante/i).first().count().catch(() => 0)
+            fr.getByText(/RUC\s*Emisor|Filtro de comprobante|Recibido/i).first().count().catch(() => 0)
           )
         )
       ).then((cs) => cs.some((c) => c > 0)).catch(() => false);
-      if (listo) break;
-      await s.page.waitForTimeout(1500).catch(() => {});
+    }
+    // Respaldo: si el goto directo no cargó el form, navegar el árbol del menú.
+    if (!formOk) {
+      pasos.push({ paso: "goto-app", nota: "no cargó por URL directa, uso el árbol del menú" });
+      await s.page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+      await s.page.waitForTimeout(2000).catch(() => {});
+      const ruta = [
+        ["Comprobantes de pago", "Comprobantes de Pago"],
+        ["Comprobantes de Pago"],
+        ["Consulta de Comprobantes de Pago"],
+        ["Nueva Consulta de comprobantes de pago"],
+      ];
+      for (const opciones of ruta) {
+        const hit = await clicNativoEspera(s.ctx, s.page, opciones, 5, 1500);
+        pasos.push({ paso: "menu", buscaba: opciones[0], clico: hit });
+        await s.page.waitForTimeout(2000).catch(() => {});
+      }
     }
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
