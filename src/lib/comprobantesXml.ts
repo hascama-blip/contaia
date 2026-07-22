@@ -260,21 +260,17 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     // 2) RUC Emisor + esperar la validación async (aparece la razón social).
     await fr.locator('[formcontrolname="rucEmisor"]').first().fill(item.rucEmisor).catch(() => {});
     await page.waitForTimeout(1800).catch(() => {});
-    // 3) Tipo de comprobante (dropdown Angular): abrir, (buscar) y elegir EXACTO.
+    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir la opción EXACTA.
+    //    OJO: NO escribir en ningún input aquí (el "último input" es Número y se
+    //    corrompía la consulta). Solo abrir y clicar la opción.
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
-    // Abrir: clic en el texto "Seleccionar" o el campo del tipo.
-    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(async () => {
-      await fr.locator('[formcontrolname="tipoComprobante"], .dropdown, select').first().click({ timeout: 2000 }).catch(() => {});
-    });
-    await page.waitForTimeout(700).catch(() => {});
-    // Si el dropdown abrió con buscador, escribir para filtrar.
-    await fr.locator('input[type="text"]').last().fill(label).catch(() => {});
-    await page.waitForTimeout(500).catch(() => {});
-    const opt = fr.getByText(label, { exact: true }).first();
-    if (await opt.count().catch(() => 0)) await opt.click({ timeout: 3000 }).catch(() => {});
+    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(900).catch(() => {});
+    const opt = fr.getByText(label, { exact: true });
+    if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
     else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
     hecho.tipo = label;
-    await page.waitForTimeout(400).catch(() => {});
+    await page.waitForTimeout(500).catch(() => {});
     // 4) Serie y Número.
     await fr.locator('[formcontrolname="serieComprobante"]').first().fill(item.serie).catch(() => {});
     await fr.locator('[formcontrolname="numeroComprobante"]').first().fill(item.numero).catch(() => {});
@@ -430,12 +426,18 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     const { esZip, extraerDeZip } = await import("./zip");
     const facturas: FacturaXml[] = [];
     const errores: any[] = [];
+    // El formulario ya está abierto (goto-app arriba). Entre comprobantes se usa
+    // "Limpiar" para resetearlo, SIN re-navegar (re-navegar cerraba el navegador).
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
-        // Formulario fresco cada vez (evita estados colgados y cierres del navegador).
-        const fr = await abrirFormulario(s.page, s.ctx);
-        if (!fr) { errores.push({ item: `${item.serie}-${item.numero}`, motivo: "no se pudo abrir el formulario" }); continue; }
+        const fr = frameForm(s.ctx);
+        if (!fr) { errores.push({ item: `${item.serie}-${item.numero}`, motivo: "el navegador se cerró" }); break; }
+        if (i > 0) {
+          // Reset del formulario para el siguiente comprobante.
+          await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+          await s.page.waitForTimeout(1200).catch(() => {});
+        }
         const llenado = await llenarYConsultar(fr, s.page, item);
         // ¿Salió el modal Resultado (factura) o un aviso de error?
         const estado = await esperarResultado(fr, s.page);
