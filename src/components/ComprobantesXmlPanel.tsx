@@ -3,14 +3,11 @@
 import { useState } from "react";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
-const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
-
-// Descarga los XML de comprobantes RECIBIDOS (compras) de un periodo desde SUNAT
-// SOL y los arma en un Excel (reusa el Excel de detalle de facturas XML).
+// Descarga los XML de comprobantes RECIBIDOS (compras) desde SUNAT SOL a partir
+// de la relación subida y los arma en un Excel (reusa el Excel de detalle de
+// facturas XML). No pide mes/año: se descarga tal cual la relación, por orden y
+// número de comprobante.
 export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string }) {
-  const hoy = new Date();
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [anio, setAnio] = useState(hoy.getFullYear());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -59,13 +56,13 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
     if (!solPass) { setError("Carga tus accesos SOL (arriba) para descargar los XML."); return; }
-    const periodo = `${anio}${String(mes).padStart(2, "0")}`;
+    if (!relacion.length) { setError("Sube primero la relación de comprobantes (usa la plantilla)."); return; }
     setBusy(true);
     setFacturas([]);
     try {
       // Modo diagnóstico: una sola tanda chica (para calibrar sin ruido).
       if (diagModo) {
-        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: relacion.slice(0, 3), diagnostico: true, parte: 0 });
+        const { res, data } = await llamarTanda({ solUser, solPass, relacion: relacion.slice(0, 3), diagnostico: true, parte: 0 });
         if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
         setFacturas(data.facturas ?? []);
@@ -73,23 +70,14 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         return;
       }
 
-      // Sin relación → una sola llamada por periodo (comportamiento clásico).
-      if (!relacion.length) {
-        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: [], parte: 0 });
-        if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
-        setFacturas(data.facturas ?? []);
-        setInfo(data.descargados ? `${data.descargados} comprobante(s) descargado(s).` : data.error ?? "Sin comprobantes.");
-        return;
-      }
-
-      // Con relación → procesar TODAS en tandas, acumulando y mostrando avance.
+      // Procesar TODA la relación en tandas, acumulando y mostrando avance.
       const total = relacion.length;
       const acum: any[] = [];
       const fallos: string[] = [];
       setProgreso({ hechos: 0, total });
       for (let inicio = 0, parte = 0; inicio < total; inicio += TANDA, parte++) {
         const bloque = relacion.slice(inicio, inicio + TANDA);
-        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: bloque, parte });
+        const { res, data } = await llamarTanda({ solUser, solPass, relacion: bloque, parte });
         if (res.status === 401) { setError(data.error ?? "SUNAT rechazó el inicio de sesión."); return; }
         if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); return; }
         if (Array.isArray(data.facturas)) acum.push(...data.facturas);
@@ -124,15 +112,13 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `comprobantes-${anio}${String(mes).padStart(2, "0")}.xlsx`;
+      a.download = "comprobantes-xml.xlsx";
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } finally {
       setBusy(false);
     }
   }
-
-  const anios = [hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2];
 
   return (
     <section className="card p-5">
@@ -141,9 +127,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         <span className="badge bg-slate-100 text-slate-500">Solo Usuario + Clave SOL</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Sube una <strong>relación de comprobantes</strong> (o elige un periodo). El sistema descarga sus
-        <strong> XML de compras</strong> directo de SUNAT (Consulta de comprobantes, SEE-SOL) y los arma
-        en un <strong>Excel</strong> con el detalle de cada factura.
+        Sube la <strong>relación de comprobantes</strong> (con la plantilla). El sistema descarga sus
+        <strong> XML de compras</strong> directo de SUNAT (Consulta de comprobantes, SEE-SOL), en el
+        mismo orden y número que la relación, y los arma en un <strong>Excel</strong> con el detalle.
       </p>
 
       {/* Relación de comprobantes: descargar plantilla + subir la llena */}
@@ -175,23 +161,11 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         </div>
         <p className="mt-2 text-[10px] text-slate-400">
           Descarga la plantilla, complétala (RUC emisor, tipo, serie, número, fecha, monto) y súbela.
-          Si no subes relación, se usa el periodo de abajo.
+          Se descargan tal cual, por orden y número de comprobante.
         </p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="label">Mes</label>
-          <select className="input" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
-            {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="label">Año</label>
-          <select className="input" value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
-            {anios.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
         <button className="btn-primary" onClick={extraer} disabled={busy}>
           {busy
             ? progreso ? `Descargando ${progreso.hechos}/${progreso.total}…` : "Descargando…"
