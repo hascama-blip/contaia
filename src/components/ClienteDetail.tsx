@@ -11,6 +11,7 @@ import EstadoSirePanel from "./EstadoSirePanel";
 import DeclaracionesPanel from "./DeclaracionesPanel";
 import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
+import ComprobantesXmlPanel from "./ComprobantesXmlPanel";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -315,6 +316,11 @@ export default function ClienteDetail({
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             inicial={cliente.deudasF36 ?? null}
           />
+
+          {/* ───── 3b · Comprobantes recibidos (XML) — solo Usuario + Clave SOL ───── */}
+          <FaseHeader n="3" titulo="Comprobantes recibidos (XML)" detalle="Descarga los XML de compras del periodo y arma el Excel." />
+
+          <ComprobantesXmlPanel clienteId={cliente.id} />
 
           {/* ───── 4 · Extracción SIRE (montos) — requiere API ───── */}
           <FaseHeader n="4" titulo="Extracción SIRE (montos)" detalle="Coloca y bloquea la API para sacar compras/ventas." />
