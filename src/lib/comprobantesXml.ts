@@ -391,10 +391,15 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     const estructura = await volcarEstructura(s.ctx);
     pasos.push({ paso: "estructura", relacionRecibida: params.relacion?.length ?? 0, framesTodos: listarFrames(s.ctx), ...estructura });
 
-    const relacion = params.relacion ?? [];
-    if (!relacion.length) {
+    const relacionTotal = params.relacion ?? [];
+    if (!relacionTotal.length) {
       return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes (con la plantilla) para descargar.", diag: { pasos } };
     }
+    // Tope por tanda: cada comprobante toma ~5-8 s; con el límite de 220 s del
+    // navegador conviene no pasar de ~20 por corrida (el resto en otra tanda).
+    const MAX_POR_TANDA = 20;
+    const relacion = relacionTotal.slice(0, MAX_POR_TANDA);
+    const sobrantes = relacionTotal.length - relacion.length;
 
     // BUCLE: por cada comprobante de la relación → llenar, consultar, descargar
     // el XML del modal "Resultado", parsearlo (ZIP o XML) y cerrar el modal.
@@ -454,11 +459,14 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       pasos.push({ paso: "resultado", framesTodos: listarFrames(s.ctx), ...resultado });
     }
 
+    const notaSobrantes = sobrantes > 0
+      ? ` (Se procesaron ${relacion.length} de ${relacionTotal.length}; sube el resto en otra tanda.)`
+      : "";
     return {
       facturas,
       descargados: facturas.length,
       error: facturas.length
-        ? undefined
+        ? (sobrantes > 0 ? `Descargados ${facturas.length}.${notaSobrantes}` : undefined)
         : `No se descargó ningún XML (de ${relacion.length}). Revisa el diagnóstico. ${errores.slice(0, 2).map((e) => e.motivo).join(" · ")}`,
       diag: { pasos },
     };
