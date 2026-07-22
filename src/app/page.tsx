@@ -53,6 +53,13 @@ const OPCIONES: Opcion[] = [
     detalle:
       "Sube los XML de los comprobantes (en bloque o en ZIP) y extrae toda la información: emisor, receptor, montos por afectación (gravado, IGV, ISC…) y el detalle de cada ítem. Descárgalo en Excel.",
   },
+  {
+    href: "/herramientas/comprobantes-xml",
+    icono: "📥",
+    titulo: "Comprobantes XML (SUNAT)",
+    detalle:
+      "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
+  },
 ];
 
 export default async function MenuPage() {
