@@ -436,9 +436,11 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     if (!relacionTotal.length) {
       return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes (con la plantilla) para descargar.", diag: { pasos } };
     }
-    // Tope por tanda: cada comprobante toma ~5-8 s; con el límite de 220 s del
-    // navegador conviene no pasar de ~20 por corrida (el resto en otra tanda).
-    const MAX_POR_TANDA = 10;
+    // Tope de seguridad por request: cada comprobante toma ~5-8 s; con el límite
+    // de 220 s del navegador entran ~25. El frontend YA parte la relación en
+    // bloques chicos (~12) y llama varias veces, así que este tope casi nunca se
+    // alcanza; es solo un cinturón de seguridad para no exceder el tiempo.
+    const MAX_POR_TANDA = 25;
     const relacion = relacionTotal.slice(0, MAX_POR_TANDA);
     const sobrantes = relacionTotal.length - relacion.length;
 

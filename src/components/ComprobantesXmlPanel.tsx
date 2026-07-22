@@ -19,6 +19,11 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [facturas, setFacturas] = useState<any[]>([]);
   const [relacion, setRelacion] = useState<any[]>([]);
   const [relNombre, setRelNombre] = useState<string | null>(null);
+  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
+
+  // Tamaño de tanda: el frontend parte la relación y llama a la API por bloques
+  // para que ninguna petición dure demasiado (proxy/timeout) y se vea el avance.
+  const TANDA = 12;
 
   async function subirRelacion(file: File) {
     setError(null); setInfo(null);
@@ -39,8 +44,18 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     }
   }
 
+  async function llamarTanda(body: any) {
+    const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  }
+
   async function extraer() {
-    setError(null); setInfo(null); setDiag(null);
+    setError(null); setInfo(null); setDiag(null); setProgreso(null);
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
     if (!solPass) { setError("Carga tus accesos SOL (arriba) para descargar los XML."); return; }
@@ -48,24 +63,51 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     setBusy(true);
     setFacturas([]);
     try {
-      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, periodo, relacion, diagnostico: diagModo }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-      if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
-      setFacturas(data.facturas ?? []);
+      // Modo diagnóstico: una sola tanda chica (para calibrar sin ruido).
+      if (diagModo) {
+        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: relacion.slice(0, 3), diagnostico: true, parte: 0 });
+        if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+        if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
+        setFacturas(data.facturas ?? []);
+        setInfo(`${data.descargados ?? 0} comprobante(s) descargado(s) (diagnóstico).`);
+        return;
+      }
+
+      // Sin relación → una sola llamada por periodo (comportamiento clásico).
+      if (!relacion.length) {
+        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: [], parte: 0 });
+        if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
+        setFacturas(data.facturas ?? []);
+        setInfo(data.descargados ? `${data.descargados} comprobante(s) descargado(s).` : data.error ?? "Sin comprobantes.");
+        return;
+      }
+
+      // Con relación → procesar TODAS en tandas, acumulando y mostrando avance.
+      const total = relacion.length;
+      const acum: any[] = [];
+      const fallos: string[] = [];
+      setProgreso({ hechos: 0, total });
+      for (let inicio = 0, parte = 0; inicio < total; inicio += TANDA, parte++) {
+        const bloque = relacion.slice(inicio, inicio + TANDA);
+        const { res, data } = await llamarTanda({ solUser, solPass, periodo, relacion: bloque, parte });
+        if (res.status === 401) { setError(data.error ?? "SUNAT rechazó el inicio de sesión."); return; }
+        if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); return; }
+        if (Array.isArray(data.facturas)) acum.push(...data.facturas);
+        const okTanda = data.descargados ?? 0;
+        if (okTanda < bloque.length) fallos.push(`${bloque.length - okTanda} en el bloque ${parte + 1}`);
+        setFacturas([...acum]);
+        setProgreso({ hechos: Math.min(inicio + bloque.length, total), total });
+      }
+      setProgreso(null);
       setInfo(
-        data.descargados
-          ? `${data.descargados} comprobante(s) descargado(s).`
-          : data.error ?? "Sin comprobantes (revisa el diagnóstico)."
+        `${acum.length} de ${total} comprobante(s) descargado(s).` +
+        (fallos.length ? ` No se pudieron bajar: ${fallos.join(", ")} (revísalos manualmente).` : "")
       );
     } catch {
       setError("Error de red al descargar los comprobantes.");
     } finally {
       setBusy(false);
+      setProgreso(null);
     }
   }
 
@@ -151,7 +193,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
           </select>
         </div>
         <button className="btn-primary" onClick={extraer} disabled={busy}>
-          {busy ? "Descargando…" : "⬇ Descargar XML de SUNAT"}
+          {busy
+            ? progreso ? `Descargando ${progreso.hechos}/${progreso.total}…` : "Descargando…"
+            : "⬇ Descargar XML de SUNAT"}
         </button>
         {facturas.length > 0 && (
           <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>
@@ -192,6 +236,24 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {progreso && (
+        <div className="mt-3">
+          <div className="mb-1 flex justify-between text-xs text-slate-500">
+            <span>Descargando XML de SUNAT…</span>
+            <span>{progreso.hechos}/{progreso.total}</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-brand-600 transition-all"
+              style={{ width: `${Math.round((progreso.hechos / Math.max(1, progreso.total)) * 100)}%` }}
+            />
+          </div>
+          <p className="mt-1 text-[10px] text-slate-400">
+            No cierres esta pestaña. Cada comprobante toma unos segundos; el total puede tardar varios minutos.
+          </p>
         </div>
       )}
 

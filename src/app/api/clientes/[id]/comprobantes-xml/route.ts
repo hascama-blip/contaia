@@ -27,9 +27,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Sube una relación de comprobantes o indica un periodo (AAAAMM)." }, { status: 400 });
   }
 
-  // Cupo del módulo gratis (salvo diagnóstico).
-  const uso = await chequearUso();
-  if (!uso.ok && !body.diagnostico) {
+  // Una relación grande se procesa en TANDAS (el frontend parte la lista y llama
+  // varias veces). Toda la operación cuenta como UN solo uso: solo la primera
+  // tanda (parte 0 o sin parte) chequea/consume el cupo; las siguientes no.
+  const esPrimeraParte = !body.parte;
+  const uso = esPrimeraParte ? await chequearUso() : { ok: true, adminId: "", ilimitado: true } as any;
+  if (esPrimeraParte && !uso.ok && !body.diagnostico) {
     return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
   }
 
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (r.loginError) {
     return NextResponse.json({ error: r.error, loginError: true, diag: r.diag }, { status: 401 });
   }
-  if (!body.diagnostico && uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
+  if (esPrimeraParte && !body.diagnostico && uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
 
   return NextResponse.json({
     facturas: r.facturas ?? [],
