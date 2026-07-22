@@ -53,11 +53,20 @@ async function clickAny(scope: any, sels: string[]) {
   }
   return false;
 }
-/** Clic por texto visible dentro de cualquier frame. */
+/** Clic por texto visible dentro de cualquier frame. Prefiere el enlace/anchor
+ *  real (el menú SOL usa <a> con onclick; clicar solo el texto no navega). */
 async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
       for (const t of textos) {
+        // 1) intenta un <a> que contenga el texto.
+        const link = fr.locator(`a:has-text("${t}")`).first();
+        if (await link.count().catch(() => 0)) {
+          await link.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+          await link.click({ timeout: 3000 }).catch(() => {});
+          return true;
+        }
+        // 2) si no hay <a>, clic por texto (y sube al ancestro clickeable).
         const loc = fr.getByText(t, { exact: false }).first();
         if (await loc.count().catch(() => 0)) {
           await loc.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
@@ -68,6 +77,16 @@ async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
     }
   }
   return false;
+}
+
+/** Lista TODOS los frames (url) de todas las páginas, para ver dónde cargó el
+ *  formulario aunque el volcado detallado lo filtre. */
+function listarFrames(ctx: any): string[] {
+  const urls: string[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) urls.push(fr.url().slice(0, 140));
+  }
+  return Array.from(new Set(urls));
 }
 function autoAceptarDialogos(ctx: any) {
   ctx.on("page", (pg: any) => pg.on("dialog", (d: any) => d.accept().catch(() => {})));
@@ -190,13 +209,17 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     }
     const okHoja = await clicTexto(s.ctx, ["Nueva Consulta de comprobantes de pago"]);
     pasos.push({ paso: "menu", intento: "Nueva Consulta de comprobantes de pago", clic: okHoja });
-    // El formulario abre en un iframe: dar tiempo a que cargue.
-    await s.page.waitForTimeout(6000).catch(() => {});
-    await s.page.waitForLoadState?.("networkidle", { timeout: 20000 }).catch(() => {});
+    // El formulario abre en un iframe: esperar a que aparezca uno de consulta.
+    for (let i = 0; i < 8; i++) {
+      await s.page.waitForTimeout(2000).catch(() => {});
+      const hay = listarFrames(s.ctx).some((u) => /consulta|comprobante|itcpe|cpe|consvalid/i.test(u) && !/MenuInternet/.test(u));
+      if (hay) break;
+    }
+    await s.page.waitForLoadState?.("networkidle", { timeout: 15000 }).catch(() => {});
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
     const estructura = await volcarEstructura(s.ctx);
-    pasos.push({ paso: "estructura", relacionRecibida: params.relacion?.length ?? 0, ...estructura });
+    pasos.push({ paso: "estructura", relacionRecibida: params.relacion?.length ?? 0, framesTodos: listarFrames(s.ctx), ...estructura });
 
     // TODO (siguiente iteración, tras calibrar): por cada ítem de la relación,
     // buscar el comprobante en SUNAT y descargar su XML → parseFacturaXml.
