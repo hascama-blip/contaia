@@ -224,12 +224,12 @@ function frameForm(ctx: any): any {
   return ctx.pages()[0].mainFrame();
 }
 
-// Código de tipo (01/03/07/08) → texto del dropdown "Tipo de comprobante".
+// Código de tipo (01/03/07/08) → texto EXACTO del dropdown "Tipo de comprobante".
 const TIPO_LABEL: Record<string, string> = {
   "01": "Factura",
   "03": "Boleta",
-  "07": "Nota de Crédito",
-  "08": "Nota de Débito",
+  "07": "Factura - Nota de Crédito",
+  "08": "Factura - Nota de Débito",
 };
 
 /** Llena el formulario (Recibido + RUC + tipo + serie/número) y da "Consultar". */
@@ -242,11 +242,14 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     hecho.recibido = true;
     // 2) RUC Emisor.
     await fr.locator('[formcontrolname="rucEmisor"]').first().fill(item.rucEmisor).catch(() => {});
-    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir por texto.
+    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir por texto EXACTO
+    //    (hay "Factura" y "Factura - Nota de Crédito"; sin exact se confunden).
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
     await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(800).catch(() => {});
-    await fr.getByText(label, { exact: false }).last().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(900).catch(() => {});
+    await fr.getByText(label, { exact: true }).first().click({ timeout: 3000 }).catch(async () => {
+      await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+    });
     hecho.tipo = label;
     // 4) Serie y Número.
     await fr.locator('[formcontrolname="serieComprobante"]').first().fill(item.serie).catch(() => {});
@@ -258,6 +261,52 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     hecho.error = String(e?.message ?? e).slice(0, 150);
   }
   return hecho;
+}
+
+/** En el modal "Resultado", hace clic en el icono "Descargar XML" y captura el
+ *  archivo. Devuelve el Buffer del XML (o del ZIP que lo contiene) o null. */
+async function descargarXmlResultado(fr: any, page: any): Promise<Buffer | null> {
+  const { promises: fs } = await import("fs");
+  // Candidatos del icono "Descargar XML" (tooltip Angular Material u otros).
+  const candidatos = [
+    '[title="Descargar XML"]',
+    '[aria-label="Descargar XML"]',
+    '[mattooltip="Descargar XML"]',
+    '[ng-reflect-message="Descargar XML"]',
+  ];
+  const clicar = async () => {
+    for (const sel of candidatos) {
+      const el = fr.locator(sel).first();
+      if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
+    }
+    // Respaldo: los 4 iconos (PDF, XML, Imprimir, Email) están juntos; el XML
+    // suele ser el 2º. Busca dentro de un contenedor con el icono PDF.
+    const iconos = fr.locator(".modal a, .modal i, .modal img, [class*=result] a, [class*=result] i").filter({ hasNot: fr.locator("nothing") });
+    const n = await iconos.count().catch(() => 0);
+    if (n >= 2) { await iconos.nth(1).click({ timeout: 3000 }).catch(() => {}); return true; }
+    return false;
+  };
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 20000 }).catch(() => null),
+    clicar(),
+  ]);
+  if (!download) return null;
+  try {
+    const p = await download.path();
+    if (!p) return null;
+    return await fs.readFile(p);
+  } catch {
+    return null;
+  }
+}
+
+/** Cierra el modal "Resultado" (× arriba a la derecha) para pasar al siguiente. */
+async function cerrarModal(fr: any): Promise<void> {
+  for (const sel of ['.modal .close', '[aria-label="Close"]', '[aria-label="Cerrar"]', '.modal-header button']) {
+    const el = fr.locator(sel).first();
+    if (await el.count().catch(() => 0)) { await el.click({ timeout: 2000 }).catch(() => {}); return; }
+  }
+  await fr.getByText("×", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
 }
 
 /**
@@ -330,24 +379,56 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes (con la plantilla) para descargar.", diag: { pasos } };
     }
 
-    // Llena el formulario y CONSULTA el primer comprobante de la relación, y
-    // vuelca el resultado (para calibrar la descarga del XML). En la próxima
-    // iteración se hace el bucle completo + descarga real.
-    const item = relacion[0];
-    const fr = frameForm(s.ctx);
-    const llenado = await llenarYConsultar(fr, s.page, item);
-    pasos.push({ paso: "llenar", item, ...llenado });
-
-    // Vuelca lo que aparece TRAS consultar (resultado + botones/enlaces de descarga).
-    await s.page.waitForTimeout(4000).catch(() => {});
-    const resultado = await volcarEstructura(s.ctx);
-    pasos.push({ paso: "resultado", framesTodos: listarFrames(s.ctx), ...resultado });
-
+    // BUCLE: por cada comprobante de la relación → llenar, consultar, descargar
+    // el XML del modal "Resultado", parsearlo (ZIP o XML) y cerrar el modal.
+    const { esZip, extraerDeZip } = await import("./zip");
     const facturas: FacturaXml[] = [];
+    const errores: any[] = [];
+    for (let i = 0; i < relacion.length; i++) {
+      const item = relacion[i];
+      try {
+        const fr = frameForm(s.ctx);
+        const llenado = await llenarYConsultar(fr, s.page, item);
+        await s.page.waitForTimeout(3500).catch(() => {});
+        const buf = await descargarXmlResultado(fr, s.page);
+        if (!buf) {
+          errores.push({ item: `${item.serie}-${item.numero}`, motivo: "no se descargó el XML", llenado });
+        } else {
+          // Puede venir como XML directo o dentro de un ZIP.
+          const xmls: string[] = [];
+          if (esZip(buf)) {
+            for (const it of extraerDeZip(buf, [".xml"])) xmls.push(it.data.toString("utf-8"));
+          } else {
+            xmls.push(buf.toString("utf-8"));
+          }
+          let ok = false;
+          for (const x of xmls) {
+            const fx = parseFacturaXml(x);
+            if (fx && fx.rucEmisor) { facturas.push(fx); ok = true; }
+          }
+          if (!ok) errores.push({ item: `${item.serie}-${item.numero}`, motivo: "el archivo no era un XML de comprobante" });
+        }
+        await cerrarModal(fr);
+        await s.page.waitForTimeout(1200).catch(() => {});
+      } catch (e: any) {
+        errores.push({ item: `${item.serie}-${item.numero}`, motivo: String(e?.message ?? e).slice(0, 120) });
+      }
+    }
+    pasos.push({ paso: "descargas", pedidos: relacion.length, ok: facturas.length, errores });
+
+    // En modo diagnóstico, además vuelca la estructura del resultado (por si hay
+    // que calibrar el icono de descarga).
+    if (params.diagnostico) {
+      const resultado = await volcarEstructura(s.ctx);
+      pasos.push({ paso: "resultado", framesTodos: listarFrames(s.ctx), ...resultado });
+    }
+
     return {
       facturas,
-      descargados: 0,
-      error: "Formulario consultado. Revisa el 'resultado' del diagnóstico (botones/enlaces de descarga) para terminar de conectar la bajada del XML.",
+      descargados: facturas.length,
+      error: facturas.length
+        ? undefined
+        : `No se descargó ningún XML (de ${relacion.length}). Revisa el diagnóstico. ${errores.slice(0, 2).map((e) => e.motivo).join(" · ")}`,
       diag: { pasos },
     };
   } catch (err: any) {
