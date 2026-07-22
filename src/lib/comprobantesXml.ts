@@ -257,9 +257,22 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     const recibido = fr.locator("#recibido").first();
     await recibido.check().catch(async () => { await recibido.click().catch(() => {}); });
     hecho.recibido = true;
-    // 2) RUC Emisor + esperar la validación async (aparece la razón social).
-    await fr.locator('[formcontrolname="rucEmisor"]').first().fill(item.rucEmisor).catch(() => {});
+    // Al cambiar de "Emitido" a "Recibido", Angular limpia/habilita el campo
+    // RUC Emisor. Hay que ESPERAR ese cambio: si llenamos de inmediato, el input
+    // sigue read-only (traía el RUC del cliente, prellenado en modo Emitido) y el
+    // fill se pierde en silencio → SUNAT busca "comprobante del cliente a sí
+    // mismo" → error. Por eso: esperar, LIMPIAR y recién llenar.
+    await page.waitForTimeout(1000).catch(() => {});
+    // 2) RUC Emisor: limpiar el prellenado, escribir el del proveedor y hacer
+    //    blur (Tab) para disparar la validación async (resuelve la razón social).
+    const rucInput = fr.locator('[formcontrolname="rucEmisor"]').first();
+    await rucInput.click({ timeout: 3000 }).catch(() => {});
+    await rucInput.fill("").catch(() => {});
+    await rucInput.fill(item.rucEmisor).catch(() => {});
+    await rucInput.press("Tab").catch(() => {});
     await page.waitForTimeout(1800).catch(() => {});
+    hecho.rucEmisorPedido = item.rucEmisor;
+    hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
     // 3) Tipo de comprobante (dropdown Angular): abrir y elegir la opción EXACTA.
     //    OJO: NO escribir en ningún input aquí (el "último input" es Número y se
     //    corrompía la consulta). Solo abrir y clicar la opción.
@@ -272,8 +285,12 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     hecho.tipo = label;
     await page.waitForTimeout(500).catch(() => {});
     // 4) Serie y Número.
-    await fr.locator('[formcontrolname="serieComprobante"]').first().fill(item.serie).catch(() => {});
-    await fr.locator('[formcontrolname="numeroComprobante"]').first().fill(item.numero).catch(() => {});
+    const serieInput = fr.locator('[formcontrolname="serieComprobante"]').first();
+    const numeroInput = fr.locator('[formcontrolname="numeroComprobante"]').first();
+    await serieInput.fill(item.serie).catch(() => {});
+    await numeroInput.fill(item.numero).catch(() => {});
+    hecho.serieVal = await serieInput.inputValue().catch(() => "");
+    hecho.numeroVal = await numeroInput.inputValue().catch(() => "");
     // 5) Consultar.
     await fr.getByText("Consultar", { exact: false }).first().click({ timeout: 4000 }).catch(() => {});
     hecho.consultado = true;
