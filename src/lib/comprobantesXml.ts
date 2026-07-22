@@ -79,6 +79,37 @@ async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
   return false;
 }
 
+/** Clic NATIVO por texto (exact y luego parcial) en cualquier frame. Es el
+ *  método que sí funciona en el menú SOL (mismo que usa el F36). */
+async function clicNativo(ctx: any, textos: string[], timeout = 4000): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      for (const t of textos) {
+        for (const exact of [true, false]) {
+          try {
+            const loc = fr.getByText(t, { exact }).first();
+            if ((await loc.count()) > 0) {
+              await loc.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+              await loc.click({ timeout });
+              return t;
+            }
+          } catch { /* siguiente */ }
+        }
+      }
+    }
+  }
+  return null;
+}
+/** Reintenta el clic nativo hasta que aparezca la opción (menú que carga lento). */
+async function clicNativoEspera(ctx: any, page: any, textos: string[], intentos = 6, esperaMs = 1500): Promise<string | null> {
+  for (let i = 0; i < intentos; i++) {
+    const hit = await clicNativo(ctx, textos);
+    if (hit) return hit;
+    await page.waitForTimeout(esperaMs).catch(() => {});
+  }
+  return null;
+}
+
 /** Lista TODOS los frames (url) de todas las páginas, para ver dónde cargó el
  *  formulario aunque el volcado detallado lo filtre. */
 function listarFrames(ctx: any): string[] {
@@ -199,29 +230,22 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       };
     }
 
-    // Ruta (confirmada por el usuario): el formulario "Consulta de Comprobante
-    // de Pago" carga en la misma página del menú. La forma MÁS confiable de
-    // llegar es el BUSCADOR del menú (#txtBusca), en vez del árbol.
-    const OPCION = "Nueva Consulta de comprobantes de pago";
-    let navegado = false;
-    const buscador = s.page.locator("#txtBusca").first();
-    if (await buscador.count().catch(() => 0)) {
-      await buscador.fill(OPCION).catch(() => {});
-      await s.page.waitForTimeout(1800).catch(() => {});
-      navegado = await clicTexto(s.ctx, [OPCION]);
-      pasos.push({ paso: "buscador", opcion: OPCION, clic: navegado });
-    }
-    if (!navegado) {
-      // Respaldo: árbol del menú.
-      for (const t of ["Comprobantes de Pago", "Consulta de Comprobantes de Pago", OPCION]) {
-        const ok = await clicTexto(s.ctx, [t]);
-        pasos.push({ paso: "menu", intento: t, clic: ok });
-        await s.page.waitForTimeout(1200).catch(() => {});
-      }
+    // Ruta del árbol (confirmada), nivel por nivel con reintentos (método del
+    // F36). OJO: "Comprobantes de pago" (sección) y "Comprobantes de Pago"
+    // (submenú) casi iguales; se navega en orden.
+    const ruta = [
+      ["Comprobantes de pago", "Comprobantes de Pago"],
+      ["Comprobantes de Pago"],
+      ["Consulta de Comprobantes de Pago"],
+      ["Nueva Consulta de comprobantes de pago"],
+    ];
+    for (const opciones of ruta) {
+      const hit = await clicNativoEspera(s.ctx, s.page, opciones, 6, 1500);
+      pasos.push({ paso: "menu", buscaba: opciones[0], clico: hit });
+      await s.page.waitForTimeout(2000).catch(() => {});
     }
     // Esperar a que cargue el formulario (aparece el texto "RUC Emisor").
-    for (let i = 0; i < 10; i++) {
-      await s.page.waitForTimeout(1500).catch(() => {});
+    for (let i = 0; i < 8; i++) {
       const listo = await Promise.all(
         s.ctx.pages().flatMap((pg: any) =>
           pg.frames().map((fr: any) =>
@@ -230,6 +254,7 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         )
       ).then((cs) => cs.some((c) => c > 0)).catch(() => false);
       if (listo) break;
+      await s.page.waitForTimeout(1500).catch(() => {});
     }
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
