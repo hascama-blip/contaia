@@ -170,18 +170,22 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       };
     }
 
-    // Intenta abrir "Consulta de comprobantes" (SEE-SOL) por texto del menú.
+    // Abre la app SEE-SOL de comprobantes. Se prueban los textos EXACTOS del
+    // menú (ya conocidos por el diagnóstico anterior), en orden de prioridad.
     const rutas = [
+      "Consulta de Facturas y Notas Electrónicas",
+      "Consulta Integrada de Comprobantes",
       "Consulta de Comprobantes",
-      "Comprobantes de pago",
-      "Consulta Comprobantes",
-      "SEE - SOL",
-      "Consulta de comprobantes recibidos",
     ];
     for (const t of rutas) {
       const ok = await clicTexto(s.ctx, [t]);
       pasos.push({ paso: "menu", intento: t, clic: ok });
-      if (ok) { await s.page.waitForTimeout(2500); break; }
+      if (ok) {
+        // La app SEE abre en un iframe: dar tiempo a que cargue su formulario.
+        await s.page.waitForTimeout(6000).catch(() => {});
+        await s.page.waitForLoadState?.("networkidle", { timeout: 20000 }).catch(() => {});
+        break;
+      }
     }
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
