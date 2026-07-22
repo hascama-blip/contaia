@@ -253,19 +253,23 @@ const TIPO_LABEL: Record<string, string> = {
 async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise<any> {
   const hecho: any = {};
   try {
-    // 1) Marcar "Recibido".
+    // 1) Cambiar a "Recibido" DE VERDAD. En "Emitido" (default) el RUC Emisor
+    //    está fijo al RUC del cliente y es read-only → si no cambiamos el modo,
+    //    el fill del proveedor se pierde y SUNAT busca un comprobante del cliente
+    //    a sí mismo (error). check() solo no basta si el radio está estilizado;
+    //    forzamos y, de respaldo, clic real en la etiqueta "Recibido".
     const recibido = fr.locator("#recibido").first();
-    await recibido.check().catch(async () => { await recibido.click().catch(() => {}); });
-    hecho.recibido = true;
-    // Al cambiar de "Emitido" a "Recibido", Angular limpia/habilita el campo
-    // RUC Emisor. Hay que ESPERAR ese cambio: si llenamos de inmediato, el input
-    // sigue read-only (traía el RUC del cliente, prellenado en modo Emitido) y el
-    // fill se pierde en silencio → SUNAT busca "comprobante del cliente a sí
-    // mismo" → error. Por eso: esperar, LIMPIAR y recién llenar.
-    await page.waitForTimeout(1000).catch(() => {});
-    // 2) RUC Emisor: limpiar el prellenado, escribir el del proveedor y hacer
-    //    blur (Tab) para disparar la validación async (resuelve la razón social).
+    await recibido.check({ force: true }).catch(() => {});
+    if (!(await recibido.isChecked().catch(() => false))) {
+      await fr.getByText("Recibido", { exact: true }).first().click({ timeout: 3000 }).catch(() => {});
+    }
+    // Angular re-renderiza al cambiar de modo (limpia/habilita el RUC Emisor).
+    await page.waitForTimeout(1500).catch(() => {});
+    hecho.recibido = await recibido.isChecked().catch(() => false);
+    // 2) RUC Emisor: comprobar que ya es editable, limpiar el prellenado, escribir
+    //    el del proveedor y hacer blur (Tab) para disparar la validación async.
     const rucInput = fr.locator('[formcontrolname="rucEmisor"]').first();
+    hecho.rucEstado = await rucInput.evaluate((el: any) => ({ ro: !!el.readOnly, dis: !!el.disabled })).catch(() => ({}));
     await rucInput.click({ timeout: 3000 }).catch(() => {});
     await rucInput.fill("").catch(() => {});
     await rucInput.fill(item.rucEmisor).catch(() => {});
