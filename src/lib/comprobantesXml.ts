@@ -305,8 +305,14 @@ async function descargarXmlResultado(fr: any, page: any): Promise<Buffer | null>
 async function esperarResultado(fr: any, page: any): Promise<"resultado" | "error" | "nada"> {
   for (let i = 0; i < 9; i++) {
     await page.waitForTimeout(1500).catch(() => {});
-    if (await fr.getByText("Resultado", { exact: false }).first().count().catch(() => 0)) return "resultado";
-    if (await fr.getByText("Aceptar", { exact: false }).first().count().catch(() => 0)) return "error";
+    // ERROR primero: el aviso de "no encontrado" trae botón "Aceptar" (y el
+    // modal de factura NO lo tiene). Así no confundimos el título "Resultado".
+    if (await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0)) return "error";
+    // RESULTADO real: aparece el contenido de la factura o el icono de descarga.
+    const facturaReal = await fr
+      .getByText(/Importe Total|FACTURA ELECTR|Descargar XML/i)
+      .first().count().catch(() => 0);
+    if (facturaReal) return "resultado";
   }
   return "nada";
 }
