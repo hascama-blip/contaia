@@ -199,23 +199,38 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       };
     }
 
-    // Ruta correcta (confirmada por el usuario): Comprobantes de Pago →
-    // Consulta de Comprobantes de Pago → Nueva Consulta de comprobantes de pago.
-    // Se expanden los padres y se abre la hoja del formulario.
-    for (const t of ["Comprobantes de Pago", "Consulta de Comprobantes de Pago"]) {
-      const ok = await clicTexto(s.ctx, [t]);
-      pasos.push({ paso: "menu", intento: t, clic: ok });
-      await s.page.waitForTimeout(1200).catch(() => {});
+    // Ruta (confirmada por el usuario): el formulario "Consulta de Comprobante
+    // de Pago" carga en la misma página del menú. La forma MÁS confiable de
+    // llegar es el BUSCADOR del menú (#txtBusca), en vez del árbol.
+    const OPCION = "Nueva Consulta de comprobantes de pago";
+    let navegado = false;
+    const buscador = s.page.locator("#txtBusca").first();
+    if (await buscador.count().catch(() => 0)) {
+      await buscador.fill(OPCION).catch(() => {});
+      await s.page.waitForTimeout(1800).catch(() => {});
+      navegado = await clicTexto(s.ctx, [OPCION]);
+      pasos.push({ paso: "buscador", opcion: OPCION, clic: navegado });
     }
-    const okHoja = await clicTexto(s.ctx, ["Nueva Consulta de comprobantes de pago"]);
-    pasos.push({ paso: "menu", intento: "Nueva Consulta de comprobantes de pago", clic: okHoja });
-    // El formulario abre en un iframe: esperar a que aparezca uno de consulta.
-    for (let i = 0; i < 8; i++) {
-      await s.page.waitForTimeout(2000).catch(() => {});
-      const hay = listarFrames(s.ctx).some((u) => /consulta|comprobante|itcpe|cpe|consvalid/i.test(u) && !/MenuInternet/.test(u));
-      if (hay) break;
+    if (!navegado) {
+      // Respaldo: árbol del menú.
+      for (const t of ["Comprobantes de Pago", "Consulta de Comprobantes de Pago", OPCION]) {
+        const ok = await clicTexto(s.ctx, [t]);
+        pasos.push({ paso: "menu", intento: t, clic: ok });
+        await s.page.waitForTimeout(1200).catch(() => {});
+      }
     }
-    await s.page.waitForLoadState?.("networkidle", { timeout: 15000 }).catch(() => {});
+    // Esperar a que cargue el formulario (aparece el texto "RUC Emisor").
+    for (let i = 0; i < 10; i++) {
+      await s.page.waitForTimeout(1500).catch(() => {});
+      const listo = await Promise.all(
+        s.ctx.pages().flatMap((pg: any) =>
+          pg.frames().map((fr: any) =>
+            fr.getByText(/RUC\s*Emisor|Filtro de comprobante/i).first().count().catch(() => 0)
+          )
+        )
+      ).then((cs) => cs.some((c) => c > 0)).catch(() => false);
+      if (listo) break;
+    }
 
     // Volcado de estructura (SIEMPRE): con esto calibramos la descarga real.
     const estructura = await volcarEstructura(s.ctx);
