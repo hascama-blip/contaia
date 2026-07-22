@@ -300,6 +300,17 @@ async function descargarXmlResultado(fr: any, page: any): Promise<Buffer | null>
   }
 }
 
+/** Tras "Consultar", espera a que aparezca el modal "Resultado" (factura) o un
+ *  aviso de error ("Aceptar"). Devuelve cuál apareció. */
+async function esperarResultado(fr: any, page: any): Promise<"resultado" | "error" | "nada"> {
+  for (let i = 0; i < 9; i++) {
+    await page.waitForTimeout(1500).catch(() => {});
+    if (await fr.getByText("Resultado", { exact: false }).first().count().catch(() => 0)) return "resultado";
+    if (await fr.getByText("Aceptar", { exact: false }).first().count().catch(() => 0)) return "error";
+  }
+  return "nada";
+}
+
 /** Cierra el modal "Resultado" (× arriba a la derecha) para pasar al siguiente. */
 async function cerrarModal(fr: any): Promise<void> {
   for (const sel of ['.modal .close', '[aria-label="Close"]', '[aria-label="Cerrar"]', '.modal-header button']) {
@@ -389,10 +400,24 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       try {
         const fr = frameForm(s.ctx);
         const llenado = await llenarYConsultar(fr, s.page, item);
-        await s.page.waitForTimeout(3500).catch(() => {});
+        // ¿Salió el modal Resultado (factura) o un aviso de error?
+        const estado = await esperarResultado(fr, s.page);
+        if (estado !== "resultado") {
+          // Cierra el aviso de error para poder consultar el siguiente.
+          await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+          errores.push({
+            item: `${item.serie}-${item.numero}`,
+            motivo: estado === "error"
+              ? "SUNAT no devolvió el comprobante (revisa RUC emisor, tipo, serie y número, o el comprobante no existe)."
+              : "no apareció el resultado (tiempo agotado).",
+            llenado,
+          });
+          await s.page.waitForTimeout(1000).catch(() => {});
+          continue;
+        }
         const buf = await descargarXmlResultado(fr, s.page);
         if (!buf) {
-          errores.push({ item: `${item.serie}-${item.numero}`, motivo: "no se descargó el XML", llenado });
+          errores.push({ item: `${item.serie}-${item.numero}`, motivo: "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", llenado });
         } else {
           // Puede venir como XML directo o dentro de un ZIP.
           const xmls: string[] = [];
