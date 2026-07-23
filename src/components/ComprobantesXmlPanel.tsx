@@ -17,7 +17,11 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [relacion, setRelacion] = useState<any[]>([]);
   const [relNombre, setRelNombre] = useState<string | null>(null);
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
+  // Comprobantes que no se pudieron bajar + cuántos reintentos se han hecho.
+  const [fallidos, setFallidos] = useState<any[]>([]);
+  const [reintentos, setReintentos] = useState(0);
 
+  const MAX_REINTENTOS = 2;
   // Tamaño de tanda: el frontend parte la relación y llama a la API por bloques
   // para que ninguna petición dure demasiado (proxy/timeout) y se vea el avance.
   const TANDA = 12;
@@ -51,8 +55,38 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     return { res, data };
   }
 
+  /** Procesa una lista de comprobantes en tandas, acumulando sobre `acum` y
+   *  devolviendo los que fallaron. `consumir` = si esta corrida gasta 1 consulta
+   *  (solo la primera; los reintentos NO gastan). Lanza en 401/429 (cortan). */
+  async function procesarLista(items: any[], acum: any[], consumir: boolean): Promise<any[]> {
+    const solPass = getSolPass(clienteId);
+    const solUser = getSolUser(clienteId);
+    const total = items.length;
+    const nuevosFallidos: any[] = [];
+    // parte 0 = consume cupo. Para NO consumir (reintentos), empezamos en 1.
+    let parte = consumir ? 0 : 1;
+    let hechos = 0;
+    setProgreso({ hechos: 0, total });
+    for (let inicio = 0; inicio < total; inicio += TANDA, parte++) {
+      // El bloque puede venir de la relación (ítems) o de la lista de fallidos
+      // ({item, motivo}); normalizamos a ítem limpio antes de mandarlo.
+      const bloque = items.slice(inicio, inicio + TANDA).map((it: any) => it.item ?? it);
+      const { res, data } = await llamarTanda({ solUser, solPass, relacion: bloque, parte });
+      if (res.status === 401) throw { corte: data.error ?? "SUNAT rechazó el inicio de sesión." };
+      if (res.status === 429) throw { corte: data.error ?? "Sin consultas disponibles." };
+      if (Array.isArray(data.facturas)) acum.push(...data.facturas);
+      // Guardamos el fallo completo ({item, motivo}) para mostrarlo y reintentar.
+      if (Array.isArray(data.fallidos)) nuevosFallidos.push(...data.fallidos);
+      hechos += bloque.length;
+      setFacturas([...acum]);
+      setProgreso({ hechos: Math.min(hechos, total), total });
+    }
+    return nuevosFallidos;
+  }
+
   async function extraer() {
     setError(null); setInfo(null); setDiag(null); setProgreso(null);
+    setFallidos([]); setReintentos(0);
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
     if (!solPass) { setError("Carga tus accesos SOL (arriba) para descargar los XML."); return; }
@@ -70,29 +104,47 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         return;
       }
 
-      // Procesar TODA la relación en tandas, acumulando y mostrando avance.
       const total = relacion.length;
       const acum: any[] = [];
-      const fallos: string[] = [];
-      setProgreso({ hechos: 0, total });
-      for (let inicio = 0, parte = 0; inicio < total; inicio += TANDA, parte++) {
-        const bloque = relacion.slice(inicio, inicio + TANDA);
-        const { res, data } = await llamarTanda({ solUser, solPass, relacion: bloque, parte });
-        if (res.status === 401) { setError(data.error ?? "SUNAT rechazó el inicio de sesión."); return; }
-        if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); return; }
-        if (Array.isArray(data.facturas)) acum.push(...data.facturas);
-        const okTanda = data.descargados ?? 0;
-        if (okTanda < bloque.length) fallos.push(`${bloque.length - okTanda} en el bloque ${parte + 1}`);
-        setFacturas([...acum]);
-        setProgreso({ hechos: Math.min(inicio + bloque.length, total), total });
-      }
-      setProgreso(null);
+      const fallos = await procesarLista(relacion, acum, true);
+      setFallidos(fallos);
       setInfo(
         `${acum.length} de ${total} comprobante(s) descargado(s).` +
-        (fallos.length ? ` No se pudieron bajar: ${fallos.join(", ")} (revísalos manualmente).` : "")
+        (fallos.length ? ` ${fallos.length} no se pudieron bajar (revisa la lista y reintenta).` : "")
       );
-    } catch {
-      setError("Error de red al descargar los comprobantes.");
+    } catch (e: any) {
+      setError(e?.corte ?? "Error de red al descargar los comprobantes.");
+    } finally {
+      setBusy(false);
+      setProgreso(null);
+    }
+  }
+
+  /** Reintenta SOLO los comprobantes fallidos (máx. 2 veces, sin gastar cupo). */
+  async function reintentar() {
+    if (!fallidos.length || reintentos >= MAX_REINTENTOS) return;
+    setError(null); setInfo(null);
+    const pendientes = fallidos;
+    setBusy(true);
+    try {
+      const acum = [...facturas];
+      const fallos = await procesarLista(pendientes, acum, false);
+      const intentoActual = reintentos + 1;
+      setReintentos(intentoActual);
+      setFacturas([...acum]);
+      setFallidos(fallos);
+      if (!fallos.length) {
+        setInfo(`¡Listo! Se recuperaron los ${pendientes.length} pendiente(s). Total: ${acum.length}.`);
+      } else if (intentoActual >= MAX_REINTENTOS) {
+        setInfo(
+          `Tras ${MAX_REINTENTOS} reintentos, ${fallos.length} comprobante(s) siguen sin descargar. ` +
+          `Es un problema temporal de SUNAT (su portal no los está entregando): intenta más tarde o descárgalos manualmente.`
+        );
+      } else {
+        setInfo(`Se recuperaron ${pendientes.length - fallos.length}; quedan ${fallos.length}. Puedes reintentar de nuevo.`);
+      }
+    } catch (e: any) {
+      setError(e?.corte ?? "Error de red al reintentar.");
     } finally {
       setBusy(false);
       setProgreso(null);
@@ -234,6 +286,55 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
+
+      {/* Comprobantes que NO se pudieron descargar + reintento (máx. 2). */}
+      {fallidos.length > 0 && !busy && (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-amber-800">
+              ⚠ {fallidos.length} comprobante(s) no se descargaron
+            </p>
+            {reintentos < MAX_REINTENTOS ? (
+              <button className="btn-primary text-sm" onClick={reintentar} disabled={busy}>
+                🔁 Reintentar los que faltan ({reintentos + 1}/{MAX_REINTENTOS})
+              </button>
+            ) : (
+              <span className="badge bg-red-100 text-red-700">Sin más reintentos</span>
+            )}
+          </div>
+          {reintentos >= MAX_REINTENTOS && (
+            <p className="mt-2 text-xs text-red-700">
+              Tras {MAX_REINTENTOS} reintentos siguen sin bajar. Es un <strong>problema temporal de SUNAT</strong>
+              {" "}(su portal no los está entregando). Intenta más tarde o descárgalos manualmente.
+            </p>
+          )}
+          <div className="mt-2 max-h-40 overflow-auto rounded border border-amber-200 bg-white">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-[10px] uppercase text-slate-400">
+                  <th className="px-2 py-1">RUC Emisor</th>
+                  <th className="px-2 py-1">Tipo</th>
+                  <th className="px-2 py-1">Serie-Número</th>
+                  <th className="px-2 py-1">Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fallidos.map((f: any, i: number) => {
+                  const it = f.item ?? f;
+                  return (
+                    <tr key={i} className="border-t border-amber-100">
+                      <td className="px-2 py-1 text-slate-600">{it.rucEmisor}</td>
+                      <td className="px-2 py-1 text-slate-600">{it.tipo}</td>
+                      <td className="px-2 py-1 font-medium text-slate-700">{it.serie}-{it.numero}</td>
+                      <td className="px-2 py-1 text-slate-500">{f.motivo ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {facturas.length > 0 && (
         <div className="mt-4 overflow-x-auto">

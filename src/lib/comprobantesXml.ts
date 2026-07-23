@@ -27,6 +27,8 @@ export interface ComprobantesParams {
 export interface ComprobantesResultado {
   facturas?: FacturaXml[];
   descargados?: number;
+  /** Comprobantes de la relación que NO se pudieron bajar (para reintentar). */
+  fallidos?: { item: ItemRelacion; motivo: string }[];
   loginError?: boolean;
   error?: string;
   diag?: { pasos: any[] };
@@ -449,13 +451,23 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     const { esZip, extraerDeZip } = await import("./zip");
     const facturas: FacturaXml[] = [];
     const errores: any[] = [];
+    const fallidos: { item: ItemRelacion; motivo: string }[] = [];
+    const marcarFallo = (item: ItemRelacion, motivo: string, llenado?: any) => {
+      errores.push({ item: `${item.serie}-${item.numero}`, motivo, ...(llenado ? { llenado } : {}) });
+      fallidos.push({ item, motivo });
+    };
     // El formulario ya está abierto (goto-app arriba). Entre comprobantes se usa
     // "Limpiar" para resetearlo, SIN re-navegar (re-navegar cerraba el navegador).
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
         const fr = frameForm(s.ctx);
-        if (!fr) { errores.push({ item: `${item.serie}-${item.numero}`, motivo: "el navegador se cerró" }); break; }
+        if (!fr) {
+          // Navegador caído: este y TODOS los que faltan quedan como fallidos
+          // (se podrán reintentar desde el frontend).
+          for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], "el navegador se cerró (reintentar)");
+          break;
+        }
         if (i > 0) {
           // Reset del formulario para el siguiente comprobante.
           await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
@@ -467,19 +479,19 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         if (estado !== "resultado") {
           // Cierra el aviso de error para poder consultar el siguiente.
           await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
-          errores.push({
-            item: `${item.serie}-${item.numero}`,
-            motivo: estado === "error"
+          marcarFallo(
+            item,
+            estado === "error"
               ? "SUNAT no devolvió el comprobante (revisa RUC emisor, tipo, serie y número, o el comprobante no existe)."
               : "no apareció el resultado (tiempo agotado).",
             llenado,
-          });
+          );
           await s.page.waitForTimeout(1000).catch(() => {});
           continue;
         }
         const buf = await descargarXmlResultado(fr, s.page);
         if (!buf) {
-          errores.push({ item: `${item.serie}-${item.numero}`, motivo: "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", llenado });
+          marcarFallo(item, "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", llenado);
         } else {
           // Puede venir como XML directo o dentro de un ZIP.
           const xmls: string[] = [];
@@ -493,12 +505,12 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
             const fx = parseFacturaXml(x);
             if (fx && fx.rucEmisor) { facturas.push(fx); ok = true; }
           }
-          if (!ok) errores.push({ item: `${item.serie}-${item.numero}`, motivo: "el archivo no era un XML de comprobante" });
+          if (!ok) marcarFallo(item, "el archivo no era un XML de comprobante");
         }
         await cerrarModal(fr);
         await s.page.waitForTimeout(1200).catch(() => {});
       } catch (e: any) {
-        errores.push({ item: `${item.serie}-${item.numero}`, motivo: String(e?.message ?? e).slice(0, 120) });
+        marcarFallo(item, String(e?.message ?? e).slice(0, 120));
       }
     }
     pasos.push({ paso: "descargas", pedidos: relacion.length, ok: facturas.length, errores });
@@ -516,6 +528,7 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     return {
       facturas,
       descargados: facturas.length,
+      fallidos,
       error: facturas.length
         ? (sobrantes > 0 ? `Descargados ${facturas.length}.${notaSobrantes}` : undefined)
         : `No se descargó ningún XML (de ${relacion.length}). Revisa el diagnóstico. ${errores.slice(0, 2).map((e) => e.motivo).join(" · ")}`,

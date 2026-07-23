@@ -54,6 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({
     facturas: r.facturas ?? [],
     descargados: r.descargados ?? 0,
+    fallidos: r.fallidos ?? [],
     error: r.error,
     diag: r.diag,
   });
