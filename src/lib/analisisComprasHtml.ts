@@ -1,13 +1,64 @@
 import type { AnalisisCompras } from "./analisisCompras";
 
 // HTML autocontenido para el informe de compras/gastos en PDF.
-// IMPORTANTE: informe "normal", SIN logo ni marca (Radar/ASENCO). Solo el
-// nombre de la empresa analizada y un diseño sobrio en escala de grises.
+// Informe SIN logo ni marca (Radar/ASENCO): solo el nombre de la empresa.
+// Diseño VIVO con la paleta de la marca (azul brand + dorado + acentos) e
+// incluye los mismos gráficos del dashboard (torta + barras) como SVG.
 
 const esc = (s: any) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const soles = (n: number) =>
   `S/ ${Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const solesK = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toLocaleString("es-PE", { maximumFractionDigits: 1 })} mil` : n.toLocaleString("es-PE", { maximumFractionDigits: 0 });
+
+// Paleta viva (misma del dashboard).
+const PAL = ["#1d4ed8", "#dca200", "#0ea5e9", "#10b981", "#f97316", "#8b5cf6", "#ef4444", "#64748b"];
+
+// --- Gráfico de torta (SVG) -------------------------------------------------
+function svgPie(data: { label: string; value: number; color: string }[], size = 210): string {
+  const r = size / 2 - 4, cx = size / 2, cy = size / 2;
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  let ang = -Math.PI / 2;
+  let out = "";
+  if (data.length === 1 || data[0].value / total >= 0.9999) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${data[0]?.color ?? PAL[0]}"/><text x="${cx}" y="${cy + 4}" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">100%</text></svg>`;
+  }
+  for (const d of data) {
+    const frac = d.value / total;
+    const a2 = ang + frac * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+    const large = frac > 0.5 ? 1 : 0;
+    out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${d.color}" stroke="#fff" stroke-width="2"/>`;
+    if (frac > 0.03) {
+      const mid = (ang + a2) / 2;
+      const lx = cx + r * 0.62 * Math.cos(mid), ly = cy + r * 0.62 * Math.sin(mid);
+      out += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">${(frac * 100).toFixed(0)}%</text>`;
+    }
+    ang = a2;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${out}</svg>`;
+}
+
+// --- Gráfico de barras (SVG) ------------------------------------------------
+function svgBars(data: { label: string; value: number; color: string }[], w = 470, h = 210): string {
+  const padL = 12, padR = 12, padT = 18, padB = 30;
+  const iw = w - padL - padR, ih = h - padT - padB;
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const gap = iw / Math.max(data.length, 1);
+  const bw = gap * 0.6;
+  let out = `<line x1="${padL}" y1="${padT + ih}" x2="${w - padR}" y2="${padT + ih}" stroke="#cbd5e1"/>`;
+  data.forEach((d, i) => {
+    const bh = (d.value / max) * ih;
+    const x = padL + gap * i + (gap - bw) / 2;
+    const y = padT + ih - bh;
+    out += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(bh, 1).toFixed(1)}" rx="3" fill="${d.color}"/>`;
+    out += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" font-size="9" text-anchor="middle" fill="#334155" font-weight="600">${esc(solesK(d.value))}</text>`;
+    out += `<text x="${(x + bw / 2).toFixed(1)}" y="${(padT + ih + 15).toFixed(1)}" font-size="9.5" text-anchor="middle" fill="#64748b">${esc(d.label)}</text>`;
+  });
+  return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${out}</svg>`;
+}
 
 function barra(pct: number): string {
   const w = Math.max(0, Math.min(100, pct));
@@ -15,9 +66,15 @@ function barra(pct: number): string {
 }
 
 export function informeComprasHtml(a: AnalisisCompras): string {
-  const funcRows = a.porFuncion.map((f) => `
+  // Datos para gráficos.
+  const funcPie = a.porFuncion.map((f, i) => ({ label: `${f.cod} ${f.nombre}`, value: f.debe, color: PAL[i % PAL.length] }));
+  const natBars = a.porNaturaleza.slice(0, 8).map((n, i) => ({ label: n.cod, value: n.debe, color: PAL[i % PAL.length] }));
+  const ccBars = a.porCentroCosto.slice(0, 8).map((c, i) => ({ label: c.cod, value: c.debe, color: PAL[i % PAL.length] }));
+  const leyenda = funcPie.map((d) => `<span class="lg"><i style="background:${d.color}"></i>${esc(d.label)} — <strong>${soles(d.value)}</strong></span>`).join("");
+
+  const funcRows = a.porFuncion.map((f, i) => `
     <tr>
-      <td><strong>${esc(f.cod)}</strong> · ${esc(f.nombre)}</td>
+      <td><span class="dot" style="background:${PAL[i % PAL.length]}"></span><strong>${esc(f.cod)}</strong> · ${esc(f.nombre)}</td>
       <td class="num">${soles(f.debe)}</td>
       <td class="pct">${f.pct.toFixed(1)}%</td>
       <td class="barcell">${barra(f.pct)}</td>
@@ -39,10 +96,10 @@ export function informeComprasHtml(a: AnalisisCompras): string {
       <td class="barcell">${barra(c.pct)}</td>
     </tr>`).join("");
 
-  const clase9 = a.porFuncion.map((f) => `
+  const clase9 = a.porFuncion.map((f, i) => `
     <table class="tbl detalle">
       <thead>
-        <tr class="grp"><td colspan="4"><strong>${esc(f.cod)} · ${esc(f.nombre)}</strong> — ${soles(f.debe)} (${f.pct.toFixed(1)}%)</td></tr>
+        <tr class="grp"><td colspan="4"><span class="dot" style="background:${PAL[i % PAL.length]}"></span><strong>${esc(f.cod)} · ${esc(f.nombre)}</strong> — ${soles(f.debe)} (${f.pct.toFixed(1)}%)</td></tr>
         <tr class="th"><th>Cuenta</th><th>Concepto</th><th class="num">Nº mov.</th><th class="num">Importe</th></tr>
       </thead>
       <tbody>
@@ -79,36 +136,49 @@ export function informeComprasHtml(a: AnalisisCompras): string {
 <html lang="es"><head><meta charset="utf-8"/>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; font-size: 11px; margin: 0; }
-  .page { padding: 4px 2px; }
-  h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: .3px; }
-  h2 { font-size: 13px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #333;
-       text-transform: uppercase; letter-spacing: .5px; }
-  .sub { color: #555; font-size: 11px; margin: 0; }
-  .head { border-bottom: 3px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 6px; }
-  .meta { color: #666; font-size: 10px; margin-top: 4px; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1e293b; font-size: 11px; margin: 0; }
+  .page { padding: 2px; }
+  h1 { font-size: 21px; margin: 0 0 2px; }
+  h2 { font-size: 13px; margin: 20px 0 8px; padding: 6px 10px; color: #fff;
+       background: linear-gradient(90deg, #102b4d, #234d82); border-left: 5px solid #dca200;
+       border-radius: 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .sub { color: #e2e8f0; font-size: 11px; margin: 0; }
+  .head { background: linear-gradient(120deg, #102b4d, #234d82); color: #fff; padding: 16px 18px;
+          border-radius: 10px; border-bottom: 4px solid #dca200; }
+  .head h1 { color: #fff; }
+  .meta { color: #cbd5e1; font-size: 10px; margin-top: 6px; }
   .kpis { display: flex; gap: 10px; margin: 12px 0; }
-  .kpi { flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; }
-  .kpi .lbl { color: #666; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; }
-  .kpi .val { font-size: 16px; font-weight: 700; margin-top: 2px; }
-  .kpi.big { background: #f3f3f3; }
+  .kpi { flex: 1; border: 1px solid #dbe4f0; border-radius: 8px; padding: 9px 11px; background: #f7f9fc; }
+  .kpi .lbl { color: #64748b; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .val { font-size: 16px; font-weight: 700; margin-top: 2px; color: #102b4d; }
+  .kpi.big { background: linear-gradient(120deg, #1d4ed8, #234d82); border: none; }
+  .kpi.big .lbl { color: #dbeafe; }
+  .kpi.big .val { color: #fff; }
+  .charts { display: flex; gap: 12px; margin: 10px 0; page-break-inside: avoid; }
+  .chart { flex: 1; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #fff; }
+  .chart h3 { font-size: 11px; margin: 0 0 6px; color: #102b4d; font-weight: 700; }
+  .chart.pie { display: flex; flex-direction: column; align-items: center; }
+  .legend { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; }
+  .lg { font-size: 9.5px; color: #334155; }
+  .lg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
   table.tbl { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  table.tbl th { text-align: left; font-size: 9px; text-transform: uppercase; color: #555;
-                 border-bottom: 1px solid #999; padding: 4px 6px; }
-  table.tbl td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+  table.tbl th { text-align: left; font-size: 9px; text-transform: uppercase; color: #475569;
+                 border-bottom: 2px solid #cbd5e1; padding: 4px 6px; }
+  table.tbl td { padding: 4px 6px; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
   .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .pct { text-align: right; color: #555; white-space: nowrap; }
+  .pct { text-align: right; color: #64748b; white-space: nowrap; }
   .mono { font-family: "Consolas", monospace; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
   .barcell { width: 120px; }
-  .barwrap { background: #eee; border-radius: 3px; height: 9px; width: 100%; overflow: hidden; }
-  .bar { background: #333; height: 9px; }
-  .grp td { background: #f0f0f0; border-top: 1px solid #999; padding: 5px 6px; }
+  .barwrap { background: #e8edf5; border-radius: 3px; height: 9px; width: 100%; overflow: hidden; }
+  .bar { background: linear-gradient(90deg, #1d4ed8, #0ea5e9); height: 9px; }
+  .grp td { background: #eef3fa; border-top: 2px solid #1d4ed8; padding: 5px 6px; color: #102b4d; }
   .detalle { margin-bottom: 10px; page-break-inside: avoid; }
-  .detalle .th th { border-bottom: 1px solid #ccc; }
-  .totalrow td { font-weight: 700; border-top: 2px solid #333; }
+  .detalle .th th { border-bottom: 1px solid #dbe4f0; }
+  .totalrow td { font-weight: 700; border-top: 2px solid #1d4ed8; color: #102b4d; background: #f7f9fc; }
   tr { page-break-inside: avoid; }
   thead { display: table-header-group; }
-  .foot { margin-top: 24px; border-top: 1px solid #ccc; padding-top: 6px; color: #888; font-size: 9px; }
+  .foot { margin-top: 24px; border-top: 2px solid #dca200; padding-top: 6px; color: #94a3b8; font-size: 9px; }
 </style></head>
 <body><div class="page">
 
@@ -123,6 +193,23 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     <div class="kpi"><div class="lbl">IGV / crédito fiscal</div><div class="val">${soles(a.totalIgv)}</div></div>
     <div class="kpi"><div class="lbl">Comprobantes</div><div class="val">${a.nAsientos}</div></div>
     <div class="kpi"><div class="lbl">Movimientos</div><div class="val">${a.nMovimientos}</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="chart pie">
+      <h3>Gasto por función (destino)</h3>
+      ${svgPie(funcPie)}
+      <div class="legend">${leyenda}</div>
+    </div>
+    <div class="chart">
+      <h3>Gasto por naturaleza (clase 6)</h3>
+      ${svgBars(natBars)}
+    </div>
+  </div>
+
+  <div class="chart" style="margin-bottom:10px;">
+    <h3>Gasto por centro de costo</h3>
+    ${svgBars(ccBars, 940, 200)}
   </div>
 
   <h2>Gasto por función (destino)</h2>
