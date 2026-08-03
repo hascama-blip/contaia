@@ -136,6 +136,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const revRows = (rev?.hallazgos ?? []).map((h) => `
     <tr>
       <td><span class="conf ${h.confianza}">${esc(h.confianza)}</span></td>
+      <td class="mono"><strong>${esc(h.documento || "—")}</strong><div class="mut">${esc(h.fecha || "")}</div></td>
       <td class="mono">${esc(h.cuenta)}<div class="mut">${esc(h.funcionActual)}</div></td>
       <td>${esc(h.glosa)}</td>
       <td class="num">${soles(h.importe)}</td>
@@ -250,7 +251,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   ${rev && rev.observados > 0 ? `
   <p style="margin:0 0 6px;color:#475569;">Se detectaron <strong>${rev.observados}</strong> de ${rev.total} movimiento(s) con posible mala clasificación (${soles(rev.importeObservado)}). ${rev.correctos} correctos.</p>
   <table class="tbl">
-    <thead><tr><th>Conf.</th><th>Cuenta actual</th><th>Glosa</th><th class="num">Importe</th><th>Reclasificar a</th><th>Motivo</th></tr></thead>
+    <thead><tr><th>Conf.</th><th>Factura / Doc.</th><th>Cuenta actual</th><th>Glosa</th><th class="num">Importe</th><th>Reclasificar a</th><th>Motivo</th></tr></thead>
     <tbody>${revRows}</tbody>
   </table>
   <p class="mut" style="margin-top:4px;">Sugerencias para revisión del contador (no se modifica nada). La cuenta sugerida mantiene la naturaleza y corrige la función. Referencia: 94 Administración · 95 Ventas · 97 Financieros.</p>

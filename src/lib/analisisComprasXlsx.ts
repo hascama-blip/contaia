@@ -124,7 +124,8 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
       { header: "Cuenta actual", key: "cuenta", width: 14 },
       { header: "Función actual", key: "funcionActual", width: 26 },
       { header: "Glosa", key: "glosa", width: 40 },
-      { header: "Documento", key: "documento", width: 16 },
+      { header: "Factura / Doc.", key: "documento", width: 18 },
+      { header: "Fecha", key: "fecha", width: 12 },
       { header: "Importe (S/)", key: "importe", width: 14 },
       { header: "Reclasificar a", key: "cuentaSugerida", width: 14 },
       { header: "Subcuenta ref.", key: "subcuenta", width: 30 },
@@ -134,7 +135,7 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
     rv.addRow({ funcionActual: `Correctos: ${a.revision.correctos}`, glosa: `Observados: ${a.revision.observados}`, importe: a.revision.importeObservado }).font = { italic: true };
     for (const h of a.revision.hallazgos) {
       const row = rv.addRow(h);
-      row.getCell(6).numFmt = MONEDA;
+      row.getCell(7).numFmt = MONEDA;
     }
     if (!a.revision.hallazgos.length) rv.addRow({ funcionActual: "Sin observaciones: todo clasificado de forma coherente." });
   }

@@ -74,7 +74,8 @@ export interface HallazgoClasificacion {
   cuentaSugerida: string;  // código sugerido (mismo, con la función corregida)
   subcuenta: string;       // referencia (de las imágenes): "95.1 Publicidad"
   glosa: string;
-  documento: string;
+  documento: string;       // nº de factura/recibo/comprobante (para ubicarlo)
+  fecha: string;           // fecha de registro (o del comprobante)
   importe: number;
   motivo: string;
   confianza: "alta" | "media";
@@ -391,6 +392,7 @@ function revisarClasificacion(c9: MovDiario[]): RevisionClasificacion {
         subcuenta: sub,
         glosa: m.glosa,
         documento: m.documento,
+        fecha: m.fecReg || m.fecDoc,
         importe: m.debe,
         motivo,
         confianza: conf,

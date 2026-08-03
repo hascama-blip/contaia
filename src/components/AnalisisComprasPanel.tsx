@@ -253,6 +253,8 @@ export default function AnalisisComprasPanel() {
                       <thead className="bg-amber-50">
                         <tr className="text-left text-[10px] uppercase text-slate-500">
                           <th className="px-2 py-1">Conf.</th>
+                          <th className="px-2 py-1">Factura / Doc.</th>
+                          <th className="px-2 py-1">Fecha</th>
                           <th className="px-2 py-1">Cuenta actual</th>
                           <th className="px-2 py-1">Glosa</th>
                           <th className="px-2 py-1 text-right">Importe</th>
@@ -268,6 +270,8 @@ export default function AnalisisComprasPanel() {
                                 {h.confianza}
                               </span>
                             </td>
+                            <td className="px-2 py-1 font-semibold text-brand-700">{h.documento || "—"}</td>
+                            <td className="px-2 py-1 tabular-nums text-slate-500">{h.fecha || "—"}</td>
                             <td className="px-2 py-1 font-medium text-slate-700">{h.cuenta}<div className="text-[10px] font-normal text-slate-400">{h.funcionActual}</div></td>
                             <td className="px-2 py-1 text-slate-500">{h.glosa}</td>
                             <td className="px-2 py-1 text-right tabular-nums text-slate-700">{soles(h.importe)}</td>
