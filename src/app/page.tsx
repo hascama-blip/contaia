@@ -60,6 +60,14 @@ const OPCIONES: Opcion[] = [
     detalle:
       "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
   },
+  {
+    href: "/herramientas/analisis-compras",
+    icono: "📊",
+    titulo: "Análisis de compras para RTP",
+    detalle:
+      "Sube el Libro Diario y obtén el análisis de la cuenta clase 9 (gastos por función: administración, ventas, financieros), un dashboard de compras/gastos para gerencia y el informe en Excel.",
+    destacado: true,
+  },
 ];
 
 export default async function MenuPage() {
