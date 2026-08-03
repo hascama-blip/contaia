@@ -226,6 +226,69 @@ export default function AnalisisComprasPanel() {
             </div>
           </div>
 
+          {/* Revisión de clasificación / reclasificación sugerida */}
+          {a.revision && (
+            <div className="card p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-700">Revisión de clasificación (reclasificación sugerida)</h3>
+                <div className="flex gap-2 text-xs">
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">✓ {a.revision.correctos} correctos</span>
+                  <span className={`rounded-full px-2 py-0.5 ${a.revision.observados ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-500"}`}>
+                    ⚠ {a.revision.observados} observados
+                  </span>
+                </div>
+              </div>
+              {a.revision.observados === 0 ? (
+                <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  ✓ No se detectaron errores de clasificación evidentes. Los gastos están asignados por función de forma coherente (94 Administración · 95 Ventas · 97 Financieros).
+                </div>
+              ) : (
+                <>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Se detectaron <strong>{a.revision.observados}</strong> movimiento(s) que podrían estar mal clasificados
+                    (S/ {Number(a.revision.importeObservado).toLocaleString("es-PE", { minimumFractionDigits: 2 })}). Sugerencia de la cuenta a reclasificar:
+                  </p>
+                  <div className="overflow-x-auto rounded-lg border border-amber-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-amber-50">
+                        <tr className="text-left text-[10px] uppercase text-slate-500">
+                          <th className="px-2 py-1">Conf.</th>
+                          <th className="px-2 py-1">Cuenta actual</th>
+                          <th className="px-2 py-1">Glosa</th>
+                          <th className="px-2 py-1 text-right">Importe</th>
+                          <th className="px-2 py-1">Reclasificar a</th>
+                          <th className="px-2 py-1">Motivo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {a.revision.hallazgos.map((h: any, i: number) => (
+                          <tr key={i} className="border-t border-amber-100">
+                            <td className="px-2 py-1">
+                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${h.confianza === "alta" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                {h.confianza}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1 font-medium text-slate-700">{h.cuenta}<div className="text-[10px] font-normal text-slate-400">{h.funcionActual}</div></td>
+                            <td className="px-2 py-1 text-slate-500">{h.glosa}</td>
+                            <td className="px-2 py-1 text-right tabular-nums text-slate-700">{soles(h.importe)}</td>
+                            <td className="px-2 py-1">
+                              <span className="font-semibold text-emerald-700">{h.cuentaSugerida}</span>
+                              <div className="text-[10px] text-slate-400">{h.subcuenta}</div>
+                            </td>
+                            <td className="px-2 py-1 text-[11px] text-slate-500">{h.motivo}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 text-[10px] text-slate-400">
+                    Sugerencias automáticas para revisión del contador (no se modifica nada). La cuenta sugerida mantiene la naturaleza y corrige la función.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Top conceptos + Top comprobantes */}
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="card p-4">

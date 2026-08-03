@@ -53,6 +53,7 @@ export interface AnalisisCompras {
   porNaturaleza: CuentaResumen[];       // clase 6 por 2 dígitos
   porCentroCosto: CuentaResumen[];      // según clase 9
   porMes: { mes: string; nombre: string; debe: number; n: number }[]; // clase 9 por mes
+  revision: RevisionClasificacion;      // evaluación de clasificación + sugerencias
   topConceptos: CuentaResumen[];        // por glosa
   topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number }[];
   detalle: {
@@ -64,6 +65,27 @@ export interface AnalisisCompras {
     cenCos: string;
     debe: number;
   }[];
+}
+
+export interface HallazgoClasificacion {
+  cuenta: string;          // cuenta actual (9x)
+  funcionActual: string;   // "94 · Gastos administrativos"
+  funcionSugerida: string; // "97 · Gastos financieros"
+  cuentaSugerida: string;  // código sugerido (mismo, con la función corregida)
+  subcuenta: string;       // referencia (de las imágenes): "95.1 Publicidad"
+  glosa: string;
+  documento: string;
+  importe: number;
+  motivo: string;
+  confianza: "alta" | "media";
+}
+
+export interface RevisionClasificacion {
+  total: number;            // movimientos clase 9 revisados
+  correctos: number;
+  observados: number;       // con posible mala clasificación
+  importeObservado: number; // suma de los importes observados
+  hallazgos: HallazgoClasificacion[];
 }
 
 // --- Catálogo de nombres (PCGE + contabilidad analítica) --------------------
@@ -309,9 +331,79 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
     porNaturaleza,
     porCentroCosto,
     porMes,
+    revision: revisarClasificacion(c9),
     topConceptos,
     topComprobantes,
     detalle,
+  };
+}
+
+// Nombre de subcuenta de referencia (estructura de las imágenes 94/95/97).
+const SUB_94: Record<string, string> = { "1": "94.1 Valuación de activos y provisiones", "2": "94.2 Útiles de escritorio", "3": "94.3 Gastos generales", "4": "94.4 Sueldos y salarios", "5": "94.5 Contribuciones y cargas sociales" };
+const SUB_95: Record<string, string> = { "1": "95.1 Publicidad", "2": "95.2 Comunicaciones", "3": "95.3 Comisiones", "4": "95.4 Sueldos y salarios", "5": "95.5 Contribuciones y cargas sociales", "6": "95.6 Depreciación y amortización", "7": "95.7 Gastos generales", "8": "95.8 Valuación de activos y provisiones" };
+
+/**
+ * Evalúa si cada gasto (clase 9) está clasificado en la función correcta
+ * (94 Administración / 95 Ventas / 97 Financieros) y, si no, sugiere a qué
+ * cuenta reclasificarlo. Reglas (según las cuentas 94/95/97 de referencia):
+ *  - Naturaleza financiera (67…) → debe ir a 97.
+ *  - Publicidad/marketing → Ventas (95.1).
+ *  - Comisiones/portes bancarios, intereses, ITF, mantenimiento de cuenta,
+ *    sobregiro → Financieros (97).
+ * Solo se marcan hallazgos de confianza razonable (no adivina el resto).
+ */
+function revisarClasificacion(c9: MovDiario[]): RevisionClasificacion {
+  const hallazgos: HallazgoClasificacion[] = [];
+  for (const m of c9) {
+    const func = m.cuenta.slice(0, 2);
+    const natEmbed = m.cuenta.slice(2, 4); // naturaleza embebida en la cuenta 9x
+    const g = (m.glosa || "").toLowerCase();
+    let esperada = "", sub = "", motivo = "", conf: "alta" | "media" = "media";
+
+    const bancoFuerte = /inter[eé]s\b|\bitf\b|impuesto.*transacci|mantenimiento de cuenta|portes de cobranza|gastos? bancari|comisi[oó]n(es)? bancari|cargo bancari|sobregiro|financiamiento|desgravamen|seguro de cr[eé]dito/i.test(g);
+    // Indicios de cargo bancario/financiero (más suaves → confianza media).
+    const bancoMedio = /\bportes\b|(mantenimiento.*(cuenta|tarjeta|portes))|transacci[oó]n|cobro.*servici/i.test(g);
+    const esPublicidad = /publicidad|marketing|gigantograf|banner|afiche|volante|promoci[oó]n|flyer|auspicio|panel(es)? public|merchandising|spot public/i.test(g);
+
+    if (natEmbed === "67" && func !== "97") {
+      esperada = "97"; sub = "97 Gastos financieros"; conf = "alta";
+      motivo = `El gasto es de naturaleza financiera (cuenta 67…) pero está registrado en ${func} (${nombreFuncion(func)}). Debe ir a Gastos financieros (97).`;
+    } else if (esPublicidad && func !== "95") {
+      esperada = "95"; sub = SUB_95["1"]; conf = "alta";
+      motivo = `Concepto de publicidad/marketing registrado en ${func} (${nombreFuncion(func)}). Corresponde a Gastos de ventas (95.1 Publicidad).`;
+    } else if (bancoFuerte && func !== "97") {
+      esperada = "97"; sub = "97 Gastos financieros"; conf = "alta";
+      motivo = `Concepto financiero/bancario registrado en ${func} (${nombreFuncion(func)}). Corresponde a Gastos financieros (97).`;
+    } else if (bancoMedio && func !== "97") {
+      esperada = "97"; sub = "97 Gastos financieros"; conf = "media";
+      motivo = `Posible cargo bancario/financiero ("${m.glosa}") registrado en ${func} (${nombreFuncion(func)}). Revisar si corresponde a Gastos financieros (97).`;
+    } else if (func === "97" && natEmbed !== "67") {
+      esperada = "94"; sub = SUB_94["3"]; conf = "media";
+      motivo = `Está en Gastos financieros (97) pero su naturaleza (${natEmbed}…) no es financiera. Revisar: probablemente sea administrativo (94) o de ventas (95).`;
+    }
+
+    if (esperada && esperada !== func) {
+      hallazgos.push({
+        cuenta: m.cuenta,
+        funcionActual: `${func} · ${nombreFuncion(func)}`,
+        funcionSugerida: `${esperada} · ${nombreFuncion(esperada)}`,
+        cuentaSugerida: esperada + m.cuenta.slice(2),
+        subcuenta: sub,
+        glosa: m.glosa,
+        documento: m.documento,
+        importe: m.debe,
+        motivo,
+        confianza: conf,
+      });
+    }
+  }
+  hallazgos.sort((a, b) => (a.confianza === b.confianza ? b.importe - a.importe : a.confianza === "alta" ? -1 : 1));
+  return {
+    total: c9.length,
+    observados: hallazgos.length,
+    correctos: c9.length - hallazgos.length,
+    importeObservado: hallazgos.reduce((s, h) => s + h.importe, 0),
+    hallazgos,
   };
 }
 

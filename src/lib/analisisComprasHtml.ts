@@ -132,6 +132,17 @@ export function informeComprasHtml(a: AnalisisCompras): string {
       <td class="num">${soles(d.debe)}</td>
     </tr>`).join("");
 
+  const rev = a.revision;
+  const revRows = (rev?.hallazgos ?? []).map((h) => `
+    <tr>
+      <td><span class="conf ${h.confianza}">${esc(h.confianza)}</span></td>
+      <td class="mono">${esc(h.cuenta)}<div class="mut">${esc(h.funcionActual)}</div></td>
+      <td>${esc(h.glosa)}</td>
+      <td class="num">${soles(h.importe)}</td>
+      <td class="mono" style="color:#047857"><strong>${esc(h.cuentaSugerida)}</strong><div class="mut">${esc(h.subcuenta)}</div></td>
+      <td>${esc(h.motivo)}</td>
+    </tr>`).join("");
+
   const hoy = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
 
   return `<!doctype html>
@@ -181,6 +192,10 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   tr { page-break-inside: avoid; }
   thead { display: table-header-group; }
   .foot { margin-top: 24px; border-top: 2px solid #dca200; padding-top: 6px; color: #94a3b8; font-size: 9px; }
+  .mut { color: #94a3b8; font-size: 8.5px; }
+  .conf { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+  .conf.alta { background: #fee2e2; color: #b91c1c; }
+  .conf.media { background: #fef3c7; color: #b45309; }
 </style></head>
 <body><div class="page">
 
@@ -230,6 +245,16 @@ export function informeComprasHtml(a: AnalisisCompras): string {
 
   <h2>Análisis de la cuenta clase 9 (detallado)</h2>
   ${clase9}
+
+  <h2>Revisión de clasificación (reclasificación sugerida)</h2>
+  ${rev && rev.observados > 0 ? `
+  <p style="margin:0 0 6px;color:#475569;">Se detectaron <strong>${rev.observados}</strong> de ${rev.total} movimiento(s) con posible mala clasificación (${soles(rev.importeObservado)}). ${rev.correctos} correctos.</p>
+  <table class="tbl">
+    <thead><tr><th>Conf.</th><th>Cuenta actual</th><th>Glosa</th><th class="num">Importe</th><th>Reclasificar a</th><th>Motivo</th></tr></thead>
+    <tbody>${revRows}</tbody>
+  </table>
+  <p class="mut" style="margin-top:4px;">Sugerencias para revisión del contador (no se modifica nada). La cuenta sugerida mantiene la naturaleza y corrige la función. Referencia: 94 Administración · 95 Ventas · 97 Financieros.</p>
+  ` : `<p style="color:#047857;">✓ No se detectaron errores de clasificación evidentes. Los ${rev?.total ?? 0} movimientos están asignados por función de forma coherente (94 Administración · 95 Ventas · 97 Financieros).</p>`}
 
   <h2>Gasto por naturaleza (clase 6)</h2>
   <table class="tbl">
