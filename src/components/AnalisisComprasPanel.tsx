@@ -34,21 +34,23 @@ export default function AnalisisComprasPanel() {
     }
   }
 
-  async function descargarExcel() {
-    setBusy(true);
+  async function descargar(tipo: "excel" | "pdf") {
+    setError(null); setBusy(true);
     try {
-      const res = await fetch("/api/analisis-compras/excel", {
+      const res = await fetch(`/api/analisis-compras/${tipo}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ analisis: a }),
       });
-      if (!res.ok) { setError("No se pudo generar el informe."); return; }
+      if (!res.ok) { setError(`No se pudo generar el informe (${tipo.toUpperCase()}).`); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const el = document.createElement("a");
-      el.href = url; el.download = "informe-compras-gerencia.xlsx";
+      el.href = url; el.download = `informe-compras-gerencia.${tipo === "excel" ? "xlsx" : "pdf"}`;
       document.body.appendChild(el); el.click(); el.remove();
       URL.revokeObjectURL(url);
+    } catch {
+      setError("Error de red al generar el informe.");
     } finally {
       setBusy(false);
     }
@@ -83,9 +85,14 @@ export default function AnalisisComprasPanel() {
           </label>
           {nombre && <span className="text-xs text-emerald-700">✓ {nombre}</span>}
           {a && (
-            <button className="btn-ghost ml-auto text-sm" onClick={descargarExcel} disabled={busy}>
-              ⬇ Descargar informe (Excel)
-            </button>
+            <div className="ml-auto flex gap-2">
+              <button className="btn-primary text-sm" onClick={() => descargar("pdf")} disabled={busy}>
+                ⬇ Informe (PDF)
+              </button>
+              <button className="btn-ghost text-sm" onClick={() => descargar("excel")} disabled={busy}>
+                ⬇ Informe (Excel)
+              </button>
+            </div>
           )}
         </div>
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
