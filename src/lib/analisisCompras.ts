@@ -46,12 +46,13 @@ export interface AnalisisCompras {
   desde: string;
   hasta: string;
   totalGasto: number;       // suma DEBE de clase 9
-  nAsientos: number;        // documentos distintos
+  nAsientos: number;        // asientos (comprobantes) contabilizados
   nMovimientos: number;     // renglones de clase 9
   totalIgv: number;         // suma DEBE cuenta 40 (crédito fiscal)
   porFuncion: FuncionResumen[];
   porNaturaleza: CuentaResumen[];       // clase 6 por 2 dígitos
   porCentroCosto: CuentaResumen[];      // según clase 9
+  porMes: { mes: string; nombre: string; debe: number; n: number }[]; // clase 9 por mes
   topConceptos: CuentaResumen[];        // por glosa
   topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number }[];
   detalle: {
@@ -117,12 +118,17 @@ function aFecha(v: any): string {
   return "";
 }
 
-/** Lee el Libro Diario (Excel) y devuelve los movimientos + la empresa. */
-export async function parseLibroDiario(buf: Buffer): Promise<{ empresa: string; movimientos: MovDiario[] }> {
+/** Lee el Libro Diario (Excel) y devuelve los movimientos + la empresa.
+ *  Reconoce los ASIENTOS por su patrón: cabecera del asiento (Sub.Sec="4",
+ *  Comp.Cuenta=nº asiento, T/C y "RC serie-doc"), líneas de detalle (Sec
+ *  "00001…") y pie "Comprobante => 04 000N | totalDebe | totalHaber". Solo se
+ *  toman las LÍNEAS DE DETALLE: una línea real tiene exactamente uno de
+ *  Debe/Haber (la cabecera trae ambos en 0; el pie de totales trae ambos > 0). */
+export async function parseLibroDiario(buf: Buffer): Promise<{ empresa: string; movimientos: MovDiario[]; asientos: number }> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as any);
   const ws = wb.worksheets[0];
-  if (!ws) return { empresa: "", movimientos: [] };
+  if (!ws) return { empresa: "", movimientos: [], asientos: 0 };
 
   let empresa = aTexto(celValor(ws.getRow(1).getCell(1)));
   // Ubica la fila de encabezado (contiene "Cuenta" y "Debe"/"Haber").
@@ -157,27 +163,36 @@ export async function parseLibroDiario(buf: Buffer): Promise<{ empresa: string; 
       break;
     }
   }
-  if (headerRow < 0 || !idx.cuenta) return { empresa, movimientos: [] };
+  if (headerRow < 0 || !idx.cuenta) return { empresa, movimientos: [], asientos: 0 };
 
   const movimientos: MovDiario[] = [];
+  let asientos = 0;
   for (let r = headerRow + 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const cuenta = aTexto(celValor(row.getCell(idx.cuenta))).replace(/\s/g, "");
-    if (!/^\d{2,}$/.test(cuenta)) continue; // salta filas de texto/totales
+    const documento = idx.documento ? aTexto(celValor(row.getCell(idx.documento))) : "";
+    // Pie de asiento: "Comprobante => 04 000N ..." → cuenta un asiento.
+    if (/^comprobante/i.test(documento)) { asientos++; continue; }
+    if (!/^\d+$/.test(cuenta)) continue; // no es cuenta contable
+    const debe = idx.debe ? aNumero(celValor(row.getCell(idx.debe))) : 0;
+    const haber = idx.haber ? aNumero(celValor(row.getCell(idx.haber))) : 0;
+    // Línea de movimiento REAL = exactamente uno de Debe/Haber. Descarta
+    // cabeceras de asiento (ambos 0) y filas de totales (ambos > 0).
+    if ((debe > 0) === (haber > 0)) continue;
     movimientos.push({
       sec: idx.sec ? aTexto(celValor(row.getCell(idx.sec))) : "",
       cuenta,
       glosa: idx.glosa ? aTexto(celValor(row.getCell(idx.glosa))) : "",
       anexo: idx.anexo ? aTexto(celValor(row.getCell(idx.anexo))) : "",
-      documento: idx.documento ? aTexto(celValor(row.getCell(idx.documento))) : "",
+      documento,
       fecDoc: idx.fecDoc ? aFecha(celValor(row.getCell(idx.fecDoc))) : "",
       fecReg: idx.fecReg ? aFecha(celValor(row.getCell(idx.fecReg))) : "",
       cenCos: idx.cenCos ? aTexto(celValor(row.getCell(idx.cenCos))) : "",
-      debe: idx.debe ? aNumero(celValor(row.getCell(idx.debe))) : 0,
-      haber: idx.haber ? aNumero(celValor(row.getCell(idx.haber))) : 0,
+      debe,
+      haber,
     });
   }
-  return { empresa, movimientos };
+  return { empresa, movimientos, asientos };
 }
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -190,8 +205,10 @@ function periodoTexto(desde: string, hasta: string): string {
   return `${ini} – ${MESES[Number(bm) - 1] ?? ""} ${by}`;
 }
 
-/** Construye el análisis de compras/gastos a partir de los movimientos. */
-export function analizarCompras(movimientos: MovDiario[], empresa: string): AnalisisCompras {
+/** Construye el análisis de compras/gastos a partir de los movimientos.
+ *  `asientos` = nº de asientos detectados (pies "Comprobante =>"); si es 0 se
+ *  usa el nº de documentos distintos. */
+export function analizarCompras(movimientos: MovDiario[], empresa: string, asientos = 0): AnalisisCompras {
   const c9 = movimientos.filter((m) => m.cuenta.startsWith("9"));
   const c6 = movimientos.filter((m) => m.cuenta.startsWith("6"));
   const c40 = movimientos.filter((m) => m.cuenta.startsWith("40"));
@@ -261,6 +278,14 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string): Anal
     debe: ms.reduce((s, m) => s + m.debe, 0),
   })).sort((a, b) => b.debe - a.debe).slice(0, 20);
 
+  // Por mes (clase 9, según Fec.Reg). Útil al subir varios meses juntos.
+  const mesMap = new Map<string, MovDiario[]>();
+  for (const m of c9) { const k = (m.fecReg || m.fecDoc).slice(0, 7); if (!k) continue; (mesMap.get(k) ?? mesMap.set(k, []).get(k)!).push(m); }
+  const porMes = [...mesMap.entries()].map(([mes, ms]) => {
+    const [y, mm] = mes.split("-");
+    return { mes, nombre: `${MESES[Number(mm) - 1] ?? mes} ${y}`, debe: ms.reduce((s, m) => s + m.debe, 0), n: ms.length };
+  }).sort((a, b) => a.mes.localeCompare(b.mes));
+
   // Detalle completo de clase 9.
   const detalle = c9.map((m) => ({
     cuenta: m.cuenta,
@@ -277,12 +302,13 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string): Anal
     periodo: periodoTexto(desde, hasta),
     desde, hasta,
     totalGasto,
-    nAsientos: new Set(c9.map((m) => m.documento).filter(Boolean)).size,
+    nAsientos: asientos > 0 ? asientos : new Set(c9.map((m) => m.documento).filter(Boolean)).size,
     nMovimientos: c9.length,
     totalIgv: c40.reduce((s, m) => s + m.debe, 0),
     porFuncion,
     porNaturaleza,
     porCentroCosto,
+    porMes,
     topConceptos,
     topComprobantes,
     detalle,

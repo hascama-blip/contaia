@@ -70,6 +70,8 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const funcPie = a.porFuncion.map((f, i) => ({ label: `${f.cod} ${f.nombre}`, value: f.debe, color: PAL[i % PAL.length] }));
   const natBars = a.porNaturaleza.slice(0, 8).map((n, i) => ({ label: n.cod, value: n.debe, color: PAL[i % PAL.length] }));
   const ccBars = a.porCentroCosto.slice(0, 8).map((c, i) => ({ label: c.cod, value: c.debe, color: PAL[i % PAL.length] }));
+  const porMes = a.porMes ?? [];
+  const mesBars = porMes.map((m, i) => ({ label: m.nombre.replace(/ \d{4}$/, ""), value: m.debe, color: PAL[i % PAL.length] }));
   const leyenda = funcPie.map((d) => `<span class="lg"><i style="background:${d.color}"></i>${esc(d.label)} — <strong>${soles(d.value)}</strong></span>`).join("");
 
   const funcRows = a.porFuncion.map((f, i) => `
@@ -207,6 +209,12 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     </div>
   </div>
 
+  ${mesBars.length > 1 ? `
+  <div class="chart" style="margin-bottom:10px;">
+    <h3>Gasto por mes</h3>
+    ${svgBars(mesBars, 940, 200)}
+  </div>` : ""}
+
   <div class="chart" style="margin-bottom:10px;">
     <h3>Gasto por centro de costo</h3>
     ${svgBars(ccBars, 940, 200)}
@@ -234,6 +242,15 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     <thead><tr><th>Centro de costo</th><th class="num">Importe</th><th class="pct">%</th><th></th></tr></thead>
     <tbody>${ccRows}</tbody>
   </table>
+
+  ${porMes.length > 1 ? `
+  <h2>Gasto por mes</h2>
+  <table class="tbl">
+    <thead><tr><th>Mes</th><th class="num">Nº mov.</th><th class="num">Importe</th></tr></thead>
+    <tbody>${porMes.map((m) => `<tr><td>${esc(m.nombre)}</td><td class="num">${m.n}</td><td class="num">${soles(m.debe)}</td></tr>`).join("")}
+      <tr class="totalrow"><td>TOTAL</td><td class="num">${a.nMovimientos}</td><td class="num">${soles(a.totalGasto)}</td></tr>
+    </tbody>
+  </table>` : ""}
 
   <h2>Principales conceptos</h2>
   <table class="tbl">

@@ -13,22 +13,22 @@ const COLORS = ["#1d4ed8", "#b88a2a", "#0ea5e9", "#10b981", "#f97316", "#8b5cf6"
 export default function AnalisisComprasPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nombre, setNombre] = useState<string | null>(null);
+  const [archivos, setArchivos] = useState<any[]>([]);
   const [a, setA] = useState<any>(null);
   const [verDetalle, setVerDetalle] = useState(false);
 
-  async function subir(file: File) {
+  async function subir(files: FileList) {
     setError(null); setA(null); setBusy(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      Array.from(files).forEach((f) => fd.append("file", f));
       const res = await fetch("/api/analisis-compras/parsear", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo analizar el archivo."); return; }
       setA(data.analisis);
-      setNombre(file.name);
+      setArchivos(data.archivos ?? []);
     } catch {
-      setError("Error de red al subir el archivo.");
+      setError("Error de red al subir los archivos.");
     } finally {
       setBusy(false);
     }
@@ -59,6 +59,7 @@ export default function AnalisisComprasPanel() {
   const funcData = (a?.porFuncion ?? []).map((f: any) => ({ name: `${f.cod} ${f.nombre.split(" ").slice(1, 2).join(" ") || f.nombre}`, nombre: f.nombre, value: f.debe, pct: f.pct }));
   const natData = (a?.porNaturaleza ?? []).map((n: any) => ({ name: n.cod, nombre: n.nombre, value: n.debe }));
   const ccData = (a?.porCentroCosto ?? []).map((c: any) => ({ name: c.cod, value: c.debe }));
+  const mesData = (a?.porMes ?? []).map((m: any) => ({ name: m.nombre.replace(/ \d{4}$/, ""), nombre: m.nombre, value: m.debe }));
 
   return (
     <section className="space-y-5">
@@ -69,21 +70,25 @@ export default function AnalisisComprasPanel() {
           <span className="badge bg-slate-100 text-slate-500">Libro Diario (Excel)</span>
         </div>
         <p className="mb-4 text-xs text-slate-400">
-          Sube el <strong>Libro Diario</strong> exportado del sistema contable. El sistema clasifica los
-          gastos por <strong>función (clase 9)</strong> — administración, ventas, financieros — arma el
-          <strong> dashboard para gerencia</strong> y genera el <strong>informe en Excel</strong>.
+          Sube el <strong>Libro Diario</strong> crudo (tal cual sale del sistema contable). Puedes subir
+          <strong> varios meses a la vez</strong> (enero…diciembre) y se combinan en un solo informe. El
+          sistema detecta los <strong>asientos</strong>, clasifica los gastos por <strong>función (clase 9)</strong>,
+          arma el <strong>dashboard para gerencia</strong> y genera el informe (PDF/Excel).
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <label className={`btn-primary cursor-pointer text-sm ${busy ? "pointer-events-none opacity-50" : ""}`}>
-            {busy ? "Analizando…" : "⬆ Subir Libro Diario (Excel)"}
+            {busy ? "Analizando…" : "⬆ Subir Libro(s) Diario(s) — varios meses"}
             <input
               type="file"
+              multiple
               accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(f); e.currentTarget.value = ""; }}
+              onChange={(e) => { const f = e.target.files; if (f && f.length) subir(f); e.currentTarget.value = ""; }}
             />
           </label>
-          {nombre && <span className="text-xs text-emerald-700">✓ {nombre}</span>}
+          {archivos.length > 0 && (
+            <span className="text-xs text-emerald-700">✓ {archivos.length} archivo(s)</span>
+          )}
           {a && (
             <div className="ml-auto flex gap-2">
               <button className="btn-primary text-sm" onClick={() => descargar("pdf")} disabled={busy}>
@@ -96,6 +101,15 @@ export default function AnalisisComprasPanel() {
           )}
         </div>
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+        {archivos.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {archivos.map((f: any, i: number) => (
+              <span key={i} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-600">
+                📄 {f.nombre} <span className="text-slate-400">· {f.asientos} asiento(s), {f.movimientos} mov.</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {a && (
@@ -142,6 +156,21 @@ export default function AnalisisComprasPanel() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {mesData.length > 1 && (
+            <div className="card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Gasto por mes</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={mesData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={solesK} width={64} />
+                  <Tooltip formatter={(v: number) => soles(v)} labelFormatter={(l, p: any) => p?.[0]?.payload?.nombre ?? l} />
+                  <Bar dataKey="value" name="Gasto" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           <div className="card p-4">
             <h3 className="mb-2 text-sm font-semibold text-slate-700">Gasto por centro de costo</h3>

@@ -116,6 +116,23 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
     row.getCell(3).numFmt = MONEDA;
   }
 
+  // --- Por Mes (si hay varios meses) ---
+  if ((a.porMes ?? []).length > 1) {
+    const mes = wb.addWorksheet("Por Mes");
+    mes.columns = [
+      { header: "Mes", key: "nombre", width: 20 },
+      { header: "Nº mov.", key: "n", width: 10 },
+      { header: "Importe (S/)", key: "debe", width: 16 },
+    ];
+    encabezado(mes, 3);
+    for (const m of a.porMes) {
+      const row = mes.addRow({ nombre: m.nombre, n: m.n, debe: m.debe });
+      row.getCell(3).numFmt = MONEDA;
+    }
+    const t = mes.addRow({ nombre: "TOTAL", n: a.nMovimientos, debe: a.totalGasto });
+    t.font = { bold: true }; t.getCell(3).numFmt = MONEDA;
+  }
+
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);
 }
