@@ -107,13 +107,14 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const detalle = a.detalleCuentas.map((g) => `
     <table class="tbl detalle">
       <thead>
-        <tr class="grp"><td colspan="4"><span class="dot" style="background:#1d4ed8"></span><strong>${esc(g.cuenta)}</strong> · ${esc(g.funcion)} — ${esc(g.concepto)} — ${soles(g.total)} (${g.movimientos.length} mov.)</td></tr>
-        <tr class="th"><th>Fecha</th><th>Glosa</th><th>Factura / Doc.</th><th class="num">Importe</th></tr>
+        <tr class="grp"><td colspan="5"><span class="dot" style="background:#1d4ed8"></span><strong>${esc(g.cuenta)} · ${esc(g.funcion)}</strong> — ${soles(g.total)} (${g.movimientos.length} mov.)</td></tr>
+        <tr class="th"><th>Fecha</th><th>Cuenta</th><th>Glosa</th><th>Factura / Doc.</th><th class="num">Importe</th></tr>
       </thead>
       <tbody>
         ${g.movimientos.map((m) => `
           <tr>
             <td>${esc(m.fecha)}${m.cenCos ? ` <span class="mut">(${esc(m.cenCos)})</span>` : ""}</td>
+            <td class="mono">${esc(m.cuenta)}</td>
             <td>${esc(m.glosa)}</td>
             <td class="mono">${esc(m.documento)}</td>
             <td class="num">${soles(m.debe)}</td>
@@ -285,7 +286,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     <tbody>${comprobantes}</tbody>
   </table>
 
-  <h2>Anexo: detalle por cuenta (clase 9)</h2>
+  <h2>Anexo: detalle por función (clase 9)</h2>
   ${detalle}
 
   <div class="foot">Documento generado automáticamente para uso de gerencia. Cifras en soles (S/).</div>

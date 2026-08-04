@@ -67,23 +67,24 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   const t2 = n2.addRow({ cod: "", nombre: "TOTAL", n: a.nMovimientos, debe: a.totalGasto, pct: "100%" });
   t2.font = { bold: true }; t2.getCell(4).numFmt = MONEDA;
 
-  // --- Detalle por cuenta (clase 9); movimientos ordenados por fecha ---
-  const det = wb.addWorksheet("Detalle por cuenta");
+  // --- Detalle por función (clase 9); movimientos ordenados por fecha ---
+  const det = wb.addWorksheet("Detalle por función");
   det.columns = [
     { header: "Fecha", key: "fecha", width: 12 },
-    { header: "Glosa", key: "glosa", width: 46 },
+    { header: "Cuenta", key: "cuenta", width: 12 },
+    { header: "Glosa", key: "glosa", width: 44 },
     { header: "Factura / Doc.", key: "documento", width: 18 },
     { header: "C. Costo", key: "cenCos", width: 10 },
     { header: "Importe (S/)", key: "debe", width: 16 },
   ];
-  encabezado(det, 5);
+  encabezado(det, 6);
   for (const g of a.detalleCuentas) {
-    const h = det.addRow({ fecha: `${g.cuenta} · ${g.funcion} — ${g.concepto}`, debe: g.total });
+    const h = det.addRow({ fecha: `${g.cuenta} · ${g.funcion}`, debe: g.total });
     h.getCell(1).font = { bold: true }; h.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3E7CC" } };
-    h.getCell(5).numFmt = MONEDA; h.getCell(5).font = { bold: true };
+    h.getCell(6).numFmt = MONEDA; h.getCell(6).font = { bold: true };
     for (const m of g.movimientos) {
-      const row = det.addRow({ fecha: m.fecha, glosa: m.glosa, documento: m.documento, cenCos: m.cenCos, debe: m.debe });
-      row.getCell(5).numFmt = MONEDA;
+      const row = det.addRow({ fecha: m.fecha, cuenta: m.cuenta, glosa: m.glosa, documento: m.documento, cenCos: m.cenCos, debe: m.debe });
+      row.getCell(6).numFmt = MONEDA;
     }
   }
 

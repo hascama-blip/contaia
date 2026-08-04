@@ -322,17 +322,17 @@ export default function AnalisisComprasPanel() {
             </div>
           </div>
 
-          {/* Detalle por cuenta (movimientos ordenados por fecha) */}
+          {/* Detalle por función (movimientos ordenados por fecha) */}
           <div className="card p-4">
             <button className="mb-2 text-sm font-semibold text-brand-600 hover:underline" onClick={() => setVerDetalle((v) => !v)}>
-              {verDetalle ? "▲ Ocultar" : "▼ Ver"} detalle por cuenta ({a.detalleCuentas.length} cuentas · {a.nMovimientos} movimientos)
+              {verDetalle ? "▲ Ocultar" : "▼ Ver"} detalle por función ({a.detalleCuentas.length} funciones · {a.nMovimientos} movimientos)
             </button>
             {verDetalle && (
               <div className="max-h-[36rem] space-y-4 overflow-auto">
                 {a.detalleCuentas.map((g: any) => (
                   <div key={g.cuenta} className="rounded-lg border border-slate-200">
                     <div className="flex items-center justify-between bg-brand-50 px-3 py-2">
-                      <span className="text-sm font-bold text-brand-800">{g.cuenta}<span className="ml-2 text-xs font-normal text-brand-500">{g.funcion} · {g.concepto}</span></span>
+                      <span className="text-sm font-bold text-brand-800">{g.cuenta} · {g.funcion}</span>
                       <span className="text-sm font-bold text-brand-800">{soles(g.total)} <span className="text-xs font-normal text-brand-500">({g.movimientos.length} mov.)</span></span>
                     </div>
                     <div className="overflow-x-auto">
@@ -340,6 +340,7 @@ export default function AnalisisComprasPanel() {
                         <thead>
                           <tr className="text-left text-[10px] uppercase text-slate-400">
                             <th className="px-3 py-1">Fecha</th>
+                            <th className="px-3 py-1">Cuenta</th>
                             <th className="px-3 py-1">Glosa</th>
                             <th className="px-3 py-1">Factura / Doc.</th>
                             <th className="px-3 py-1">C.C.</th>
@@ -350,6 +351,7 @@ export default function AnalisisComprasPanel() {
                           {g.movimientos.map((m: any, i: number) => (
                             <tr key={i} className="border-t border-slate-100">
                               <td className="px-3 py-1 tabular-nums text-slate-500">{m.fecha}</td>
+                              <td className="px-3 py-1 tabular-nums text-slate-500">{m.cuenta}</td>
                               <td className="px-3 py-1 text-slate-600">{m.glosa}</td>
                               <td className="px-3 py-1 text-slate-500">{m.documento}</td>
                               <td className="px-3 py-1 text-slate-400">{m.cenCos}</td>

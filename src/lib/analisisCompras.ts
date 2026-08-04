@@ -56,15 +56,16 @@ export interface AnalisisCompras {
   revision: RevisionClasificacion;      // evaluación de clasificación + sugerencias
   topConceptos: CuentaResumen[];        // por glosa
   topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number }[];
-  // Detalle AGRUPADO POR CUENTA (clase 9); dentro de cada cuenta, los
-  // movimientos van ordenados por fecha.
+  // Detalle AGRUPADO POR FUNCIÓN (2 dígitos: 94/95/97…); dentro de cada
+  // función, los movimientos van ordenados por fecha.
   detalleCuentas: {
-    cuenta: string;
+    cuenta: string;       // código de función (2 dígitos)
     funcion: string;
     concepto: string;
     total: number;
     movimientos: {
       fecha: string;      // fecha de registro (o del comprobante)
+      cuenta: string;     // cuenta específica del movimiento (informativa)
       glosa: string;
       documento: string;
       cenCos: string;
@@ -315,17 +316,18 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
     return { mes, nombre: `${MESES[Number(mm) - 1] ?? mes} ${y}`, debe: ms.reduce((s, m) => s + m.debe, 0), n: ms.length };
   }).sort((a, b) => a.mes.localeCompare(b.mes));
 
-  // Detalle AGRUPADO POR CUENTA (clase 9); dentro de cada cuenta, los
-  // movimientos ordenados por fecha. Las cuentas van en orden de código.
-  const detCuentaMap = new Map<string, MovDiario[]>();
-  for (const m of c9) (detCuentaMap.get(m.cuenta) ?? detCuentaMap.set(m.cuenta, []).get(m.cuenta)!).push(m);
-  const detalleCuentas = [...detCuentaMap.entries()].map(([cuenta, ms]) => ({
-    cuenta,
-    funcion: nombreFuncion(cuenta.slice(0, 2)),
-    concepto: conceptoRepresentativo(ms),
+  // Detalle AGRUPADO POR FUNCIÓN (2 dígitos); dentro de cada función, los
+  // movimientos ordenados por fecha. Las funciones van en orden de código.
+  const detFuncMap = new Map<string, MovDiario[]>();
+  for (const m of c9) { const k = m.cuenta.slice(0, 2); (detFuncMap.get(k) ?? detFuncMap.set(k, []).get(k)!).push(m); }
+  const detalleCuentas = [...detFuncMap.entries()].map(([cod, ms]) => ({
+    cuenta: cod,
+    funcion: nombreFuncion(cod),
+    concepto: "",
     total: ms.reduce((s, m) => s + m.debe, 0),
     movimientos: ms.map((m) => ({
       fecha: m.fecReg || m.fecDoc,
+      cuenta: m.cuenta,
       glosa: m.glosa,
       documento: m.documento,
       cenCos: m.cenCos,
