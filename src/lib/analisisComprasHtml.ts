@@ -98,23 +98,6 @@ export function informeComprasHtml(a: AnalisisCompras): string {
       <td class="barcell">${barra(c.pct)}</td>
     </tr>`).join("");
 
-  const clase9 = a.porFuncion.map((f, i) => `
-    <table class="tbl detalle">
-      <thead>
-        <tr class="grp"><td colspan="4"><span class="dot" style="background:${PAL[i % PAL.length]}"></span><strong>${esc(f.cod)} · ${esc(f.nombre)}</strong> — ${soles(f.debe)} (${f.pct.toFixed(1)}%)</td></tr>
-        <tr class="th"><th>Cuenta</th><th>Concepto</th><th class="num">Nº mov.</th><th class="num">Importe</th></tr>
-      </thead>
-      <tbody>
-        ${f.cuentas.map((c) => `
-          <tr>
-            <td class="mono">${esc(c.cod)}</td>
-            <td>${esc(c.nombre)}</td>
-            <td class="num">${c.n}</td>
-            <td class="num">${soles(c.debe)}</td>
-          </tr>`).join("")}
-      </tbody>
-    </table>`).join("");
-
   const conceptos = a.topConceptos.map((c) => `
     <tr><td>${esc(c.nombre)}</td><td class="num">${c.n}</td><td class="num">${soles(c.debe)}</td></tr>`).join("");
 
@@ -250,8 +233,14 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     </tbody>
   </table>
 
-  <h2>Análisis de la cuenta clase 9 (detallado)</h2>
-  ${clase9}
+  <h2>Detalle a nivel 2 dígitos (función)</h2>
+  <table class="tbl">
+    <thead><tr><th>Cuenta</th><th>Descripción</th><th class="num">Nº mov.</th><th class="num">Importe</th><th class="pct">%</th></tr></thead>
+    <tbody>
+      ${a.porFuncion.map((f) => `<tr><td class="mono"><strong>${esc(f.cod)}</strong></td><td>${esc(f.nombre)}</td><td class="num">${f.n}</td><td class="num">${soles(f.debe)}</td><td class="pct">${f.pct.toFixed(1)}%</td></tr>`).join("")}
+      <tr class="totalrow"><td colspan="2">TOTAL</td><td class="num">${a.nMovimientos}</td><td class="num">${soles(a.totalGasto)}</td><td class="pct">100%</td></tr>
+    </tbody>
+  </table>
 
   <h2>Revisión de clasificación (reclasificación sugerida)</h2>
   ${rev && rev.observados > 0 ? `

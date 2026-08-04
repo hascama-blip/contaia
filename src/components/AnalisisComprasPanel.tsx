@@ -187,42 +187,38 @@ export default function AnalisisComprasPanel() {
             </ResponsiveContainer>
           </div>
 
-          {/* Análisis clase 9 por función → cuentas */}
+          {/* Detalle a nivel 2 dígitos (rollup por función 90…97) */}
           <div className="card p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">Análisis de cuenta clase 9 (detallado)</h3>
-            <div className="space-y-4">
-              {a.porFuncion.map((f: any) => (
-                <div key={f.cod}>
-                  <div className="flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2">
-                    <span className="text-sm font-bold text-brand-800">{f.cod} · {f.nombre}</span>
-                    <span className="text-sm font-bold text-brand-800">{soles(f.debe)} <span className="text-xs font-normal text-brand-500">({f.pct.toFixed(1)}%)</span></span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] uppercase text-slate-400">
-                          <th className="px-3 py-1">Cuenta</th>
-                          <th className="px-3 py-1">Concepto</th>
-                          <th className="px-3 py-1 text-right">Nº mov.</th>
-                          <th className="px-3 py-1 text-right">Importe</th>
-                          <th className="px-3 py-1 text-right">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {f.cuentas.map((c: any) => (
-                          <tr key={c.cod} className="border-t border-slate-100">
-                            <td className="px-3 py-1 font-medium text-slate-700">{c.cod}</td>
-                            <td className="px-3 py-1 text-slate-500">{c.nombre}</td>
-                            <td className="px-3 py-1 text-right tabular-nums text-slate-500">{c.n}</td>
-                            <td className="px-3 py-1 text-right tabular-nums text-slate-700">{soles(c.debe)}</td>
-                            <td className="px-3 py-1 text-right tabular-nums text-slate-400">{c.pct.toFixed(1)}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Detalle a nivel 2 dígitos (función)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase text-slate-400">
+                    <th className="px-3 py-1">Cuenta</th>
+                    <th className="px-3 py-1">Descripción</th>
+                    <th className="px-3 py-1 text-right">Nº mov.</th>
+                    <th className="px-3 py-1 text-right">Importe</th>
+                    <th className="px-3 py-1 text-right">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {a.porFuncion.map((f: any) => (
+                    <tr key={f.cod} className="border-t border-slate-100">
+                      <td className="px-3 py-1 font-bold text-brand-700">{f.cod}</td>
+                      <td className="px-3 py-1 text-slate-600">{f.nombre}</td>
+                      <td className="px-3 py-1 text-right tabular-nums text-slate-500">{f.n}</td>
+                      <td className="px-3 py-1 text-right tabular-nums font-semibold text-slate-700">{soles(f.debe)}</td>
+                      <td className="px-3 py-1 text-right tabular-nums text-slate-400">{f.pct.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-brand-200 font-bold text-brand-800">
+                    <td className="px-3 py-1" colSpan={2}>TOTAL</td>
+                    <td className="px-3 py-1 text-right tabular-nums">{a.nMovimientos}</td>
+                    <td className="px-3 py-1 text-right tabular-nums">{soles(a.totalGasto)}</td>
+                    <td className="px-3 py-1 text-right">100%</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

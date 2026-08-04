@@ -50,25 +50,22 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   const tot = res.addRow(["TOTAL", a.totalGasto, "100%"]);
   tot.font = { bold: true }; tot.getCell(2).numFmt = MONEDA;
 
-  // --- Análisis Clase 9 (por función → cuentas) ---
-  const c9 = wb.addWorksheet("Análisis Clase 9");
-  c9.columns = [
-    { header: "Función / Cuenta", key: "a", width: 42 },
-    { header: "Concepto", key: "b", width: 40 },
-    { header: "Nº mov.", key: "c", width: 10 },
-    { header: "Importe (S/)", key: "d", width: 16 },
-    { header: "% del total", key: "e", width: 12 },
+  // --- Nivel 2 dígitos (rollup por función) ---
+  const n2 = wb.addWorksheet("Nivel 2 dígitos");
+  n2.columns = [
+    { header: "Cuenta", key: "cod", width: 10 },
+    { header: "Descripción", key: "nombre", width: 42 },
+    { header: "Nº mov.", key: "n", width: 10 },
+    { header: "Importe (S/)", key: "debe", width: 16 },
+    { header: "%", key: "pct", width: 10 },
   ];
-  encabezado(c9, 5);
+  encabezado(n2, 5);
   for (const f of a.porFuncion) {
-    const r = c9.addRow([`${f.cod} · ${f.nombre}`, "", f.n, f.debe, `${f.pct.toFixed(1)}%`]);
-    r.eachCell((c) => { c.font = { bold: true }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3E7CC" } }; });
-    r.getCell(4).numFmt = MONEDA;
-    for (const cu of f.cuentas) {
-      const row = c9.addRow([`   ${cu.cod}`, cu.nombre, cu.n, cu.debe, `${cu.pct.toFixed(1)}%`]);
-      row.getCell(4).numFmt = MONEDA;
-    }
+    const row = n2.addRow({ cod: f.cod, nombre: f.nombre, n: f.n, debe: f.debe, pct: `${f.pct.toFixed(1)}%` });
+    row.getCell(4).numFmt = MONEDA;
   }
+  const t2 = n2.addRow({ cod: "", nombre: "TOTAL", n: a.nMovimientos, debe: a.totalGasto, pct: "100%" });
+  t2.font = { bold: true }; t2.getCell(4).numFmt = MONEDA;
 
   // --- Detalle por cuenta (clase 9); movimientos ordenados por fecha ---
   const det = wb.addWorksheet("Detalle por cuenta");
