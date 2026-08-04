@@ -56,14 +56,20 @@ export interface AnalisisCompras {
   revision: RevisionClasificacion;      // evaluación de clasificación + sugerencias
   topConceptos: CuentaResumen[];        // por glosa
   topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number }[];
-  detalle: {
+  // Detalle AGRUPADO POR CUENTA (clase 9); dentro de cada cuenta, los
+  // movimientos van ordenados por fecha.
+  detalleCuentas: {
     cuenta: string;
     funcion: string;
-    glosa: string;
-    documento: string;
-    fecDoc: string;
-    cenCos: string;
-    debe: number;
+    concepto: string;
+    total: number;
+    movimientos: {
+      fecha: string;      // fecha de registro (o del comprobante)
+      glosa: string;
+      documento: string;
+      cenCos: string;
+      debe: number;
+    }[];
   }[];
 }
 
@@ -309,16 +315,23 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
     return { mes, nombre: `${MESES[Number(mm) - 1] ?? mes} ${y}`, debe: ms.reduce((s, m) => s + m.debe, 0), n: ms.length };
   }).sort((a, b) => a.mes.localeCompare(b.mes));
 
-  // Detalle completo de clase 9.
-  const detalle = c9.map((m) => ({
-    cuenta: m.cuenta,
-    funcion: nombreFuncion(m.cuenta.slice(0, 2)),
-    glosa: m.glosa,
-    documento: m.documento,
-    fecDoc: m.fecDoc,
-    cenCos: m.cenCos,
-    debe: m.debe,
-  })).sort((a, b) => b.debe - a.debe);
+  // Detalle AGRUPADO POR CUENTA (clase 9); dentro de cada cuenta, los
+  // movimientos ordenados por fecha. Las cuentas van en orden de código.
+  const detCuentaMap = new Map<string, MovDiario[]>();
+  for (const m of c9) (detCuentaMap.get(m.cuenta) ?? detCuentaMap.set(m.cuenta, []).get(m.cuenta)!).push(m);
+  const detalleCuentas = [...detCuentaMap.entries()].map(([cuenta, ms]) => ({
+    cuenta,
+    funcion: nombreFuncion(cuenta.slice(0, 2)),
+    concepto: conceptoRepresentativo(ms),
+    total: ms.reduce((s, m) => s + m.debe, 0),
+    movimientos: ms.map((m) => ({
+      fecha: m.fecReg || m.fecDoc,
+      glosa: m.glosa,
+      documento: m.documento,
+      cenCos: m.cenCos,
+      debe: m.debe,
+    })).sort((a, b) => (a.fecha || "").localeCompare(b.fecha || "")),
+  })).sort((a, b) => a.cuenta.localeCompare(b.cuenta));
 
   return {
     empresa: empresa || "—",
@@ -335,7 +348,7 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
     revision: revisarClasificacion(c9),
     topConceptos,
     topComprobantes,
-    detalle,
+    detalleCuentas,
   };
 }
 

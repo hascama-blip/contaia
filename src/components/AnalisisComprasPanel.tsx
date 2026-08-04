@@ -326,39 +326,45 @@ export default function AnalisisComprasPanel() {
             </div>
           </div>
 
-          {/* Detalle completo */}
+          {/* Detalle por cuenta (movimientos ordenados por fecha) */}
           <div className="card p-4">
             <button className="mb-2 text-sm font-semibold text-brand-600 hover:underline" onClick={() => setVerDetalle((v) => !v)}>
-              {verDetalle ? "▲ Ocultar" : "▼ Ver"} detalle completo de clase 9 ({a.detalle.length} movimientos)
+              {verDetalle ? "▲ Ocultar" : "▼ Ver"} detalle por cuenta ({a.detalleCuentas.length} cuentas · {a.nMovimientos} movimientos)
             </button>
             {verDetalle && (
-              <div className="max-h-96 overflow-auto rounded-lg border border-slate-200">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-slate-50">
-                    <tr className="text-left text-[10px] uppercase text-slate-400">
-                      <th className="px-2 py-1">Cuenta</th>
-                      <th className="px-2 py-1">Función</th>
-                      <th className="px-2 py-1">Glosa</th>
-                      <th className="px-2 py-1">Documento</th>
-                      <th className="px-2 py-1">Fecha</th>
-                      <th className="px-2 py-1">C.C.</th>
-                      <th className="px-2 py-1 text-right">Importe</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {a.detalle.map((d: any, i: number) => (
-                      <tr key={i} className="border-t border-slate-100">
-                        <td className="px-2 py-1 font-medium text-slate-700">{d.cuenta}</td>
-                        <td className="px-2 py-1 text-slate-500">{d.funcion}</td>
-                        <td className="px-2 py-1 text-slate-500">{d.glosa}</td>
-                        <td className="px-2 py-1 text-slate-500">{d.documento}</td>
-                        <td className="px-2 py-1 text-slate-400">{d.fecDoc}</td>
-                        <td className="px-2 py-1 text-slate-400">{d.cenCos}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-slate-700">{soles(d.debe)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="max-h-[36rem] space-y-4 overflow-auto">
+                {a.detalleCuentas.map((g: any) => (
+                  <div key={g.cuenta} className="rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between bg-brand-50 px-3 py-2">
+                      <span className="text-sm font-bold text-brand-800">{g.cuenta}<span className="ml-2 text-xs font-normal text-brand-500">{g.funcion} · {g.concepto}</span></span>
+                      <span className="text-sm font-bold text-brand-800">{soles(g.total)} <span className="text-xs font-normal text-brand-500">({g.movimientos.length} mov.)</span></span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-[10px] uppercase text-slate-400">
+                            <th className="px-3 py-1">Fecha</th>
+                            <th className="px-3 py-1">Glosa</th>
+                            <th className="px-3 py-1">Factura / Doc.</th>
+                            <th className="px-3 py-1">C.C.</th>
+                            <th className="px-3 py-1 text-right">Importe</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.movimientos.map((m: any, i: number) => (
+                            <tr key={i} className="border-t border-slate-100">
+                              <td className="px-3 py-1 tabular-nums text-slate-500">{m.fecha}</td>
+                              <td className="px-3 py-1 text-slate-600">{m.glosa}</td>
+                              <td className="px-3 py-1 text-slate-500">{m.documento}</td>
+                              <td className="px-3 py-1 text-slate-400">{m.cenCos}</td>
+                              <td className="px-3 py-1 text-right tabular-nums text-slate-700">{soles(m.debe)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

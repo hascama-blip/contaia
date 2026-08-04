@@ -70,21 +70,24 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
     }
   }
 
-  // --- Detalle Clase 9 (renglón por renglón) ---
-  const det = wb.addWorksheet("Detalle Clase 9");
+  // --- Detalle por cuenta (clase 9); movimientos ordenados por fecha ---
+  const det = wb.addWorksheet("Detalle por cuenta");
   det.columns = [
-    { header: "Cuenta", key: "cuenta", width: 12 },
-    { header: "Función", key: "funcion", width: 26 },
-    { header: "Glosa", key: "glosa", width: 44 },
-    { header: "Documento", key: "documento", width: 18 },
-    { header: "Fec. Doc.", key: "fecDoc", width: 12 },
+    { header: "Fecha", key: "fecha", width: 12 },
+    { header: "Glosa", key: "glosa", width: 46 },
+    { header: "Factura / Doc.", key: "documento", width: 18 },
     { header: "C. Costo", key: "cenCos", width: 10 },
     { header: "Importe (S/)", key: "debe", width: 16 },
   ];
-  encabezado(det, 7);
-  for (const d of a.detalle) {
-    const row = det.addRow(d);
-    row.getCell(7).numFmt = MONEDA;
+  encabezado(det, 5);
+  for (const g of a.detalleCuentas) {
+    const h = det.addRow({ fecha: `${g.cuenta} · ${g.funcion} — ${g.concepto}`, debe: g.total });
+    h.getCell(1).font = { bold: true }; h.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3E7CC" } };
+    h.getCell(5).numFmt = MONEDA; h.getCell(5).font = { bold: true };
+    for (const m of g.movimientos) {
+      const row = det.addRow({ fecha: m.fecha, glosa: m.glosa, documento: m.documento, cenCos: m.cenCos, debe: m.debe });
+      row.getCell(5).numFmt = MONEDA;
+    }
   }
 
   // --- Por Naturaleza (clase 6) ---

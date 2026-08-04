@@ -121,16 +121,22 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const comprobantes = a.topComprobantes.map((d) => `
     <tr><td class="mono">${esc(d.documento)}</td><td class="mono">${esc(d.proveedor || "—")}</td><td>${esc(d.glosa)}</td><td class="num">${soles(d.debe)}</td></tr>`).join("");
 
-  const detalle = a.detalle.map((d) => `
-    <tr>
-      <td class="mono">${esc(d.cuenta)}</td>
-      <td>${esc(d.funcion)}</td>
-      <td>${esc(d.glosa)}</td>
-      <td class="mono">${esc(d.documento)}</td>
-      <td>${esc(d.fecDoc)}</td>
-      <td>${esc(d.cenCos)}</td>
-      <td class="num">${soles(d.debe)}</td>
-    </tr>`).join("");
+  const detalle = a.detalleCuentas.map((g) => `
+    <table class="tbl detalle">
+      <thead>
+        <tr class="grp"><td colspan="4"><span class="dot" style="background:#1d4ed8"></span><strong>${esc(g.cuenta)}</strong> · ${esc(g.funcion)} — ${esc(g.concepto)} — ${soles(g.total)} (${g.movimientos.length} mov.)</td></tr>
+        <tr class="th"><th>Fecha</th><th>Glosa</th><th>Factura / Doc.</th><th class="num">Importe</th></tr>
+      </thead>
+      <tbody>
+        ${g.movimientos.map((m) => `
+          <tr>
+            <td>${esc(m.fecha)}${m.cenCos ? ` <span class="mut">(${esc(m.cenCos)})</span>` : ""}</td>
+            <td>${esc(m.glosa)}</td>
+            <td class="mono">${esc(m.documento)}</td>
+            <td class="num">${soles(m.debe)}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`).join("");
 
   const rev = a.revision;
   const revRows = (rev?.hallazgos ?? []).map((h) => `
@@ -290,11 +296,8 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     <tbody>${comprobantes}</tbody>
   </table>
 
-  <h2>Anexo: detalle de movimientos (clase 9)</h2>
-  <table class="tbl">
-    <thead><tr><th>Cuenta</th><th>Función</th><th>Glosa</th><th>Documento</th><th>Fecha</th><th>C.C.</th><th class="num">Importe</th></tr></thead>
-    <tbody>${detalle}</tbody>
-  </table>
+  <h2>Anexo: detalle por cuenta (clase 9)</h2>
+  ${detalle}
 
   <div class="foot">Documento generado automáticamente para uso de gerencia. Cifras en soles (S/).</div>
 
