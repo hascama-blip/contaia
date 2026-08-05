@@ -38,6 +38,13 @@ const OPCIONES: Opcion[] = [
       "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
   },
   {
+    href: "/herramientas/detalle-sire",
+    icono: "📋",
+    titulo: "Detalle SIRE",
+    detalle:
+      "Extrae el detalle de la propuesta SUNAT (RVIE ventas / RCE compras) comprobante por comprobante desde la API oficial, y descárgalo en Excel.",
+  },
+  {
     href: "/herramientas/analisis-compras",
     icono: "📊",
     titulo: "Análisis de compras para RTP",

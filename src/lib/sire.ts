@@ -55,6 +55,9 @@ interface SireConfig {
   apiBase: string;
   exportVentasPath: string;
   exportComprasPath: string;
+  // Detalle (propuesta comprobante por comprobante) — RVIE ventas / RCE compras.
+  propuestaVentasPath: string;
+  propuestaComprasPath: string;
   estadoPath: string;
   descargaPath: string;
   codLibroVentas: string;
@@ -84,6 +87,15 @@ function getConfig(): SireConfig {
     exportComprasPath:
       process.env.SIRE_EXPORT_COMPRAS_PATH ??
       "/rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen}/{codTipoArchivo}/exporta?codLibro={codLibro}",
+    // DETALLE (propuesta): exporta la propuesta comprobante por comprobante. Son
+    // endpoints distintos por libro (rvie=ventas, rce=compras) y async (ticket).
+    // ⚠️ AJUSTABLE por entorno; calibrar con Modo diagnóstico si SUNAT cambia la ruta.
+    propuestaVentasPath:
+      process.env.SIRE_PROPUESTA_VENTAS_PATH ??
+      "/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0",
+    propuestaComprasPath:
+      process.env.SIRE_PROPUESTA_COMPRAS_PATH ??
+      "/rce/propuesta/web/propuesta/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -861,6 +873,156 @@ export async function consultarEstadoSire(params: {
   const noObligado = ventasNoObl && comprasNoObl;
   if (params.diagnostico) return { diag };
   return { estados, noObligado, diag };
+}
+
+// ============================================================
+//  DETALLE SIRE (propuesta comprobante por comprobante)
+// ============================================================
+// A diferencia del resumen (totales), la PROPUESTA devuelve el detalle: una
+// fila por comprobante con sus columnas (fecha, tipo, serie, número, RUC,
+// razón social, base, IGV, total…). Flujo: token → exporta propuesta (ticket)
+// → espera archivo → descarga TXT → se devuelve tal cual (columnas + filas).
+
+export interface SireDetalleBloque {
+  columnas: string[];
+  filas: string[][];
+  comprobantes: number;
+}
+export interface SireDetalleResultado {
+  periodo: string;
+  ventas?: SireDetalleBloque;
+  compras?: SireDetalleBloque;
+  diag?: SireDiag;
+}
+
+/** Exporta la propuesta (detalle). Devuelve el TXT crudo, "" si no hay
+ *  movimiento, o null si falló (queda registrado en el diagnóstico). */
+async function exportarPropuesta(
+  cfg: SireConfig,
+  token: string,
+  periodo: string,
+  pathTemplate: string,
+  codLibro: string,
+  etiqueta: string,
+  diag: SireDiag
+): Promise<string | null> {
+  const url = buildUrl(cfg, pathTemplate, { periodo, codLibro });
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    const txt = await res.text();
+    diag.pasos.push({
+      paso: `propuesta-${etiqueta}`,
+      url,
+      metodo: "GET",
+      httpStatus: res.status,
+      ok: res.ok,
+      respuesta: trunc(txt, 1200),
+    });
+    if (!res.ok) {
+      if (/1070|no se ha encontrado/i.test(txt)) return "";
+      throw new Error(`${etiqueta} (HTTP ${res.status}): ${trunc(txt, 150)}`);
+    }
+    // ¿Ticket asíncrono o contenido directo?
+    let ticket = "";
+    try {
+      const j = JSON.parse(txt);
+      ticket = String(j.numTicket ?? j.numticket ?? j.ticket ?? "");
+    } catch {
+      /* contenido directo */
+    }
+    if (ticket) {
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
+      if (nombre === VACIO) return "";
+      return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
+    }
+    return txt;
+  } catch (err) {
+    diag.pasos.push({
+      paso: `error-${etiqueta}`,
+      ok: false,
+      respuesta: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/** Convierte el TXT del detalle en columnas + filas (tolerante a encabezado). */
+function parseDetalle(texto: string): SireDetalleBloque {
+  const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lineas.length) return { columnas: [], filas: [], comprobantes: 0 };
+  const delim = ["|", ";", "\t", ","].find((d) => lineas[0].includes(d)) ?? "|";
+  const first = lineas[0];
+  const esHeader =
+    /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(first) &&
+    /ruc|fecha|comprob|serie|igv|base|tipo|raz[oó]n|adquir|proveedor|emisor/i.test(first);
+  let columnas: string[];
+  let filas: string[][];
+  if (esHeader) {
+    columnas = first.split(delim).map((s) => s.trim());
+    filas = lineas.slice(1).map((l) => l.split(delim).map((c) => c.trim()));
+  } else {
+    const n = first.split(delim).length;
+    columnas = Array.from({ length: n }, (_, i) => `Columna ${i + 1}`);
+    filas = lineas.map((l) => l.split(delim).map((c) => c.trim()));
+  }
+  // Descarta filas de total / vacías.
+  filas = filas.filter((f) => {
+    const p = (f[0] ?? "").toLowerCase();
+    return p !== "total" && p !== "" && f.length >= 3;
+  });
+  return { columnas, filas, comprobantes: filas.length };
+}
+
+/** Extrae el DETALLE SIRE (propuesta) de ventas y/o compras de un periodo. */
+export async function consultarDetalleSire(
+  params: SireParams & { incluirVentas?: boolean; incluirCompras?: boolean }
+): Promise<SireDetalleResultado> {
+  const { ruc, periodo, solUser, solPass } = params;
+  if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
+  if (!periodoValido(periodo)) throw new Error("Periodo inválido (use AAAAMM, p. ej. 202606).");
+  if (!solUser || !solPass) throw new Error("Ingresa el Usuario SOL y la Clave SOL.");
+
+  const cfg = getConfig();
+  const clientId = params.clientId || cfg.defClientId;
+  const clientSecret = params.clientSecret || cfg.defClientSecret;
+  if (!clientId || !clientSecret) {
+    throw new Error("Faltan las credenciales de la app SIRE (client_id y client_secret).");
+  }
+
+  const diag: SireDiag = { periodo, pasos: [] };
+  let token: string;
+  try {
+    token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
+  } catch (err) {
+    if (params.diagnostico) {
+      diag.pasos.push({ paso: "error", ok: false, respuesta: err instanceof Error ? err.message : String(err) });
+      return { periodo, diag };
+    }
+    throw err;
+  }
+
+  const incluirVentas = params.incluirVentas !== false;
+  const incluirCompras = params.incluirCompras !== false;
+  const tV = incluirVentas
+    ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaVentasPath, cfg.codLibroVentas, "ventas", diag)
+    : null;
+  const tC = incluirCompras
+    ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaComprasPath, cfg.codLibroCompras, "compras", diag)
+    : null;
+
+  if (params.diagnostico) return { periodo, diag };
+
+  if (incluirVentas && tV === null && incluirCompras && tC === null) {
+    throw new Error("No se pudo obtener el detalle (usa Modo diagnóstico para ver la respuesta de SUNAT).");
+  }
+  return {
+    periodo,
+    ventas: tV != null ? parseDetalle(tV) : undefined,
+    compras: tC != null ? parseDetalle(tC) : undefined,
+    diag,
+  };
 }
 
 export function etiquetaPeriodo(periodo: string): string {
