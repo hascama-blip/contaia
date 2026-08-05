@@ -29,7 +29,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const MAX_REINTENTOS = 2;
   // Tamaño de tanda: el frontend parte la relación y llama a la API por bloques
   // para que ninguna petición dure demasiado (proxy/timeout) y se vea el avance.
-  const TANDA = 12;
+  const TANDA = 10;
 
   async function subirRelacion(file: File) {
     setError(null); setInfo(null);

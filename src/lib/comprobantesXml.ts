@@ -276,7 +276,17 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     await rucInput.fill("").catch(() => {});
     await rucInput.fill(item.rucEmisor).catch(() => {});
     await rucInput.press("Tab").catch(() => {});
-    await page.waitForTimeout(1800).catch(() => {});
+    // SUNAT valida el RUC de forma asíncrona (resuelve la razón social). Si
+    // consultamos antes de que termine, devuelve "no encontrado" aunque el
+    // comprobante exista. Esperamos a que aparezca la razón social del proveedor
+    // (o hasta 5 s) antes de seguir.
+    for (let w = 0; w < 5; w++) {
+      await page.waitForTimeout(700).catch(() => {});
+      const resuelto = await fr
+        .getByText(/RUC\s*Emisor[^]{0,80}[A-Za-zÁÉÍÓÚÑ]{3,}/i)
+        .first().count().catch(() => 0);
+      if (resuelto) break;
+    }
     hecho.rucEmisorPedido = item.rucEmisor;
     hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
     // 3) Tipo de comprobante (dropdown Angular): abrir y elegir la opción EXACTA.
@@ -468,17 +478,24 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], "el navegador se cerró (reintentar)");
           break;
         }
-        if (i > 0) {
-          // Reset del formulario para el siguiente comprobante.
-          await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+        // Se intenta hasta 2 veces por comprobante: un "no encontrado" suele ser
+        // timing (la validación async del RUC), no que el comprobante no exista.
+        let estado: "resultado" | "error" | "nada" = "nada";
+        let llenado: any = null;
+        for (let intento = 0; intento < 2; intento++) {
+          if (i > 0 || intento > 0) {
+            // Reset del formulario (para el siguiente comprobante o el reintento).
+            await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+            await s.page.waitForTimeout(1200).catch(() => {});
+          }
+          llenado = await llenarYConsultar(fr, s.page, item);
+          estado = await esperarResultado(fr, s.page);
+          if (estado === "resultado") break;
+          // Cierra el aviso de error ("Aceptar") antes de reintentar / continuar.
+          await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
           await s.page.waitForTimeout(1200).catch(() => {});
         }
-        const llenado = await llenarYConsultar(fr, s.page, item);
-        // ¿Salió el modal Resultado (factura) o un aviso de error?
-        const estado = await esperarResultado(fr, s.page);
         if (estado !== "resultado") {
-          // Cierra el aviso de error para poder consultar el siguiente.
-          await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
           marcarFallo(
             item,
             estado === "error"
@@ -486,7 +503,6 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
               : "no apareció el resultado (tiempo agotado).",
             llenado,
           );
-          await s.page.waitForTimeout(1000).catch(() => {});
           continue;
         }
         const buf = await descargarXmlResultado(fr, s.page);
