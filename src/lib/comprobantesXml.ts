@@ -337,15 +337,39 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
 }
 
 /** En el modal "Resultado", hace clic en el icono "Descargar XML" y captura el
- *  archivo. Devuelve el Buffer del XML (o del ZIP que lo contiene) o null. */
-async function descargarXmlResultado(fr: any, page: any): Promise<Buffer | null> {
+ *  archivo (por evento download o por pestaña nueva). `diagOut` recibe el
+ *  volcado de iconos del modal para calibrar el selector. */
+async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise<Buffer | null> {
   const { promises: fs } = await import("fs");
-  // Candidatos del icono "Descargar XML" (tooltip Angular Material u otros).
+  // Esperar a que el modal de resultado termine de renderizar los iconos.
+  await page.waitForTimeout(1400).catch(() => {});
+
+  // Volcado de iconos/botones clicables del modal (para ver el icono XML real).
+  if (diagOut) {
+    diagOut.iconos = await fr.evaluate(() => {
+      const vis = (el: Element) => (el as HTMLElement).offsetParent !== null;
+      const els = Array.from(document.querySelectorAll("button, a, i, img, mat-icon, span[mattooltip], [mattooltip], [title], [aria-label], [ng-reflect-message]")) as HTMLElement[];
+      return els.filter(vis).map((e) => ({
+        tag: e.tagName.toLowerCase(),
+        tip: e.getAttribute("mattooltip") || e.getAttribute("ng-reflect-message") || e.getAttribute("title") || e.getAttribute("aria-label") || "",
+        cls: (e.getAttribute("class") || "").slice(0, 45),
+        txt: (e.textContent || "").trim().slice(0, 18),
+        src: (e.getAttribute("src") || "").slice(-28),
+      })).filter((x) => x.tip || /xml|pdf|descarg|download/i.test(x.cls + " " + x.txt + " " + x.src)).slice(0, 30);
+    }).catch(() => []);
+  }
+
+  // Candidatos del icono "Descargar XML" (tooltip Angular Material u otros),
+  // tolerante a mayúsculas y a texto parcial ("...XML").
   const candidatos = [
-    '[title="Descargar XML"]',
-    '[aria-label="Descargar XML"]',
-    '[mattooltip="Descargar XML"]',
-    '[ng-reflect-message="Descargar XML"]',
+    '[mattooltip*="XML" i]',
+    '[ng-reflect-message*="XML" i]',
+    '[title*="XML" i]',
+    '[aria-label*="XML" i]',
+    'button:has-text("XML")',
+    'a:has-text("XML")',
+    'img[src*="xml" i]',
+    '[class*="xml" i]',
   ];
   const clicar = async () => {
     for (const sel of candidatos) {
@@ -353,24 +377,32 @@ async function descargarXmlResultado(fr: any, page: any): Promise<Buffer | null>
       if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
     }
     // Respaldo: los 4 iconos (PDF, XML, Imprimir, Email) están juntos; el XML
-    // suele ser el 2º. Busca dentro de un contenedor con el icono PDF.
-    const iconos = fr.locator(".modal a, .modal i, .modal img, [class*=result] a, [class*=result] i").filter({ hasNot: fr.locator("nothing") });
+    // suele ser el 2º.
+    const iconos = fr.locator(".modal a, .modal i, .modal img, .modal button, [class*=result] a, [class*=result] i, [class*=result] button");
     const n = await iconos.count().catch(() => 0);
     if (n >= 2) { await iconos.nth(1).click({ timeout: 3000 }).catch(() => {}); return true; }
     return false;
   };
-  const [download] = await Promise.all([
-    page.waitForEvent("download", { timeout: 20000 }).catch(() => null),
-    clicar(),
-  ]);
-  if (!download) return null;
-  try {
-    const p = await download.path();
-    if (!p) return null;
-    return await fs.readFile(p);
-  } catch {
-    return null;
+
+  // El XML puede llegar como descarga (evento) o abrirse en una pestaña nueva.
+  const waitDl = page.waitForEvent("download", { timeout: 16000 }).then((d: any) => ({ download: d })).catch(() => null);
+  const waitPop = page.context().waitForEvent("page", { timeout: 16000 }).then((p: any) => ({ popup: p })).catch(() => null);
+  await clicar();
+  const res: any = await Promise.race([waitDl, waitPop]);
+
+  if (res?.download) {
+    try { const p = await res.download.path(); if (p) return await fs.readFile(p); } catch { /* */ }
   }
+  if (res?.popup) {
+    try {
+      await res.popup.waitForLoadState("domcontentloaded", { timeout: 8000 }).catch(() => {});
+      const contenido = await res.popup.content().catch(() => "");
+      await res.popup.close().catch(() => {});
+      const m = contenido.match(/<\?xml[\s\S]*<\/[A-Za-z:]+>\s*$/i) || contenido.match(/<(Invoice|CreditNote|DebitNote)[\s\S]*<\/\1>/i);
+      if (m) return Buffer.from(m[0], "utf-8");
+    } catch { /* */ }
+  }
+  return null;
 }
 
 /** Tras "Consultar", espera a que aparezca el modal "Resultado" (factura) o un
@@ -532,9 +564,10 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           );
           continue;
         }
-        const buf = await descargarXmlResultado(fr, s.page);
+        const dxml: any = {};
+        const buf = await descargarXmlResultado(fr, s.page, params.diagnostico ? dxml : undefined);
         if (!buf) {
-          marcarFallo(item, "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", llenado);
+          marcarFallo(item, "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", { ...llenado, iconosModal: dxml.iconos });
         } else {
           // Puede venir como XML directo o dentro de un ZIP.
           const xmls: string[] = [];
