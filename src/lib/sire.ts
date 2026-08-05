@@ -990,30 +990,45 @@ async function descargarPropuesta(
   diag: SireDiag
 ): Promise<string> {
   const base = "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte";
-  const variantes: string[] = [
-    "?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=00",
-    "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00",
-    "?nomArchivoReporte={nombre}&codLibro={codLibro}&perTributario={periodo}&codProceso={codProceso}&codOrigenEnvio=1&codTipoArchivoReporte=00",
-    "?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
+  const b64 = (s: string) => Buffer.from(String(s), "utf8").toString("base64");
+  // El manual SUNAT pasa los parámetros de los servicios masivos en CABECERAS,
+  // con los valores en Base64. Probamos ambas formas (query y headers base64)
+  // hasta que una devuelva el ZIP/TXT.
+  const headB64: Record<string, string> = {
+    nomArchivoReporte: b64(nombre),
+    codLibro: b64(codLibro),
+    perTributario: b64(periodo),
+    codProceso: b64(codProceso),
+    codTipoArchivoReporte: b64("00"),
+    codOrigenEnvio: b64("2"),
+  };
+  const intentos: { q: string; headers?: Record<string, string> }[] = [
+    { q: "", headers: headB64 },
+    { q: "?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=00" },
+    { q: "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00" },
+    { q: "?nomArchivoReporte={nombre}&codLibro={codLibro}&perTributario={periodo}&codProceso={codProceso}&codOrigenEnvio=1&codTipoArchivoReporte=00" },
+    { q: "?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00" },
   ];
   const override = process.env.SIRE_DESCARGA_PROPUESTA_QUERY;
-  if (override) variantes.unshift(override.startsWith("?") ? override : `?${override}`);
+  if (override) intentos.unshift({ q: override.startsWith("?") ? override : `?${override}` });
 
   let ultimoStatus = 0;
-  for (const q of variantes) {
-    const url = buildUrl(cfg, base + q, { nombre, periodo, codLibro, codProceso });
+  for (const it of intentos) {
+    const url = buildUrl(cfg, base + it.q, { nombre, periodo, codLibro, codProceso });
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, ...(it.headers ?? {}) },
+      });
       ultimoStatus = res.status;
       const buf = Buffer.from(await res.arrayBuffer());
       const esZip = buf[0] === 0x50 && buf[1] === 0x4b;
       const texto = descomprimirSiHaceFalta(buf);
-      const pareceError = !esZip && /<html|error\s*5\d\d|request failed|not found/i.test(texto.slice(0, 200));
+      const pareceError = !esZip && /<html|error\s*5\d\d|request failed|not found|"cod"\s*:\s*"[45]/i.test(texto.slice(0, 200));
       if (res.ok && texto && !pareceError) {
-        diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: 200, ok: true, respuesta: trunc(texto, 1500) });
+        diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: 200, ok: true, respuesta: trunc((it.headers ? "[headers base64] " : "") + texto, 1500) });
         return texto;
       }
-      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: res.status, ok: false, respuesta: trunc(esZip ? "(zip vacío)" : texto, 300) });
+      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: res.status, ok: false, respuesta: trunc((it.headers ? "[headers base64] " : "") + (esZip ? "(zip vacío)" : texto), 300) });
     } catch (e) {
       diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", ok: false, respuesta: e instanceof Error ? e.message : String(e) });
     }
