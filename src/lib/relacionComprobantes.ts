@@ -70,6 +70,7 @@ const norm = (s: any) =>
 export function relacionDesdeSireCompras(columnas: string[], filas: string[][]): ItemRelacion[] {
   const H = (columnas ?? []).map(norm);
   const col = (pred: (h: string) => boolean) => H.findIndex(pred);
+  const cCar = col((h) => h.includes("carsunat"));             // CAR SUNAT (autoritativo)
   const cRuc = col((h) => h.includes("nrodocidentidad"));      // RUC del proveedor
   const cTipo = col((h) => h.includes("tipocp"));               // Tipo CP/Doc.
   const cSerie = col((h) => h.includes("serie"));               // Serie del CDP
@@ -80,13 +81,25 @@ export function relacionDesdeSireCompras(columnas: string[], filas: string[][]):
 
   const items: ItemRelacion[] = [];
   for (const f of filas ?? []) {
-    const rucEmisor = cel(f, cRuc).replace(/\D/g, "");
-    const serie = cel(f, cSerie).toUpperCase();
-    const numero = cel(f, cNum).replace(/^0+/, "") || cel(f, cNum);
+    // Fuente AUTORITATIVA: el CAR SUNAT codifica RUC(11)+tipo(2)+serie(4)+correlativo.
+    // As\u00ed serie y n\u00famero salen EXACTOS (evita errores de las columnas sueltas).
+    const car = cel(f, cCar).replace(/\s/g, "");
+    let rucCar = "", tipoCar = "", serieCar = "", numCar = "";
+    if (/^\d{11}\d{2}[A-Za-z0-9]{4}\d{1,}$/.test(car)) {
+      rucCar = car.slice(0, 11);
+      tipoCar = car.slice(11, 13);
+      serieCar = car.slice(13, 17).toUpperCase();
+      numCar = car.slice(17).replace(/^0+/, "") || "0";
+    }
+    // Respaldo: columnas dedicadas si el CAR no calza.
+    const rucEmisor = (cel(f, cRuc).replace(/\D/g, "")) || rucCar;
+    const tipo = tipoCar || (cel(f, cTipo).replace(/\D/g, "").padStart(2, "0").slice(-2)) || "01";
+    const serie = serieCar || cel(f, cSerie).toUpperCase();
+    const numero = numCar || cel(f, cNum).replace(/^0+/, "") || cel(f, cNum);
     if (!rucEmisor && !serie && !numero) continue;
     items.push({
       rucEmisor,
-      tipo: cel(f, cTipo).replace(/\D/g, "").padStart(2, "0").slice(-2) || "01",
+      tipo: tipo || "01",
       serie,
       numero,
       fecha: cel(f, cFecha),

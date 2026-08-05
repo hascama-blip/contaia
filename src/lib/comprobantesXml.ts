@@ -243,12 +243,22 @@ async function abrirFormulario(page: any, ctx: any): Promise<any> {
   return frameForm(ctx);
 }
 
-// Código de tipo (01/03/07/08) → texto EXACTO del dropdown "Tipo de comprobante".
+// Código de tipo → texto del dropdown "Tipo de comprobante".
 const TIPO_LABEL: Record<string, string> = {
   "01": "Factura",
   "03": "Boleta",
   "07": "Factura - Nota de Crédito",
   "08": "Factura - Nota de Débito",
+  "14": "Recibo de Servicios Públicos",
+};
+// Palabra clave distintiva por tipo (para elegir la opción aunque el texto
+// exacto del dropdown varíe un poco). AJUSTABLE con las opciones del diagnóstico.
+const TIPO_KEYS: Record<string, string> = {
+  "01": "factura",
+  "03": "boleta",
+  "07": "crédito",
+  "08": "débito",
+  "14": "recibo",
 };
 
 /** Llena el formulario (Recibido + RUC + tipo + serie/número) y da "Consultar". */
@@ -293,11 +303,21 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     //    OJO: NO escribir en ningún input aquí (el "último input" es Número y se
     //    corrompía la consulta). Solo abrir y clicar la opción.
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
+    const keyw = TIPO_KEYS[item.tipo] ?? "factura";
     await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
     await page.waitForTimeout(900).catch(() => {});
+    // Diagnóstico: capturar las opciones reales del dropdown para calibrar labels.
+    hecho.tipoOpciones = await fr
+      .locator('mat-option, [role="option"], li, .dropdown-item, .mat-option')
+      .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).slice(0, 25)).catch(() => []);
+    // 1) etiqueta exacta; 2) por palabra clave distintiva (recibo/boleta/…).
     const opt = fr.getByText(label, { exact: true });
     if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
-    else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+    else {
+      const porClave = fr.getByText(new RegExp(keyw, "i")).last();
+      if (await porClave.count().catch(() => 0)) await porClave.click({ timeout: 2500 }).catch(() => {});
+      else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+    }
     hecho.tipo = label;
     await page.waitForTimeout(500).catch(() => {});
     // 4) Serie y Número.
