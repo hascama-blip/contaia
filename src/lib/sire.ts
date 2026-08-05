@@ -259,7 +259,10 @@ async function esperarArchivo(
   periodo: string,
   ticket: string,
   etiqueta: string,
-  diag: SireDiag
+  diag: SireDiag,
+  // true (propuesta): descarga SIEMPRE que exista archivo, aunque el contador
+  // de comprobantes venga en 0 (no siempre se puebla en la propuesta).
+  descargarSiempre = false
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
   // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
@@ -319,6 +322,9 @@ async function esperarArchivo(
         ok: true,
         respuesta: trunc(txt, 2500),
       });
+      // Si hay archivo generado, se descarga (la propuesta puede traer
+      // cntCPInformados=0 aunque el archivo tenga datos).
+      if (nombre && (descargarSiempre || comprobantes > 0)) return String(nombre);
       // Mes sin movimiento: no hay archivo útil que descargar -> totales en 0.
       if (comprobantes === 0) return VACIO;
       if (nombre) return String(nombre);
@@ -951,7 +957,7 @@ async function exportarPropuesta(
       /* contenido directo */
     }
     if (ticket) {
-      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag);
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true);
       if (nombre === VACIO) return "";
       return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
     }
