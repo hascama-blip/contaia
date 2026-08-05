@@ -45,6 +45,13 @@ const OPCIONES: Opcion[] = [
       "Extrae el detalle de la propuesta SUNAT (compras RCE y ventas RVIE, cada uno por separado) comprobante por comprobante desde la API oficial, y descárgalo en Excel.",
   },
   {
+    href: "/herramientas/rtt",
+    icono: "📄",
+    titulo: "Reporte Tributario para Terceros (RTT)",
+    detalle:
+      "Solicita el RTT de SUNAT y recíbelo automáticamente por webhook de correo, con trazabilidad de cada estado (creado → en proceso → listo). Descarga el PDF/XML cuando llega.",
+  },
+  {
     href: "/herramientas/analisis-compras",
     icono: "📊",
     titulo: "Análisis de compras para RTP",

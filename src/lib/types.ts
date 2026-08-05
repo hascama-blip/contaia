@@ -415,3 +415,34 @@ export interface SireResumen {
   fuente: "oficial" | "simulado";
   consultadoAt: string;
 }
+
+// ============================================================
+//  RTT — Reporte Tributario para Terceros (trazabilidad + webhook)
+// ============================================================
+// Máquina de estados de la generación del RTT de SUNAT. El bot dispara la
+// generación en SOL (paso 3); SUNAT envía el PDF/XML por correo (asíncrono);
+// un webhook de correo entrante lo captura (paso 5) y lo cruza por RUC.
+export type EstadoRTT =
+  | "creado"      // el usuario solicitó, aún no se dispara el bot
+  | "pendiente"   // encolado, listo para el bot
+  | "en_proceso"  // el bot ya envió la solicitud en SOL; esperando a SUNAT
+  | "recibido"    // el webhook capturó el correo con el PDF/XML
+  | "listo"       // archivo guardado y asociado al RUC; descargable
+  | "error";      // falló el login, SUNAT no respondió, o timeout
+
+export interface SolicitudRTT {
+  id: string;
+  ruc: string;
+  razonSocial?: string;
+  /** Correo de destino con sub-address del RUC: reportes+RUC{ruc}@dominio */
+  emailDestino: string;
+  estado: EstadoRTT;
+  /** Historial de transiciones (para auditar y detectar atascos). */
+  historial: { estado: EstadoRTT; at: string; nota?: string }[];
+  creadoEn: string;
+  actualizadoEn: string;
+  rutaPdf?: string;   // nombre de archivo en UPLOADS_DIR/rtt
+  rutaXml?: string;
+  error?: string;
+  solicitadoPor?: string; // userId
+}

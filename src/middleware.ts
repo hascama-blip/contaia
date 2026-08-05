@@ -9,7 +9,10 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/reset") ||
-    pathname.startsWith("/api/auth")
+    pathname.startsWith("/api/auth") ||
+    // Webhooks entrantes (correo de SUNAT para el RTT): los llama el proveedor
+    // de correo, sin sesión; se protegen con su propio secreto compartido.
+    pathname.startsWith("/api/webhooks/")
   ) {
     return NextResponse.next();
   }

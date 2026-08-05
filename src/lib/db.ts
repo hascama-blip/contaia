@@ -17,6 +17,8 @@ import type {
   DeudaF36Tabla,
   SeguimientoBuzon,
   AccionAuditoria,
+  SolicitudRTT,
+  EstadoRTT,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -47,7 +49,9 @@ interface Store {
    *  en toda la plataforma (evita crear cuentas falsas para reconsultar). */
   rucsRegistrados?: Record<string, { studioId: string; clienteId: string; ownerNombre?: string; at: string }>;
   /** Configuración global de la plataforma (la administra el supremo). */
-  config?: { browserWsUrl?: string };
+  config?: { browserWsUrl?: string; rttDominio?: string; rttSecret?: string };
+  /** Solicitudes de RTT (Reporte Tributario para Terceros) con su trazabilidad. */
+  rtt?: SolicitudRTT[];
 }
 
 async function ensureDirs() {
@@ -324,6 +328,134 @@ export async function setBrowserWsUrl(url: string): Promise<void> {
   if (!store.config) store.config = {};
   store.config.browserWsUrl = url.trim();
   await writeStore(store);
+}
+
+// ---- RTT: Reporte Tributario para Terceros (trazabilidad + webhook) ---------
+
+/** Config del RTT: dominio del sub-address y secreto del webhook. La variable
+ *  de entorno tiene prioridad (RTT_DOMINIO / RTT_WEBHOOK_SECRET). */
+export async function getRttConfig(): Promise<{ dominio: string; secret: string }> {
+  const store = await readStore();
+  return {
+    dominio: (process.env.RTT_DOMINIO || store.config?.rttDominio || "").trim(),
+    secret: (process.env.RTT_WEBHOOK_SECRET || store.config?.rttSecret || "").trim(),
+  };
+}
+export async function setRttConfig(cfg: { dominio?: string; secret?: string }): Promise<void> {
+  const store = await readStore();
+  if (!store.config) store.config = {};
+  if (cfg.dominio !== undefined) store.config.rttDominio = cfg.dominio.trim();
+  if (cfg.secret !== undefined) store.config.rttSecret = cfg.secret.trim();
+  await writeStore(store);
+}
+
+const RTT_DIR = path.join(UPLOADS_DIR, "rtt");
+
+/** Crea una solicitud de RTT (estado inicial "creado"). */
+export async function crearSolicitudRTT(datos: {
+  ruc: string; razonSocial?: string; emailDestino: string; solicitadoPor?: string;
+}): Promise<SolicitudRTT> {
+  const store = await readStore();
+  if (!Array.isArray(store.rtt)) store.rtt = [];
+  const now = new Date().toISOString();
+  const sol: SolicitudRTT = {
+    id: crypto.randomUUID(),
+    ruc: datos.ruc,
+    razonSocial: datos.razonSocial,
+    emailDestino: datos.emailDestino,
+    estado: "creado",
+    historial: [{ estado: "creado", at: now }],
+    creadoEn: now,
+    actualizadoEn: now,
+    solicitadoPor: datos.solicitadoPor,
+  };
+  store.rtt.push(sol);
+  await writeStore(store);
+  return sol;
+}
+
+/** Cambia el estado de una solicitud y registra la transición. */
+export async function setEstadoRTT(id: string, estado: EstadoRTT, nota?: string, extra?: Partial<SolicitudRTT>): Promise<SolicitudRTT | null> {
+  const store = await readStore();
+  const sol = (store.rtt ?? []).find((s) => s.id === id);
+  if (!sol) return null;
+  const now = new Date().toISOString();
+  sol.estado = estado;
+  sol.actualizadoEn = now;
+  sol.historial.push({ estado, at: now, nota });
+  if (extra) Object.assign(sol, extra);
+  await writeStore(store);
+  return sol;
+}
+
+export async function getSolicitudRTT(id: string): Promise<SolicitudRTT | null> {
+  const store = await readStore();
+  return (store.rtt ?? []).find((s) => s.id === id) ?? null;
+}
+
+/** Lista solicitudes RTT (opcionalmente de un usuario). */
+export async function listarSolicitudesRTT(solicitadoPor?: string): Promise<SolicitudRTT[]> {
+  const store = await readStore();
+  let lista = store.rtt ?? [];
+  if (solicitadoPor) lista = lista.filter((s) => s.solicitadoPor === solicitadoPor);
+  return [...lista].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+}
+
+/** Nº de solicitudes creadas HOY para un RUC (límite SUNAT: 3/día). */
+export async function contarRTTHoy(ruc: string): Promise<number> {
+  const store = await readStore();
+  const hoy = new Date().toISOString().slice(0, 10);
+  return (store.rtt ?? []).filter((s) => s.ruc === ruc && s.creadoEn.slice(0, 10) === hoy).length;
+}
+
+/**
+ * WEBHOOK: cruza el correo entrante por RUC y guarda el PDF/XML. Busca la
+ * solicitud más reciente de ese RUC en "en_proceso" (o "recibido"), guarda los
+ * archivos y la pasa a "listo". Devuelve la solicitud o null si no hay match.
+ */
+export async function guardarArchivosRTTPorRuc(
+  ruc: string,
+  archivos: { pdf?: Buffer; xml?: Buffer }
+): Promise<SolicitudRTT | null> {
+  await fs.mkdir(RTT_DIR, { recursive: true });
+  const store = await readStore();
+  const candidatas = (store.rtt ?? [])
+    .filter((s) => s.ruc === ruc && (s.estado === "en_proceso" || s.estado === "recibido" || s.estado === "pendiente"))
+    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  const sol = candidatas[0];
+  if (!sol) return null;
+  const base = `${ruc}-${Date.now()}`;
+  const now = new Date().toISOString();
+  if (archivos.pdf) { await fs.writeFile(path.join(RTT_DIR, `${base}.pdf`), archivos.pdf); sol.rutaPdf = `${base}.pdf`; }
+  if (archivos.xml) { await fs.writeFile(path.join(RTT_DIR, `${base}.xml`), archivos.xml); sol.rutaXml = `${base}.xml`; }
+  sol.estado = "listo";
+  sol.actualizadoEn = now;
+  sol.historial.push({ estado: "recibido", at: now, nota: "correo capturado por webhook" });
+  sol.historial.push({ estado: "listo", at: now });
+  await writeStore(store);
+  return sol;
+}
+
+/** Lee un archivo RTT guardado (pdf/xml) por nombre. */
+export async function leerArchivoRTT(nombre: string): Promise<Buffer | null> {
+  try { return await fs.readFile(path.join(RTT_DIR, path.basename(nombre))); } catch { return null; }
+}
+
+/** Marca como "error" las solicitudes atascadas en en_proceso más de N minutos. */
+export async function marcarRTTAtascados(minutos = 60): Promise<number> {
+  const store = await readStore();
+  const limite = Date.now() - minutos * 60_000;
+  let n = 0;
+  for (const s of store.rtt ?? []) {
+    if ((s.estado === "en_proceso" || s.estado === "pendiente") && new Date(s.actualizadoEn).getTime() < limite) {
+      const now = new Date().toISOString();
+      s.estado = "error"; s.error = "Timeout: SUNAT no envió el correo a tiempo."; s.actualizadoEn = now;
+      s.historial.push({ estado: "error", at: now, nota: "timeout" });
+      n++;
+    }
+  }
+  if (n) await writeStore(store);
+  return n;
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */
