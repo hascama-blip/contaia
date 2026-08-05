@@ -262,7 +262,9 @@ async function esperarArchivo(
   diag: SireDiag,
   // true (propuesta): descarga SIEMPRE que exista archivo, aunque el contador
   // de comprobantes venga en 0 (no siempre se puebla en la propuesta).
-  descargarSiempre = false
+  descargarSiempre = false,
+  // Opcional: recibe metadatos del ticket (p. ej. codProceso) para la descarga.
+  outMeta?: { codProceso?: string }
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
   // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
@@ -314,6 +316,7 @@ async function esperarArchivo(
       null;
 
     if (terminado) {
+      if (outMeta) outMeta.codProceso = String(reg?.codProceso ?? det?.codProceso ?? "");
       diag.pasos.push({
         paso: `estado-${etiqueta}`,
         url,
@@ -957,9 +960,10 @@ async function exportarPropuesta(
       /* contenido directo */
     }
     if (ticket) {
-      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true);
+      const meta: { codProceso?: string } = {};
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
       if (nombre === VACIO) return "";
-      return await descargarReporte(cfg, token, periodo, nombre, codLibro, etiqueta, diag);
+      return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta.codProceso || "10", etiqueta, diag);
     }
     return txt;
   } catch (err) {
@@ -970,6 +974,51 @@ async function exportarPropuesta(
     });
     return null;
   }
+}
+
+/** Descarga el archivo de la PROPUESTA. El endpoint archivoreporte devuelve 500
+ *  si los parámetros no son los exactos y estos varían por versión del manual
+ *  SUNAT; por eso probamos varias combinaciones hasta obtener el ZIP/TXT. */
+async function descargarPropuesta(
+  cfg: SireConfig,
+  token: string,
+  periodo: string,
+  nombre: string,
+  codLibro: string,
+  codProceso: string,
+  etiqueta: string,
+  diag: SireDiag
+): Promise<string> {
+  const base = "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte";
+  const variantes: string[] = [
+    "?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=00",
+    "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00",
+    "?nomArchivoReporte={nombre}&codLibro={codLibro}&perTributario={periodo}&codProceso={codProceso}&codOrigenEnvio=1&codTipoArchivoReporte=00",
+    "?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00",
+  ];
+  const override = process.env.SIRE_DESCARGA_PROPUESTA_QUERY;
+  if (override) variantes.unshift(override.startsWith("?") ? override : `?${override}`);
+
+  let ultimoStatus = 0;
+  for (const q of variantes) {
+    const url = buildUrl(cfg, base + q, { nombre, periodo, codLibro, codProceso });
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      ultimoStatus = res.status;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const esZip = buf[0] === 0x50 && buf[1] === 0x4b;
+      const texto = descomprimirSiHaceFalta(buf);
+      const pareceError = !esZip && /<html|error\s*5\d\d|request failed|not found/i.test(texto.slice(0, 200));
+      if (res.ok && texto && !pareceError) {
+        diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: 200, ok: true, respuesta: trunc(texto, 1500) });
+        return texto;
+      }
+      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: res.status, ok: false, respuesta: trunc(esZip ? "(zip vacío)" : texto, 300) });
+    } catch (e) {
+      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", ok: false, respuesta: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  throw new Error(`descarga ${etiqueta}: el endpoint archivoreporte devolvió error (HTTP ${ultimoStatus}) en todas las variantes. Revisa el diagnóstico.`);
 }
 
 /** Convierte el TXT del detalle en columnas + filas (tolerante a encabezado). */
