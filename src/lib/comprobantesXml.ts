@@ -488,9 +488,16 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     };
     // El formulario ya está abierto (goto-app arriba). Entre comprobantes se usa
     // "Limpiar" para resetearlo, SIN re-navegar (re-navegar cerraba el navegador).
+    // La Consulta individual solo soporta CPE (factura/boleta/notas/recibo).
+    // Tipos como 50/52/54 (DUA/DAM de importación) no se pueden bajar aquí.
+    const TIPOS_SOPORTADOS = new Set(["01", "03", "07", "08", "14"]);
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
+        if (!TIPOS_SOPORTADOS.has(item.tipo)) {
+          marcarFallo(item, `Tipo ${item.tipo} (importación/aduana u otro) no se descarga en la Consulta individual de SUNAT.`);
+          continue;
+        }
         const fr = frameForm(s.ctx);
         if (!fr) {
           // Navegador caído: este y TODOS los que faltan quedan como fallidos
