@@ -4,7 +4,7 @@ import { requireUser, studioId } from "@/lib/auth";
 import DetalleSireTool from "@/components/DetalleSireTool";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Detalle SIRE — Radar Tributario" };
+export const metadata = { title: "Detalle SIRE — Ventas (RVIE) — Radar Tributario" };
 
 export default async function Page() {
   const user = await requireUser();
@@ -20,13 +20,13 @@ export default async function Page() {
     <div className="space-y-4">
       <div>
         <Link href="/" className="text-sm text-brand-600 hover:underline">← Menú</Link>
-        <h1 className="mt-1 text-2xl font-bold text-slate-800">Detalle SIRE</h1>
+        <h1 className="mt-1 text-2xl font-bold text-slate-800">Detalle SIRE — Ventas (RVIE)</h1>
         <p className="text-sm text-slate-500">
-          Extrae el detalle de la propuesta SUNAT (RVIE ventas / RCE compras) comprobante por
-          comprobante, vía la API oficial, y descárgalo en Excel.
+          Extrae el detalle de la propuesta de ventas (RVIE) comprobante por comprobante desde la
+          API oficial de SUNAT, y descárgalo en Excel.
         </p>
       </div>
-      <DetalleSireTool clientes={min} />
+      <DetalleSireTool clientes={min} tipo="ventas" />
     </div>
   );
 }

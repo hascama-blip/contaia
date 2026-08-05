@@ -908,10 +908,25 @@ async function exportarPropuesta(
 ): Promise<string | null> {
   const url = buildUrl(cfg, pathTemplate, { periodo, codLibro });
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    });
-    const txt = await res.text();
+    // SUNAT limita las solicitudes (429). Reintentamos con backoff.
+    let res!: Response;
+    let txt = "";
+    for (let intento = 0; intento < 4; intento++) {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      txt = await res.text();
+      if (res.status !== 429) break;
+      diag.pasos.push({
+        paso: `propuesta-${etiqueta}`,
+        url,
+        metodo: "GET",
+        httpStatus: 429,
+        ok: false,
+        respuesta: `429 Too Many Requests — reintento ${intento + 1}/4`,
+      });
+      if (intento < 3) await new Promise((r) => setTimeout(r, 4000 * (intento + 1)));
+    }
     diag.pasos.push({
       paso: `propuesta-${etiqueta}`,
       url,
@@ -920,6 +935,9 @@ async function exportarPropuesta(
       ok: res.ok,
       respuesta: trunc(txt, 1200),
     });
+    if (res.status === 429) {
+      throw new Error(`${etiqueta}: SUNAT limitó las solicitudes (429 Too Many Requests). Espera 1–2 minutos y reintenta.`);
+    }
     if (!res.ok) {
       if (/1070|no se ha encontrado/i.test(txt)) return "";
       throw new Error(`${etiqueta} (HTTP ${res.status}): ${trunc(txt, 150)}`);
@@ -1007,15 +1025,22 @@ export async function consultarDetalleSire(
   const incluirCompras = params.incluirCompras !== false;
   const tV = incluirVentas
     ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaVentasPath, cfg.codLibroVentas, "ventas", diag)
-    : null;
+    : undefined;
   const tC = incluirCompras
     ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaComprasPath, cfg.codLibroCompras, "compras", diag)
-    : null;
+    : undefined;
 
   if (params.diagnostico) return { periodo, diag };
 
-  if (incluirVentas && tV === null && incluirCompras && tC === null) {
-    throw new Error("No se pudo obtener el detalle (usa Modo diagnóstico para ver la respuesta de SUNAT).");
+  // Falla solo si TODO lo pedido falló (null). "" = sin movimiento (válido).
+  const pedidos = [tV, tC].filter((_x, i) => (i === 0 ? incluirVentas : incluirCompras));
+  if (pedidos.length && pedidos.every((x) => x === null)) {
+    const hay429 = diag.pasos.some((p) => /429|too many/i.test(String(p.respuesta ?? "")));
+    throw new Error(
+      hay429
+        ? "SUNAT limitó las solicitudes (429 Too Many Requests). Espera 1–2 minutos y vuelve a intentar."
+        : "No se pudo obtener el detalle (usa Modo diagnóstico para ver la respuesta de SUNAT)."
+    );
   }
   return {
     periodo,

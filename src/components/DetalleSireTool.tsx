@@ -7,8 +7,9 @@ import DetalleSirePanel from "./DetalleSirePanel";
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
 // Herramienta suelta (menú de inicio): elige la empresa, pon la Clave SOL y
-// extrae el detalle SIRE (propuesta) de la API oficial de SUNAT.
-export default function DetalleSireTool({ clientes }: { clientes: ClienteMin[] }) {
+// extrae el detalle SIRE (propuesta) de la API oficial de SUNAT. `tipo` separa
+// el módulo de Ventas (RVIE) del de Compras (RCE).
+export default function DetalleSireTool({ clientes, tipo }: { clientes: ClienteMin[]; tipo: "ventas" | "compras" }) {
   const [id, setId] = useState("");
   const sel = clientes.find((c) => c.id === id) ?? null;
 
@@ -34,7 +35,7 @@ export default function DetalleSireTool({ clientes }: { clientes: ClienteMin[] }
       {sel && (
         <>
           <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
-          <DetalleSirePanel clienteId={sel.id} />
+          <DetalleSirePanel clienteId={sel.id} tipo={tipo} />
         </>
       )}
     </div>
