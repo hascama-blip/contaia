@@ -62,6 +62,40 @@ export async function plantillaRelacionXlsx(): Promise<Buffer> {
 const norm = (s: any) =>
   String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/**
+ * Convierte el DETALLE SIRE de compras (columnas + filas de la propuesta RCE) en
+ * una relaci\u00f3n de comprobantes para descargar sus XML. En compras, el emisor es
+ * el PROVEEDOR: su RUC est\u00e1 en "Nro Doc Identidad".
+ */
+export function relacionDesdeSireCompras(columnas: string[], filas: string[][]): ItemRelacion[] {
+  const H = (columnas ?? []).map(norm);
+  const col = (pred: (h: string) => boolean) => H.findIndex(pred);
+  const cRuc = col((h) => h.includes("nrodocidentidad"));      // RUC del proveedor
+  const cTipo = col((h) => h.includes("tipocp"));               // Tipo CP/Doc.
+  const cSerie = col((h) => h.includes("serie"));               // Serie del CDP
+  const cNum = col((h) => h.includes("nrocp") || h.includes("nroinicial")); // N\u00ba inicial
+  const cFecha = col((h) => h.includes("fechadeemision") || h === "fechaemision");
+  const cMonto = col((h) => h.includes("totalcp"));
+  const cel = (f: string[], i: number) => (i >= 0 ? String(f[i] ?? "").trim() : "");
+
+  const items: ItemRelacion[] = [];
+  for (const f of filas ?? []) {
+    const rucEmisor = cel(f, cRuc).replace(/\D/g, "");
+    const serie = cel(f, cSerie).toUpperCase();
+    const numero = cel(f, cNum).replace(/^0+/, "") || cel(f, cNum);
+    if (!rucEmisor && !serie && !numero) continue;
+    items.push({
+      rucEmisor,
+      tipo: cel(f, cTipo).replace(/\D/g, "").padStart(2, "0").slice(-2) || "01",
+      serie,
+      numero,
+      fecha: cel(f, cFecha),
+      monto: Number(cel(f, cMonto).replace(/[^\d.-]/g, "")) || 0,
+    });
+  }
+  return items;
+}
+
 /** Lee la relación subida (Excel). Mapea por encabezado (tolerante). */
 export async function parseRelacionXlsx(buf: Buffer): Promise<ItemRelacion[]> {
   const wb = new ExcelJS.Workbook();

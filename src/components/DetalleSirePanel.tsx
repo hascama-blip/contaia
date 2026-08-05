@@ -122,6 +122,13 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
       </div>
 
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
+      {!esVentas && hayDatos && (
+        <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-xs text-brand-800">
+          ➡ Esta relación queda guardada. Para bajar los <strong>XML con glosa</strong> de estas compras, ve a{" "}
+          <a href="/herramientas/comprobantes-xml" className="font-semibold underline">Comprobantes XML (SUNAT)</a>,
+          elige esta empresa y pulsa <strong>“📋 Cargar del SIRE”</strong> con este mismo periodo.
+        </div>
+      )}
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 

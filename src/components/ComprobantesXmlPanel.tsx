@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+
 // Descarga los XML de comprobantes RECIBIDOS (compras) desde SUNAT SOL a partir
 // de la relación subida y los arma en un Excel (reusa el Excel de detalle de
 // facturas XML). No pide mes/año: se descarga tal cual la relación, por orden y
@@ -16,6 +18,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [facturas, setFacturas] = useState<any[]>([]);
   const [relacion, setRelacion] = useState<any[]>([]);
   const [relNombre, setRelNombre] = useState<string | null>(null);
+  const hoyD = new Date();
+  const [sireMes, setSireMes] = useState(hoyD.getMonth() + 1);
+  const [sireAnio, setSireAnio] = useState(hoyD.getFullYear());
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   // Comprobantes que no se pudieron bajar + cuántos reintentos se han hecho.
   const [fallidos, setFallidos] = useState<any[]>([]);
@@ -82,6 +87,24 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       setProgreso({ hechos: Math.min(hechos, total), total });
     }
     return nuevosFallidos;
+  }
+
+  async function cargarDesdeSire() {
+    setError(null); setInfo(null);
+    const periodo = `${sireAnio}${String(sireMes).padStart(2, "0")}`;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/sire-detalle/relacion?periodo=${periodo}&tipo=compras`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo cargar la relación del SIRE."); return; }
+      setRelacion(data.items ?? []);
+      setRelNombre(`Detalle SIRE compras ${periodo}`);
+      setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) de compras (${periodo}).`);
+    } catch {
+      setError("Error de red al cargar la relación del SIRE.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function extraer() {
@@ -215,6 +238,23 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
           Descarga la plantilla, complétala (RUC emisor, tipo, serie, número, fecha, monto) y súbela.
           Se descargan tal cual, por orden y número de comprobante.
         </p>
+
+        {/* O cargar la relación directamente del Detalle SIRE (compras) guardado. */}
+        <div className="mt-3 border-t border-brand-200 pt-3">
+          <p className="mb-1 text-[11px] font-semibold text-brand-800">…o usa el Detalle SIRE (compras) ya extraído</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select className="input h-8 py-0 text-xs" value={sireMes} onChange={(e) => setSireMes(Number(e.target.value))}>
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+            <select className="input h-8 py-0 text-xs" value={sireAnio} onChange={(e) => setSireAnio(Number(e.target.value))}>
+              {[hoyD.getFullYear(), hoyD.getFullYear() - 1, hoyD.getFullYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <button className="btn-ghost text-sm" onClick={cargarDesdeSire} disabled={busy}>📋 Cargar del SIRE</button>
+          </div>
+          <p className="mt-1 text-[10px] text-slate-400">
+            Trae la lista de compras que extrajiste en <strong>Detalle SIRE</strong> y descarga sus XML (con glosa). Debes haberlo extraído antes ahí.
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
