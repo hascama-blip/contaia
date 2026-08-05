@@ -263,8 +263,9 @@ async function esperarArchivo(
   // true (propuesta): descarga SIEMPRE que exista archivo, aunque el contador
   // de comprobantes venga en 0 (no siempre se puebla en la propuesta).
   descargarSiempre = false,
-  // Opcional: recibe metadatos del ticket (p. ej. codProceso) para la descarga.
-  outMeta?: { codProceso?: string }
+  // Opcional: recibe metadatos del ticket (codProceso, codTipoArchivoReporte)
+  // para la descarga (servicio 5.17 del manual SUNAT).
+  outMeta?: { codProceso?: string; codTipo?: string }
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
   // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
@@ -316,7 +317,11 @@ async function esperarArchivo(
       null;
 
     if (terminado) {
-      if (outMeta) outMeta.codProceso = String(reg?.codProceso ?? det?.codProceso ?? "");
+      if (outMeta) {
+        outMeta.codProceso = String(reg?.codProceso ?? det?.codProceso ?? "");
+        // Ojo: el campo de SUNAT trae la errata "codTipoAchivoReporte".
+        outMeta.codTipo = String(archRep?.codTipoAchivoReporte ?? archRep?.codTipoArchivoReporte ?? "");
+      }
       diag.pasos.push({
         paso: `estado-${etiqueta}`,
         url,
@@ -960,10 +965,10 @@ async function exportarPropuesta(
       /* contenido directo */
     }
     if (ticket) {
-      const meta: { codProceso?: string } = {};
+      const meta: { codProceso?: string; codTipo?: string } = {};
       const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
       if (nombre === VACIO) return "";
-      return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta.codProceso || "10", etiqueta, diag);
+      return await descargarPropuesta(cfg, token, nombre, codLibro, meta.codTipo ?? "00", etiqueta, diag);
     }
     return txt;
   } catch (err) {
@@ -982,58 +987,44 @@ async function exportarPropuesta(
 async function descargarPropuesta(
   cfg: SireConfig,
   token: string,
-  periodo: string,
   nombre: string,
   codLibro: string,
-  codProceso: string,
+  codTipo: string,
   etiqueta: string,
   diag: SireDiag
 ): Promise<string> {
   const base = "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte";
-  const b64 = (s: string) => Buffer.from(String(s), "utf8").toString("base64");
-  // El manual SUNAT pasa los parámetros de los servicios masivos en CABECERAS,
-  // con los valores en Base64. Probamos ambas formas (query y headers base64)
-  // hasta que una devuelva el ZIP/TXT.
-  const headB64: Record<string, string> = {
-    nomArchivoReporte: b64(nombre),
-    codLibro: b64(codLibro),
-    perTributario: b64(periodo),
-    codProceso: b64(codProceso),
-    codTipoArchivoReporte: b64("00"),
-    codOrigenEnvio: b64("2"),
-  };
-  const intentos: { q: string; headers?: Record<string, string> }[] = [
-    { q: "", headers: headB64 },
-    { q: "?nomArchivoReporte={nombre}&codLibro={codLibro}&codTipoArchivoReporte=00" },
-    { q: "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00" },
-    { q: "?nomArchivoReporte={nombre}&codLibro={codLibro}&perTributario={periodo}&codProceso={codProceso}&codOrigenEnvio=1&codTipoArchivoReporte=00" },
-    { q: "?nomArchivoReporte={nombre}&perTributario={periodo}&codLibro={codLibro}&codTipoArchivoReporte=00" },
+  // Endpoint EXACTO del manual SUNAT v30 (5.17 Descargar archivo): query string
+  // con nomArchivoReporte + codTipoArchivoReporte + codLibro. codTipo viene del
+  // ticket (5.16). Sin perTributario ni headers base64 (eso causaba el 500).
+  const intentos: string[] = [
+    "?nomArchivoReporte={nombre}&codTipoArchivoReporte={codTipo}&codLibro={codLibro}",
+    "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00&codLibro={codLibro}",
+    "?nomArchivoReporte={nombre}&codLibro={codLibro}",
   ];
   const override = process.env.SIRE_DESCARGA_PROPUESTA_QUERY;
-  if (override) intentos.unshift({ q: override.startsWith("?") ? override : `?${override}` });
+  if (override) intentos.unshift(override.startsWith("?") ? override : `?${override}`);
 
   let ultimoStatus = 0;
-  for (const it of intentos) {
-    const url = buildUrl(cfg, base + it.q, { nombre, periodo, codLibro, codProceso });
+  for (const q of intentos) {
+    const url = buildUrl(cfg, base + q, { nombre, codTipo: codTipo || "00", codLibro });
     try {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, ...(it.headers ?? {}) },
-      });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       ultimoStatus = res.status;
       const buf = Buffer.from(await res.arrayBuffer());
       const esZip = buf[0] === 0x50 && buf[1] === 0x4b;
       const texto = descomprimirSiHaceFalta(buf);
       const pareceError = !esZip && /<html|error\s*5\d\d|request failed|not found|"cod"\s*:\s*"[45]/i.test(texto.slice(0, 200));
       if (res.ok && texto && !pareceError) {
-        diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: 200, ok: true, respuesta: trunc((it.headers ? "[headers base64] " : "") + texto, 1500) });
+        diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: 200, ok: true, respuesta: trunc(texto, 1500) });
         return texto;
       }
-      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: res.status, ok: false, respuesta: trunc((it.headers ? "[headers base64] " : "") + (esZip ? "(zip vacío)" : texto), 300) });
+      diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", httpStatus: res.status, ok: false, respuesta: trunc(esZip ? "(zip vacío)" : texto, 300) });
     } catch (e) {
       diag.pasos.push({ paso: `descarga-${etiqueta}`, url, metodo: "GET", ok: false, respuesta: e instanceof Error ? e.message : String(e) });
     }
   }
-  throw new Error(`descarga ${etiqueta}: el endpoint archivoreporte devolvió error (HTTP ${ultimoStatus}) en todas las variantes. Revisa el diagnóstico.`);
+  throw new Error(`descarga ${etiqueta}: archivoreporte devolvió error (HTTP ${ultimoStatus}). Revisa el diagnóstico.`);
 }
 
 /** Convierte el TXT del detalle en columnas + filas (tolerante a encabezado). */
