@@ -263,9 +263,9 @@ async function esperarArchivo(
   // true (propuesta): descarga SIEMPRE que exista archivo, aunque el contador
   // de comprobantes venga en 0 (no siempre se puebla en la propuesta).
   descargarSiempre = false,
-  // Opcional: recibe metadatos del ticket (codProceso, codTipoArchivoReporte)
-  // para la descarga (servicio 5.17 del manual SUNAT).
-  outMeta?: { codProceso?: string; codTipo?: string }
+  // Opcional: recibe metadatos del ticket (codProceso, codTipoArchivoReporte,
+  // numTicket, nº comprobantes) para la descarga (servicio 5.17 del manual).
+  outMeta?: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number }
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
   // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
@@ -321,6 +321,8 @@ async function esperarArchivo(
         outMeta.codProceso = String(reg?.codProceso ?? det?.codProceso ?? "");
         // Ojo: el campo de SUNAT trae la errata "codTipoAchivoReporte".
         outMeta.codTipo = String(archRep?.codTipoAchivoReporte ?? archRep?.codTipoArchivoReporte ?? "");
+        outMeta.numTicket = ticket;
+        outMeta.comprobantes = comprobantes;
       }
       diag.pasos.push({
         paso: `estado-${etiqueta}`,
@@ -965,10 +967,20 @@ async function exportarPropuesta(
       /* contenido directo */
     }
     if (ticket) {
-      const meta: { codProceso?: string; codTipo?: string } = {};
+      const meta: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number } = {};
       const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
       if (nombre === VACIO) return "";
-      return await descargarPropuesta(cfg, token, nombre, codLibro, meta.codTipo ?? "00", etiqueta, diag);
+      try {
+        return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta, etiqueta, diag);
+      } catch (e) {
+        // La propuesta vacía (cntCPInformados=0) suele dar 500 al descargar:
+        // se trata como periodo sin movimiento, no como error.
+        if ((meta.comprobantes ?? 0) === 0) {
+          diag.pasos.push({ paso: `propuesta-${etiqueta}`, ok: true, respuesta: "Periodo sin comprobantes (cntCPInformados=0): no hay archivo de propuesta que descargar." });
+          return "";
+        }
+        throw e;
+      }
     }
     return txt;
   } catch (err) {
@@ -987,17 +999,22 @@ async function exportarPropuesta(
 async function descargarPropuesta(
   cfg: SireConfig,
   token: string,
+  periodo: string,
   nombre: string,
   codLibro: string,
-  codTipo: string,
+  meta: { codTipo?: string; codProceso?: string; numTicket?: string },
   etiqueta: string,
   diag: SireDiag
 ): Promise<string> {
   const base = "/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte";
-  // Endpoint EXACTO del manual SUNAT v30 (5.17 Descargar archivo): query string
-  // con nomArchivoReporte + codTipoArchivoReporte + codLibro. codTipo viene del
-  // ticket (5.16). Sin perTributario ni headers base64 (eso causaba el 500).
+  const codTipo = meta.codTipo || "00";
+  const codProceso = meta.codProceso || "10";
+  const numTicket = meta.numTicket || "";
+  // Endpoint del manual SUNAT v30 (5.17 Descargar archivo): query string. El
+  // ejemplo usa 3 params, pero la tabla marca perTributario/codProceso/numTicket
+  // como obligatorios: probamos ambas formas hasta obtener el ZIP/TXT.
   const intentos: string[] = [
+    "?nomArchivoReporte={nombre}&codTipoArchivoReporte={codTipo}&codLibro={codLibro}&perTributario={periodo}&codProceso={codProceso}&numTicket={numTicket}",
     "?nomArchivoReporte={nombre}&codTipoArchivoReporte={codTipo}&codLibro={codLibro}",
     "?nomArchivoReporte={nombre}&codTipoArchivoReporte=00&codLibro={codLibro}",
     "?nomArchivoReporte={nombre}&codLibro={codLibro}",
@@ -1007,7 +1024,7 @@ async function descargarPropuesta(
 
   let ultimoStatus = 0;
   for (const q of intentos) {
-    const url = buildUrl(cfg, base + q, { nombre, codTipo: codTipo || "00", codLibro });
+    const url = buildUrl(cfg, base + q, { nombre, codTipo, codLibro, periodo, codProceso, numTicket });
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       ultimoStatus = res.status;
