@@ -93,9 +93,11 @@ function getConfig(): SireConfig {
     propuestaVentasPath:
       process.env.SIRE_PROPUESTA_VENTAS_PATH ??
       "/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0",
+    // RCE (compras) — verbo EXACTO del manual SIRE Compras v28:
+    // exportacioncomprobantepropuesta, con codOrigenEnvio=2 (Servicio web).
     propuestaComprasPath:
       process.env.SIRE_PROPUESTA_COMPRAS_PATH ??
-      "/rce/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0&codOrigenEnvio=1",
+      "/rce/propuesta/web/propuesta/{periodo}/exportacioncomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=2",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -1118,9 +1120,7 @@ export async function consultarDetalleSire(
   // probamos las variantes conocidas hasta que una responda.
   const comprasCandidatos = [
     cfg.propuestaComprasPath,
-    "/rce/propuesta/web/propuesta/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
-    "/rce/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0",
-    "/rce/propuesta/web/comprobantes/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
+    "/rce/propuesta/web/propuesta/{periodo}/exportacioncomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
   ].filter((v, i, a) => a.indexOf(v) === i);
   const tC = incluirCompras
     ? await exportarPropuesta(cfg, token, periodo, comprasCandidatos, cfg.codLibroCompras, "compras", diag)
