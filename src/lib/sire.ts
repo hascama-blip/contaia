@@ -95,7 +95,7 @@ function getConfig(): SireConfig {
       "/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0",
     propuestaComprasPath:
       process.env.SIRE_PROPUESTA_COMPRAS_PATH ??
-      "/rce/propuesta/web/propuesta/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
+      "/rce/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0&codOrigenEnvio=1",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -917,40 +917,50 @@ async function exportarPropuesta(
   cfg: SireConfig,
   token: string,
   periodo: string,
-  pathTemplate: string,
+  pathTemplate: string | string[],
   codLibro: string,
   etiqueta: string,
   diag: SireDiag
 ): Promise<string | null> {
-  const url = buildUrl(cfg, pathTemplate, { periodo, codLibro });
+  const candidatos = Array.isArray(pathTemplate) ? pathTemplate : [pathTemplate];
   try {
-    // SUNAT limita las solicitudes (429). Reintentamos con backoff.
     let res!: Response;
     let txt = "";
-    for (let intento = 0; intento < 4; intento++) {
-      res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      });
-      txt = await res.text();
-      if (res.status !== 429) break;
+    let url = "";
+    // Prueba cada endpoint candidato (para RCE hay variantes de verbo); ante
+    // 429 reintenta con backoff; ante 5xx pasa al siguiente candidato.
+    for (let ci = 0; ci < candidatos.length; ci++) {
+      url = buildUrl(cfg, candidatos[ci], { periodo, codLibro });
+      for (let intento = 0; intento < 4; intento++) {
+        res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        txt = await res.text();
+        if (res.status !== 429) break;
+        diag.pasos.push({
+          paso: `propuesta-${etiqueta}`,
+          url,
+          metodo: "GET",
+          httpStatus: 429,
+          ok: false,
+          respuesta: `429 Too Many Requests — reintento ${intento + 1}/4`,
+        });
+        if (intento < 3) await new Promise((r) => setTimeout(r, 4000 * (intento + 1)));
+      }
       diag.pasos.push({
         paso: `propuesta-${etiqueta}`,
         url,
         metodo: "GET",
-        httpStatus: 429,
-        ok: false,
-        respuesta: `429 Too Many Requests — reintento ${intento + 1}/4`,
+        httpStatus: res.status,
+        ok: res.ok,
+        respuesta: trunc(txt, 1200),
       });
-      if (intento < 3) await new Promise((r) => setTimeout(r, 4000 * (intento + 1)));
+      // 200 o "sin movimiento" → dejar de probar candidatos.
+      if (res.ok || /1070|no se ha encontrado/i.test(txt)) break;
+      // 5xx y quedan candidatos → probar el siguiente verbo/endpoint.
+      if (res.status >= 500 && ci < candidatos.length - 1) continue;
+      break;
     }
-    diag.pasos.push({
-      paso: `propuesta-${etiqueta}`,
-      url,
-      metodo: "GET",
-      httpStatus: res.status,
-      ok: res.ok,
-      respuesta: trunc(txt, 1200),
-    });
     if (res.status === 429) {
       throw new Error(`${etiqueta}: SUNAT limitó las solicitudes (429 Too Many Requests). Espera 1–2 minutos y reintenta.`);
     }
@@ -1104,8 +1114,16 @@ export async function consultarDetalleSire(
   const tV = incluirVentas
     ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaVentasPath, cfg.codLibroVentas, "ventas", diag)
     : undefined;
+  // RCE (compras): el verbo del endpoint varía según la versión del manual;
+  // probamos las variantes conocidas hasta que una responda.
+  const comprasCandidatos = [
+    cfg.propuestaComprasPath,
+    "/rce/propuesta/web/propuesta/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
+    "/rce/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0",
+    "/rce/propuesta/web/comprobantes/{periodo}/exportacomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=1",
+  ].filter((v, i, a) => a.indexOf(v) === i);
   const tC = incluirCompras
-    ? await exportarPropuesta(cfg, token, periodo, cfg.propuestaComprasPath, cfg.codLibroCompras, "compras", diag)
+    ? await exportarPropuesta(cfg, token, periodo, comprasCandidatos, cfg.codLibroCompras, "compras", diag)
     : undefined;
 
   if (params.diagnostico) return { periodo, diag };
