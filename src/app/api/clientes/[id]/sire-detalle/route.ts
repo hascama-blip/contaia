@@ -61,7 +61,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Guarda en caché el bloque obtenido (para no reconsultar la próxima vez).
     const bloque = tipo === "ventas" ? r.ventas : r.compras;
     if (bloque) await setSireDetalleCache(cliente.id, tipo, periodo, bloque);
-    return NextResponse.json({ periodo: r.periodo, ventas: r.ventas, compras: r.compras, diag: r.diag });
+    // En modo normal NO se devuelve la traza (diag): solo los datos.
+    return NextResponse.json({ periodo: r.periodo, ventas: r.ventas, compras: r.compras });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? "Error consultando el detalle SIRE" }, { status: 400 });
   }

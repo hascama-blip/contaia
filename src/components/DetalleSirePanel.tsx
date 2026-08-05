@@ -36,7 +36,7 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
         body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (res.status === 400 && !solPass && !data.desdeCache) {
         setError("No hay datos guardados de este periodo. Carga tus accesos SOL (arriba) para extraerlo de SUNAT.");
         return;
