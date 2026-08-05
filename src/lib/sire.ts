@@ -1080,6 +1080,15 @@ function parseDetalle(texto: string): SireDetalleBloque {
     const p = (f[0] ?? "").toLowerCase();
     return p !== "total" && p !== "" && f.length >= 3;
   });
+  // Normaliza el ancho de cada fila al nº de columnas.
+  const ncol = columnas.length;
+  filas = filas.map((f) => { const r = f.slice(0, ncol); while (r.length < ncol) r.push(""); return r; });
+  // Quita columnas totalmente vacías (el SIRE trae muchas CLU vacías al final).
+  if (filas.length > 0) {
+    const keep = columnas.map((_, j) => filas.some((f) => (f[j] ?? "").trim() !== ""));
+    columnas = columnas.filter((_, j) => keep[j]);
+    filas = filas.map((f) => f.filter((_, j) => keep[j]));
+  }
   return { columnas, filas, comprobantes: filas.length };
 }
 
