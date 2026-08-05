@@ -18,6 +18,7 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const [refrescar, setRefrescar] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const [bloque, setBloque] = useState<any>(null);
 
@@ -25,21 +26,29 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
     setError(null); setInfo(null); setDiag(null); setBloque(null);
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
-    if (!solPass) { setError("Carga tus accesos SOL (arriba) para extraer el detalle."); return; }
+    // Con caché no hace falta la Clave SOL; sin caché (o refrescar) sí.
     const periodo = `${anio}${String(mes).padStart(2, "0")}`;
     setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo }),
+        body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      if (res.status === 400 && !solPass && !data.desdeCache) {
+        setError("No hay datos guardados de este periodo. Carga tus accesos SOL (arriba) para extraerlo de SUNAT.");
+        return;
+      }
       if (!res.ok) { setError(data.error ?? "No se pudo extraer el detalle."); return; }
       const b = esVentas ? data.ventas : data.compras;
       setBloque(b ?? null);
-      setInfo(diagModo ? "Diagnóstico listo (revisa la traza cruda abajo)." : `${b?.comprobantes ?? 0} comprobante(s) de ${libro}.`);
+      if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); return; }
+      const desde = data.desdeCache
+        ? ` · guardado (${new Date(data.cacheAt).toLocaleString("es-PE")}) — no se reconsultó SUNAT`
+        : " · recién extraído de SUNAT (guardado en caché)";
+      setInfo(`${b?.comprobantes ?? 0} comprobante(s) de ${libro}${desde}.`);
     } catch {
       setError("Error de red al extraer el detalle.");
     } finally {
@@ -80,7 +89,9 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
       <p className="mb-4 text-xs text-slate-400">
         Extrae el <strong>detalle comprobante por comprobante</strong> de la propuesta SUNAT de
         <strong> {libro}</strong> vía la API oficial, y descárgalo en <strong>Excel</strong>.
-        Requiere tus accesos SOL y las credenciales de la app SIRE ya guardadas.
+        Requiere tus accesos SOL y las credenciales de la app SIRE ya guardadas. Lo extraído se
+        <strong> guarda en caché</strong>: si vuelves a consultar el mismo periodo no se re-pregunta a
+        SUNAT (marca <strong>🔄 Refrescar</strong> para forzar una nueva consulta).
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -102,7 +113,10 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
         {hayDatos && (
           <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>⬇ Excel</button>
         )}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500" title="Vuelve a consultar SUNAT en vez de usar lo guardado">
+          <input type="checkbox" checked={refrescar} onChange={(e) => setRefrescar(e.target.checked)} /> 🔄 Refrescar
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-500">
           <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
         </label>
       </div>

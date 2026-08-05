@@ -634,6 +634,20 @@ export async function setSireResumen(
   return cliente;
 }
 
+export async function setSireDetalleCache(
+  clienteId: string,
+  tipo: "ventas" | "compras",
+  periodo: string,
+  bloque: { columnas: string[]; filas: string[][]; comprobantes: number }
+): Promise<void> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return;
+  if (!cliente.sireDetalle) cliente.sireDetalle = {};
+  cliente.sireDetalle[`${tipo}-${periodo}`] = { ...bloque, at: new Date().toISOString() };
+  await writeStore(store);
+}
+
 export async function addDeclaracion(
   clienteId: string,
   decl: DeclaracionMensual
