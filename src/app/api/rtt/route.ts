@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { crearSolicitudRTT, setEstadoRTT, listarSolicitudesRTT, contarRTTHoy, getRttConfig, marcarRTTAtascados } from "@/lib/db";
+import { crearSolicitudRTT, setEstadoRTT, listarSolicitudesRTT, contarRTTHoy, getRttConfig, marcarRTTAtascados, getWebhookLogRTT } from "@/lib/db";
 import { generarRTT } from "@/lib/rtt";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
 
-// GET → lista las solicitudes RTT del usuario (con su trazabilidad).
+// GET → lista las solicitudes RTT del usuario + bitácora del webhook + config.
 export async function GET() {
   const user = await requireUser();
   await marcarRTTAtascados(60); // marca error los atascados >60 min
   const solicitudes = await listarSolicitudesRTT(user.id);
-  return NextResponse.json({ solicitudes });
+  const webhookLog = await getWebhookLogRTT();
+  const { dominio } = await getRttConfig();
+  return NextResponse.json({ solicitudes, webhookLog, dominio, dominioOk: !!dominio });
 }
 
 // POST → crea una solicitud de RTT y dispara el bot en SOL (pasos 1→3).

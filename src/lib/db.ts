@@ -52,6 +52,8 @@ interface Store {
   config?: { browserWsUrl?: string; rttDominio?: string; rttSecret?: string };
   /** Solicitudes de RTT (Reporte Tributario para Terceros) con su trazabilidad. */
   rtt?: SolicitudRTT[];
+  /** Bitácora de los últimos correos recibidos por el webhook del RTT (diagnóstico). */
+  rttWebhookLog?: { at: string; ruc: string; tienePdf: boolean; tieneXml: boolean; resultado: string; from?: string }[];
 }
 
 async function ensureDirs() {
@@ -434,6 +436,26 @@ export async function guardarArchivosRTTPorRuc(
   sol.historial.push({ estado: "listo", at: now });
   await writeStore(store);
   return sol;
+}
+
+/** Registra un evento del webhook (para verificar que el correo llegó). */
+export async function registrarWebhookRTT(ev: { ruc?: string; tienePdf?: boolean; tieneXml?: boolean; resultado: string; from?: string }): Promise<void> {
+  const store = await readStore();
+  if (!Array.isArray(store.rttWebhookLog)) store.rttWebhookLog = [];
+  store.rttWebhookLog.unshift({
+    at: new Date().toISOString(),
+    ruc: ev.ruc ?? "",
+    tienePdf: !!ev.tienePdf,
+    tieneXml: !!ev.tieneXml,
+    resultado: ev.resultado,
+    from: ev.from,
+  });
+  store.rttWebhookLog = store.rttWebhookLog.slice(0, 25);
+  await writeStore(store);
+}
+export async function getWebhookLogRTT(): Promise<Store["rttWebhookLog"]> {
+  const store = await readStore();
+  return store.rttWebhookLog ?? [];
 }
 
 /** Lee un archivo RTT guardado (pdf/xml) por nombre. */

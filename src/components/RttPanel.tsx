@@ -30,13 +30,15 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
+  const [webhookLog, setWebhookLog] = useState<any[]>([]);
+  const [dominio, setDominio] = useState<string>("");
   const sel = clientes.find((c) => c.id === id) ?? null;
 
   async function cargar() {
     try {
       const res = await fetch("/api/rtt");
       const data = await res.json().catch(() => ({}));
-      if (res.ok) setSolicitudes(data.solicitudes ?? []);
+      if (res.ok) { setSolicitudes(data.solicitudes ?? []); setWebhookLog(data.webhookLog ?? []); setDominio(data.dominio ?? ""); }
     } catch { /* */ }
   }
   useEffect(() => { cargar(); }, []);
@@ -109,6 +111,48 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         )}
         {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+      </div>
+
+      {/* Verificación del webhook: últimos correos recibidos */}
+      <div className="card p-5">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800">Webhook de correo — verificación</h2>
+          <span className={`badge ${dominio ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+            {dominio ? `Dominio: ${dominio}` : "Falta configurar RTT_DOMINIO"}
+          </span>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">
+          Aquí aparece <strong>cada correo que llega al webhook</strong>. Para probar, envía un correo con un PDF
+          adjunto a <code className="rounded bg-slate-100 px-1">reportes+RUC20512737456@{dominio || "reportes.tudominio.com"}</code> —
+          si la cadena (MX → SendGrid → webhook) está bien, verás el evento abajo en segundos.
+        </p>
+        {webhookLog.length === 0 ? (
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+            Aún no ha llegado ningún correo al webhook. Si ya enviaste uno y no aparece, revisa: MX de <code>reportes</code> → <code>mx.sendgrid.net</code>, el Inbound Parse (host + Destination URL con el secreto), y las variables en Render.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-[10px] uppercase text-slate-400">
+                  <th className="px-2 py-1">Hora</th><th className="px-2 py-1">RUC</th><th className="px-2 py-1">PDF</th><th className="px-2 py-1">XML</th><th className="px-2 py-1">Resultado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {webhookLog.map((e: any, i: number) => (
+                  <tr key={i} className="border-t border-slate-100">
+                    <td className="px-2 py-1 text-slate-500">{new Date(e.at).toLocaleString("es-PE")}</td>
+                    <td className="px-2 py-1 font-medium text-slate-700">{e.ruc || "—"}</td>
+                    <td className="px-2 py-1">{e.tienePdf ? "✓" : "—"}</td>
+                    <td className="px-2 py-1">{e.tieneXml ? "✓" : "—"}</td>
+                    <td className={`px-2 py-1 ${/OK/.test(e.resultado) ? "text-emerald-700" : "text-amber-700"}`}>{e.resultado}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <button className="btn-ghost mt-2 text-sm" onClick={cargar}>↻ Actualizar</button>
       </div>
 
       {/* Trazabilidad */}

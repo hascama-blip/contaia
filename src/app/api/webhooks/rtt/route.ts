@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRttConfig, guardarArchivosRTTPorRuc } from "@/lib/db";
+import { getRttConfig, guardarArchivosRTTPorRuc, registrarWebhookRTT } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,11 +16,13 @@ export async function POST(req: NextRequest) {
   const url = new URL(req.url);
   const enviado = req.headers.get("x-webhook-secret") || url.searchParams.get("secret") || "";
   if (!secret || enviado !== secret) {
+    await registrarWebhookRTT({ resultado: "secreto inválido (401)" }).catch(() => {});
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const ct = (req.headers.get("content-type") || "").toLowerCase();
   let ruc = "";
+  let from = "";
   let pdf: Buffer | undefined;
   let xml: Buffer | undefined;
 
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
       const destinatario =
         rcptHeader ||
         String(form.get("to") || form.get("recipient") || form.get("envelope") || "");
+      from = String(form.get("from") || "");
       ruc = extraerRuc(destinatario) || extraerRuc(String(form.get("subject") || ""));
       for (const [, value] of form.entries()) {
         if (value instanceof File) {
@@ -47,6 +50,7 @@ export async function POST(req: NextRequest) {
     } else if (ct.includes("application/json")) {
       // Formato JSON con adjuntos en base64 (proveedor propio / worker custom).
       const body = await req.json().catch(() => ({}));
+      from = String(body.from || "");
       ruc = extraerRuc(rcptHeader || String(body.to || body.recipient || "")) || extraerRuc(String(body.subject || ""));
       const atts: any[] = Array.isArray(body.attachments) ? body.attachments : [];
       for (const a of atts) {
@@ -59,17 +63,29 @@ export async function POST(req: NextRequest) {
         else if (tct.includes("xml") || nombre.endsWith(".xml")) xml = buf;
       }
     } else {
+      await registrarWebhookRTT({ resultado: `content-type no soportado (${ct.slice(0, 40)})`, from }).catch(() => {});
       return NextResponse.json({ error: "content-type no soportado" }, { status: 415 });
     }
   } catch (e: any) {
+    await registrarWebhookRTT({ resultado: "error parseando el correo", from }).catch(() => {});
     return NextResponse.json({ error: e?.message ?? "error parseando el correo" }, { status: 400 });
   }
 
-  if (!/^\d{11}$/.test(ruc)) return NextResponse.json({ error: "sin RUC en el destinatario (+RUC…@)" }, { status: 400 });
-  if (!pdf && !xml) return NextResponse.json({ error: "correo sin PDF/XML" }, { status: 422 });
+  if (!/^\d{11}$/.test(ruc)) {
+    await registrarWebhookRTT({ ruc, tienePdf: !!pdf, tieneXml: !!xml, resultado: "correo recibido, pero SIN RUC en el destinatario (+RUC…@)", from }).catch(() => {});
+    return NextResponse.json({ error: "sin RUC en el destinatario (+RUC…@)" }, { status: 400 });
+  }
+  if (!pdf && !xml) {
+    await registrarWebhookRTT({ ruc, resultado: "correo recibido, pero SIN adjunto PDF/XML", from }).catch(() => {});
+    return NextResponse.json({ error: "correo sin PDF/XML" }, { status: 422 });
+  }
 
   const sol = await guardarArchivosRTTPorRuc(ruc, { pdf, xml });
-  if (!sol) return NextResponse.json({ error: `sin solicitud en proceso para el RUC ${ruc}` }, { status: 404 });
+  if (!sol) {
+    await registrarWebhookRTT({ ruc, tienePdf: !!pdf, tieneXml: !!xml, resultado: "correo recibido OK, pero no había solicitud en proceso para ese RUC", from }).catch(() => {});
+    return NextResponse.json({ error: `sin solicitud en proceso para el RUC ${ruc}` }, { status: 404 });
+  }
+  await registrarWebhookRTT({ ruc, tienePdf: !!pdf, tieneXml: !!xml, resultado: "OK: archivo guardado y solicitud marcada como lista", from }).catch(() => {});
   return NextResponse.json({ ok: true, id: sol.id, estado: sol.estado });
 }
 
