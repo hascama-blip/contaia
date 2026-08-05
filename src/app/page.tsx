@@ -24,34 +24,11 @@ const OPCIONES: Opcion[] = [
     destacado: true,
   },
   {
-    href: "/herramientas/cruce-sire",
-    icono: "🔀",
-    titulo: "Comparativo SIRE vs sistema contable",
-    detalle:
-      "Cruza el SIRE con Contasis comprobante por comprobante y descarga el reporte de diferencias en Excel.",
-    destacado: true,
-  },
-  {
-    href: "/herramientas/procesar-compras",
-    icono: "📥",
-    titulo: "Masivo SIRE → Contabilidad (Contasis)",
-    detalle:
-      "Sube el SIRE de compras y ventas, agrega los XML (glosa, opcional), reclasifica las cuentas y genera el masivo para importar a Contasis.",
-    destacado: true,
-  },
-  {
     href: "/herramientas/consultas",
     icono: "📨",
     titulo: "Consultas tributarias",
     detalle:
       "Extrae los mensajes del buzón electrónico SUNAT con sus asuntos y descarga, mensaje por mensaje, el PDF adjunto de cada notificación.",
-  },
-  {
-    href: "/herramientas/facturas-xml",
-    icono: "🧾",
-    titulo: "Detalle completo de facturas (XML)",
-    detalle:
-      "Sube los XML de los comprobantes (en bloque o en ZIP) y extrae toda la información: emisor, receptor, montos por afectación (gravado, IGV, ISC…) y el detalle de cada ítem. Descárgalo en Excel.",
   },
   {
     href: "/herramientas/comprobantes-xml",
