@@ -6,11 +6,12 @@ import DetalleSirePanel from "./DetalleSirePanel";
 
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
-// Herramienta suelta (menú de inicio): elige la empresa, pon la Clave SOL y
-// extrae el detalle SIRE (propuesta) de la API oficial de SUNAT. `tipo` separa
-// el módulo de Ventas (RVIE) del de Compras (RCE).
-export default function DetalleSireTool({ clientes, tipo }: { clientes: ClienteMin[]; tipo: "ventas" | "compras" }) {
+// Herramienta única de Detalle SIRE: elige la empresa una vez y alterna entre
+// Compras (RCE) y Ventas (RVIE). Cada libro se EXTRAE por separado (su propio
+// botón); ambos paneles quedan montados para no perder lo ya extraído al cambiar.
+export default function DetalleSireTool({ clientes }: { clientes: ClienteMin[] }) {
   const [id, setId] = useState("");
+  const [tab, setTab] = useState<"compras" | "ventas">("compras");
   const sel = clientes.find((c) => c.id === id) ?? null;
 
   return (
@@ -35,7 +36,29 @@ export default function DetalleSireTool({ clientes, tipo }: { clientes: ClienteM
       {sel && (
         <>
           <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
-          <DetalleSirePanel clienteId={sel.id} tipo={tipo} />
+
+          {/* Selector de libro (la extracción de cada uno es independiente). */}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+            {(["compras", "ventas"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${
+                  tab === t ? "bg-brand-600 text-white" : "text-slate-500 hover:text-brand-700"
+                }`}
+              >
+                {t === "compras" ? "Compras (RCE)" : "Ventas (RVIE)"}
+              </button>
+            ))}
+          </div>
+
+          {/* Ambos paneles montados; se oculta el inactivo para conservar estado. */}
+          <div className={tab === "compras" ? "" : "hidden"}>
+            <DetalleSirePanel clienteId={sel.id} tipo="compras" />
+          </div>
+          <div className={tab === "ventas" ? "" : "hidden"}>
+            <DetalleSirePanel clienteId={sel.id} tipo="ventas" />
+          </div>
         </>
       )}
     </div>
