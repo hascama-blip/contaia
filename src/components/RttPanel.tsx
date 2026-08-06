@@ -32,14 +32,26 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [webhookLog, setWebhookLog] = useState<any[]>([]);
   const [dominio, setDominio] = useState<string>("");
+  const [revisadoAt, setRevisadoAt] = useState<string>("");
+  const [refrescando, setRefrescando] = useState(false);
   const sel = clientes.find((c) => c.id === id) ?? null;
 
   async function cargar() {
+    setRefrescando(true);
     try {
-      const res = await fetch("/api/rtt");
+      const res = await fetch("/api/rtt", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (res.ok) { setSolicitudes(data.solicitudes ?? []); setWebhookLog(data.webhookLog ?? []); setDominio(data.dominio ?? ""); }
-    } catch { /* */ }
+      setRevisadoAt(new Date().toLocaleTimeString("es-PE"));
+    } catch { /* */ } finally { setRefrescando(false); }
+  }
+
+  async function probarWebhook() {
+    setRefrescando(true);
+    try {
+      await fetch("/api/rtt/probar-webhook", { method: "POST" });
+      await cargar();
+    } finally { setRefrescando(false); }
   }
   useEffect(() => { cargar(); }, []);
   // Auto-refresco mientras haya solicitudes en proceso (esperando el correo).
@@ -152,7 +164,19 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
             </table>
           </div>
         )}
-        <button className="btn-ghost mt-2 text-sm" onClick={cargar}>↻ Actualizar</button>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button className="btn-ghost text-sm" onClick={cargar} disabled={refrescando}>
+            {refrescando ? "Revisando…" : "↻ Actualizar"}
+          </button>
+          <button className="btn-ghost text-sm" onClick={probarWebhook} disabled={refrescando} title="Inserta un evento de prueba para confirmar que la app funciona">
+            🧪 Probar webhook
+          </button>
+          {revisadoAt && (
+            <span className="text-[11px] text-slate-400">
+              Revisado {revisadoAt} · {webhookLog.length} evento(s)
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Trazabilidad */}
