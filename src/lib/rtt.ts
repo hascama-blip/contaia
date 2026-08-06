@@ -181,23 +181,41 @@ async function marcarYAceptar(fr: any): Promise<string> {
   return via;
 }
 
-/** Vuelca el checkbox y el botón "Acepto" reales del frame del RTT (para
- *  calibrar el handler exacto que abre la pantalla del correo). */
+/** Vuelca el checkbox, el botón "Acepto", el estado del JS y la definición de
+ *  goToPage/forms del frame del RTT (para calibrar cómo pasar al correo). */
 async function dumpRTT(fr: any): Promise<any> {
   return await fr.evaluate(() => {
     const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+    const w = window as any;
     const c = document.querySelector("#chkAceptar") as HTMLInputElement | null;
     const botones = (Array.from(document.querySelectorAll("a,button,input")) as any[])
       .filter((e) => /acepto|generar|enviar|continuar/i.test((e.value || "") + " " + (e.textContent || "")))
       .map((e) => ({
-        tag: e.tagName, txt: norm(e.textContent || e.value), cls: (e.className || "").slice(0, 60),
-        disabled: !!e.disabled, onclick: (e.getAttribute && e.getAttribute("onclick") || "").slice(0, 160),
-        href: (e.getAttribute && e.getAttribute("href") || "").slice(0, 100),
-        html: (e.outerHTML || "").replace(/\s+/g, " ").slice(0, 220),
+        tag: e.tagName, txt: norm(e.textContent || e.value), disabled: !!e.disabled,
+        onclick: (e.getAttribute && e.getAttribute("onclick") || "").slice(0, 160),
       })).slice(0, 8);
+    // Definición de goToPage (si es inline) para saber qué URL/POST arma.
+    let gotoSrc = "";
+    for (const s of Array.from(document.querySelectorAll("script:not([src])")) as HTMLScriptElement[]) {
+      const t = s.textContent || "";
+      const i = t.search(/function\s+goToPage|goToPage\s*[=:]/);
+      if (i >= 0) { gotoSrc = norm(t.slice(Math.max(0, i - 10), i + 260)); break; }
+    }
+    const forms = (Array.from(document.forms) as HTMLFormElement[]).map((f) => ({
+      name: f.name || f.id, action: (f.getAttribute("action") || "").slice(0, 120), method: f.method,
+      hidden: (Array.from(f.querySelectorAll('input[type="hidden"]')) as HTMLInputElement[]).map((h) => h.name).slice(0, 20),
+    })).slice(0, 4);
     return {
-      checkbox: c ? { checked: c.checked, onclick: (c.getAttribute("onclick") || "").slice(0, 160), html: (c.outerHTML || "").replace(/\s+/g, " ").slice(0, 220) } : null,
+      checkbox: c ? { checked: c.checked, onclick: (c.getAttribute("onclick") || "").slice(0, 160) } : null,
       botones,
+      js: {
+        goToPage: typeof w.goToPage,
+        habilitarIngreso: typeof w.habilitarIngreso,
+        scriptsSrc: (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[]).map((s) => (s.getAttribute("src") || "").slice(0, 90)).slice(0, 20),
+      },
+      gotoSrc,
+      forms,
+      url: location.href.slice(0, 160),
     };
   }).catch(() => null);
 }
