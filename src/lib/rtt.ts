@@ -123,6 +123,36 @@ async function clickMenuJS(ctx: any, patrones: string[]): Promise<{ ok: boolean;
   return { ok: false };
 }
 
+/** Pantalla 1 del RTT: marca la casilla y pulsa "Acepto" (vía JS, robusto). */
+async function marcarYAceptar(fr: any): Promise<boolean> {
+  return await fr.evaluate(() => {
+    const c = document.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    if (c) {
+      c.checked = true;
+      c.dispatchEvent(new Event("click", { bubbles: true }));
+      c.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const cands = Array.from(document.querySelectorAll("input,button,a")) as any[];
+    const b = cands.find((e) => /acepto|aceptar/i.test(((e as any).value || "") + " " + (e.textContent || "")));
+    if (b) { (b as any).disabled = false; (b as HTMLElement).click(); return true; }
+    return false;
+  }).catch(() => false);
+}
+/** ¿Este frame es el CONTENIDO del RTT (no el menú)? Por URL del app o textos propios. */
+async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; acepto: boolean }> {
+  if (/menuinternet|cl-ti-itmenu/i.test(fr.url())) {
+    // El frame del menú también dice "Reporte Tributario para Terceros"; ignóralo
+    // salvo que tenga el campo de correo embebido.
+    const campo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
+    return { app: !!campo, correo: !!campo, acepto: false };
+  }
+  const url = /itreportetri|reportetri/i.test(fr.url());
+  const campo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
+  const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
+  const acepto = /desea generar el reporte|marque la casilla|sr\.?\s*contribuyente/i.test(txt) || (await fr.locator('input[type="checkbox"]').count().catch(() => 0)) > 0;
+  return { app: url || !!campo || acepto, correo: !!campo, acepto };
+}
+
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
 async function volcar(ctx: any): Promise<any> {
   const frames: any[] = [];
@@ -200,20 +230,39 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     const clic = await clickMenuJS(ctx, patrones);
     pasos.push({ paso: "menu-rtt", clico: clic.ok, opcion: clic.text, frame: clic.frame, urlDirecta: RTT_URL, candidatos: candidatos.slice(0, 30) });
 
-    // Esperar a que cargue el formulario del RTT (iframe del app o pestaña nueva).
+    // Esperar a que cargue el CONTENIDO del RTT: primero la pantalla "Acepto"
+    // (casilla + botón), luego la del correo. Se distingue del frame del menú.
     let frameRTT: any = null;
+    let estado = { app: false, correo: false, acepto: false };
     for (let i = 0; i < 15 && !frameRTT; i++) {
       await page.waitForTimeout(1000).catch(() => {});
       for (const fr of todosLosFrames(ctx)) {
-        const esApp = /itreportetri|reportetri/i.test(fr.url());
-        const tieneCampo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
-        if ((esApp && tieneCampo) || tieneCampo) { frameRTT = fr; break; }
+        const st = await esFrameRTT(fr);
+        if (st.app) { frameRTT = fr; estado = st; break; }
       }
     }
 
-    // Volcado de estructura (para calibrar la navegación si el form no aparece).
+    // 3) Pantalla 1 → marcar la casilla "Acepto" y pulsar el botón. Recién luego
+    //    aparece la pantalla del correo (#txtCorreo). Si ya hay correo, se salta.
+    let paso1 = false;
+    if (frameRTT && estado.acepto && !estado.correo) {
+      paso1 = await marcarYAceptar(frameRTT);
+      // Esperar la pantalla del correo (mismo frame recargado o uno nuevo).
+      for (let i = 0; i < 12; i++) {
+        await page.waitForTimeout(1000).catch(() => {});
+        let encontrado = false;
+        for (const fr of todosLosFrames(ctx)) {
+          const st = await esFrameRTT(fr);
+          if (st.correo) { frameRTT = fr; estado = st; encontrado = true; break; }
+        }
+        if (encontrado) break;
+      }
+    }
+    pasos.push({ paso: "acepto", aceptado: paso1, hayCorreo: estado.correo });
+
+    // Volcado de estructura (para calibrar la navegación si algo no aparece).
     const estructura = await volcar(ctx);
-    pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, ...estructura });
+    pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
 
@@ -227,12 +276,12 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       };
     }
 
-    // 3) Escribir el correo de destino (en cualquier frame) y Enviar.
+    // 4) Escribir el correo de destino (en el frame del RTT) y Enviar.
     const emailSels = ["#txtCorreo", 'input[name="txtCorreo"]', 'input[type="email"]', 'input[placeholder*="Correo" i]', 'input[type="text"]'];
     const fill = await fillEnFrames(ctx, emailSels, params.emailDestino);
     pasos.push({ paso: "correo", escrito: fill.ok, frame: fill.frameUrl, sel: fill.sel, emailDestino: params.emailDestino });
     if (!fill.ok) {
-      return { ok: false, error: "No se encontró el campo de correo en el formulario del RTT.", diag: { pasos } };
+      return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto'/'estructura'.", diag: { pasos } };
     }
 
     // Clic "Enviar" (#btnCorreo), en cualquier frame.
