@@ -146,39 +146,37 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
   return { app: true, correo: !!correo, acepto: !!acepto };
 }
 
-/** Pantalla 1 del RTT: marca la casilla (#chkAceptar) y pulsa "Acepto".
- *  1) interacción REAL de Playwright; 2) respaldo por JS que ADEMÁS ejecuta el
- *  onclick del botón (algunos handlers no responden a un click sintético sobre
- *  un <a> deshabilitado por clase). Devuelve la vía que se usó. */
+/** Pantalla 1 del RTT: marca la casilla y pasa a la pantalla del correo.
+ *  Los handlers reales de SUNAT son: casilla #chkAceptar → habilitarIngreso()
+ *  (habilita el botón), botón #btnAceptar → goToPage('cargarFormulario') (carga
+ *  el correo). Se INVOCAN esas funciones directamente (como fraccionamiento
+ *  llama a fListarNotiMen), que es mucho más fiable que un clic sintético.
+ *  Respaldo: clic real de Playwright sobre el botón. Devuelve la vía usada. */
 async function marcarYAceptar(fr: any): Promise<string> {
   const chk = fr.locator("#chkAceptar").first();
   if (await chk.count().catch(() => 0)) {
     await chk.check({ force: true }).catch(async () => { await chk.click({ force: true }).catch(() => {}); });
   }
-  await fr.page().waitForTimeout(400).catch(() => {});
-  // Clic real de Playwright sobre "Acepto".
-  const acepto = fr.locator('a:has-text("Acepto"), input[value="Acepto" i], button:has-text("Acepto"), #btnAceptar').first();
-  if (await acepto.count().catch(() => 0)) {
-    await acepto.click({ force: true, timeout: 4000 }).catch(() => {});
-  }
-  await fr.page().waitForTimeout(600).catch(() => {});
-  // Respaldo JS: asegurar checked, habilitar y EJECUTAR el onclick del botón.
+  await fr.page().waitForTimeout(300).catch(() => {});
   const via = (await fr.evaluate(() => {
-    const c = document.querySelector("#chkAceptar") as HTMLInputElement | null;
-    if (c && !c.checked) {
-      c.checked = true;
-      c.dispatchEvent(new Event("click", { bubbles: true }));
-      c.dispatchEvent(new Event("change", { bubbles: true }));
+    const w = window as any;
+    const c = document.getElementById("chkAceptar") as HTMLInputElement | null;
+    if (c) c.checked = true;
+    try { if (typeof w.habilitarIngreso === "function") w.habilitarIngreso(); } catch { /* sigue */ }
+    if (typeof w.goToPage === "function") {
+      try { w.goToPage("cargarFormulario"); return "goToPage"; }
+      catch (e: any) { return "goToPage-err:" + (e && e.message ? String(e.message).slice(0, 60) : ""); }
     }
-    const a = (Array.from(document.querySelectorAll("a,button,input")) as any[])
-      .find((e) => /acepto/i.test((e.value || "") + " " + (e.textContent || "")));
-    if (!a) return "sin-boton";
-    a.classList?.remove("disabled"); a.removeAttribute?.("disabled"); a.disabled = false;
-    const oc = a.getAttribute && a.getAttribute("onclick");
-    if (oc) { try { (0, eval)(oc); return "onclick-eval"; } catch { /* sigue */ } }
-    try { a.click(); return "js-click"; } catch { /* sigue */ }
-    return "noop";
+    const b = document.getElementById("btnAceptar") as HTMLElement | null;
+    if (b) { b.click(); return "btn-click"; }
+    return "sin-via";
   }).catch(() => "err")) as string;
+  await fr.page().waitForTimeout(600).catch(() => {});
+  // Respaldo: si no había funciones globales, clic real sobre el botón.
+  if (via === "sin-via" || via === "err" || String(via).startsWith("goToPage-err")) {
+    const b = fr.locator("#btnAceptar, button:has-text(\"Acepto\")").first();
+    if (await b.count().catch(() => 0)) await b.click({ force: true, timeout: 4000 }).catch(() => {});
+  }
   await fr.page().waitForTimeout(1000).catch(() => {});
   return via;
 }
