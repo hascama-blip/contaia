@@ -1,20 +1,21 @@
 // ============================================================
 //  RTT — bot que dispara la generación del Reporte Tributario para Terceros
 // ============================================================
-// Paso 3 de la trazabilidad: inicia sesión en SOL con Clave SOL y genera el RTT,
-// escribiendo como correo de destino el sub-address con el RUC embebido
-// (reportes+RUC{ruc}@dominio). SUNAT envía el PDF/XML por correo (asíncrono);
-// el webhook lo captura después. La navegación EXACTA del menú RTT se calibra
-// con Modo diagnóstico (devuelve el volcado de estructura), igual que el resto.
+// Paso 3 de la trazabilidad: inicia sesión en SOL, entra por el MENÚ a
+// "Reporte Tributario para Terceros" (ir directo a ww1 falla: SUNAT exige los
+// parámetros de sesión que inyecta el menú), marca la casilla "Acepto" y escribe
+// como correo de destino el sub-address con el RUC embebido (reportes+RUC{ruc}@
+// dominio). SUNAT envía el PDF/XML por correo (asíncrono); el webhook lo captura.
+//
+// El inicio de sesión y la EVASIÓN de las pantallas flotantes ("Valida tus datos
+// de contacto") están copiados del flujo YA PROBADO del buzón/fraccionamiento
+// (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
 
 const LOGIN_URL =
+  process.env.BUZON_LOGIN_URL ??
   "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?exe=01.04.00.00.000000";
-// URL directa del formulario del RTT (descubierta por inspección): pide el
-// correo de destino y con "Enviar" genera y manda el reporte.
-const RTT_URL =
-  "https://ww1.sunat.gob.pe/ol-ti-itreportetri/reportetri.htm?action=cargarFormulario";
 
 export interface RttParams {
   ruc: string;
@@ -32,32 +33,34 @@ export interface RttResultado {
   diag?: { pasos: any[] };
 }
 
-async function rellenar(page: any, sels: string[], val: string) {
-  for (const s of sels) {
-    const el = page.locator(s).first();
-    if (await el.count().catch(() => 0)) { await el.fill(val).catch(() => {}); return true; }
+// ============================================================
+//  Helpers copiados del flujo probado (buzón / fraccionamiento)
+// ============================================================
+
+async function rellenar(page: any, selectores: string[], valor: string) {
+  for (const sel of selectores) {
+    try {
+      const el = await page.$(sel);
+      if (el) { await el.fill(valor); return true; }
+    } catch { /* siguiente */ }
   }
   return false;
 }
-async function clickAny(scope: any, sels: string[]) {
-  for (const s of sels) {
-    const el = scope.locator(s).first();
-    if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
+async function clickAny(page: any, selectores: string[]) {
+  for (const sel of selectores) {
+    try {
+      const el = await page.$(sel);
+      if (el) { await el.click(); return true; }
+    } catch { /* siguiente */ }
   }
   return false;
 }
-async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
-  for (const pg of ctx.pages()) {
-    for (const fr of pg.frames()) {
-      for (const t of textos) {
-        const link = fr.locator(`a:has-text("${t}")`).first();
-        if (await link.count().catch(() => 0)) { await link.click({ timeout: 3000 }).catch(() => {}); return true; }
-        const loc = fr.getByText(t, { exact: false }).first();
-        if (await loc.count().catch(() => 0)) { await loc.click({ timeout: 3000 }).catch(() => {}); return true; }
-      }
-    }
-  }
-  return false;
+
+/** Acepta automáticamente cualquier alert/confirm ("mensaje de página web"). */
+function autoAceptarDialogos(ctx: any) {
+  const enganchar = (pg: any) => pg.on("dialog", (d: any) => d.accept().catch(() => {}));
+  ctx.pages().forEach(enganchar);
+  ctx.on("page", enganchar);
 }
 
 /** Todos los frames de todas las páginas del contexto. */
@@ -66,107 +69,100 @@ function todosLosFrames(ctx: any): any[] {
   for (const pg of ctx.pages()) for (const fr of pg.frames()) out.push(fr);
   return out;
 }
-/** Rellena el primer input que exista (buscando en TODOS los frames). */
-async function fillEnFrames(ctx: any, selectores: string[], valor: string): Promise<{ ok: boolean; sel?: string; frameUrl?: string }> {
-  for (const fr of todosLosFrames(ctx)) {
-    for (const sel of selectores) {
-      const el = fr.locator(sel).first();
-      if (await el.count().catch(() => 0)) {
-        await el.fill(valor).catch(() => {});
-        const v = await el.inputValue().catch(() => "");
-        if (v) return { ok: true, sel, frameUrl: fr.url().slice(0, 100) };
+
+/** Clic por texto DENTRO de un frame concreto (JS click, tolera oculto). */
+async function clickEnFrame(frame: any, textos: string[]): Promise<string | null> {
+  return frame
+    .evaluate((textos: string[]) => {
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const els = Array.from(
+        document.querySelectorAll('a, button, input[type="button"], input[type="submit"], [role="button"]')
+      ) as HTMLElement[];
+      for (const t of textos) {
+        const tl = norm(t);
+        const el = els.find((e) => norm((e.textContent || "") + " " + ((e as HTMLInputElement).value || "")).includes(tl));
+        if (el) { el.click(); return t; }
       }
-    }
-  }
-  return { ok: false };
-}
-/** Clic en el primer elemento que exista (buscando en TODOS los frames). */
-async function clickEnFrames(ctx: any, selectores: string[]): Promise<boolean> {
-  for (const fr of todosLosFrames(ctx)) {
-    for (const sel of selectores) {
-      const el = fr.locator(sel).first();
-      if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
-    }
-  }
-  return false;
+      return null;
+    }, textos)
+    .catch(() => null);
 }
 
-/** Lista opciones del menú cuyo texto matchea un patrón (para calibrar el RTT). */
-async function opcionesMenu(ctx: any, re: RegExp): Promise<any[]> {
-  const out: any[] = [];
-  for (const fr of todosLosFrames(ctx)) {
-    const items = await fr.evaluate(() => {
-      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-      return (Array.from(document.querySelectorAll("a,span[onclick],li[onclick]")) as HTMLElement[])
-        .map((e) => ({ text: norm(e.textContent), id: (e as any).id || "", onclick: (e.getAttribute("onclick") || "").slice(0, 60) }))
-        .filter((x) => x.text && x.text.length < 80);
-    }).catch(() => []);
-    for (const it of items) if (re.test(it.text)) out.push({ ...it, frame: fr.url().slice(0, 70) });
+/** Cierra la campaña "VALIDA TUS DATOS DE CONTACTO" dentro de SU frame
+ *  (Continuar sin confirmar / Finalizar). Copiado tal cual de fraccionamiento. */
+async function cerrarPantallas(ctx: any, page: any) {
+  for (let i = 0; i < 6; i++) {
+    const camp = ctx
+      .pages()
+      .flatMap((p: any) => p.frames())
+      .find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+    if (!camp) break;
+    await clickEnFrame(camp, ["Continuar sin confirmar"]);
+    await page.waitForTimeout(1000);
+    await clickEnFrame(camp, ["Finalizar"]);
+    await page.waitForTimeout(1200);
   }
-  return out;
 }
-/** Clic (vía JS, funciona con el árbol del menú oculto) en la opción por texto. */
-async function clickMenuJS(ctx: any, patrones: string[]): Promise<{ ok: boolean; text?: string; frame?: string }> {
-  for (const fr of todosLosFrames(ctx)) {
-    const clicked = await fr.evaluate((pats: string[]) => {
-      const res = pats.map((p) => new RegExp(p, "i"));
-      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-      const nodes = Array.from(document.querySelectorAll("a,span[onclick],li[onclick]")) as HTMLElement[];
-      for (const n of nodes) {
-        const t = norm(n.textContent);
-        if (t && res.some((r) => r.test(t))) { (n as HTMLElement).click(); return t; }
-      }
-      return "";
-    }, patrones).catch(() => "");
-    if (clicked) return { ok: true, text: clicked, frame: fr.url().slice(0, 70) };
+
+/** Clic en el ENLACE REAL del menú (onclick ejecuta/iconExecute) por su texto.
+ *  Copiado de fraccionamiento (clicMenu). */
+async function clicMenu(ctx: any, textos: string[]): Promise<string | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((textos: string[]) => {
+          const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const els = Array.from(document.querySelectorAll("a,[onclick]")) as HTMLElement[];
+          for (const t of textos) {
+            const el = els.find(
+              (e) => /ejecuta\(|iconexecute/i.test(e.getAttribute("onclick") || "") && norm(e.textContent).includes(norm(t))
+            );
+            if (el) { el.click(); return (el.getAttribute("onclick") || "").slice(0, 160); }
+          }
+          return null;
+        }, textos)
+        .catch(() => null);
+      if (hit) return hit;
+    }
   }
-  return { ok: false };
+  return null;
+}
+
+// ============================================================
+//  Helpers específicos del RTT
+// ============================================================
+
+// Selectores del campo de correo del RTT (aparece tras "Acepto").
+const CORREO_SELS = '#txtCorreo, input[name="txtCorreo"], input[type="email"], input[id*="correo" i], input[name*="correo" i], input[placeholder*="correo" i]';
+
+/** ¿Este frame es el CONTENIDO del RTT? El RTT SIEMPRE vive en
+ *  ol-ti-itreportetri/reportetri.htm. Cualquier otro frame (menú, campaña
+ *  "valida tus datos" — que también tiene campos txtCorreo — o el reloj) NO es
+ *  el RTT: exigir la URL evita rellenar el correo en el formulario equivocado. */
+async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; acepto: boolean }> {
+  if (!/itreportetri|reportetri/i.test(fr.url())) return { app: false, correo: false, acepto: false };
+  const correo = await fr.locator(CORREO_SELS).count().catch(() => 0);
+  const acepto = await fr.locator("#chkAceptar").count().catch(() => 0);
+  return { app: true, correo: !!correo, acepto: !!acepto };
 }
 
 /** Pantalla 1 del RTT: marca la casilla (#chkAceptar) y pulsa "Acepto".
- *  Interacción REAL de Playwright (dispara los handlers de SUNAT que habilitan
- *  el botón y cargan la pantalla del correo); con respaldo por JS. */
+ *  Interacción REAL de Playwright (dispara los handlers de SUNAT que cargan la
+ *  pantalla del correo); con respaldo por JS. */
 async function marcarYAceptar(fr: any): Promise<boolean> {
-  const pg = fr.page();
-  // Marcar la casilla.
   const chk = fr.locator('#chkAceptar, input[type="checkbox"]').first();
   if (await chk.count().catch(() => 0)) {
     await chk.check({ force: true }).catch(async () => { await chk.click({ force: true }).catch(() => {}); });
   }
-  await pg.waitForTimeout(400).catch(() => {});
-  // Clic "Acepto" (link o botón).
+  await fr.page().waitForTimeout(400).catch(() => {});
   let clicked = false;
-  for (const sel of ['a:has-text("Acepto")', 'input[value="Acepto" i]', 'button:has-text("Acepto")', "#btnAceptar", 'a.btn:has-text("Acepto")']) {
+  for (const sel of ['a:has-text("Acepto")', 'input[value="Acepto" i]', 'button:has-text("Acepto")', "#btnAceptar"]) {
     const el = fr.locator(sel).first();
     if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clicked = true; break; }
   }
-  // Respaldo por JS si el <a> estaba deshabilitado por clase.
-  if (!clicked) {
-    clicked = await fr.evaluate(() => {
-      const b = (Array.from(document.querySelectorAll("a,button,input")) as any[])
-        .find((e) => /acepto|aceptar/i.test((e.value || "") + " " + (e.textContent || "")));
-      if (b) { b.classList?.remove("disabled"); b.removeAttribute?.("disabled"); b.disabled = false; b.click(); return true; }
-      return false;
-    }).catch(() => false);
-  }
-  await pg.waitForTimeout(600).catch(() => {});
+  if (!clicked) clicked = !!(await clickEnFrame(fr, ["Acepto"]));
+  await fr.page().waitForTimeout(600).catch(() => {});
   return clicked;
-}
-// Selectores del campo de correo del RTT (aparece tras "Acepto").
-const CORREO_SELS = '#txtCorreo, input[name="txtCorreo"], input[type="email"], input[id*="correo" i], input[name*="correo" i], input[placeholder*="correo" i]';
-/** ¿Este frame es el CONTENIDO del RTT (no el menú)? Por URL del app o textos propios. */
-async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; acepto: boolean }> {
-  if (/menuinternet|cl-ti-itmenu/i.test(fr.url())) {
-    // El frame del menú también dice "Reporte Tributario para Terceros"; ignóralo
-    // salvo que tenga el campo de correo embebido.
-    const campo = await fr.locator(CORREO_SELS).count().catch(() => 0);
-    return { app: !!campo, correo: !!campo, acepto: false };
-  }
-  const url = /itreportetri|reportetri/i.test(fr.url());
-  const campo = await fr.locator(CORREO_SELS).count().catch(() => 0);
-  const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
-  const acepto = /desea generar el reporte|marque la casilla|sr\.?\s*contribuyente/i.test(txt) || (await fr.locator("#chkAceptar, input[type=\"checkbox\"]").count().catch(() => 0)) > 0;
-  return { app: url || !!campo || acepto, correo: !!campo, acepto };
 }
 
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
@@ -189,11 +185,10 @@ async function volcar(ctx: any): Promise<any> {
   return { frames };
 }
 
-/**
- * Dispara la generación del RTT en SOL. Devuelve ok=true si el login fue
- * correcto y se llegó al formulario (la calibración fina se hace con
- * diagnóstico). El correo de destino lleva el RUC embebido.
- */
+// ============================================================
+//  Bot RTT
+// ============================================================
+
 export async function generarRTT(params: RttParams): Promise<RttResultado> {
   const pasos: any[] = [];
   let browser: any = null;
@@ -205,67 +200,72 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     });
     await bloquearRecursos(ctx);
+    autoAceptarDialogos(ctx);
     const page = await ctx.newPage();
 
-    // 1) Login SOL (mismo flujo probado del buzón/F36).
-    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+    // 1) Login SOL (secuencia idéntica a fraccionamiento/buzón, con reintento).
+    let navOk = false;
+    for (let i = 0; i < 3 && !navOk; i++) {
+      try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 }); navOk = true; }
+      catch { await page.waitForTimeout(2000).catch(() => {}); }
+    }
+    if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 }).catch(() => {});
     await page.waitForTimeout(2500).catch(() => {});
-    await rellenar(page, ["#txtRuc", 'input[name="ruc"]'], params.ruc);
-    await rellenar(page, ["#txtUsuario", 'input[name="usuario"]'], params.solUser);
-    await rellenar(page, ["#txtContrasena", 'input[type="password"]'], params.solPass);
-    await clickAny(page, ["#btnAceptar", 'button[type="submit"]']);
+    await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
+    await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
+    await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
+    await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
     await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(2500).catch(() => {});
-    // Cerrar campaña "valida tus datos".
-    for (let i = 0; i < 4; i++) {
+    await page.waitForTimeout(3000).catch(() => {});
+    // Cerrar campaña "valida tus datos" (dos vías, como fraccionamiento).
+    for (let i = 0; i < 5; i++) {
       const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
       if (!camp) break;
-      await clicTexto(ctx, ["Finalizar"]); await page.waitForTimeout(1000).catch(() => {});
-      await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]); await page.waitForTimeout(1500).catch(() => {});
+      await clickEnFrame(camp, ["Finalizar"]); await page.waitForTimeout(1200).catch(() => {});
+      await clickEnFrame(camp, ["Continuar sin confirmar", "Continuar"]); await page.waitForTimeout(1800).catch(() => {});
     }
+    await cerrarPantallas(ctx, page);
+
     const url = page.url();
     const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
     const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
     pasos.push({ paso: "login", url, loginError });
     if (loginError) {
-      return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL).", diag: { pasos } };
+      return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal por varios intentos). Espera ~10 min y reintenta.", diag: { pasos } };
     }
 
-    // 2) Abrir el RTT POR EL MENÚ. Ir directo a ww1 devuelve "No se ha enviado
-    //    correctamente los parametros de autenticacion": es el menú de SOL el que
-    //    inyecta los parámetros de sesión al aplicativo. El árbol del menú está en
-    //    el DOM (oculto), así que se dispara el clic por JS y el RTT abre en un
-    //    iframe/pestaña con la sesión válida.
-    const patrones = [
-      "reporte tributario.*tercero",
-      "reporte.*para terceros",
-      "reporte tributario",
-      "reporte.*tercero",
-    ];
-    const candidatos = await opcionesMenu(ctx, /reporte|tercero|tribut/i);
-    const clic = await clickMenuJS(ctx, patrones);
-    pasos.push({ paso: "menu-rtt", clico: clic.ok, opcion: clic.text, frame: clic.frame, urlDirecta: RTT_URL, candidatos: candidatos.slice(0, 30) });
+    // 2) Entrar por el MENÚ a "Reporte Tributario para Terceros" (el menú inyecta
+    //    los parámetros de sesión; ir directo a ww1 da error de autenticación).
+    //    En SUNAT el texto viene pegado: "Reporte Tributariopara Terceros".
+    await cerrarPantallas(ctx, page);
+    const opcionMenu = await clicMenu(ctx, [
+      "Reporte Tributariopara Terceros",
+      "Reporte Tributario para Terceros",
+      "Tributariopara Terceros",
+      "para Terceros",
+    ]);
+    pasos.push({ paso: "menu-rtt", clico: !!opcionMenu, onclick: opcionMenu });
 
-    // Esperar a que cargue el CONTENIDO del RTT: primero la pantalla "Acepto"
-    // (casilla + botón), luego la del correo. Se distingue del frame del menú.
+    // Esperar el CONTENIDO del RTT (frame ol-ti-itreportetri): primero la pantalla
+    // "Acepto", luego la del correo. Se cierra la campaña por si reaparece.
     let frameRTT: any = null;
     let estado = { app: false, correo: false, acepto: false };
     for (let i = 0; i < 15 && !frameRTT; i++) {
       await page.waitForTimeout(1000).catch(() => {});
+      await cerrarPantallas(ctx, page);
       for (const fr of todosLosFrames(ctx)) {
         const st = await esFrameRTT(fr);
         if (st.app) { frameRTT = fr; estado = st; break; }
       }
     }
 
-    // 3) Pantalla 1 → marcar la casilla "Acepto" y pulsar el botón. Recién luego
-    //    aparece la pantalla del correo (#txtCorreo). Si ya hay correo, se salta.
+    // 3) Pantalla 1 → marcar la casilla y pulsar "Acepto". Luego aparece el correo.
     let paso1 = false;
     if (frameRTT && estado.acepto && !estado.correo) {
       paso1 = await marcarYAceptar(frameRTT);
-      // Esperar la pantalla del correo (mismo frame recargado o uno nuevo).
       for (let i = 0; i < 12; i++) {
         await page.waitForTimeout(1000).catch(() => {});
+        await cerrarPantallas(ctx, page);
         let encontrado = false;
         for (const fr of todosLosFrames(ctx)) {
           const st = await esFrameRTT(fr);
@@ -276,7 +276,6 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     }
     pasos.push({ paso: "acepto", aceptado: paso1, hayCorreo: estado.correo });
 
-    // Volcado de estructura (para calibrar la navegación si algo no aparece).
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
 
@@ -285,15 +284,15 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     if (!frameRTT) {
       return {
         ok: false,
-        error: clic.ok
-          ? "Se abrió la opción del RTT en el menú, pero el formulario no cargó. Usa Modo diagnóstico y revisa los pasos 'menu-rtt' y 'estructura'."
-          : "No se encontró la opción del RTT en el menú de SOL. Usa Modo diagnóstico: en 'menu-rtt' → 'candidatos' están las opciones detectadas para calibrar el texto exacto.",
+        error: opcionMenu
+          ? "Se abrió la opción del RTT en el menú, pero el formulario no cargó. Usa Modo diagnóstico y revisa 'menu-rtt' / 'estructura'."
+          : "No se encontró la opción 'Reporte Tributario para Terceros' en el menú de SOL. Usa Modo diagnóstico y revisa 'estructura'.",
         diag: { pasos },
       };
     }
 
-    // 4) Escribir el correo de destino DENTRO del frame del RTT (nunca en el
-    //    buscador del menú) y Enviar.
+    // 4) Escribir el correo DENTRO del frame del RTT (nunca en el buscador del
+    //    menú ni en la campaña de datos) y Enviar.
     let escrito = false, selUsado = "";
     for (const sel of CORREO_SELS.split(",").map((s) => s.trim())) {
       const el = frameRTT.locator(sel).first();
@@ -305,17 +304,17 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     }
     pasos.push({ paso: "correo", escrito, sel: selUsado, emailDestino: params.emailDestino });
     if (!escrito) {
-      return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto'/'estructura'.", diag: { pasos } };
+      return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
     }
 
-    // Clic "Enviar" dentro del frame del RTT.
-    const enviado =
-      (await clickAny(frameRTT, ["#btnCorreo", "#btnEnviar", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")'])) ||
-      (await clicTexto(ctx, ["Enviar"]));
-    await page.waitForTimeout(1500).catch(() => {});
-    // Confirmación (SUNAT suele mostrar un aviso "Aceptar"/"Sí").
-    await clicTexto(ctx, ["Aceptar", "Sí", "Confirmar", "OK"]);
-    await page.waitForTimeout(2000).catch(() => {});
+    // Enviar dentro del frame del RTT (el confirm lo acepta autoAceptarDialogos).
+    let enviado = false;
+    for (const sel of ["#btnCorreo", "#btnEnviar", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
+      const el = frameRTT.locator(sel).first();
+      if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); enviado = true; break; }
+    }
+    if (!enviado) enviado = !!(await clickEnFrame(frameRTT, ["Enviar"]));
+    await page.waitForTimeout(2500).catch(() => {});
     const trasEnviar = (await frameRTT.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
     pasos.push({ paso: "enviar", clico: enviado, respuesta: trasEnviar.slice(0, 200) });
 
