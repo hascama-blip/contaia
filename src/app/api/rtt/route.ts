@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { crearSolicitudRTT, setEstadoRTT, listarSolicitudesRTT, contarRTTHoy, getRttConfig, marcarRTTAtascados, getWebhookLogRTT } from "@/lib/db";
+import { crearSolicitudRTT, setEstadoRTT, listarSolicitudesRTT, getRttConfig, marcarRTTAtascados, getWebhookLogRTT } from "@/lib/db";
 import { generarRTT } from "@/lib/rtt";
 
 export const runtime = "nodejs";
@@ -37,23 +37,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta configurar el dominio del webhook (RTT_DOMINIO). Configúralo en el panel Supremo." }, { status: 400 });
   }
 
-  // Límite SUNAT: 3 reportes por día por RUC.
-  if ((await contarRTTHoy(ruc)) >= 3) {
-    return NextResponse.json({ error: "SUNAT permite máximo 3 reportes RTT por día por RUC. Intenta mañana." }, { status: 429 });
-  }
-
   // Sub-address con el RUC embebido (match determinístico en el webhook).
   const emailDestino = `reportes+RUC${ruc}@${dominio}`;
+
+  // Modo diagnóstico: NO crea solicitud (no consume ni ensucia la trazabilidad),
+  // solo recorre el formulario en SOL y devuelve el volcado crudo.
+  if (body.diagnostico === true) {
+    const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: true });
+    return NextResponse.json({ diag: r.diag });
+  }
+
+  // Nota: SUNAT aplica su propio tope de 3 reportes/día por RUC. No lo replicamos
+  // en la app (contaba diagnósticos y reintentos); si SUNAT lo rechaza, el bot lo
+  // reporta como error en la trazabilidad.
   const sol = await crearSolicitudRTT({ ruc, razonSocial, emailDestino, solicitadoPor: user.id });
   await setEstadoRTT(sol.id, "pendiente", "encolado");
 
   // Dispara el bot en SOL (paso 3). Login con rucLogin; el correo lleva el RUC
   // del tercero para el match. La Clave SOL NO se persiste.
-  const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: body.diagnostico === true });
+  const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: false });
 
-  if (body.diagnostico) {
-    return NextResponse.json({ solicitud: sol, diag: r.diag });
-  }
   if (r.loginError) {
     const s = await setEstadoRTT(sol.id, "error", "login SOL falló", { error: r.error });
     return NextResponse.json({ solicitud: s, error: r.error }, { status: 401 });
