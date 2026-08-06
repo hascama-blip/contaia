@@ -463,21 +463,88 @@ export async function leerArchivoRTT(nombre: string): Promise<Buffer | null> {
   try { return await fs.readFile(path.join(RTT_DIR, path.basename(nombre))); } catch { return null; }
 }
 
-/** Marca como "error" las solicitudes atascadas en en_proceso más de N minutos. */
-export async function marcarRTTAtascados(minutos = 60): Promise<number> {
+/** Crea o ACTUALIZA la solicitud de RTT de un RUC (una sola por usuario+RUC).
+ *  Si ya existe, la reusa: la pone "en_proceso", CONSERVA el archivo previo (para
+ *  no perder el último reporte si la regeneración fallara) y limpia el error.
+ *  Así nunca se acumulan casillas: siempre hay una por empresa. */
+export async function upsertSolicitudRTT(datos: {
+  ruc: string; razonSocial?: string; emailDestino: string; solicitadoPor?: string;
+}): Promise<SolicitudRTT> {
   const store = await readStore();
-  const limite = Date.now() - minutos * 60_000;
-  let n = 0;
-  for (const s of store.rtt ?? []) {
-    if ((s.estado === "en_proceso" || s.estado === "pendiente") && new Date(s.actualizadoEn).getTime() < limite) {
-      const now = new Date().toISOString();
-      s.estado = "error"; s.error = "Timeout: SUNAT no envió el correo a tiempo."; s.actualizadoEn = now;
-      s.historial.push({ estado: "error", at: now, nota: "timeout" });
-      n++;
-    }
+  if (!Array.isArray(store.rtt)) store.rtt = [];
+  const now = new Date().toISOString();
+  let sol = store.rtt.find((s) => s.ruc === datos.ruc && s.solicitadoPor === datos.solicitadoPor);
+  if (sol) {
+    sol.razonSocial = datos.razonSocial ?? sol.razonSocial;
+    sol.emailDestino = datos.emailDestino;
+    sol.estado = "en_proceso";
+    sol.error = undefined;
+    sol.actualizadoEn = now;
+    sol.historial.push({ estado: "en_proceso", at: now, nota: "regeneración" });
+  } else {
+    sol = {
+      id: crypto.randomUUID(),
+      ruc: datos.ruc,
+      razonSocial: datos.razonSocial,
+      emailDestino: datos.emailDestino,
+      estado: "en_proceso",
+      historial: [{ estado: "en_proceso", at: now }],
+      creadoEn: now,
+      actualizadoEn: now,
+      solicitadoPor: datos.solicitadoPor,
+    };
+    store.rtt.push(sol);
   }
-  if (n) await writeStore(store);
-  return n;
+  await writeStore(store);
+  return sol;
+}
+
+/** Resuelve un fallo de generación SIN dejar casilla roja: si había un reporte
+ *  previo, vuelve a "listo" (se conserva el anterior); si nunca hubo, BORRA la
+ *  casilla. Devuelve true si quedó un reporte descargable. */
+export async function resolverFalloRTT(id: string): Promise<boolean> {
+  const store = await readStore();
+  if (!Array.isArray(store.rtt)) return false;
+  const i = store.rtt.findIndex((s) => s.id === id);
+  if (i < 0) return false;
+  const sol = store.rtt[i];
+  const now = new Date().toISOString();
+  if (sol.rutaPdf || sol.rutaXml) {
+    sol.estado = "listo";
+    sol.error = undefined;
+    sol.actualizadoEn = now;
+    sol.historial.push({ estado: "listo", at: now, nota: "se conserva el reporte anterior" });
+    await writeStore(store);
+    return true;
+  }
+  store.rtt.splice(i, 1); // nunca tuvo reporte → no dejar casilla
+  await writeStore(store);
+  return false;
+}
+
+/** Limpia la lista de RTT: quita casillas en "error" y resuelve las atascadas
+ *  (>N min): con archivo → "listo"; sin archivo → se borran. Nunca deja casillas
+ *  rojas ni colgadas. Devuelve nº de casillas afectadas. */
+export async function limpiarRTT(minutos = 30): Promise<number> {
+  const store = await readStore();
+  if (!Array.isArray(store.rtt)) return 0;
+  const limite = Date.now() - minutos * 60_000;
+  const now = new Date().toISOString();
+  let dirty = false;
+  store.rtt = store.rtt.filter((s) => {
+    const conArchivo = !!(s.rutaPdf || s.rutaXml);
+    if (s.estado === "error") {
+      if (conArchivo) { s.estado = "listo"; s.error = undefined; s.actualizadoEn = now; dirty = true; return true; }
+      dirty = true; return false; // error sin archivo → fuera
+    }
+    if (["en_proceso", "pendiente", "recibido", "creado"].includes(s.estado) && new Date(s.actualizadoEn).getTime() < limite) {
+      if (conArchivo) { s.estado = "listo"; s.actualizadoEn = now; dirty = true; return true; }
+      dirty = true; return false; // atascada sin archivo → fuera
+    }
+    return true;
+  });
+  if (dirty) await writeStore(store);
+  return dirty ? 1 : 0;
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */

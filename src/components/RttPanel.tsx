@@ -127,11 +127,11 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
             {refrescando ? "Actualizando…" : "↻ Actualizar"}
           </button>
         </div>
-        {solicitudes.length === 0 ? (
+        {solicitudes.filter((s) => s.estado !== "error").length === 0 ? (
           <p className="text-sm text-slate-400">Aún no has generado ningún reporte. Elige una empresa y pulsa “Generar Reporte Tributario”.</p>
         ) : (
           <div className="space-y-3">
-            {solicitudes.map((s) => {
+            {solicitudes.filter((s) => s.estado !== "error").map((s) => {
               const listo = s.estado === "listo";
               const enCurso = ["creado", "pendiente", "en_proceso", "recibido"].includes(s.estado);
               return (

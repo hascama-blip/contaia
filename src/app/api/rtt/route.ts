@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { crearSolicitudRTT, setEstadoRTT, listarSolicitudesRTT, getRttConfig, marcarRTTAtascados, getWebhookLogRTT } from "@/lib/db";
+import { upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfig, limpiarRTT, getWebhookLogRTT } from "@/lib/db";
 import { generarRTT } from "@/lib/rtt";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export const maxDuration = 240;
 // GET → lista las solicitudes RTT del usuario + bitácora del webhook + config.
 export async function GET() {
   const user = await requireUser();
-  await marcarRTTAtascados(60); // marca error los atascados >60 min
+  await limpiarRTT(30); // quita casillas en error / atascadas (nunca deja rojas)
   const solicitudes = await listarSolicitudesRTT(user.id);
   const webhookLog = await getWebhookLogRTT();
   const { dominio } = await getRttConfig();
@@ -47,24 +47,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ diag: r.diag });
   }
 
-  // Nota: SUNAT aplica su propio tope de 3 reportes/día por RUC. No lo replicamos
-  // en la app (contaba diagnósticos y reintentos); si SUNAT lo rechaza, el bot lo
-  // reporta como error en la trazabilidad.
-  const sol = await crearSolicitudRTT({ ruc, razonSocial, emailDestino, solicitadoPor: user.id });
-  await setEstadoRTT(sol.id, "pendiente", "encolado");
+  // UNA casilla por empresa: crea o ACTUALIZA la del RUC (no acumula). Queda
+  // "en_proceso"; conserva el reporte anterior por si la regeneración fallara.
+  const sol = await upsertSolicitudRTT({ ruc, razonSocial, emailDestino, solicitadoPor: user.id });
 
-  // Dispara el bot en SOL (paso 3). Login con rucLogin; el correo lleva el RUC
-  // del tercero para el match. La Clave SOL NO se persiste.
+  // Dispara el bot en SOL. La Clave SOL NO se persiste.
   const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: false });
 
-  if (r.loginError) {
-    const s = await setEstadoRTT(sol.id, "error", "login SOL falló", { error: r.error });
-    return NextResponse.json({ solicitud: s, error: r.error }, { status: 401 });
-  }
   if (!r.ok) {
-    const s = await setEstadoRTT(sol.id, "error", "el bot no pudo generar el RTT", { error: r.error });
-    return NextResponse.json({ solicitud: s, error: r.error }, { status: 502 });
+    // Sin casilla roja: si había reporte previo se conserva "listo"; si no, se
+    // borra la casilla. El error se comunica solo como aviso transitorio.
+    await resolverFalloRTT(sol.id);
+    return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte." }, { status: r.loginError ? 401 : 502 });
   }
-  const s = await setEstadoRTT(sol.id, "en_proceso", "solicitud enviada en SOL; esperando el correo de SUNAT");
-  return NextResponse.json({ solicitud: s });
+  // OK → queda "en_proceso" esperando el correo de SUNAT (lo captura el webhook).
+  return NextResponse.json({ solicitud: sol });
 }
