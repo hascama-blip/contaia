@@ -60,6 +60,37 @@ async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
   return false;
 }
 
+/** Todos los frames de todas las páginas del contexto. */
+function todosLosFrames(ctx: any): any[] {
+  const out: any[] = [];
+  for (const pg of ctx.pages()) for (const fr of pg.frames()) out.push(fr);
+  return out;
+}
+/** Rellena el primer input que exista (buscando en TODOS los frames). */
+async function fillEnFrames(ctx: any, selectores: string[], valor: string): Promise<{ ok: boolean; sel?: string; frameUrl?: string }> {
+  for (const fr of todosLosFrames(ctx)) {
+    for (const sel of selectores) {
+      const el = fr.locator(sel).first();
+      if (await el.count().catch(() => 0)) {
+        await el.fill(valor).catch(() => {});
+        const v = await el.inputValue().catch(() => "");
+        if (v) return { ok: true, sel, frameUrl: fr.url().slice(0, 100) };
+      }
+    }
+  }
+  return { ok: false };
+}
+/** Clic en el primer elemento que exista (buscando en TODOS los frames). */
+async function clickEnFrames(ctx: any, selectores: string[]): Promise<boolean> {
+  for (const fr of todosLosFrames(ctx)) {
+    for (const sel of selectores) {
+      const el = fr.locator(sel).first();
+      if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
+    }
+  }
+  return false;
+}
+
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
 async function volcar(ctx: any): Promise<any> {
   const frames: any[] = [];
@@ -122,44 +153,36 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL).", diag: { pasos } };
     }
 
-    // 2) Ir DIRECTO al formulario del RTT (URL descubierta por inspección). La
-    //    sesión SOL ya vale para ww1.sunat.gob.pe.
+    // 2) Ir DIRECTO al formulario del RTT (URL descubierta por inspección).
     await page.goto(RTT_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
-    await page.waitForTimeout(2500).catch(() => {});
-    const formTexto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 200)).catch(() => "")) as string;
-    pasos.push({ paso: "form-rtt", url: page.url(), tieneFormulario: /reporte tributario|correo/i.test(formTexto) });
+    await page.waitForTimeout(3000).catch(() => {});
+    const urlActual = page.url();
+    const formTexto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 250)).catch(() => "")) as string;
+    // ¿Nos redirigió al login? (la sesión no se compartió con ww1).
+    const enLogin = /txtRuc|iniciar sesi|clave sol/i.test(formTexto) || /login|autentica/i.test(urlActual);
+    pasos.push({ paso: "form-rtt", url: urlActual, enLogin, tieneCorreo: /reporte tributario|correo/i.test(formTexto) });
 
-    // Volcado de estructura del formulario (para calibrar campos si hace falta).
+    // Volcado de estructura (para calibrar si el formulario no aparece).
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, ...estructura });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
 
-    // 3) Escribir el correo de destino (sub-address con el RUC) y Enviar.
-    const emailSels = [
-      "#txtCorreo",                    // id exacto del formulario RTT
-      'input[name="txtCorreo"]',
-      'input[type="email"]',
-      'input[placeholder*="Correo" i]',
-      'input[type="text"]',
-    ];
-    let escrito = false;
-    for (const sel of emailSels) {
-      const el = page.locator(sel).first();
-      if (await el.count().catch(() => 0)) {
-        await el.fill(params.emailDestino).catch(() => {});
-        const v = await el.inputValue().catch(() => "");
-        if (v) { escrito = true; break; }
-      }
+    if (enLogin) {
+      return { ok: false, error: "SUNAT no mantuvo la sesión al abrir el RTT directo (redirigió a login). Hay que llegar por el menú.", diag: { pasos } };
     }
-    pasos.push({ paso: "correo", escrito, emailDestino: params.emailDestino });
-    if (!escrito) {
+
+    // 3) Escribir el correo de destino (en cualquier frame) y Enviar.
+    const emailSels = ["#txtCorreo", 'input[name="txtCorreo"]', 'input[type="email"]', 'input[placeholder*="Correo" i]', 'input[type="text"]'];
+    const fill = await fillEnFrames(ctx, emailSels, params.emailDestino);
+    pasos.push({ paso: "correo", escrito: fill.ok, frame: fill.frameUrl, sel: fill.sel, emailDestino: params.emailDestino });
+    if (!fill.ok) {
       return { ok: false, error: "No se encontró el campo de correo en el formulario del RTT.", diag: { pasos } };
     }
 
-    // Clic "Enviar" (botón #btnCorreo del formulario RTT).
+    // Clic "Enviar" (#btnCorreo), en cualquier frame.
     const enviado =
-      (await clickAny(page, ["#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]'])) ||
+      (await clickEnFrames(ctx, ["#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]'])) ||
       (await clicTexto(ctx, ["Enviar"]));
     await page.waitForTimeout(1500).catch(() => {});
     // Confirmación (SUNAT suele mostrar un aviso "Aceptar"/"Sí").

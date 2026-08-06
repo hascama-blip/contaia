@@ -29,6 +29,8 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [diagModo, setDiagModo] = useState(false);
+  const [diag, setDiag] = useState<string | null>(null);
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [webhookLog, setWebhookLog] = useState<any[]>([]);
   const [dominio, setDominio] = useState<string>("");
@@ -63,7 +65,7 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   }, [solicitudes]);
 
   async function solicitar() {
-    setError(null); setInfo(null);
+    setError(null); setInfo(null); setDiag(null);
     if (!sel) { setError("Elige la empresa con la que inicias sesión en SOL."); return; }
     const solPass = getSolPass(sel.id);
     const solUser = getSolUser(sel.id, sel.solUser);
@@ -75,11 +77,12 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
       const res = await fetch("/api/rtt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ruc, rucLogin: sel.ruc, solUser, solPass, razonSocial: ruc === sel.ruc ? sel.razonSocial : undefined }),
+        body: JSON.stringify({ ruc, rucLogin: sel.ruc, solUser, solPass, razonSocial: ruc === sel.ruc ? sel.razonSocial : undefined, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (!res.ok) { setError(data.error ?? "No se pudo solicitar el RTT."); await cargar(); return; }
-      setInfo("Solicitud enviada. SUNAT procesará y enviará el reporte por correo; aquí verás cuándo esté listo.");
+      setInfo(diagModo ? "Diagnóstico listo (revisa la traza cruda abajo)." : "Solicitud enviada. SUNAT procesará y enviará el reporte por correo; aquí verás cuándo esté listo.");
       await cargar();
     } catch {
       setError("Error de red al solicitar el RTT.");
@@ -118,11 +121,15 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
               <button className="btn-primary" onClick={solicitar} disabled={busy}>
                 {busy ? "Solicitando…" : "📄 Solicitar RTT"}
               </button>
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+              </label>
             </div>
           </div>
         )}
         {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+        {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
       </div>
 
       {/* Verificación del webhook: últimos correos recibidos */}
