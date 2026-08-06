@@ -147,22 +147,61 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
 }
 
 /** Pantalla 1 del RTT: marca la casilla (#chkAceptar) y pulsa "Acepto".
- *  Interacción REAL de Playwright (dispara los handlers de SUNAT que cargan la
- *  pantalla del correo); con respaldo por JS. */
-async function marcarYAceptar(fr: any): Promise<boolean> {
-  const chk = fr.locator('#chkAceptar, input[type="checkbox"]').first();
+ *  1) interacción REAL de Playwright; 2) respaldo por JS que ADEMÁS ejecuta el
+ *  onclick del botón (algunos handlers no responden a un click sintético sobre
+ *  un <a> deshabilitado por clase). Devuelve la vía que se usó. */
+async function marcarYAceptar(fr: any): Promise<string> {
+  const chk = fr.locator("#chkAceptar").first();
   if (await chk.count().catch(() => 0)) {
     await chk.check({ force: true }).catch(async () => { await chk.click({ force: true }).catch(() => {}); });
   }
   await fr.page().waitForTimeout(400).catch(() => {});
-  let clicked = false;
-  for (const sel of ['a:has-text("Acepto")', 'input[value="Acepto" i]', 'button:has-text("Acepto")', "#btnAceptar"]) {
-    const el = fr.locator(sel).first();
-    if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clicked = true; break; }
+  // Clic real de Playwright sobre "Acepto".
+  const acepto = fr.locator('a:has-text("Acepto"), input[value="Acepto" i], button:has-text("Acepto"), #btnAceptar').first();
+  if (await acepto.count().catch(() => 0)) {
+    await acepto.click({ force: true, timeout: 4000 }).catch(() => {});
   }
-  if (!clicked) clicked = !!(await clickEnFrame(fr, ["Acepto"]));
   await fr.page().waitForTimeout(600).catch(() => {});
-  return clicked;
+  // Respaldo JS: asegurar checked, habilitar y EJECUTAR el onclick del botón.
+  const via = (await fr.evaluate(() => {
+    const c = document.querySelector("#chkAceptar") as HTMLInputElement | null;
+    if (c && !c.checked) {
+      c.checked = true;
+      c.dispatchEvent(new Event("click", { bubbles: true }));
+      c.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const a = (Array.from(document.querySelectorAll("a,button,input")) as any[])
+      .find((e) => /acepto/i.test((e.value || "") + " " + (e.textContent || "")));
+    if (!a) return "sin-boton";
+    a.classList?.remove("disabled"); a.removeAttribute?.("disabled"); a.disabled = false;
+    const oc = a.getAttribute && a.getAttribute("onclick");
+    if (oc) { try { (0, eval)(oc); return "onclick-eval"; } catch { /* sigue */ } }
+    try { a.click(); return "js-click"; } catch { /* sigue */ }
+    return "noop";
+  }).catch(() => "err")) as string;
+  await fr.page().waitForTimeout(1000).catch(() => {});
+  return via;
+}
+
+/** Vuelca el checkbox y el botón "Acepto" reales del frame del RTT (para
+ *  calibrar el handler exacto que abre la pantalla del correo). */
+async function dumpRTT(fr: any): Promise<any> {
+  return await fr.evaluate(() => {
+    const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+    const c = document.querySelector("#chkAceptar") as HTMLInputElement | null;
+    const botones = (Array.from(document.querySelectorAll("a,button,input")) as any[])
+      .filter((e) => /acepto|generar|enviar|continuar/i.test((e.value || "") + " " + (e.textContent || "")))
+      .map((e) => ({
+        tag: e.tagName, txt: norm(e.textContent || e.value), cls: (e.className || "").slice(0, 60),
+        disabled: !!e.disabled, onclick: (e.getAttribute && e.getAttribute("onclick") || "").slice(0, 160),
+        href: (e.getAttribute && e.getAttribute("href") || "").slice(0, 100),
+        html: (e.outerHTML || "").replace(/\s+/g, " ").slice(0, 220),
+      })).slice(0, 8);
+    return {
+      checkbox: c ? { checked: c.checked, onclick: (c.getAttribute("onclick") || "").slice(0, 160), html: (c.outerHTML || "").replace(/\s+/g, " ").slice(0, 220) } : null,
+      botones,
+    };
+  }).catch(() => null);
 }
 
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
@@ -260,9 +299,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     }
 
     // 3) Pantalla 1 → marcar la casilla y pulsar "Acepto". Luego aparece el correo.
-    let paso1 = false;
+    let via = "no-frame";
+    let domRTT: any = null;
     if (frameRTT && estado.acepto && !estado.correo) {
-      paso1 = await marcarYAceptar(frameRTT);
+      if (params.diagnostico) domRTT = await dumpRTT(frameRTT); // antes de tocar
+      via = await marcarYAceptar(frameRTT);
       for (let i = 0; i < 12; i++) {
         await page.waitForTimeout(1000).catch(() => {});
         await cerrarPantallas(ctx, page);
@@ -274,7 +315,7 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         if (encontrado) break;
       }
     }
-    pasos.push({ paso: "acepto", aceptado: paso1, hayCorreo: estado.correo });
+    pasos.push({ paso: "acepto", via, hayCorreo: estado.correo, ...(domRTT ? { domRTT } : {}) });
 
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
