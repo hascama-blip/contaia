@@ -123,33 +123,49 @@ async function clickMenuJS(ctx: any, patrones: string[]): Promise<{ ok: boolean;
   return { ok: false };
 }
 
-/** Pantalla 1 del RTT: marca la casilla y pulsa "Acepto" (vía JS, robusto). */
+/** Pantalla 1 del RTT: marca la casilla (#chkAceptar) y pulsa "Acepto".
+ *  Interacción REAL de Playwright (dispara los handlers de SUNAT que habilitan
+ *  el botón y cargan la pantalla del correo); con respaldo por JS. */
 async function marcarYAceptar(fr: any): Promise<boolean> {
-  return await fr.evaluate(() => {
-    const c = document.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-    if (c) {
-      c.checked = true;
-      c.dispatchEvent(new Event("click", { bubbles: true }));
-      c.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    const cands = Array.from(document.querySelectorAll("input,button,a")) as any[];
-    const b = cands.find((e) => /acepto|aceptar/i.test(((e as any).value || "") + " " + (e.textContent || "")));
-    if (b) { (b as any).disabled = false; (b as HTMLElement).click(); return true; }
-    return false;
-  }).catch(() => false);
+  const pg = fr.page();
+  // Marcar la casilla.
+  const chk = fr.locator('#chkAceptar, input[type="checkbox"]').first();
+  if (await chk.count().catch(() => 0)) {
+    await chk.check({ force: true }).catch(async () => { await chk.click({ force: true }).catch(() => {}); });
+  }
+  await pg.waitForTimeout(400).catch(() => {});
+  // Clic "Acepto" (link o botón).
+  let clicked = false;
+  for (const sel of ['a:has-text("Acepto")', 'input[value="Acepto" i]', 'button:has-text("Acepto")', "#btnAceptar", 'a.btn:has-text("Acepto")']) {
+    const el = fr.locator(sel).first();
+    if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clicked = true; break; }
+  }
+  // Respaldo por JS si el <a> estaba deshabilitado por clase.
+  if (!clicked) {
+    clicked = await fr.evaluate(() => {
+      const b = (Array.from(document.querySelectorAll("a,button,input")) as any[])
+        .find((e) => /acepto|aceptar/i.test((e.value || "") + " " + (e.textContent || "")));
+      if (b) { b.classList?.remove("disabled"); b.removeAttribute?.("disabled"); b.disabled = false; b.click(); return true; }
+      return false;
+    }).catch(() => false);
+  }
+  await pg.waitForTimeout(600).catch(() => {});
+  return clicked;
 }
+// Selectores del campo de correo del RTT (aparece tras "Acepto").
+const CORREO_SELS = '#txtCorreo, input[name="txtCorreo"], input[type="email"], input[id*="correo" i], input[name*="correo" i], input[placeholder*="correo" i]';
 /** ¿Este frame es el CONTENIDO del RTT (no el menú)? Por URL del app o textos propios. */
 async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; acepto: boolean }> {
   if (/menuinternet|cl-ti-itmenu/i.test(fr.url())) {
     // El frame del menú también dice "Reporte Tributario para Terceros"; ignóralo
     // salvo que tenga el campo de correo embebido.
-    const campo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
+    const campo = await fr.locator(CORREO_SELS).count().catch(() => 0);
     return { app: !!campo, correo: !!campo, acepto: false };
   }
   const url = /itreportetri|reportetri/i.test(fr.url());
-  const campo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
+  const campo = await fr.locator(CORREO_SELS).count().catch(() => 0);
   const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
-  const acepto = /desea generar el reporte|marque la casilla|sr\.?\s*contribuyente/i.test(txt) || (await fr.locator('input[type="checkbox"]').count().catch(() => 0)) > 0;
+  const acepto = /desea generar el reporte|marque la casilla|sr\.?\s*contribuyente/i.test(txt) || (await fr.locator("#chkAceptar, input[type=\"checkbox\"]").count().catch(() => 0)) > 0;
   return { app: url || !!campo || acepto, correo: !!campo, acepto };
 }
 
@@ -276,23 +292,31 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       };
     }
 
-    // 4) Escribir el correo de destino (en el frame del RTT) y Enviar.
-    const emailSels = ["#txtCorreo", 'input[name="txtCorreo"]', 'input[type="email"]', 'input[placeholder*="Correo" i]', 'input[type="text"]'];
-    const fill = await fillEnFrames(ctx, emailSels, params.emailDestino);
-    pasos.push({ paso: "correo", escrito: fill.ok, frame: fill.frameUrl, sel: fill.sel, emailDestino: params.emailDestino });
-    if (!fill.ok) {
+    // 4) Escribir el correo de destino DENTRO del frame del RTT (nunca en el
+    //    buscador del menú) y Enviar.
+    let escrito = false, selUsado = "";
+    for (const sel of CORREO_SELS.split(",").map((s) => s.trim())) {
+      const el = frameRTT.locator(sel).first();
+      if (await el.count().catch(() => 0)) {
+        await el.fill(params.emailDestino).catch(() => {});
+        const v = await el.inputValue().catch(() => "");
+        if (v) { escrito = true; selUsado = sel; break; }
+      }
+    }
+    pasos.push({ paso: "correo", escrito, sel: selUsado, emailDestino: params.emailDestino });
+    if (!escrito) {
       return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto'/'estructura'.", diag: { pasos } };
     }
 
-    // Clic "Enviar" (#btnCorreo), en cualquier frame.
+    // Clic "Enviar" dentro del frame del RTT.
     const enviado =
-      (await clickEnFrames(ctx, ["#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]'])) ||
+      (await clickAny(frameRTT, ["#btnCorreo", "#btnEnviar", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")'])) ||
       (await clicTexto(ctx, ["Enviar"]));
     await page.waitForTimeout(1500).catch(() => {});
     // Confirmación (SUNAT suele mostrar un aviso "Aceptar"/"Sí").
     await clicTexto(ctx, ["Aceptar", "Sí", "Confirmar", "OK"]);
     await page.waitForTimeout(2000).catch(() => {});
-    const trasEnviar = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
+    const trasEnviar = (await frameRTT.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
     pasos.push({ paso: "enviar", clico: enviado, respuesta: trasEnviar.slice(0, 200) });
 
     return { ok: enviado, error: enviado ? undefined : "No se pudo pulsar Enviar en el formulario del RTT.", diag: { pasos } };
