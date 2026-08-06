@@ -11,6 +11,10 @@ import { lanzarNavegador, bloquearRecursos } from "./navegador";
 
 const LOGIN_URL =
   "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?exe=01.04.00.00.000000";
+// URL directa del formulario del RTT (descubierta por inspección): pide el
+// correo de destino y con "Enviar" genera y manda el reporte.
+const RTT_URL =
+  "https://ww1.sunat.gob.pe/ol-ti-itreportetri/reportetri.htm?action=cargarFormulario";
 
 export interface RttParams {
   ruc: string;
@@ -118,30 +122,53 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL).", diag: { pasos } };
     }
 
-    // 2) Navegar al menú del RTT (Reporte Tributario para Terceros). La ruta
-    //    exacta se calibra con diagnóstico (varía según el menú de cada RUC).
-    const ruta = [
-      ["Reporte Tributario", "Reporte Tributario para Terceros", "RTT"],
-      ["Reporte Tributario para Terceros", "Generar reporte", "Generar"],
-    ];
-    for (const opciones of ruta) {
-      const hit = await clicTexto(ctx, opciones);
-      pasos.push({ paso: "menu", buscaba: opciones[0], clico: hit });
-      await page.waitForTimeout(2000).catch(() => {});
-    }
+    // 2) Ir DIRECTO al formulario del RTT (URL descubierta por inspección). La
+    //    sesión SOL ya vale para ww1.sunat.gob.pe.
+    await page.goto(RTT_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(2500).catch(() => {});
+    const formTexto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 200)).catch(() => "")) as string;
+    pasos.push({ paso: "form-rtt", url: page.url(), tieneFormulario: /reporte tributario|correo/i.test(formTexto) });
 
-    // 3) Volcado de estructura (para calibrar el formulario del RTT y el campo
-    //    de correo donde se escribe el sub-address con el RUC).
+    // Volcado de estructura del formulario (para calibrar campos si hace falta).
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, ...estructura });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
 
-    // TODO(calibrar): con el volcado, aquí se llenará el formulario del RTT y el
-    // campo de correo con params.emailDestino, y se enviará. Por ahora, si el
-    // login fue correcto se considera "disparado" (estado en_proceso) y el
-    // webhook cerrará la trazabilidad cuando llegue el correo de SUNAT.
-    return { ok: true, diag: { pasos } };
+    // 3) Escribir el correo de destino (sub-address con el RUC) y Enviar.
+    const emailSels = [
+      "#txtCorreo",                    // id exacto del formulario RTT
+      'input[name="txtCorreo"]',
+      'input[type="email"]',
+      'input[placeholder*="Correo" i]',
+      'input[type="text"]',
+    ];
+    let escrito = false;
+    for (const sel of emailSels) {
+      const el = page.locator(sel).first();
+      if (await el.count().catch(() => 0)) {
+        await el.fill(params.emailDestino).catch(() => {});
+        const v = await el.inputValue().catch(() => "");
+        if (v) { escrito = true; break; }
+      }
+    }
+    pasos.push({ paso: "correo", escrito, emailDestino: params.emailDestino });
+    if (!escrito) {
+      return { ok: false, error: "No se encontró el campo de correo en el formulario del RTT.", diag: { pasos } };
+    }
+
+    // Clic "Enviar" (botón #btnCorreo del formulario RTT).
+    const enviado =
+      (await clickAny(page, ["#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]'])) ||
+      (await clicTexto(ctx, ["Enviar"]));
+    await page.waitForTimeout(1500).catch(() => {});
+    // Confirmación (SUNAT suele mostrar un aviso "Aceptar"/"Sí").
+    await clicTexto(ctx, ["Aceptar", "Sí", "Confirmar", "OK"]);
+    await page.waitForTimeout(2000).catch(() => {});
+    const trasEnviar = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
+    pasos.push({ paso: "enviar", clico: enviado, respuesta: trasEnviar.slice(0, 200) });
+
+    return { ok: enviado, error: enviado ? undefined : "No se pudo pulsar Enviar en el formulario del RTT.", diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error generando el RTT.", diag: { pasos } };
   } finally {
