@@ -91,6 +91,38 @@ async function clickEnFrames(ctx: any, selectores: string[]): Promise<boolean> {
   return false;
 }
 
+/** Lista opciones del menú cuyo texto matchea un patrón (para calibrar el RTT). */
+async function opcionesMenu(ctx: any, re: RegExp): Promise<any[]> {
+  const out: any[] = [];
+  for (const fr of todosLosFrames(ctx)) {
+    const items = await fr.evaluate(() => {
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+      return (Array.from(document.querySelectorAll("a,span[onclick],li[onclick]")) as HTMLElement[])
+        .map((e) => ({ text: norm(e.textContent), id: (e as any).id || "", onclick: (e.getAttribute("onclick") || "").slice(0, 60) }))
+        .filter((x) => x.text && x.text.length < 80);
+    }).catch(() => []);
+    for (const it of items) if (re.test(it.text)) out.push({ ...it, frame: fr.url().slice(0, 70) });
+  }
+  return out;
+}
+/** Clic (vía JS, funciona con el árbol del menú oculto) en la opción por texto. */
+async function clickMenuJS(ctx: any, patrones: string[]): Promise<{ ok: boolean; text?: string; frame?: string }> {
+  for (const fr of todosLosFrames(ctx)) {
+    const clicked = await fr.evaluate((pats: string[]) => {
+      const res = pats.map((p) => new RegExp(p, "i"));
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+      const nodes = Array.from(document.querySelectorAll("a,span[onclick],li[onclick]")) as HTMLElement[];
+      for (const n of nodes) {
+        const t = norm(n.textContent);
+        if (t && res.some((r) => r.test(t))) { (n as HTMLElement).click(); return t; }
+      }
+      return "";
+    }, patrones).catch(() => "");
+    if (clicked) return { ok: true, text: clicked, frame: fr.url().slice(0, 70) };
+  }
+  return { ok: false };
+}
+
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
 async function volcar(ctx: any): Promise<any> {
   const frames: any[] = [];
@@ -153,23 +185,46 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL).", diag: { pasos } };
     }
 
-    // 2) Ir DIRECTO al formulario del RTT (URL descubierta por inspección).
-    await page.goto(RTT_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
-    await page.waitForTimeout(3000).catch(() => {});
-    const urlActual = page.url();
-    const formTexto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 250)).catch(() => "")) as string;
-    // ¿Nos redirigió al login? (la sesión no se compartió con ww1).
-    const enLogin = /txtRuc|iniciar sesi|clave sol/i.test(formTexto) || /login|autentica/i.test(urlActual);
-    pasos.push({ paso: "form-rtt", url: urlActual, enLogin, tieneCorreo: /reporte tributario|correo/i.test(formTexto) });
+    // 2) Abrir el RTT POR EL MENÚ. Ir directo a ww1 devuelve "No se ha enviado
+    //    correctamente los parametros de autenticacion": es el menú de SOL el que
+    //    inyecta los parámetros de sesión al aplicativo. El árbol del menú está en
+    //    el DOM (oculto), así que se dispara el clic por JS y el RTT abre en un
+    //    iframe/pestaña con la sesión válida.
+    const patrones = [
+      "reporte tributario.*tercero",
+      "reporte.*para terceros",
+      "reporte tributario",
+      "reporte.*tercero",
+    ];
+    const candidatos = await opcionesMenu(ctx, /reporte|tercero|tribut/i);
+    const clic = await clickMenuJS(ctx, patrones);
+    pasos.push({ paso: "menu-rtt", clico: clic.ok, opcion: clic.text, frame: clic.frame, urlDirecta: RTT_URL, candidatos: candidatos.slice(0, 30) });
 
-    // Volcado de estructura (para calibrar si el formulario no aparece).
+    // Esperar a que cargue el formulario del RTT (iframe del app o pestaña nueva).
+    let frameRTT: any = null;
+    for (let i = 0; i < 15 && !frameRTT; i++) {
+      await page.waitForTimeout(1000).catch(() => {});
+      for (const fr of todosLosFrames(ctx)) {
+        const esApp = /itreportetri|reportetri/i.test(fr.url());
+        const tieneCampo = await fr.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').count().catch(() => 0);
+        if ((esApp && tieneCampo) || tieneCampo) { frameRTT = fr; break; }
+      }
+    }
+
+    // Volcado de estructura (para calibrar la navegación si el form no aparece).
     const estructura = await volcar(ctx);
-    pasos.push({ paso: "estructura", emailDestino: params.emailDestino, ...estructura });
+    pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, ...estructura });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
 
-    if (enLogin) {
-      return { ok: false, error: "SUNAT no mantuvo la sesión al abrir el RTT directo (redirigió a login). Hay que llegar por el menú.", diag: { pasos } };
+    if (!frameRTT) {
+      return {
+        ok: false,
+        error: clic.ok
+          ? "Se abrió la opción del RTT en el menú, pero el formulario no cargó. Usa Modo diagnóstico y revisa los pasos 'menu-rtt' y 'estructura'."
+          : "No se encontró la opción del RTT en el menú de SOL. Usa Modo diagnóstico: en 'menu-rtt' → 'candidatos' están las opciones detectadas para calibrar el texto exacto.",
+        diag: { pasos },
+      };
     }
 
     // 3) Escribir el correo de destino (en cualquier frame) y Enviar.
