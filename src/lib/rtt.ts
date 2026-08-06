@@ -305,18 +305,25 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
     }
 
-    // Enviar dentro del frame del RTT (el confirm lo acepta autoAceptarDialogos).
+    // Enviar dentro del frame del RTT. El botón corre la reCAPTCHA v3 (rellena
+    // tokenCaptchaV3) y hace el POST; por eso se hace CLIC (no POST directo) y el
+    // confirm lo acepta autoAceptarDialogos.
     let enviado = false;
-    for (const sel of ["#btnCorreo", "#btnEnviar", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
+    for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
       const el = frameRTT.locator(sel).first();
       if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); enviado = true; break; }
     }
     if (!enviado) enviado = !!(await clickEnFrame(frameRTT, ["Enviar"]));
-    await page.waitForTimeout(2500).catch(() => {});
-    const trasEnviar = (await frameRTT.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-    pasos.push({ paso: "enviar", clico: enviado, respuesta: trasEnviar.slice(0, 200) });
+    // reCAPTCHA v3 + POST son asíncronos: dar tiempo.
+    await page.waitForTimeout(4500).catch(() => {});
+    const trasEnviar = (await frameRTT.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
+    const exito = /se ha enviado|se enviar[aá]|se generar[aá]|enviado a su correo|correo.*registrad|de manera exitosa|exitos|env[ií]o.*correo/i.test(trasEnviar);
+    const fallo = /captcha|no es v[aá]lid|inv[aá]lid|no se pudo|vuelva a intentar|error/i.test(trasEnviar);
+    pasos.push({ paso: "enviar", clico: enviado, exito, fallo, respuesta: trasEnviar.slice(0, 300) });
 
-    return { ok: enviado, error: enviado ? undefined : "No se pudo pulsar Enviar en el formulario del RTT.", diag: { pasos } };
+    if (!enviado) return { ok: false, error: "No se pudo pulsar Enviar en el formulario del RTT.", diag: { pasos } };
+    if (fallo && !exito) return { ok: false, error: "SUNAT no aceptó el envío: " + trasEnviar.replace(/\s+/g, " ").slice(0, 160), diag: { pasos } };
+    return { ok: true, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error generando el RTT.", diag: { pasos } };
   } finally {
