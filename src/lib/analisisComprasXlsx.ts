@@ -17,7 +17,7 @@ function encabezado(ws: ExcelJS.Worksheet, cols: number) {
 
 export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Radar Tributario · ASENCO";
+  wb.creator = "Radar Tributar IA";
 
   // --- Resumen ---
   const res = wb.addWorksheet("Resumen");

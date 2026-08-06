@@ -599,8 +599,6 @@ export default async function InformePage({ params }: { params: { id: string } }
           <p>
             Informe generado automáticamente por{" "}
             <span translate="no" className="font-semibold text-slate-500">RADAR TRIBUTAR·IA</span>{" "}
-            <span translate="no">· by </span>
-            <span translate="no" className="font-semibold text-slate-500">ASENCO</span>{" "}
             a partir de la información de SUNAT y los documentos cargados.{" "}
             <span className="font-semibold text-slate-500">Este informe es confidencial</span>{" "}
             y debe ser validado por un contador o auditor colegiado antes de su uso formal.

@@ -75,7 +75,7 @@ export default async function MenuPage() {
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div>
             <span translate="no" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
-              RADAR TRIBUTAR<span className="rounded bg-accent-400 px-1 text-brand-900">IA</span> · by <span className="font-bold">ASENCO</span>
+              RADAR TRIBUTAR<span className="rounded bg-accent-400 px-1 text-brand-900">IA</span>
             </span>
             <h1 className="mt-3 text-3xl font-bold leading-tight">¿Qué quieres hacer hoy?</h1>
             <p className="mt-2 max-w-xl text-sm text-white/85">

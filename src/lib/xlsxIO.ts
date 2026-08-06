@@ -62,7 +62,7 @@ const AZUL = "FF1D4ED8"; // brand-700 aprox.
 /** Genera el Excel del comparativo (hojas Resumen, Compras y/o Ventas). */
 export async function construirExcelCruce(res: ResultadoCruce): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "ASENCOIA";
+  wb.creator = "Radar Tributar IA";
   wb.created = new Date();
 
   hojaResumen(wb, res);
