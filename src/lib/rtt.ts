@@ -147,77 +147,18 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
 }
 
 /** Pantalla 1 del RTT: marca la casilla y pasa a la pantalla del correo.
- *  Los handlers reales de SUNAT son: casilla #chkAceptar → habilitarIngreso()
- *  (habilita el botón), botón #btnAceptar → goToPage('cargarFormulario') (carga
- *  el correo). Se INVOCAN esas funciones directamente (como fraccionamiento
- *  llama a fListarNotiMen), que es mucho más fiable que un clic sintético.
- *  Respaldo: clic real de Playwright sobre el botón. Devuelve la vía usada. */
-async function marcarYAceptar(fr: any): Promise<string> {
-  const chk = fr.locator("#chkAceptar").first();
-  if (await chk.count().catch(() => 0)) {
-    await chk.check({ force: true }).catch(async () => { await chk.click({ force: true }).catch(() => {}); });
-  }
-  await fr.page().waitForTimeout(300).catch(() => {});
-  const via = (await fr.evaluate(() => {
-    const w = window as any;
-    const c = document.getElementById("chkAceptar") as HTMLInputElement | null;
-    if (c) c.checked = true;
-    try { if (typeof w.habilitarIngreso === "function") w.habilitarIngreso(); } catch { /* sigue */ }
-    if (typeof w.goToPage === "function") {
-      try { w.goToPage("cargarFormulario"); return "goToPage"; }
-      catch (e: any) { return "goToPage-err:" + (e && e.message ? String(e.message).slice(0, 60) : ""); }
-    }
-    const b = document.getElementById("btnAceptar") as HTMLElement | null;
-    if (b) { b.click(); return "btn-click"; }
-    return "sin-via";
-  }).catch(() => "err")) as string;
-  await fr.page().waitForTimeout(600).catch(() => {});
-  // Respaldo: si no había funciones globales, clic real sobre el botón.
-  if (via === "sin-via" || via === "err" || String(via).startsWith("goToPage-err")) {
-    const b = fr.locator("#btnAceptar, button:has-text(\"Acepto\")").first();
-    if (await b.count().catch(() => 0)) await b.click({ force: true, timeout: 4000 }).catch(() => {});
-  }
-  await fr.page().waitForTimeout(1000).catch(() => {});
+ *  Capturado con DevTools: "Acepto" es un GET a
+ *  reportetri.htm?action=cargarFormulario, SIN hc/token (la sesión va por
+ *  cookies). Como ya entramos por el menú, las cookies están puestas: navegamos
+ *  el frame DIRECTO a esa URL y así saltamos el checkbox + "Acepto". */
+const FORM_CORREO_URL = "https://ww1.sunat.gob.pe/ol-ti-itreportetri/reportetri.htm?action=cargarFormulario";
+async function irAlFormularioCorreo(fr: any): Promise<string> {
+  const via = (await fr.evaluate((u: string) => {
+    try { window.location.href = u; return "goto"; }
+    catch (e: any) { return "err:" + (e && e.message ? String(e.message).slice(0, 60) : ""); }
+  }, FORM_CORREO_URL).catch(() => "err")) as string;
+  await fr.page().waitForTimeout(1500).catch(() => {});
   return via;
-}
-
-/** Vuelca el checkbox, el botón "Acepto", el estado del JS y la definición de
- *  goToPage/forms del frame del RTT (para calibrar cómo pasar al correo). */
-async function dumpRTT(fr: any): Promise<any> {
-  return await fr.evaluate(() => {
-    const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-    const w = window as any;
-    const c = document.querySelector("#chkAceptar") as HTMLInputElement | null;
-    const botones = (Array.from(document.querySelectorAll("a,button,input")) as any[])
-      .filter((e) => /acepto|generar|enviar|continuar/i.test((e.value || "") + " " + (e.textContent || "")))
-      .map((e) => ({
-        tag: e.tagName, txt: norm(e.textContent || e.value), disabled: !!e.disabled,
-        onclick: (e.getAttribute && e.getAttribute("onclick") || "").slice(0, 160),
-      })).slice(0, 8);
-    // Definición de goToPage (si es inline) para saber qué URL/POST arma.
-    let gotoSrc = "";
-    for (const s of Array.from(document.querySelectorAll("script:not([src])")) as HTMLScriptElement[]) {
-      const t = s.textContent || "";
-      const i = t.search(/function\s+goToPage|goToPage\s*[=:]/);
-      if (i >= 0) { gotoSrc = norm(t.slice(Math.max(0, i - 10), i + 260)); break; }
-    }
-    const forms = (Array.from(document.forms) as HTMLFormElement[]).map((f) => ({
-      name: f.name || f.id, action: (f.getAttribute("action") || "").slice(0, 120), method: f.method,
-      hidden: (Array.from(f.querySelectorAll('input[type="hidden"]')) as HTMLInputElement[]).map((h) => h.name).slice(0, 20),
-    })).slice(0, 4);
-    return {
-      checkbox: c ? { checked: c.checked, onclick: (c.getAttribute("onclick") || "").slice(0, 160) } : null,
-      botones,
-      js: {
-        goToPage: typeof w.goToPage,
-        habilitarIngreso: typeof w.habilitarIngreso,
-        scriptsSrc: (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[]).map((s) => (s.getAttribute("src") || "").slice(0, 90)).slice(0, 20),
-      },
-      gotoSrc,
-      forms,
-      url: location.href.slice(0, 160),
-    };
-  }).catch(() => null);
 }
 
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
@@ -314,12 +255,12 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       }
     }
 
-    // 3) Pantalla 1 → marcar la casilla y pulsar "Acepto". Luego aparece el correo.
+    // 3) Ir DIRECTO a la pantalla del correo (GET reportetri.htm?action=
+    //    cargarFormulario; la sesión viaja por cookies al haber entrado por el
+    //    menú). Salta el checkbox + "Acepto".
     let via = "no-frame";
-    let domRTT: any = null;
-    if (frameRTT && estado.acepto && !estado.correo) {
-      if (params.diagnostico) domRTT = await dumpRTT(frameRTT); // antes de tocar
-      via = await marcarYAceptar(frameRTT);
+    if (frameRTT && !estado.correo) {
+      via = await irAlFormularioCorreo(frameRTT);
       for (let i = 0; i < 12; i++) {
         await page.waitForTimeout(1000).catch(() => {});
         await cerrarPantallas(ctx, page);
@@ -331,7 +272,7 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         if (encontrado) break;
       }
     }
-    pasos.push({ paso: "acepto", via, hayCorreo: estado.correo, ...(domRTT ? { domRTT } : {}) });
+    pasos.push({ paso: "cargar-formulario", via, hayCorreo: estado.correo });
 
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
