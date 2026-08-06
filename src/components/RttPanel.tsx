@@ -6,13 +6,14 @@ import { getSolPass, getSolUser } from "@/lib/solSession";
 
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
-const PASOS = [
-  { estado: "creado", label: "Solicitado" },
-  { estado: "pendiente", label: "Encolado" },
-  { estado: "en_proceso", label: "Generando en SOL / esperando correo" },
-  { estado: "recibido", label: "Correo recibido" },
-  { estado: "listo", label: "Listo para descargar" },
-];
+const LABEL: Record<string, string> = {
+  creado: "Solicitado",
+  pendiente: "Encolado",
+  en_proceso: "Generando en SOL / esperando correo",
+  recibido: "Correo recibido",
+  listo: "Listo para descargar",
+  error: "Error",
+};
 const COLOR: Record<string, string> = {
   creado: "bg-slate-100 text-slate-600",
   pendiente: "bg-sky-100 text-sky-700",
@@ -21,11 +22,9 @@ const COLOR: Record<string, string> = {
   listo: "bg-emerald-100 text-emerald-700",
   error: "bg-red-100 text-red-700",
 };
-const orden = (e: string) => PASOS.findIndex((p) => p.estado === e);
 
 export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   const [id, setId] = useState("");
-  const [terceroRuc, setTerceroRuc] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -48,15 +47,8 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
     } catch { /* */ } finally { setRefrescando(false); }
   }
 
-  async function probarWebhook() {
-    setRefrescando(true);
-    try {
-      await fetch("/api/rtt/probar-webhook", { method: "POST" });
-      await cargar();
-    } finally { setRefrescando(false); }
-  }
   useEffect(() => { cargar(); }, []);
-  // Auto-refresco mientras haya solicitudes en proceso (esperando el correo).
+  // Auto-refresco mientras haya generaciones en curso (esperando el correo).
   useEffect(() => {
     const enProceso = solicitudes.some((s) => ["creado", "pendiente", "en_proceso", "recibido"].includes(s.estado));
     if (!enProceso) return;
@@ -70,22 +62,22 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
     const solPass = getSolPass(sel.id);
     const solUser = getSolUser(sel.id, sel.solUser);
     if (!solPass) { setError("Carga tu Clave SOL (arriba)."); return; }
-    const ruc = (terceroRuc || sel.ruc).replace(/\D/g, "");
-    if (!/^\d{11}$/.test(ruc)) { setError("RUC a reportar inválido (11 dígitos)."); return; }
+    const ruc = sel.ruc.replace(/\D/g, "");
+    if (!/^\d{11}$/.test(ruc)) { setError("La empresa no tiene un RUC válido."); return; }
     setBusy(true);
     try {
       const res = await fetch("/api/rtt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ruc, rucLogin: sel.ruc, solUser, solPass, razonSocial: ruc === sel.ruc ? sel.razonSocial : undefined, diagnostico: diagModo }),
+        body: JSON.stringify({ ruc, rucLogin: sel.ruc, solUser, solPass, razonSocial: sel.razonSocial, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-      if (!res.ok) { setError(data.error ?? "No se pudo solicitar el RTT."); await cargar(); return; }
-      setInfo(diagModo ? "Diagnóstico listo (revisa la traza cruda abajo)." : "Solicitud enviada. SUNAT procesará y enviará el reporte por correo; aquí verás cuándo esté listo.");
+      if (!res.ok) { setError(data.error ?? "No se pudo generar el reporte."); await cargar(); return; }
+      setInfo(diagModo ? "Diagnóstico listo (revisa la traza cruda abajo)." : "Generación enviada. SUNAT procesa y envía el reporte por correo; aquí lo verás listo para descargar en cuanto llegue.");
       await cargar();
     } catch {
-      setError("Error de red al solicitar el RTT.");
+      setError("Error de red al generar el reporte.");
     } finally {
       setBusy(false);
     }
@@ -94,17 +86,17 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   return (
     <div className="space-y-4">
       <div className="card p-5">
-        <h2 className="mb-1 font-semibold text-slate-800">Solicitar Reporte Tributario para Terceros</h2>
+        <h2 className="mb-1 font-semibold text-slate-800">Generar Reporte Tributario para Terceros</h2>
         <p className="mb-4 text-xs text-slate-400">
-          Elige la empresa con cuya <strong>Clave SOL</strong> se inicia sesión y el <strong>RUC a reportar</strong>
-          (puede ser un tercero). El bot dispara la generación en SOL; SUNAT envía el PDF/XML por correo y un
-          <strong> webhook</strong> lo captura automáticamente. No revisas el correo a mano.
+          Elige la empresa: el bot inicia sesión con su <strong>Clave SOL</strong>, genera su Reporte Tributario
+          para Terceros y SUNAT lo envía por correo; un <strong>webhook</strong> lo captura automáticamente y aquí
+          lo descargas. No revisas el correo a mano.
         </p>
         <label className="label">Empresa (acceso SOL)</label>
         {clientes.length === 0 ? (
           <p className="text-sm text-slate-500">No tienes empresas. <a href="/clientes/nuevo" className="text-brand-600 hover:underline">Crea una →</a></p>
         ) : (
-          <select className="input max-w-lg" value={id} onChange={(e) => { setId(e.target.value); setTerceroRuc(""); }}>
+          <select className="input max-w-lg" value={id} onChange={(e) => setId(e.target.value)}>
             <option value="">— Elige una empresa —</option>
             {clientes.map((c) => <option key={c.id} value={c.id}>{c.razonSocial} · RUC {c.ruc}</option>)}
           </select>
@@ -112,14 +104,9 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         {sel && (
           <div className="mt-4 space-y-3">
             <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="label">RUC a reportar</label>
-                <input className="input w-52" placeholder={sel.ruc} value={terceroRuc} onChange={(e) => setTerceroRuc(e.target.value.replace(/\D/g, "").slice(0, 11))} />
-                <p className="mt-1 text-[10px] text-slate-400">Vacío = el RUC de la propia empresa.</p>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
               <button className="btn-primary" onClick={solicitar} disabled={busy}>
-                {busy ? "Solicitando…" : "📄 Solicitar RTT"}
+                {busy ? "Generando…" : "📄 Generar Reporte Tributario"}
               </button>
               <label className="flex items-center gap-2 text-xs text-slate-500">
                 <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
@@ -132,6 +119,59 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
       </div>
 
+      {/* Generación de Reporte Tributario: info + descarga */}
+      <div className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800">Generación de Reporte Tributario</h2>
+          <button className="btn-ghost text-sm" onClick={cargar} disabled={refrescando}>
+            {refrescando ? "Actualizando…" : "↻ Actualizar"}
+          </button>
+        </div>
+        {solicitudes.length === 0 ? (
+          <p className="text-sm text-slate-400">Aún no has generado ningún reporte. Elige una empresa y pulsa “Generar Reporte Tributario”.</p>
+        ) : (
+          <div className="space-y-3">
+            {solicitudes.map((s) => {
+              const listo = s.estado === "listo";
+              const enCurso = ["creado", "pendiente", "en_proceso", "recibido"].includes(s.estado);
+              return (
+                <div key={s.id} className={`rounded-lg border p-3 ${listo ? "border-emerald-200 bg-emerald-50/40" : s.estado === "error" ? "border-red-200 bg-red-50/40" : "border-slate-200"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="font-semibold text-slate-700">{s.razonSocial || `RUC ${s.ruc}`}</span>
+                      <span className="ml-2 text-xs text-slate-400">RUC {s.ruc}</span>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${COLOR[s.estado] ?? "bg-slate-100"}`}>
+                      {LABEL[s.estado] ?? s.estado}
+                    </span>
+                  </div>
+
+                  {/* Información de la generación */}
+                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-500 sm:grid-cols-3">
+                    <div><dt className="inline text-slate-400">Solicitado: </dt><dd className="inline">{new Date(s.creadoEn).toLocaleString("es-PE")}</dd></div>
+                    {s.actualizadoEn && <div><dt className="inline text-slate-400">Actualizado: </dt><dd className="inline">{new Date(s.actualizadoEn).toLocaleString("es-PE")}</dd></div>}
+                    <div><dt className="inline text-slate-400">Correo: </dt><dd className="inline break-all">{s.emailDestino}</dd></div>
+                  </dl>
+
+                  {s.estado === "error" && (
+                    <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-600">⚠ {s.error ?? "Error en la generación"}</div>
+                  )}
+                  {listo && (
+                    <div className="mt-2 flex gap-2">
+                      <a className="btn-primary text-sm" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ Descargar PDF</a>
+                      {s.rutaXml && <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ Descargar XML</a>}
+                    </div>
+                  )}
+                  {enCurso && (
+                    <p className="mt-2 text-[11px] text-slate-400">⏳ SUNAT está procesando el reporte; llega por correo y aquí queda listo para descargar. Esta vista se actualiza sola.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Verificación del webhook: últimos correos recibidos */}
       <div className="card p-5">
         <div className="mb-1 flex items-center justify-between">
@@ -141,13 +181,12 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
           </span>
         </div>
         <p className="mb-3 text-xs text-slate-400">
-          Aquí aparece <strong>cada correo que llega al webhook</strong>. Para probar, envía un correo con un PDF
-          adjunto a <code className="rounded bg-slate-100 px-1">reportes+RUC20512737456@{dominio || "reportes.tudominio.com"}</code> —
-          si la cadena (MX → SendGrid → webhook) está bien, verás el evento abajo en segundos.
+          Aquí aparece <strong>cada correo que llega al webhook</strong> (el PDF/XML de SUNAT). Sirve para verificar
+          que la cadena MX → SendGrid → webhook está funcionando.
         </p>
         {webhookLog.length === 0 ? (
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-            Aún no ha llegado ningún correo al webhook. Si ya enviaste uno y no aparece, revisa: MX de <code>reportes</code> → <code>mx.sendgrid.net</code>, el Inbound Parse (host + Destination URL con el secreto), y las variables en Render.
+            Aún no ha llegado ningún correo al webhook.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -175,72 +214,12 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
           <button className="btn-ghost text-sm" onClick={cargar} disabled={refrescando}>
             {refrescando ? "Revisando…" : "↻ Actualizar"}
           </button>
-          <button className="btn-ghost text-sm" onClick={probarWebhook} disabled={refrescando} title="Inserta un evento de prueba para confirmar que la app funciona">
-            🧪 Probar webhook
-          </button>
           {revisadoAt && (
             <span className="text-[11px] text-slate-400">
               Revisado {revisadoAt} · {webhookLog.length} evento(s)
             </span>
           )}
         </div>
-      </div>
-
-      {/* Trazabilidad */}
-      <div className="card p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Mis solicitudes (trazabilidad)</h2>
-          <button className="btn-ghost text-sm" onClick={cargar}>↻ Actualizar</button>
-        </div>
-        {solicitudes.length === 0 ? (
-          <p className="text-sm text-slate-400">Aún no hay solicitudes.</p>
-        ) : (
-          <div className="space-y-3">
-            {solicitudes.map((s) => (
-              <div key={s.id} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="font-semibold text-slate-700">RUC {s.ruc}</span>
-                    {s.razonSocial && <span className="ml-2 text-xs text-slate-400">{s.razonSocial}</span>}
-                    <div className="text-[11px] text-slate-400">Solicitado: {new Date(s.creadoEn).toLocaleString("es-PE")}</div>
-                  </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${COLOR[s.estado] ?? "bg-slate-100"}`}>
-                    {PASOS.find((p) => p.estado === s.estado)?.label ?? s.estado}
-                  </span>
-                </div>
-
-                {/* Barra de pasos */}
-                <div className="mt-3 flex items-center gap-1">
-                  {PASOS.map((p, i) => {
-                    const done = s.estado !== "error" && orden(s.estado) >= i;
-                    const cur = s.estado === p.estado;
-                    return (
-                      <div key={p.estado} className="flex flex-1 items-center gap-1" title={p.label}>
-                        <div className={`h-2 flex-1 rounded-full ${done ? "bg-brand-500" : "bg-slate-200"} ${cur ? "ring-2 ring-brand-300" : ""}`} />
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-1 flex justify-between text-[9px] uppercase text-slate-400">
-                  {PASOS.map((p) => <span key={p.estado}>{p.label.split(" ")[0]}</span>)}
-                </div>
-
-                {s.estado === "error" && (
-                  <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-600">⚠ {s.error ?? "Error"}</div>
-                )}
-                {s.estado === "listo" && (
-                  <div className="mt-2 flex gap-2">
-                    <a className="btn-primary text-sm" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ PDF</a>
-                    {s.rutaXml && <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ XML</a>}
-                  </div>
-                )}
-                {["en_proceso", "recibido", "pendiente", "creado"].includes(s.estado) && (
-                  <p className="mt-2 text-[11px] text-slate-400">Esperando a SUNAT — el reporte llega por correo cuando SUNAT lo procesa (puede tardar). Esta vista se actualiza sola.</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
