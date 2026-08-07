@@ -457,3 +457,21 @@ export interface SolicitudRTT {
   error?: string;
   solicitadoPor?: string; // userId
 }
+
+/** Solicitud del Reporte de Rentas y Retenciones (4ta/5ta) de una persona
+ *  natural. Igual flujo que el RTT (correo → nube → webhook) pero el PDF se
+ *  PARSEA (reporteRentas.ts) y se guarda el detalle. */
+export interface SolicitudRentas {
+  id: string;
+  clienteId: string;
+  ruc: string;
+  emailDestino: string; // reportes+RENTAS{ruc}@dominio
+  estado: "en_proceso" | "listo" | "error";
+  /** Detalle parseado del reporte (por empleador, periodo, 4ta/5ta, totales). */
+  reporte?: any;
+  rutaPdf?: string;     // PDF en UPLOADS_DIR/rentas
+  error?: string;
+  creadoEn: string;
+  actualizadoEn: string;
+  solicitadoPor?: string;
+}

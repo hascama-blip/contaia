@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRttConfig, guardarArchivosRTTPorRuc, registrarWebhookRTT } from "@/lib/db";
+import { getRttConfig, guardarArchivosRTTPorRuc, registrarWebhookRTT, guardarReporteRentasPorRuc } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   const ct = (req.headers.get("content-type") || "").toLowerCase();
   let ruc = "";
   let from = "";
+  let recipiente = "";   // destinatario completo (para distinguir RTT vs RENTAS)
   let pdf: Buffer | undefined;
   let xml: Buffer | undefined;
 
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       const destinatario =
         rcptHeader ||
         String(form.get("to") || form.get("recipient") || form.get("envelope") || "");
+      recipiente = destinatario;
       from = String(form.get("from") || "");
       ruc = extraerRuc(destinatario) || extraerRuc(String(form.get("subject") || ""));
       for (const [, value] of form.entries()) {
@@ -51,7 +53,8 @@ export async function POST(req: NextRequest) {
       // Formato JSON con adjuntos en base64 (proveedor propio / worker custom).
       const body = await req.json().catch(() => ({}));
       from = String(body.from || "");
-      ruc = extraerRuc(rcptHeader || String(body.to || body.recipient || "")) || extraerRuc(String(body.subject || ""));
+      recipiente = rcptHeader || String(body.to || body.recipient || "");
+      ruc = extraerRuc(recipiente) || extraerRuc(String(body.subject || ""));
       const atts: any[] = Array.isArray(body.attachments) ? body.attachments : [];
       for (const a of atts) {
         const nombre = String(a.filename || a.name || "").toLowerCase();
@@ -78,6 +81,23 @@ export async function POST(req: NextRequest) {
   if (!pdf && !xml) {
     await registrarWebhookRTT({ ruc, resultado: "correo recibido, pero SIN adjunto PDF/XML", from }).catch(() => {});
     return NextResponse.json({ error: "correo sin PDF/XML" }, { status: 422 });
+  }
+
+  // ¿Es el Reporte de Rentas y Retenciones (sub-address +RENTAS…)? Se guarda y
+  // PARSEA aparte. Si no, es el RTT (PDF/XML por RUC) de siempre.
+  const esRentas = /RENTAS/i.test(recipiente);
+  if (esRentas) {
+    if (!pdf) {
+      await registrarWebhookRTT({ ruc, resultado: "rentas: correo recibido pero SIN PDF", from }).catch(() => {});
+      return NextResponse.json({ error: "rentas sin PDF" }, { status: 422 });
+    }
+    const sr = await guardarReporteRentasPorRuc(ruc, pdf);
+    if (!sr) {
+      await registrarWebhookRTT({ ruc, tienePdf: true, resultado: "rentas: OK pero sin solicitud en proceso para ese RUC", from }).catch(() => {});
+      return NextResponse.json({ error: `rentas: sin solicitud en proceso para ${ruc}` }, { status: 404 });
+    }
+    await registrarWebhookRTT({ ruc, tienePdf: true, resultado: "OK: reporte de rentas guardado y parseado", from }).catch(() => {});
+    return NextResponse.json({ ok: true, tipo: "rentas", estado: sr.estado });
   }
 
   const sol = await guardarArchivosRTTPorRuc(ruc, { pdf, xml });

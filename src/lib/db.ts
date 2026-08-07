@@ -19,6 +19,7 @@ import type {
   AccionAuditoria,
   SolicitudRTT,
   EstadoRTT,
+  SolicitudRentas,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -54,6 +55,8 @@ interface Store {
   rtt?: SolicitudRTT[];
   /** Bitácora de los últimos correos recibidos por el webhook del RTT (diagnóstico). */
   rttWebhookLog?: { at: string; ruc: string; tienePdf: boolean; tieneXml: boolean; resultado: string; from?: string }[];
+  /** Solicitudes del Reporte de Rentas y Retenciones (4ta/5ta) por cliente. */
+  rentas?: SolicitudRentas[];
 }
 
 async function ensureDirs() {
@@ -461,6 +464,67 @@ export async function getWebhookLogRTT(): Promise<Store["rttWebhookLog"]> {
 /** Lee un archivo RTT guardado (pdf/xml) por nombre. */
 export async function leerArchivoRTT(nombre: string): Promise<Buffer | null> {
   try { return await fs.readFile(path.join(RTT_DIR, path.basename(nombre))); } catch { return null; }
+}
+
+// ---- Reporte de Rentas y Retenciones (4ta/5ta) --------------------------------
+const RENTAS_DIR = path.join(UPLOADS_DIR, "rentas");
+
+/** Crea o ACTUALIZA la solicitud de rentas de un cliente (una por cliente).
+ *  La deja "en_proceso" esperando el correo de SUNAT. */
+export async function upsertSolicitudRentas(datos: {
+  clienteId: string; ruc: string; emailDestino: string; solicitadoPor?: string;
+}): Promise<SolicitudRentas> {
+  const store = await readStore();
+  if (!Array.isArray(store.rentas)) store.rentas = [];
+  const now = new Date().toISOString();
+  let s = store.rentas.find((x) => x.clienteId === datos.clienteId);
+  if (s) {
+    s.ruc = datos.ruc; s.emailDestino = datos.emailDestino; s.estado = "en_proceso"; s.error = undefined; s.actualizadoEn = now;
+  } else {
+    s = { id: crypto.randomUUID(), clienteId: datos.clienteId, ruc: datos.ruc, emailDestino: datos.emailDestino, estado: "en_proceso", creadoEn: now, actualizadoEn: now, solicitadoPor: datos.solicitadoPor };
+    store.rentas.push(s);
+  }
+  await writeStore(store);
+  return s;
+}
+
+export async function setEstadoRentas(clienteId: string, estado: SolicitudRentas["estado"], extra?: Partial<SolicitudRentas>): Promise<SolicitudRentas | null> {
+  const store = await readStore();
+  const s = (store.rentas ?? []).find((x) => x.clienteId === clienteId);
+  if (!s) return null;
+  s.estado = estado; s.actualizadoEn = new Date().toISOString();
+  if (extra) Object.assign(s, extra);
+  await writeStore(store);
+  return s;
+}
+
+export async function getSolicitudRentas(clienteId: string): Promise<SolicitudRentas | null> {
+  const store = await readStore();
+  return (store.rentas ?? []).find((x) => x.clienteId === clienteId) ?? null;
+}
+
+export async function leerPdfRentas(nombre: string): Promise<Buffer | null> {
+  try { return await fs.readFile(path.join(RENTAS_DIR, path.basename(nombre))); } catch { return null; }
+}
+
+/** WEBHOOK: cruza el correo del reporte de rentas por RUC, guarda el PDF, lo
+ *  PARSEA y deja la solicitud "listo". Devuelve la solicitud o null si no hay
+ *  una "en_proceso" para ese RUC. */
+export async function guardarReporteRentasPorRuc(ruc: string, pdf: Buffer): Promise<SolicitudRentas | null> {
+  const store = await readStore();
+  const s = (store.rentas ?? []).find((x) => x.ruc === ruc && (x.estado === "en_proceso" || x.estado === "listo"));
+  if (!s) return null;
+  await fs.mkdir(RENTAS_DIR, { recursive: true });
+  const base = `${ruc}-${Date.now()}.pdf`;
+  await fs.writeFile(path.join(RENTAS_DIR, base), pdf);
+  let reporte: any = null;
+  try {
+    const { textoDePdf, parseReporteRentas } = await import("./reporteRentas");
+    reporte = parseReporteRentas(await textoDePdf(pdf));
+  } catch { /* si el parseo falla, igual queda el PDF descargable */ }
+  s.rutaPdf = base; s.reporte = reporte; s.estado = "listo"; s.error = undefined; s.actualizadoEn = new Date().toISOString();
+  await writeStore(store);
+  return s;
 }
 
 // ---- Comprobantes XML: persistencia de lo extraído por cliente + periodo ------

@@ -9,6 +9,8 @@ import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
+import RentasPanel from "./RentasPanel";
+import ItfPanel from "./ItfPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
 import {
   CondicionBadge,
@@ -341,16 +343,17 @@ export default function ClienteDetail({
             yaConsultado={Boolean(cliente.buzon)}
           />
 
-          {/* ───── 2 · Estado SIRE (presentado / no presentado) ───── */}
+          {/* ───── 2 · Estado SIRE (con negocio) · o Reporte 4ta/5ta (sin negocio) ───── */}
           {llevaSire(cliente) ? (
             <>
               <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
               <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
             </>
           ) : (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-              <b>SIRE deshabilitado.</b> Esta persona natural (RUC 10) es <b>sin negocio</b>, por lo que <b>no está obligada</b> a llevar ni presentar SIRE. Los pasos de SIRE se omiten.
-            </div>
+            <>
+              <FaseHeader n="2" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
+              <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
+            </>
           )}
 
           {/* ───── 3 · Deudas (Fraccionamiento F36) — solo Usuario + Clave SOL ───── */}
@@ -362,8 +365,8 @@ export default function ClienteDetail({
             inicial={cliente.deudasF36 ?? null}
           />
 
-          {/* ───── 4 · Extracción SIRE (montos) — requiere API. Solo si lleva SIRE. ───── */}
-          {llevaSire(cliente) && (
+          {/* ───── 4 · Extracción SIRE (con negocio) · o ITF (sin negocio) ───── */}
+          {llevaSire(cliente) ? (
             <>
               <FaseHeader n="4" titulo="Extracción SIRE (montos)" detalle="Coloca y bloquea la API para sacar compras/ventas." />
               <SunatPanel
@@ -372,6 +375,11 @@ export default function ClienteDetail({
                 inicialCred={cliente.credSire ?? null}
                 puedeApi={puedeApi}
               />
+            </>
+          ) : (
+            <>
+              <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
+              <ItfPanel clienteId={cliente.id} />
             </>
           )}
 
