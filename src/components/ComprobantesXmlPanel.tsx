@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { zipSync } from "fflate";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -211,6 +212,54 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     } finally { setBusy(false); }
   }
 
+  // TODAS las facturas en un ZIP (los PDF acumulados) — para no bajarlas una por
+  // una. Usa el PDF oficial capturado (pdfBase64); los que no lo tengan se
+  // generan al vuelo. El ZIP se arma en el navegador (instantáneo).
+  async function descargarZip() {
+    if (!facturas.length) return;
+    setError(null); setBusy(true);
+    try {
+      const files: Record<string, Uint8Array> = {};
+      const usados: Record<string, number> = {};
+      const faltan: { f: any; nombre: string }[] = [];
+      const nombreUnico = (base: string) => {
+        let n = base.replace(/[^\w.-]/g, "_") || "comprobante";
+        if (usados[n] != null) { usados[n] += 1; n = `${n}_${usados[n]}`; } else usados[n] = 0;
+        return n;
+      };
+      for (const f of facturas) {
+        const nombre = nombreUnico(f.serieNumero || `${f.serie}-${f.numero}`);
+        if (f.pdfBase64) {
+          const bin = atob(f.pdfBase64);
+          const by = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+          files[`${nombre}.pdf`] = by;
+        } else {
+          faltan.push({ f, nombre });
+        }
+      }
+      // Los que no traen PDF oficial: se generan (representación) para incluirlos.
+      for (const { f, nombre } of faltan) {
+        try {
+          const res = await fetch("/api/facturas-xml/pdf", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
+          });
+          if (res.ok) files[`${nombre}.pdf`] = new Uint8Array(await res.arrayBuffer());
+        } catch { /* se omite ese */ }
+      }
+      if (!Object.keys(files).length) { setError("No hay PDFs para armar el ZIP."); return; }
+      const zipped = zipSync(files, { level: 0 }); // PDFs ya comprimidos → store
+      const blob = new Blob([zipped], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = periodoSire ? `facturas-${periodoSire}.zip` : "facturas-xml.zip";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("No se pudo armar el ZIP de facturas.");
+    } finally { setBusy(false); }
+  }
+
   // PDF de UN comprobante (fila + botón, estilo buzón). Si se capturó el PDF
   // OFICIAL de SUNAT (f.pdfBase64), se baja ese; si no, la representación generada.
   async function descargarPdf(f: any) {
@@ -316,6 +365,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
             </button>
             <button className="btn-ghost" onClick={descargarExcelMes} disabled={busy} title="Una fila por comprobante + totales del mes">
               ⬇ Excel del mes (acumulado)
+            </button>
+            <button className="btn-primary" onClick={descargarZip} disabled={busy} title="Todas las facturas (PDF) en un solo ZIP">
+              ⬇ Todas las facturas (ZIP)
             </button>
           </>
         )}
