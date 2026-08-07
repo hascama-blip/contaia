@@ -342,15 +342,21 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     let tipoOk = false;
     let se: any = null;
     let opciones: string[] = [];
-    for (let w = 0; w < 12 && !se; w++) {
-      const selects = fr.locator("select");
-      const nSel = await selects.count().catch(() => 0);
-      for (let k = 0; k < nSel; k++) {
-        const cand = selects.nth(k);
-        const ops = await cand.locator("option").allInnerTexts().catch(() => []) as string[];
-        if (ops.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) { se = cand; opciones = ops; break; }
+    // Buscar el <select> del tipo en TODOS los frames de la página, con espera
+    // (se renderiza de forma intermitente tras validar el RUC).
+    const framesPagina = () => { try { return fr.page().frames(); } catch { return [fr]; } };
+    for (let w = 0; w < 16 && !se; w++) {
+      for (const f2 of framesPagina()) {
+        const selects = f2.locator("select");
+        const nSel = await selects.count().catch(() => 0);
+        for (let k = 0; k < nSel; k++) {
+          const cand = selects.nth(k);
+          const ops = await cand.locator("option").allInnerTexts().catch(() => []) as string[];
+          if (ops.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) { se = cand; opciones = ops; break; }
+        }
+        if (se) break;
       }
-      if (!se) await page.waitForTimeout(400).catch(() => {});
+      if (!se) await page.waitForTimeout(500).catch(() => {});
     }
     if (se) {
       hecho.tipoOpciones = opciones.map((o) => o.trim()).filter(Boolean).slice(0, 25);
