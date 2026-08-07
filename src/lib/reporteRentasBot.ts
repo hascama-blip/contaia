@@ -99,9 +99,9 @@ async function volcar(ctx: any): Promise<any> {
 /** ¿Este frame es el del reporte de rentas? (app itreporteec o texto propio). */
 async function frameRentas(ctx: any): Promise<any> {
   for (const fr of todosLosFrames(ctx)) {
-    if (/itreporteec|reporteec|rentasyretenc/i.test(fr.url())) return fr;
-    const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-    if (/RENTAS Y RETENCIONES|Generar Reporte/i.test(txt)) return fr;
+    if (/itrentasretenc|rentasretenc|itreporteec|reporteec/i.test(fr.url())) return fr;
+    const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
+    if (/RENTAS Y RETENCIONES|Generar Reporte|Seleccione ejercicio/i.test(txt)) return fr;
   }
   return null;
 }
@@ -141,22 +141,29 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     }
     if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal).", diag: { pasos } };
 
-    // 2) Entrar por el MENÚ a "Reporte Electrónico de Rentas y Retenciones".
+    // 2) Ir DIRECTO al formulario por la URL de ejecución del menú (code
+    //    descubierto por DevTools: 13.20.1.1.2 → carga consulta.htm con los
+    //    parámetros de sesión). Respaldo: clic en la opción del menú.
+    const APP_URL = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=13.20.1.1.2&s=ww1";
+    await page.goto(APP_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(2500).catch(() => {});
     await cerrarPantallas(ctx, page);
-    const opcion = await clicMenu(ctx, [
-      "Reporte Electrónico de Rentas y Retenciones",
-      "Reporte Electronico de Rentas y Retenciones",
-      "Rentas y Retenciones",
-    ]);
-    pasos.push({ paso: "menu", clico: !!opcion, onclick: opcion });
-
+    let fr: any = await frameRentas(ctx);
+    let opcion: string | null = null;
+    if (!fr) {
+      opcion = await clicMenu(ctx, [
+        "Reporte Electrónico de Rentas y Retenciones",
+        "Reporte Electronico de Rentas y Retenciones",
+        "Rentas y Retenciones",
+      ]);
+    }
     // Esperar el formulario del reporte (aparece "RENTAS Y RETENCIONES"/"Generar").
-    let fr: any = null;
     for (let i = 0; i < 15 && !fr; i++) {
       await page.waitForTimeout(1000).catch(() => {});
       await cerrarPantallas(ctx, page);
       fr = await frameRentas(ctx);
     }
+    pasos.push({ paso: "menu", via: fr ? "url-directa-o-menu" : "no-form", onclick: opcion });
 
     // 3) Dejar el ejercicio (por defecto 2025) y escribir el correo.
     if (fr && params.ejercicio) {
