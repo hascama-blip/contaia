@@ -9,8 +9,6 @@ import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
-import DeclaracionesPanel from "./DeclaracionesPanel";
-import DeclaracionesAnualesPanel from "./DeclaracionesAnualesPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
 import {
   CondicionBadge,
@@ -377,23 +375,6 @@ export default function ClienteDetail({
             </>
           )}
 
-          {/* ───── 5 · Comparativo mensual (DJ 621 vs SIRE) ───── */}
-          <FaseHeader n="5" titulo="Comparativo mensual" detalle="Sube el PDF de la DJ mensual (621) vs SIRE." />
-
-          <DeclaracionesPanel
-            clienteId={cliente.id}
-            inicialDeclaraciones={cliente.declaraciones ?? []}
-            inicialSire={cliente.sire ?? []}
-          />
-
-          {/* ───── 6 · Comparativo anual (subida de PDF) ───── */}
-          <FaseHeader n="6" titulo="Comparativo anual" detalle="Sube el PDF de la DJ anual (Formulario 710)." />
-
-          <DeclaracionesAnualesPanel
-            clienteId={cliente.id}
-            clienteRuc={cliente.ruc}
-            inicial={cliente.declaracionesAnuales ?? []}
-          />
         </div>
 
         {/* Columna derecha: diagnóstico */}
