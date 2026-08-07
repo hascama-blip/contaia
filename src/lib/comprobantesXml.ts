@@ -323,28 +323,33 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
     const keyw = TIPO_KEYS[item.tipo] ?? "factura";
     let tipoOk = false;
-    const selects = fr.locator("select");
-    const nSel = await selects.count().catch(() => 0);
-    for (let k = 0; k < nSel; k++) {
-      const se = selects.nth(k);
-      const opciones = await se.locator("option").allInnerTexts().catch(() => []) as string[];
-      // El <select> del tipo trae Factura/Boleta/Nota de crédito/débito.
-      if (!opciones.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) continue;
+    // Buscar el <select> del tipo CON ESPERA: tras "Limpiar" se re-renderiza y a
+    // veces no está listo al primer intento (por eso fallaba del 2º en adelante).
+    let se: any = null;
+    let opciones: string[] = [];
+    for (let w = 0; w < 10 && !se; w++) {
+      const selects = fr.locator("select");
+      const nSel = await selects.count().catch(() => 0);
+      for (let k = 0; k < nSel; k++) {
+        const cand = selects.nth(k);
+        const ops = await cand.locator("option").allInnerTexts().catch(() => []) as string[];
+        if (ops.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) { se = cand; opciones = ops; break; }
+      }
+      if (!se) await page.waitForTimeout(400).catch(() => {});
+    }
+    if (se) {
       hecho.tipoOpciones = opciones.map((o) => o.trim()).filter(Boolean).slice(0, 25);
-      // Elegir la opción por etiqueta exacta; si no calza, por palabra clave.
       const objetivo = opciones.find((o) => o.trim().toLowerCase() === label.toLowerCase())
         || opciones.find((o) => new RegExp(keyw, "i").test(o));
       if (objetivo) {
         await se.selectOption({ label: objetivo }).catch(async () => {
           await se.selectOption({ index: opciones.indexOf(objetivo) }).catch(() => {});
         });
-        // Disparar change por si Angular escucha el evento nativo.
         await se.evaluate((el: any) => el.dispatchEvent(new Event("change", { bubbles: true }))).catch(() => {});
         hecho.tipoSelectNativo = true;
         hecho.tipoVal = await se.evaluate((el: any) => el.options[el.selectedIndex]?.text || "").catch(() => "");
         tipoOk = true;
       }
-      break;
     }
     if (!tipoOk) {
       // Respaldo: dropdown custom "Seleccionar" + clic en la opción.
@@ -408,32 +413,28 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
         cls: (e.getAttribute("class") || "").slice(0, 45),
         txt: (e.textContent || "").trim().slice(0, 18),
         src: (e.getAttribute("src") || "").slice(-28),
-      })).filter((x) => x.tip || /xml|pdf|descarg|download/i.test(x.cls + " " + x.txt + " " + x.src)).slice(0, 30);
+      })).filter((x) => x.tip || /xml|pdf|descarg|download|fa-file|fa-code|excel/i.test(x.cls + " " + x.txt + " " + x.src)).slice(0, 30);
     }).catch(() => []);
   }
 
-  // Candidatos del icono "Descargar XML" (tooltip Angular Material u otros),
-  // tolerante a mayúsculas y a texto parcial ("...XML").
+  // Candidatos del icono "Descargar XML". En SUNAT ConsultaCpe los iconos son
+  // font-awesome: el XML es fa-file-code (el PDF es fa-file-pdf). Se apunta al
+  // XML explícitamente para NO bajar el PDF por error.
   const candidatos = [
-    '[mattooltip*="XML" i]',
-    '[ng-reflect-message*="XML" i]',
-    '[title*="XML" i]',
-    '[aria-label*="XML" i]',
-    'button:has-text("XML")',
-    'a:has-text("XML")',
-    'img[src*="xml" i]',
-    '[class*="xml" i]',
+    'i[class*="fa-file-code"]', '[class*="fa-file-code"]',
+    'i[class*="fa-file-excel"]', '[class*="fa-file-excel"]',
+    'i[class*="fa-code"]',
+    '[mattooltip*="XML" i]', '[ng-reflect-message*="XML" i]', '[title*="XML" i]', '[aria-label*="XML" i]',
+    'button:has-text("XML")', 'a:has-text("XML")', 'img[src*="xml" i]', '[class*="xml" i]',
   ];
   const clicar = async () => {
     for (const sel of candidatos) {
       const el = fr.locator(sel).first();
       if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); return true; }
     }
-    // Respaldo: los 4 iconos (PDF, XML, Imprimir, Email) están juntos; el XML
-    // suele ser el 2º.
-    const iconos = fr.locator(".modal a, .modal i, .modal img, .modal button, [class*=result] a, [class*=result] i, [class*=result] button");
-    const n = await iconos.count().catch(() => 0);
-    if (n >= 2) { await iconos.nth(1).click({ timeout: 3000 }).catch(() => {}); return true; }
+    // Respaldo: ícono de archivo que NO sea el PDF (el XML es el otro fa-file-*).
+    const noPdf = fr.locator('i[class*="fa-file"]:not([class*="fa-file-pdf"]):not([class*="pdf"]), [class*="fa-file"]:not([class*="pdf"])');
+    if (await noPdf.count().catch(() => 0)) { await noPdf.first().click({ timeout: 3000 }).catch(() => {}); return true; }
     return false;
   };
 
@@ -462,21 +463,17 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
  *  de SUNAT (por evento download o por pestaña nueva del visor PDF). */
 async function descargarPdfResultado(fr: any, page: any): Promise<Buffer | null> {
   const { promises: fs } = await import("fs");
+  // El PDF es fa-file-pdf (confirmado en el diagnóstico).
   const candidatos = [
+    'i[class*="fa-file-pdf"]', '[class*="fa-file-pdf"]',
     '[mattooltip*="PDF" i]', '[ng-reflect-message*="PDF" i]', '[title*="PDF" i]',
     '[aria-label*="PDF" i]', 'a:has-text("PDF")', 'img[src*="pdf" i]', '[class*="pdf" i]',
   ];
   const waitDl = page.waitForEvent("download", { timeout: 16000 }).then((d: any) => ({ download: d })).catch(() => null);
   const waitPop = page.context().waitForEvent("page", { timeout: 16000 }).then((p: any) => ({ popup: p })).catch(() => null);
-  let clic = false;
   for (const sel of candidatos) {
     const el = fr.locator(sel).first();
-    if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); clic = true; break; }
-  }
-  if (!clic) {
-    // Respaldo: los 4 iconos juntos; el PDF suele ser el 1º.
-    const iconos = fr.locator(".modal a, .modal i, .modal img, .modal button, [class*=result] a, [class*=result] i, [class*=result] button");
-    if (await iconos.count().catch(() => 0)) await iconos.nth(0).click({ timeout: 3000 }).catch(() => {});
+    if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); break; }
   }
   const res: any = await Promise.race([waitDl, waitPop]);
   if (res?.download) {
