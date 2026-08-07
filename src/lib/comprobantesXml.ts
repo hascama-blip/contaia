@@ -145,38 +145,46 @@ async function loginSol(params: ComprobantesParams, pasos: any[]) {
   await bloquearRecursos(ctx);
   autoAceptarDialogos(ctx);
   const page = await ctx.newPage();
-  let navOk = false;
-  for (let i = 0; i < 3 && !navOk; i++) {
-    try {
-      await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
-      navOk = true;
-    } catch (e) {
-      pasos.push({ paso: "nav-reintento", intento: i + 1, motivo: e instanceof Error ? e.message.slice(0, 80) : "" });
-      await page.waitForTimeout(2000);
+  // MISMA secuencia probada, pero REINTENTADA: el login de SOL a veces no pasa a
+  // la primera (hipo/timing) aunque las credenciales estén bien. Se intenta 2
+  // veces antes de dar por fallado (no toca la lógica de cada intento).
+  let url = "";
+  let loginError = true;
+  for (let intento = 0; intento < 2 && loginError; intento++) {
+    let navOk = false;
+    for (let i = 0; i < 3 && !navOk; i++) {
+      try {
+        await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+        navOk = true;
+      } catch (e) {
+        pasos.push({ paso: "nav-reintento", intento: i + 1, motivo: e instanceof Error ? e.message.slice(0, 80) : "" });
+        await page.waitForTimeout(2000);
+      }
     }
+    if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
+    await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
+    await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
+    await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
+    await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    // Cerrar campaña "valida tus datos".
+    for (let i = 0; i < 5; i++) {
+      const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
+      if (!camp) break;
+      await clicTexto(ctx, ["Finalizar"]);
+      await page.waitForTimeout(1200);
+      await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
+      await page.waitForTimeout(1800);
+    }
+    // Detección de login idéntica a fraccionamiento/buzón/RTT (probada).
+    url = page.url();
+    const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
+    loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
+    pasos.push({ paso: "login", url, loginError, intento: intento + 1 });
+    if (loginError) await page.waitForTimeout(2500); // respiro antes de reintentar
   }
-  if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 });
-  await page.waitForTimeout(2500);
-  await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
-  await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
-  await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
-  await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
-  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
-  // Cerrar campaña "valida tus datos".
-  for (let i = 0; i < 5; i++) {
-    const camp = page.frames().find((f: any) => /itadminforuc-modifdatos|campanha/i.test(f.url()));
-    if (!camp) break;
-    await clicTexto(ctx, ["Finalizar"]);
-    await page.waitForTimeout(1200);
-    await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
-    await page.waitForTimeout(1800);
-  }
-  // Detección de login idéntica a fraccionamiento/buzón/RTT (probada).
-  const url = page.url();
-  const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-  const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
-  pasos.push({ paso: "login", url, loginError });
   return { browser, ctx, page, loginError };
 }
 
