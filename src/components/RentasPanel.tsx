@@ -12,7 +12,6 @@ export default function RentasPanel({
   clienteId, solUserGuardado, inicial,
 }: { clienteId: string; solUserGuardado?: string; inicial?: any }) {
   const [sol, setSol] = useState<any>(inicial ?? null);
-  const [bitacora, setBitacora] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -23,7 +22,7 @@ export default function RentasPanel({
     try {
       const res = await fetch(`/api/clientes/${clienteId}/rentas`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) { setSol(data.solicitud ?? null); setBitacora(data.bitacora ?? []); }
+      if (res.ok) setSol(data.solicitud ?? null);
     } catch { /* */ }
   }
   useEffect(() => { cargar(); }, []); // eslint-disable-line
@@ -46,7 +45,7 @@ export default function RentasPanel({
         body: JSON.stringify({ solUser, solPass, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (!res.ok) { setError(data.error ?? "No se pudo generar el reporte."); await cargar(); return; }
       setInfo(diagModo ? "Diagnóstico listo (revisa la traza abajo)." : "Solicitud enviada. SUNAT enviará el reporte por correo; aquí aparecerá el detalle cuando llegue.");
       await cargar();
@@ -89,22 +88,7 @@ export default function RentasPanel({
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {sol?.estado === "error" && sol.error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">⚠ {sol.error}</div>}
       {sol?.estado === "en_proceso" && <p className="mt-3 text-[11px] text-slate-400">⏳ SUNAT procesa el reporte y lo envía por correo; esta vista se actualiza sola.</p>}
-      {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
-
-      {bitacora.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Bitácora de la nube (correos recibidos)</p>
-          <ul className="space-y-1">
-            {bitacora.map((e: any, i: number) => (
-              <li key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-[11px]">
-                <span className={/OK:/.test(e.resultado) ? "text-emerald-600" : "text-amber-600"}>{/OK:/.test(e.resultado) ? "✔" : "•"}</span>
-                <span className="text-slate-400">{new Date(e.at).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-slate-600">{e.resultado}{e.tienePdf ? " · PDF" : ""}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {diagModo && diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
       {rep && (
         <div className="mt-4">
