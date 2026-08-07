@@ -517,9 +517,11 @@ async function descargarPdfResultado(fr: any, page: any): Promise<Buffer | null>
 async function esperarResultado(fr: any, page: any): Promise<{ estado: "resultado" | "error" | "nada"; aviso: string }> {
   for (let i = 0; i < 9; i++) {
     await page.waitForTimeout(1500).catch(() => {});
-    // ERROR primero: el aviso de "no encontrado" trae botón "Aceptar" (y el
-    // modal de factura NO lo tiene). Así no confundimos el título "Resultado".
-    if (await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0)) {
+    // ERROR: el aviso trae botón "Aceptar" O el texto "Error del Servidor" (que a
+    // veces queda DETRÁS del "Cargando...", pero igual está en el DOM).
+    const hayAceptar = await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0);
+    const hayErrorServidor = await fr.getByText(/Error del Servidor|no se puede acceder a los servicios de SUNAT/i).first().count().catch(() => 0);
+    if (hayAceptar || hayErrorServidor) {
       // Captura el TEXTO del aviso de SUNAT (para distinguir "no existe" de
       // "Error del Servidor / reintentar en N minutos").
       const aviso = (await fr.evaluate(() => {
@@ -530,7 +532,7 @@ async function esperarResultado(fr: any, page: any): Promise<{ estado: "resultad
         const t = cont.filter(vis).map((n) => (n.innerText || "").replace(/\s+/g, " ").trim()).find((s) => s.length > 0);
         return (t || "").slice(0, 400);
       }).catch(() => "")) as string;
-      return { estado: "error", aviso };
+      return { estado: "error", aviso: aviso || "Error del Servidor" };
     }
     // RESULTADO real: aparece el contenido de la factura o el icono de descarga.
     const facturaReal = await fr
@@ -702,10 +704,10 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         if (estado !== "resultado") {
           if (ES_SERVIDOR_CAIDO.test(ultimoAviso)) {
             serverSeguidos++;
-            marcarFallo(item, "SUNAT respondió “Error del Servidor” para este comprobante (reintenta en unos minutos).", llenado);
+            marcarFallo(item, "No se puede extraer por problemas en la plataforma de SUNAT (respondió “Error del Servidor”). Reintenta en unos minutos.", llenado);
             // Solo si es PERSISTENTE (varios seguidos) se declara caído y se corta.
             if (serverSeguidos >= UMBRAL_CAIDO) {
-              const msg = "SUNAT no está disponible: respondió “Error del Servidor” varias veces seguidas. Reintenta en unos minutos.";
+              const msg = "No se puede extraer por problemas en la plataforma de SUNAT (respondió “Error del Servidor” varias veces). Reintenta en unos minutos.";
               for (let j = i + 1; j < relacion.length; j++) marcarFallo(relacion[j], msg);
               sunatCaido = msg;
               break;
