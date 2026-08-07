@@ -310,6 +310,11 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     hecho.tipoOpciones = await fr
       .locator('mat-option, [role="option"], li, .dropdown-item, .mat-option')
       .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).slice(0, 25)).catch(() => []);
+    // Diag extra: volcado del overlay (CDK/menu) para ver cómo viene el dropdown.
+    hecho.overlay = await fr.evaluate(() => {
+      const o = document.querySelector(".cdk-overlay-container, .cdk-overlay-pane, .mat-select-panel, .mat-menu-panel");
+      return o ? (o as HTMLElement).innerText.replace(/\s+/g, " ").trim().slice(0, 300) : "(sin overlay)";
+    }).catch(() => "");
     // 1) etiqueta exacta; 2) por palabra clave distintiva (recibo/boleta/…).
     const opt = fr.getByText(label, { exact: true });
     if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
@@ -407,12 +412,25 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
 
 /** Tras "Consultar", espera a que aparezca el modal "Resultado" (factura) o un
  *  aviso de error ("Aceptar"). Devuelve cuál apareció. */
-async function esperarResultado(fr: any, page: any): Promise<"resultado" | "error" | "nada"> {
+async function esperarResultado(fr: any, page: any, diagOut?: any): Promise<"resultado" | "error" | "nada"> {
   for (let i = 0; i < 9; i++) {
     await page.waitForTimeout(1500).catch(() => {});
     // ERROR primero: el aviso de "no encontrado" trae botón "Aceptar" (y el
     // modal de factura NO lo tiene). Así no confundimos el título "Resultado".
-    if (await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0)) return "error";
+    if (await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0)) {
+      if (diagOut) {
+        // Captura el TEXTO del aviso de SUNAT (para saber por qué rechaza).
+        diagOut.aviso = await fr.evaluate(() => {
+          const vis = (el: Element) => (el as HTMLElement).offsetParent !== null;
+          const cont = Array.from(document.querySelectorAll(
+            '.modal, .modal-content, .mat-dialog-container, mat-dialog-container, .swal2-popup, .p-dialog, [role="dialog"], .mat-snack-bar-container, .toast, .alert'
+          )) as HTMLElement[];
+          const t = cont.filter(vis).map((n) => (n.innerText || "").replace(/\s+/g, " ").trim()).find((s) => s.length > 0);
+          return (t || "").slice(0, 400);
+        }).catch(() => "");
+      }
+      return "error";
+    }
     // RESULTADO real: aparece el contenido de la factura o el icono de descarga.
     const facturaReal = await fr
       .getByText(/Importe Total|FACTURA ELECTR|Descargar XML/i)
@@ -548,7 +566,9 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
             await s.page.waitForTimeout(1200).catch(() => {});
           }
           llenado = await llenarYConsultar(fr, s.page, item);
-          estado = await esperarResultado(fr, s.page);
+          const dres: any = {};
+          estado = await esperarResultado(fr, s.page, params.diagnostico ? dres : undefined);
+          if (params.diagnostico && dres.aviso && llenado) llenado.aviso = dres.aviso;
           if (estado === "resultado") break;
           // Cierra el aviso de error ("Aceptar") antes de reintentar / continuar.
           await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
