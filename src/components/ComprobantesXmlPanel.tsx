@@ -50,6 +50,32 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     finally { setBusyRel(false); }
   }
 
+  // Recupera del servidor los comprobantes YA extraídos de este periodo y marca
+  // sus filas como "ok" (para no rehacerlos si se cayó el internet / se recargó).
+  async function restaurarGuardados(items: any[], periodo: string): Promise<number> {
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml?periodo=${periodo}`);
+      const data = await res.json().catch(() => ({}));
+      const guardadas: any[] = Array.isArray(data.facturas) ? data.facturas : [];
+      if (!guardadas.length) return 0;
+      const norm = (s: any, n: any) => `${String(s || "").toUpperCase()}-${String(n || "").replace(/^0+/, "")}`;
+      const mapa = new Map<string, any>();
+      for (const f of guardadas) {
+        const sn = String(f.serieNumero || `${f.serie}-${f.numero}`);
+        const [s, ...rest] = sn.split("-");
+        mapa.set(norm(s, rest.join("-")), f);
+      }
+      const nuevos: Record<number, EstadoFila> = {};
+      items.forEach((it, i) => {
+        const f = mapa.get(norm(it.serie, it.numero));
+        if (f) nuevos[i] = { estado: "ok", factura: f };
+      });
+      const n = Object.keys(nuevos).length;
+      if (n) { setFilas(nuevos); setConsumido(true); }
+      return n;
+    } catch { return 0; }
+  }
+
   async function cargarDesdeSire() {
     setError(null); setInfo(null); setBusyRel(true);
     const periodo = `${sireAnio}${String(sireMes).padStart(2, "0")}`;
@@ -57,9 +83,12 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const res = await fetch(`/api/clientes/${clienteId}/sire-detalle/relacion?periodo=${periodo}&tipo=compras`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo cargar la relación del SIRE."); return; }
-      setRelacion(data.items ?? []); setFilas({}); setConsumido(false);
+      const items = data.items ?? [];
+      setRelacion(items); setFilas({}); setConsumido(false);
       setPeriodoSire(periodo); setRelNombre(`Detalle SIRE compras ${periodo}`);
-      setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) (${periodo}). Extrae uno por uno.`);
+      const rec = await restaurarGuardados(items, periodo);
+      setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) (${periodo}).` +
+        (rec ? ` ♻ Se recuperaron ${rec} ya extraído(s) — sigue con los que faltan.` : " Extrae uno por uno."));
     } catch { setError("Error de red al cargar la relación del SIRE."); }
     finally { setBusyRel(false); }
   }
@@ -79,7 +108,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const parte = consumido ? 1 : 0;
       const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, relacion: [item], parte }),
+        body: JSON.stringify({ solUser, solPass, relacion: [item], parte, periodo: periodoSire }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) { setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: data.error ?? "Login SOL falló" } })); return false; }

@@ -463,6 +463,36 @@ export async function leerArchivoRTT(nombre: string): Promise<Buffer | null> {
   try { return await fs.readFile(path.join(RTT_DIR, path.basename(nombre))); } catch { return null; }
 }
 
+// ---- Comprobantes XML: persistencia de lo extraído por cliente + periodo ------
+// Cada comprobante extraído se guarda como un JSON en disco (con su XML/PDF en
+// base64). Así, si se cae el internet o se recarga la página, se recuperan y no
+// hay que volver a extraerlos. NO va al store.json (para no inflarlo).
+const COMPROBANTES_DIR = path.join(UPLOADS_DIR, "comprobantes");
+const sanRuta = (s: string) => String(s || "").replace(/[^\w.-]/g, "_").slice(0, 60) || "x";
+
+/** Guarda un comprobante extraído (factura completa) en disco. */
+export async function guardarComprobanteExtraido(clienteId: string, periodo: string, factura: any): Promise<void> {
+  if (!/^\d{6}$/.test(periodo) || !factura) return;
+  const dir = path.join(COMPROBANTES_DIR, sanRuta(clienteId), periodo);
+  await fs.mkdir(dir, { recursive: true });
+  const sn = sanRuta(factura.serieNumero || `${factura.serie}-${factura.numero}`);
+  await fs.writeFile(path.join(dir, `${sn}.json`), JSON.stringify(factura)).catch(() => {});
+}
+
+/** Lista los comprobantes ya extraídos (facturas completas) de un cliente+periodo. */
+export async function listarComprobantesExtraidos(clienteId: string, periodo: string): Promise<any[]> {
+  if (!/^\d{6}$/.test(periodo)) return [];
+  const dir = path.join(COMPROBANTES_DIR, sanRuta(clienteId), periodo);
+  let files: string[];
+  try { files = await fs.readdir(dir); } catch { return []; }
+  const out: any[] = [];
+  for (const f of files) {
+    if (!f.endsWith(".json")) continue;
+    try { out.push(JSON.parse(await fs.readFile(path.join(dir, f), "utf-8"))); } catch { /* corrupto: se ignora */ }
+  }
+  return out;
+}
+
 /** Crea o ACTUALIZA la solicitud de RTT de un RUC (una sola por usuario+RUC).
  *  Si ya existe, la reusa: la pone "en_proceso", CONSERVA el archivo previo (para
  *  no perder el último reporte si la regeneración fallara) y limpia el error.

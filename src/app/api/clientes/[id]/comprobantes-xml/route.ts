@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerComprobantesXml } from "@/lib/comprobantesXml";
 import { chequearUso, registrarUso } from "@/lib/usos";
+import { guardarComprobanteExtraido, listarComprobantesExtraidos } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
+
+// GET → recupera los comprobantes YA extraídos de un periodo (para no rehacerlos
+// si se cae el internet / se recarga la página).
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const cliente = await getClienteAutorizado(params.id);
+  if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  const periodo = new URL(req.url).searchParams.get("periodo") ?? "";
+  const facturas = await listarComprobantesExtraidos(params.id, periodo);
+  return NextResponse.json({ facturas });
+}
 
 // Descarga los XML de comprobantes RECIBIDOS (compras) del periodo desde SUNAT
 // SOL (scraping). La Clave SOL viaja en el body y NO se persiste. Consume 1 uso
@@ -55,6 +66,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: r.error, sunatCaido: true, fallidos: r.fallidos ?? [], diag: r.diag }, { status: 503 });
   }
   if (esPrimeraParte && !body.diagnostico && uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
+
+  // Persistir lo extraído (por cliente+periodo) para poder recuperarlo si se cae
+  // el internet o se recarga la página. Se guarda en disco, no en el store.json.
+  if (!body.diagnostico && /^\d{6}$/.test(periodo) && Array.isArray(r.facturas)) {
+    for (const f of r.facturas) await guardarComprobanteExtraido(params.id, periodo, f).catch(() => {});
+  }
 
   return NextResponse.json({
     facturas: r.facturas ?? [],
