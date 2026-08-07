@@ -197,7 +197,7 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     if (!fr) return { ok: false, error: "No se encontró el formulario del Reporte de Rentas en el menú. Usa Modo diagnóstico.", diag: { pasos } };
     if (!correoOk) return { ok: false, error: "Se llegó al formulario pero no se pudo escribir el correo. Usa Modo diagnóstico.", diag: { pasos } };
 
-    // 4) Generar Reporte (el confirm lo acepta autoAceptarDialogos).
+    // 4) Generar Reporte.
     let generado = false;
     for (const sel of ['#btnGenerar', 'button:has-text("Generar Reporte")', 'a:has-text("Generar Reporte")', 'input[value*="Generar" i]', 'button:has-text("Generar")', 'a:has-text("Generar")']) {
       const el = fr.locator(sel).first();
@@ -205,16 +205,42 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     }
     if (!generado) generado = !!(await clickEnFrame(fr, ["Generar Reporte", "Generar"]));
 
-    // SUNAT suele confirmar con "Se ha enviado..." / "correo". Damos margen y
-    // aceptamos cualquier diálogo de confirmación (autoAceptarDialogos).
+    // 4b) CONFIRMAR: tras "Generar Reporte" SUNAT abre un modal ("se enviará el
+    //     reporte a su correo") con botón Aceptar/Confirmar. Sin este clic el
+    //     correo NUNCA se envía. Puede estar en cualquier frame o en el top.
+    //     (Los confirm() nativos ya los acepta autoAceptarDialogos.)
+    let modalTxt = "";
+    let confirmado = false;
+    for (let i = 0; i < 6 && !confirmado; i++) {
+      await page.waitForTimeout(900).catch(() => {});
+      for (const f of todosLosFrames(ctx)) {
+        const t = (await f.evaluate(() => {
+          const vis = (el: any) => { const r = el.getBoundingClientRect?.(); const s = getComputedStyle(el); return r && r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+          const dlg = Array.from(document.querySelectorAll('.modal, .ui-dialog, [role="dialog"], .swal2-popup, .modal-content')).find(vis as any) as HTMLElement | undefined;
+          return dlg ? (dlg.innerText || "").replace(/\s+/g, " ").trim().slice(0, 200) : "";
+        }).catch(() => "")) as string;
+        if (t) modalTxt = t;
+      }
+      // Intentar confirmar en todos los frames.
+      for (const f of todosLosFrames(ctx)) {
+        const hit = await clickEnFrame(f, ["Aceptar", "Confirmar", "Sí", "Si", "Continuar", "Enviar"]);
+        if (hit) { confirmado = true; break; }
+      }
+    }
+
+    // Detectar el mensaje de éxito de SUNAT.
     let trasGen = "";
     for (let i = 0; i < 8; i++) {
-      await page.waitForTimeout(1200).catch(() => {});
-      trasGen = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
-      if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|generad|éxito|exito/i.test(trasGen)) break;
+      await page.waitForTimeout(1000).catch(() => {});
+      for (const f of todosLosFrames(ctx)) {
+        const t = (await f.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
+        if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|se generar|generado con|éxito|exito/i.test(t)) { trasGen = t; break; }
+        if (t && !trasGen) trasGen = t;
+      }
+      if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|se generar|generado con|éxito|exito/i.test(trasGen)) break;
     }
-    const exito = /se ha enviado|enviad|se enviar|su solicitud|generad|éxito|exito|correo electr[óo]nico/i.test(trasGen);
-    pasos.push({ paso: "generar", clico: generado, exito, respuesta: trasGen.slice(0, 250) });
+    const exito = /se ha enviado|enviad|se enviar|su solicitud|se generar|generado con|éxito|exito|correo electr[óo]nico/i.test(trasGen);
+    pasos.push({ paso: "generar", clico: generado, modal: modalTxt, confirmado, exito, respuesta: trasGen.slice(0, 250) });
 
     // Si pulsamos el botón, damos la solicitud por buena aunque el texto no
     // confirme (el resultado real llega por correo al webhook).

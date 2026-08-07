@@ -47,7 +47,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
   if (!r.ok) {
     await setEstadoRentas(params.id, "error", { error: r.error });
-    return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte." }, { status: r.loginError ? 401 : 502 });
+    return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
   }
-  return NextResponse.json({ solicitud: sol });
+  // Devolvemos también la traza de la generación (modal/confirmado/éxito) para
+  // poder verificar que SUNAT aceptó el envío, sin activar el modo diagnóstico.
+  return NextResponse.json({ solicitud: sol, diag: r.diag });
 }
