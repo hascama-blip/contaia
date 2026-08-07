@@ -405,7 +405,7 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
       const els = Array.from(document.querySelectorAll("button, a, i, img, mat-icon, span[mattooltip], [mattooltip], [title], [aria-label], [ng-reflect-message]")) as HTMLElement[];
       return els.filter(vis).map((e) => ({
         tag: e.tagName.toLowerCase(),
-        tip: e.getAttribute("mattooltip") || e.getAttribute("ng-reflect-message") || e.getAttribute("title") || e.getAttribute("aria-label") || "",
+        tip: e.getAttribute("mattooltip") || e.getAttribute("ng-reflect-message") || e.getAttribute("ng-reflect-text") || e.getAttribute("ptooltip") || e.getAttribute("title") || e.getAttribute("aria-label") || "",
         cls: (e.getAttribute("class") || "").slice(0, 45),
         txt: (e.textContent || "").trim().slice(0, 18),
         src: (e.getAttribute("src") || "").slice(-28),
@@ -417,10 +417,13 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
   // font-awesome: el XML es fa-file-code (el PDF es fa-file-pdf). Se apunta al
   // XML explícitamente para NO bajar el PDF por error.
   const candidatos = [
+    // Por el tooltip "Descargar XML" (PrimeNG: pTooltip → ng-reflect-text).
+    '[ng-reflect-text*="XML" i]', '[pTooltip*="XML" i]', '[ng-reflect-p-tooltip*="XML" i]',
+    '[mattooltip*="XML" i]', '[ng-reflect-message*="XML" i]', '[title*="XML" i]', '[aria-label*="XML" i]',
+    // Por la clase del ícono (font-awesome): el XML es fa-file-code (el PDF es fa-file-pdf).
     'i[class*="fa-file-code"]', '[class*="fa-file-code"]',
     'i[class*="fa-file-excel"]', '[class*="fa-file-excel"]',
     'i[class*="fa-code"]',
-    '[mattooltip*="XML" i]', '[ng-reflect-message*="XML" i]', '[title*="XML" i]', '[aria-label*="XML" i]',
     'button:has-text("XML")', 'a:has-text("XML")', 'img[src*="xml" i]', '[class*="xml" i]',
   ];
   const clicar = async () => {
