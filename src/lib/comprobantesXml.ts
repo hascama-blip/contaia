@@ -170,9 +170,16 @@ async function loginSol(params: ComprobantesParams, pasos: any[]) {
     await page.waitForTimeout(1800);
   }
   const url = page.url();
-  const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-  const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
-  pasos.push({ paso: "login", url, loginError });
+  const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 400)).catch(() => "")) as string;
+  // Éxito = salimos del servidor de autenticación (llegamos al menú/app). Error =
+  // seguimos en la página de login (api-seguridad / loginMenuSol / oauth2 error),
+  // o el texto indica clave incorrecta / bloqueo / captcha. OJO: NO usar
+  // "AutenticaMenuInternet" — aparece SIEMPRE como originalUrl en la página de
+  // login, y daba un FALSO POSITIVO aunque el login fuera correcto.
+  const enAuth = /api-seguridad\.sunat\.gob\.pe|loginmenusol|oauth2\/error/i.test(url);
+  const textoMal = /(clave|usuario|contrase[nñ]a).{0,40}(incorrect|no es v[aá]lid|inv[aá]lid|no coincide|err[oó]ne)|c[oó]digo de captcha|ingrese el c[oó]digo|demasiados intentos|por seguridad|cuenta.*bloque|problema en la aplicaci|no podemos atenderlo/i.test(texto);
+  const loginError = enAuth || textoMal;
+  pasos.push({ paso: "login", url, loginError, enAuth, texto: texto.slice(0, 220) });
   return { browser, ctx, page, loginError };
 }
 
