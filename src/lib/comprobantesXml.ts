@@ -296,35 +296,12 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     // Angular re-renderiza al cambiar de modo (limpia/habilita el RUC Emisor).
     await page.waitForTimeout(1500).catch(() => {});
     hecho.recibido = await recibido.isChecked().catch(() => false);
-    // 2) RUC Emisor: comprobar que ya es editable, limpiar el prellenado, escribir
-    //    el del proveedor y hacer blur (Tab) para disparar la validación async.
-    const rucInput = fr.locator('[formcontrolname="rucEmisor"]').first();
-    hecho.rucEstado = await rucInput.evaluate((el: any) => ({ ro: !!el.readOnly, dis: !!el.disabled })).catch(() => ({}));
-    await rucInput.click({ timeout: 3000 }).catch(() => {});
-    await rucInput.fill("").catch(() => {});
-    await rucInput.fill(item.rucEmisor).catch(() => {});
-    await rucInput.press("Tab").catch(() => {});
-    // SUNAT valida el RUC de forma asíncrona (resuelve la razón social). Si
-    // consultamos antes de que termine, devuelve "no encontrado" aunque el
-    // comprobante exista. Esperamos a que aparezca la razón social del proveedor
-    // (o hasta 5 s) antes de seguir.
-    for (let w = 0; w < 5; w++) {
-      await page.waitForTimeout(700).catch(() => {});
-      const resuelto = await fr
-        .getByText(/RUC\s*Emisor[^]{0,80}[A-Za-zÁÉÍÓÚÑ]{3,}/i)
-        .first().count().catch(() => 0);
-      if (resuelto) break;
-    }
-    hecho.rucEmisorPedido = item.rucEmisor;
-    hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
-    // 3) Tipo de comprobante. Es un <select> NATIVO ("Factura/Boleta/…"): lo más
-    //    fiable es selectOption sobre el propio <select>. Si no fuera nativo, se
-    //    usa el respaldo del dropdown "Seleccionar" + clic en la opción.
+    // 2) TIPO de comprobante PRIMERO (el orden a mano es: Recibido → Tipo →
+    //    recién llenar RUC/serie/número). Es un <select> NATIVO; se espera a que
+    //    esté listo (tras "Limpiar" se re-renderiza) y se usa selectOption.
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
     const keyw = TIPO_KEYS[item.tipo] ?? "factura";
     let tipoOk = false;
-    // Buscar el <select> del tipo CON ESPERA: tras "Limpiar" se re-renderiza y a
-    // veces no está listo al primer intento (por eso fallaba del 2º en adelante).
     let se: any = null;
     let opciones: string[] = [];
     for (let w = 0; w < 10 && !se; w++) {
@@ -367,15 +344,33 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
       }
     }
     hecho.tipo = label;
-    // CONFIRMAR que el tipo QUEDÓ seleccionado (el control muestra su etiqueta en
-    // aria-label). Evita la carrera: si "Consultar" dispara antes del commit del
-    // form Angular, SUNAT recibe una consulta mal formada → "Error del Servidor".
+    // Confirmar que el tipo quedó seleccionado (muestra su etiqueta en aria-label).
     let tipoConfirmado = false;
     for (let w = 0; w < 8 && !tipoConfirmado; w++) {
       await page.waitForTimeout(400).catch(() => {});
       tipoConfirmado = (await fr.locator(`input[aria-label*="${label}" i]`).count().catch(() => 0)) > 0;
     }
     hecho.tipoConfirmado = tipoConfirmado;
+    // 3) RUC Emisor (recién con Recibido + Tipo puestos): editable, se limpia el
+    //    prellenado, se escribe el del proveedor y Tab para la validación async.
+    const rucInput = fr.locator('[formcontrolname="rucEmisor"]').first();
+    hecho.rucEstado = await rucInput.evaluate((el: any) => ({ ro: !!el.readOnly, dis: !!el.disabled })).catch(() => ({}));
+    await rucInput.click({ timeout: 3000 }).catch(() => {});
+    await rucInput.fill("").catch(() => {});
+    await rucInput.fill(item.rucEmisor).catch(() => {});
+    await rucInput.press("Tab").catch(() => {});
+    // SUNAT valida el RUC de forma asíncrona (resuelve la razón social). Si
+    // consultamos antes de que termine, devuelve "no encontrado" aunque el
+    // comprobante exista. Esperamos a que aparezca la razón social (o hasta 5 s).
+    for (let w = 0; w < 5; w++) {
+      await page.waitForTimeout(700).catch(() => {});
+      const resuelto = await fr
+        .getByText(/RUC\s*Emisor[^]{0,80}[A-Za-zÁÉÍÓÚÑ]{3,}/i)
+        .first().count().catch(() => 0);
+      if (resuelto) break;
+    }
+    hecho.rucEmisorPedido = item.rucEmisor;
+    hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
     // 4) Serie y Número.
     const serieInput = fr.locator('[formcontrolname="serieComprobante"]').first();
     const numeroInput = fr.locator('[formcontrolname="numeroComprobante"]').first();
