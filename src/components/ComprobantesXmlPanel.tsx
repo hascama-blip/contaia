@@ -211,19 +211,30 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     } finally { setBusy(false); }
   }
 
-  // PDF de UN comprobante (representación impresa, estilo buzón: fila + botón).
+  // PDF de UN comprobante (fila + botón, estilo buzón). Si se capturó el PDF
+  // OFICIAL de SUNAT (f.pdfBase64), se baja ese; si no, la representación generada.
   async function descargarPdf(f: any) {
     const clave = f.serieNumero || `${f.serie}-${f.numero}`;
+    const nombre = `${String(clave).replace(/[^\w.-]/g, "_")}.pdf`;
     setError(null); setPdfBusy(clave);
     try {
-      const res = await fetch("/api/facturas-xml/pdf", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
-      });
-      if (!res.ok) { setError("No se pudo generar el PDF del comprobante."); return; }
-      const blob = await res.blob();
+      let blob: Blob | null = null;
+      if (f.pdfBase64) {
+        // PDF oficial de SUNAT ya capturado: decodificar base64 → blob.
+        const bin = atob(f.pdfBase64);
+        const by = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+        blob = new Blob([by], { type: "application/pdf" });
+      } else {
+        const res = await fetch("/api/facturas-xml/pdf", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
+        });
+        if (!res.ok) { setError("No se pudo generar el PDF del comprobante."); return; }
+        blob = await res.blob();
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `${String(clave).replace(/[^\w.-]/g, "_")}.pdf`;
+      a.href = url; a.download = nombre;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } catch { setError("Error de red al generar el PDF."); }

@@ -56,6 +56,8 @@ export interface FacturaXml {
   lineas: LineaXml[];
   /** Glosa para contabilidad: descripciones de las líneas unidas. */
   glosa: string;
+  /** PDF OFICIAL de SUNAT (ícono rojo del modal) en base64, si se capturó. */
+  pdfBase64?: string;
 }
 
 function asArray<T>(x: T | T[] | undefined): T[] {

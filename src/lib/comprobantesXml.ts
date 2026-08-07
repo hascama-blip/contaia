@@ -436,6 +436,54 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
   return null;
 }
 
+/** En el modal "Resultado", clic en el icono PDF (rojo) y captura el PDF OFICIAL
+ *  de SUNAT (por evento download o por pestaña nueva del visor PDF). */
+async function descargarPdfResultado(fr: any, page: any): Promise<Buffer | null> {
+  const { promises: fs } = await import("fs");
+  const candidatos = [
+    '[mattooltip*="PDF" i]', '[ng-reflect-message*="PDF" i]', '[title*="PDF" i]',
+    '[aria-label*="PDF" i]', 'a:has-text("PDF")', 'img[src*="pdf" i]', '[class*="pdf" i]',
+  ];
+  const waitDl = page.waitForEvent("download", { timeout: 16000 }).then((d: any) => ({ download: d })).catch(() => null);
+  const waitPop = page.context().waitForEvent("page", { timeout: 16000 }).then((p: any) => ({ popup: p })).catch(() => null);
+  let clic = false;
+  for (const sel of candidatos) {
+    const el = fr.locator(sel).first();
+    if (await el.count().catch(() => 0)) { await el.click({ timeout: 4000 }).catch(() => {}); clic = true; break; }
+  }
+  if (!clic) {
+    // Respaldo: los 4 iconos juntos; el PDF suele ser el 1º.
+    const iconos = fr.locator(".modal a, .modal i, .modal img, .modal button, [class*=result] a, [class*=result] i, [class*=result] button");
+    if (await iconos.count().catch(() => 0)) await iconos.nth(0).click({ timeout: 3000 }).catch(() => {});
+  }
+  const res: any = await Promise.race([waitDl, waitPop]);
+  if (res?.download) {
+    try { const p = await res.download.path(); if (p) return await fs.readFile(p); } catch { /* */ }
+  }
+  if (res?.popup) {
+    // Visor PDF en pestaña nueva: bajar los bytes de su URL (con cookies).
+    try {
+      await res.popup.waitForLoadState("domcontentloaded", { timeout: 8000 }).catch(() => {});
+      const u = res.popup.url();
+      if (/^https?:/.test(u)) {
+        const b64 = (await res.popup.evaluate(async (url: string) => {
+          try {
+            const r = await fetch(url, { credentials: "include" });
+            const b = await r.arrayBuffer(); const by = new Uint8Array(b);
+            let s = ""; for (let i = 0; i < by.length; i++) s += String.fromCharCode(by[i]);
+            return btoa(s);
+          } catch { return ""; }
+        }, u).catch(() => "")) as string;
+        await res.popup.close().catch(() => {});
+        if (b64) return Buffer.from(b64, "base64");
+      } else {
+        await res.popup.close().catch(() => {});
+      }
+    } catch { /* */ }
+  }
+  return null;
+}
+
 /** Tras "Consultar", espera a que aparezca el modal "Resultado" (factura) o un
  *  aviso de error ("Aceptar"). Devuelve cuál apareció. */
 async function esperarResultado(fr: any, page: any): Promise<{ estado: "resultado" | "error" | "nada"; aviso: string }> {
@@ -567,6 +615,8 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     // Tipos como 50/52/54 (DUA/DAM de importación) no se pueden bajar aquí.
     const TIPOS_SOPORTADOS = new Set(["01", "03", "07", "08", "14"]);
     let sunatCaido: string | null = null;
+    let serverSeguidos = 0;          // "Error del Servidor" consecutivos
+    const UMBRAL_CAIDO = 4;          // ese nº seguido = SUNAT realmente caído
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
@@ -581,11 +631,11 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], "el navegador se cerró (reintentar)");
           break;
         }
-        // Se intenta hasta 2 veces por comprobante: un "no encontrado" suele ser
-        // timing (la validación async del RUC), no que el comprobante no exista.
+        // Hasta 2 intentos por comprobante: un "no encontrado" o un "Error del
+        // Servidor" suele ser transitorio (SUNAT sí responde al reintentar).
         let estado: "resultado" | "error" | "nada" = "nada";
         let llenado: any = null;
-        let avisoServidor = "";
+        let ultimoAviso = "";
         for (let intento = 0; intento < 2; intento++) {
           if (i > 0 || intento > 0) {
             // Reset del formulario (para el siguiente comprobante o el reintento).
@@ -595,32 +645,40 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           llenado = await llenarYConsultar(fr, s.page, item);
           const r = await esperarResultado(fr, s.page);
           estado = r.estado;
+          if (r.aviso) ultimoAviso = r.aviso;
           if (params.diagnostico && r.aviso && llenado) llenado.aviso = r.aviso;
           if (estado === "resultado") break;
-          // ¿SUNAT CAÍDO? ("Error del Servidor / reintentar en N minutos"): no es
-          // la data — no tiene sentido reintentar ni seguir con los demás.
-          if (ES_SERVIDOR_CAIDO.test(r.aviso || "")) { avisoServidor = r.aviso; break; }
-          // Cierra el aviso de error ("Aceptar") antes de reintentar / continuar.
+          // Cierra el aviso ("Aceptar"); si fue "Error del Servidor" espera algo
+          // más antes de reintentar (suele resolverse en el 2º intento).
           await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
-          await s.page.waitForTimeout(1200).catch(() => {});
+          await s.page.waitForTimeout(ES_SERVIDOR_CAIDO.test(r.aviso || "") ? 3000 : 1200).catch(() => {});
         }
-        // SUNAT caído → cortar TODA la relación (no golpear un servicio caído).
-        if (avisoServidor) {
-          const msg = "SUNAT no está disponible en este momento (su servicio respondió: “reintentar en unos minutos”). No es un problema de tus datos — vuelve a intentar en unos minutos.";
-          for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], msg);
-          sunatCaido = msg;
-          break;
-        }
+
         if (estado !== "resultado") {
-          marcarFallo(
-            item,
-            estado === "error"
-              ? "SUNAT no devolvió el comprobante (revisa RUC emisor, tipo, serie y número, o el comprobante no existe)."
-              : "no apareció el resultado (tiempo agotado).",
-            llenado,
-          );
+          if (ES_SERVIDOR_CAIDO.test(ultimoAviso)) {
+            serverSeguidos++;
+            marcarFallo(item, "SUNAT respondió “Error del Servidor” para este comprobante (reintenta en unos minutos).", llenado);
+            // Solo si es PERSISTENTE (varios seguidos) se declara caído y se corta.
+            if (serverSeguidos >= UMBRAL_CAIDO) {
+              const msg = "SUNAT no está disponible: respondió “Error del Servidor” varias veces seguidas. Reintenta en unos minutos.";
+              for (let j = i + 1; j < relacion.length; j++) marcarFallo(relacion[j], msg);
+              sunatCaido = msg;
+              break;
+            }
+          } else {
+            serverSeguidos = 0;
+            marcarFallo(
+              item,
+              estado === "error"
+                ? "SUNAT no devolvió el comprobante (revisa RUC emisor, tipo, serie y número, o el comprobante no existe)."
+                : "no apareció el resultado (tiempo agotado).",
+              llenado,
+            );
+          }
           continue;
         }
+        serverSeguidos = 0; // hubo resultado → SUNAT está respondiendo
+
         const dxml: any = {};
         const buf = await descargarXmlResultado(fr, s.page, params.diagnostico ? dxml : undefined);
         if (!buf) {
@@ -633,12 +691,20 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           } else {
             xmls.push(buf.toString("utf-8"));
           }
-          let ok = false;
+          const nuevas: FacturaXml[] = [];
           for (const x of xmls) {
             const fx = parseFacturaXml(x);
-            if (fx && fx.rucEmisor) { facturas.push(fx); ok = true; }
+            if (fx && fx.rucEmisor) { facturas.push(fx); nuevas.push(fx); }
           }
-          if (!ok) marcarFallo(item, "el archivo no era un XML de comprobante");
+          if (!nuevas.length) marcarFallo(item, "el archivo no era un XML de comprobante");
+          else {
+            // PDF OFICIAL de SUNAT (ícono rojo del modal): se adjunta a la factura.
+            const pdfBuf = await descargarPdfResultado(fr, s.page).catch(() => null);
+            if (pdfBuf && pdfBuf.slice(0, 4).toString("latin1") === "%PDF") {
+              const b64 = pdfBuf.toString("base64");
+              for (const f of nuevas) f.pdfBase64 = b64;
+            }
+          }
         }
         await cerrarModal(fr);
         await s.page.waitForTimeout(1200).catch(() => {});
