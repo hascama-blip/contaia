@@ -612,7 +612,7 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
 
     // BUCLE: por cada comprobante → navegar al formulario LIMPIO, llenar,
     // consultar, descargar el XML del modal "Resultado" y parsearlo (ZIP/XML).
-    const { esZip, extraerDeZip } = await import("./zip");
+    const { esZip, extraerDeZip, extraerTodo } = await import("./zip");
     const facturas: FacturaXml[] = [];
     const errores: any[] = [];
     const fallidos: { item: ItemRelacion; motivo: string }[] = [];
@@ -695,13 +695,18 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         if (!buf) {
           marcarFallo(item, "salió la factura pero no se pudo bajar el XML (revisar icono de descarga).", { ...llenado, iconosModal: dxml.iconos });
         } else {
-          // Puede venir como XML directo o dentro de un ZIP.
+          // El botón XML de SUNAT baja un ZIP con los documentos: se descomprime
+          // y se leen TODOS (cualquier extensión, y ZIPs anidados). Cada uno se
+          // intenta parsear como comprobante; nos quedamos con el/los que lo sean.
           const xmls: string[] = [];
-          if (esZip(buf)) {
-            for (const it of extraerDeZip(buf, [".xml"])) xmls.push(it.data.toString("utf-8"));
-          } else {
-            xmls.push(buf.toString("utf-8"));
-          }
+          const recolectar = (b: Buffer, depth: number) => {
+            if (!esZip(b)) { xmls.push(b.toString("utf-8")); return; }
+            for (const it of extraerTodo(b)) {
+              if (depth < 3 && (it.name.toLowerCase().endsWith(".zip") || esZip(it.data))) recolectar(it.data, depth + 1);
+              else xmls.push(it.data.toString("utf-8"));
+            }
+          };
+          recolectar(buf, 0);
           const nuevas: FacturaXml[] = [];
           for (const x of xmls) {
             const fx = parseFacturaXml(x);

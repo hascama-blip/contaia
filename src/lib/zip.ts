@@ -33,6 +33,27 @@ export function esZipContenedor(buf: Buffer, nombre?: string): boolean {
 }
 
 /**
+ * Extrae TODOS los archivos de un ZIP (cualquier extensión, incluye subcarpetas).
+ * Ignora basura de macOS y carpetas. Útil cuando el ZIP de SUNAT trae el XML sin
+ * una extensión esperada o junto a otros documentos.
+ */
+export function extraerTodo(buf: Buffer): { name: string; data: Buffer }[] {
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(new Uint8Array(buf));
+  } catch {
+    return [];
+  }
+  const out: { name: string; data: Buffer }[] = [];
+  for (const [name, data] of Object.entries(files)) {
+    const lower = name.toLowerCase();
+    if (lower.includes("__macosx") || lower.endsWith("/")) continue;
+    out.push({ name: name.split("/").pop() || name, data: Buffer.from(data) });
+  }
+  return out;
+}
+
+/**
  * Extrae de un ZIP los archivos cuya extensión esté en `exts` (recursivo:
  * incluye subcarpetas). Ignora basura de macOS (__MACOSX).
  */
