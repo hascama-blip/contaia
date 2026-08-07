@@ -165,14 +165,21 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     }
     pasos.push({ paso: "menu", via: fr ? "url-directa-o-menu" : "no-form", onclick: opcion });
 
-    // 3) Dejar el ejercicio (por defecto 2025) y escribir el correo.
-    if (fr && params.ejercicio) {
-      const sel = fr.locator("select").first();
-      if (await sel.count().catch(() => 0)) await sel.selectOption({ label: params.ejercicio }).catch(() => {});
+    // 3) Seleccionar el ejercicio (por defecto 2025) y escribir el correo.
+    //    IDs reales del formulario (DevTools): #selUsuEjercicio y #txtUsuEmail.
+    const ejercicio = params.ejercicio || "2025";
+    let ejercicioOk = false;
+    if (fr) {
+      const sel = fr.locator("#selUsuEjercicio, select").first();
+      if (await sel.count().catch(() => 0)) {
+        for (const arg of [{ label: ejercicio }, { value: ejercicio }, ejercicio]) {
+          try { await sel.selectOption(arg as any); ejercicioOk = true; break; } catch { /* */ }
+        }
+      }
     }
     let correoOk = false;
     if (fr) {
-      for (const s of ['input[type="email"]', 'input[id*="correo" i]', 'input[name*="correo" i]', 'input[placeholder*="correo" i]', 'input[type="text"]']) {
+      for (const s of ['#txtUsuEmail', 'input[type="email"]', 'input[id*="correo" i]', 'input[name*="correo" i]', 'input[placeholder*="correo" i]', 'input[type="text"]']) {
         const el = fr.locator(s).first();
         if (await el.count().catch(() => 0)) {
           await el.fill(params.emailDestino).catch(() => {});
@@ -181,7 +188,7 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
         }
       }
     }
-    pasos.push({ paso: "form", frameOk: !!fr, correoOk, emailDestino: params.emailDestino });
+    pasos.push({ paso: "form", frameOk: !!fr, ejercicioOk, ejercicio, correoOk, emailDestino: params.emailDestino });
 
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", ...estructura });
@@ -192,15 +199,25 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
 
     // 4) Generar Reporte (el confirm lo acepta autoAceptarDialogos).
     let generado = false;
-    for (const sel of ['button:has-text("Generar")', 'input[value*="Generar" i]', '#btnGenerar', 'a:has-text("Generar")']) {
+    for (const sel of ['#btnGenerar', 'button:has-text("Generar Reporte")', 'a:has-text("Generar Reporte")', 'input[value*="Generar" i]', 'button:has-text("Generar")', 'a:has-text("Generar")']) {
       const el = fr.locator(sel).first();
       if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); generado = true; break; }
     }
     if (!generado) generado = !!(await clickEnFrame(fr, ["Generar Reporte", "Generar"]));
-    await page.waitForTimeout(2500).catch(() => {});
-    const trasGen = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-    pasos.push({ paso: "generar", clico: generado, respuesta: trasGen.slice(0, 200) });
 
+    // SUNAT suele confirmar con "Se ha enviado..." / "correo". Damos margen y
+    // aceptamos cualquier diálogo de confirmación (autoAceptarDialogos).
+    let trasGen = "";
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(1200).catch(() => {});
+      trasGen = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
+      if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|generad|éxito|exito/i.test(trasGen)) break;
+    }
+    const exito = /se ha enviado|enviad|se enviar|su solicitud|generad|éxito|exito|correo electr[óo]nico/i.test(trasGen);
+    pasos.push({ paso: "generar", clico: generado, exito, respuesta: trasGen.slice(0, 250) });
+
+    // Si pulsamos el botón, damos la solicitud por buena aunque el texto no
+    // confirme (el resultado real llega por correo al webhook).
     return { ok: generado, error: generado ? undefined : "No se pudo pulsar Generar Reporte.", diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error generando el reporte de rentas.", diag: { pasos } };
