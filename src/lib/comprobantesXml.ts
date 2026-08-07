@@ -127,8 +127,11 @@ function listarFrames(ctx: any): string[] {
   }
   return Array.from(new Set(urls));
 }
+// Idéntico a fraccionamiento/RTT: engancha las páginas EXISTENTES y las futuras.
 function autoAceptarDialogos(ctx: any) {
-  ctx.on("page", (pg: any) => pg.on("dialog", (d: any) => d.accept().catch(() => {})));
+  const enganchar = (pg: any) => pg.on("dialog", (d: any) => d.accept().catch(() => {}));
+  ctx.pages().forEach(enganchar);
+  ctx.on("page", enganchar);
 }
 
 // --- login SOL (mismo flujo probado del F36/buzón) --------------------------
