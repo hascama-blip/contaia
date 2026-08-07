@@ -239,10 +239,14 @@ async function volcarEstructura(ctx: any): Promise<any> {
 /** Frame del formulario Angular de consulta de comprobantes. */
 function frameForm(ctx: any): any {
   const pgs = ctx.pages();
+  const matches: any[] = [];
   for (const pg of pgs) {
-    for (const fr of pg.frames()) if (/nuevaconsulta|consultacpe/i.test(fr.url())) return fr;
+    for (const fr of pg.frames()) if (/nuevaconsulta|consultacpe/i.test(fr.url())) matches.push(fr);
   }
-  return pgs[0]?.mainFrame() ?? null;
+  // Preferir el frame del APP (no el "loader" del menú, que aún no tiene el form).
+  return matches.find((f) => !/loader/i.test(f.url()))
+    || matches[0]
+    || pgs[0]?.mainFrame() || null;
 }
 
 const APP_URL_CONSULTA = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=11.38.1.1.1&s=ww1";
@@ -599,6 +603,20 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         pasos.push({ paso: "menu", buscaba: opciones[0], clico: hit });
         await s.page.waitForTimeout(2000).catch(() => {});
       }
+      // Esperar a que el LOADER del menú termine de renderizar el formulario
+      // (aparece "RUC Emisor"/"Recibido"). Si no se espera, se intenta llenar
+      // antes de que existan los campos → todo vacío → timeout.
+      for (let i = 0; i < 16 && !formOk; i++) {
+        await s.page.waitForTimeout(1500).catch(() => {});
+        formOk = await Promise.all(
+          s.ctx.pages().flatMap((pg: any) =>
+            pg.frames().map((fr: any) =>
+              fr.getByText(/RUC\s*Emisor|Filtro de comprobante|Recibido/i).first().count().catch(() => 0)
+            )
+          )
+        ).then((cs) => cs.some((c) => c > 0)).catch(() => false);
+      }
+      pasos.push({ paso: "menu-form", formOk });
     }
 
     // Volcado del formulario (antes de llenar).
