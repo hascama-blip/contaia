@@ -30,9 +30,15 @@ export interface ComprobantesResultado {
   /** Comprobantes de la relación que NO se pudieron bajar (para reintentar). */
   fallidos?: { item: ItemRelacion; motivo: string }[];
   loginError?: boolean;
+  /** SUNAT respondió "Error del Servidor / reintentar en N minutos": su servicio
+   *  de consulta está caído (no es la data). El frontend corta y avisa. */
+  sunatCaido?: boolean;
   error?: string;
   diag?: { pasos: any[] };
 }
+
+// Aviso de SUNAT cuando su servicio de consulta está caído (no es la data).
+const ES_SERVIDOR_CAIDO = /error del servidor|no se puede acceder a los servicios|reintentar en\s*\d*\s*minuto|servicio.*no.*disponible|no podemos atenderlo/i;
 
 // --- helpers de scraping (autocontenidos) -----------------------------------
 async function rellenar(page: any, sels: string[], val: string) {
@@ -412,32 +418,31 @@ async function descargarXmlResultado(fr: any, page: any, diagOut?: any): Promise
 
 /** Tras "Consultar", espera a que aparezca el modal "Resultado" (factura) o un
  *  aviso de error ("Aceptar"). Devuelve cuál apareció. */
-async function esperarResultado(fr: any, page: any, diagOut?: any): Promise<"resultado" | "error" | "nada"> {
+async function esperarResultado(fr: any, page: any): Promise<{ estado: "resultado" | "error" | "nada"; aviso: string }> {
   for (let i = 0; i < 9; i++) {
     await page.waitForTimeout(1500).catch(() => {});
     // ERROR primero: el aviso de "no encontrado" trae botón "Aceptar" (y el
     // modal de factura NO lo tiene). Así no confundimos el título "Resultado".
     if (await fr.getByText("Aceptar", { exact: true }).first().count().catch(() => 0)) {
-      if (diagOut) {
-        // Captura el TEXTO del aviso de SUNAT (para saber por qué rechaza).
-        diagOut.aviso = await fr.evaluate(() => {
-          const vis = (el: Element) => (el as HTMLElement).offsetParent !== null;
-          const cont = Array.from(document.querySelectorAll(
-            '.modal, .modal-content, .mat-dialog-container, mat-dialog-container, .swal2-popup, .p-dialog, [role="dialog"], .mat-snack-bar-container, .toast, .alert'
-          )) as HTMLElement[];
-          const t = cont.filter(vis).map((n) => (n.innerText || "").replace(/\s+/g, " ").trim()).find((s) => s.length > 0);
-          return (t || "").slice(0, 400);
-        }).catch(() => "");
-      }
-      return "error";
+      // Captura el TEXTO del aviso de SUNAT (para distinguir "no existe" de
+      // "Error del Servidor / reintentar en N minutos").
+      const aviso = (await fr.evaluate(() => {
+        const vis = (el: Element) => (el as HTMLElement).offsetParent !== null;
+        const cont = Array.from(document.querySelectorAll(
+          '.modal, .modal-content, .mat-dialog-container, mat-dialog-container, .swal2-popup, .p-dialog, [role="dialog"], .mat-snack-bar-container, .toast, .alert'
+        )) as HTMLElement[];
+        const t = cont.filter(vis).map((n) => (n.innerText || "").replace(/\s+/g, " ").trim()).find((s) => s.length > 0);
+        return (t || "").slice(0, 400);
+      }).catch(() => "")) as string;
+      return { estado: "error", aviso };
     }
     // RESULTADO real: aparece el contenido de la factura o el icono de descarga.
     const facturaReal = await fr
       .getByText(/Importe Total|FACTURA ELECTR|Descargar XML/i)
       .first().count().catch(() => 0);
-    if (facturaReal) return "resultado";
+    if (facturaReal) return { estado: "resultado", aviso: "" };
   }
-  return "nada";
+  return { estado: "nada", aviso: "" };
 }
 
 /** Cierra el modal "Resultado" (× arriba a la derecha) para pasar al siguiente. */
@@ -541,6 +546,7 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     // La Consulta individual solo soporta CPE (factura/boleta/notas/recibo).
     // Tipos como 50/52/54 (DUA/DAM de importación) no se pueden bajar aquí.
     const TIPOS_SOPORTADOS = new Set(["01", "03", "07", "08", "14"]);
+    let sunatCaido: string | null = null;
     for (let i = 0; i < relacion.length; i++) {
       const item = relacion[i];
       try {
@@ -559,6 +565,7 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
         // timing (la validación async del RUC), no que el comprobante no exista.
         let estado: "resultado" | "error" | "nada" = "nada";
         let llenado: any = null;
+        let avisoServidor = "";
         for (let intento = 0; intento < 2; intento++) {
           if (i > 0 || intento > 0) {
             // Reset del formulario (para el siguiente comprobante o el reintento).
@@ -566,13 +573,23 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
             await s.page.waitForTimeout(1200).catch(() => {});
           }
           llenado = await llenarYConsultar(fr, s.page, item);
-          const dres: any = {};
-          estado = await esperarResultado(fr, s.page, params.diagnostico ? dres : undefined);
-          if (params.diagnostico && dres.aviso && llenado) llenado.aviso = dres.aviso;
+          const r = await esperarResultado(fr, s.page);
+          estado = r.estado;
+          if (params.diagnostico && r.aviso && llenado) llenado.aviso = r.aviso;
           if (estado === "resultado") break;
+          // ¿SUNAT CAÍDO? ("Error del Servidor / reintentar en N minutos"): no es
+          // la data — no tiene sentido reintentar ni seguir con los demás.
+          if (ES_SERVIDOR_CAIDO.test(r.aviso || "")) { avisoServidor = r.aviso; break; }
           // Cierra el aviso de error ("Aceptar") antes de reintentar / continuar.
           await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
           await s.page.waitForTimeout(1200).catch(() => {});
+        }
+        // SUNAT caído → cortar TODA la relación (no golpear un servicio caído).
+        if (avisoServidor) {
+          const msg = "SUNAT no está disponible en este momento (su servicio respondió: “reintentar en unos minutos”). No es un problema de tus datos — vuelve a intentar en unos minutos.";
+          for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], msg);
+          sunatCaido = msg;
+          break;
         }
         if (estado !== "resultado") {
           marcarFallo(
@@ -625,7 +642,10 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       facturas,
       descargados: facturas.length,
       fallidos,
-      error: facturas.length
+      sunatCaido: !!sunatCaido,
+      error: sunatCaido
+        ? sunatCaido
+        : facturas.length
         ? (sobrantes > 0 ? `Descargados ${facturas.length}.${notaSobrantes}` : undefined)
         : `No se descargó ningún XML (de ${relacion.length}). Revisa el diagnóstico. ${errores.slice(0, 2).map((e) => e.motivo).join(" · ")}`,
       diag: { pasos },

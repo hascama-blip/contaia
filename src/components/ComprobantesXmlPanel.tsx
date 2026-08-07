@@ -84,6 +84,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const { res, data } = await llamarTanda({ solUser, solPass, relacion: bloque, parte });
       if (res.status === 401) throw { corte: data.error ?? "SUNAT rechazó el inicio de sesión." };
       if (res.status === 429) throw { corte: data.error ?? "Sin consultas disponibles." };
+      if (res.status === 503 || data.sunatCaido) throw { corte: data.error ?? "SUNAT no está disponible ahora. Reintenta en unos minutos." };
       if (Array.isArray(data.facturas)) acum.push(...data.facturas);
       // Guardamos el fallo completo ({item, motivo}) para mostrarlo y reintentar.
       if (Array.isArray(data.fallidos)) nuevosFallidos.push(...data.fallidos);

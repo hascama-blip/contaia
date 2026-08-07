@@ -49,12 +49,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (r.loginError) {
     return NextResponse.json({ error: r.error, loginError: true, diag: r.diag }, { status: 401 });
   }
+  // SUNAT caído (Error del Servidor) → NO consume uso y el frontend corta la
+  // descarga de las demás tandas (no tiene sentido seguir).
+  if (r.sunatCaido && !r.descargados) {
+    return NextResponse.json({ error: r.error, sunatCaido: true, fallidos: r.fallidos ?? [], diag: r.diag }, { status: 503 });
+  }
   if (esPrimeraParte && !body.diagnostico && uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
 
   return NextResponse.json({
     facturas: r.facturas ?? [],
     descargados: r.descargados ?? 0,
     fallidos: r.fallidos ?? [],
+    sunatCaido: !!r.sunatCaido,
     error: r.error,
     diag: r.diag,
   });
