@@ -351,7 +351,15 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
       }
     }
     hecho.tipo = label;
-    await page.waitForTimeout(500).catch(() => {});
+    // CONFIRMAR que el tipo QUEDÓ seleccionado (el control muestra su etiqueta en
+    // aria-label). Evita la carrera: si "Consultar" dispara antes del commit del
+    // form Angular, SUNAT recibe una consulta mal formada → "Error del Servidor".
+    let tipoConfirmado = false;
+    for (let w = 0; w < 8 && !tipoConfirmado; w++) {
+      await page.waitForTimeout(400).catch(() => {});
+      tipoConfirmado = (await fr.locator(`input[aria-label*="${label}" i]`).count().catch(() => 0)) > 0;
+    }
+    hecho.tipoConfirmado = tipoConfirmado;
     // 4) Serie y Número.
     const serieInput = fr.locator('[formcontrolname="serieComprobante"]').first();
     const numeroInput = fr.locator('[formcontrolname="numeroComprobante"]').first();
@@ -359,6 +367,8 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     await numeroInput.fill(item.numero).catch(() => {});
     hecho.serieVal = await serieInput.inputValue().catch(() => "");
     hecho.numeroVal = await numeroInput.inputValue().catch(() => "");
+    // Pausa para que el formulario termine de validar antes de consultar.
+    await page.waitForTimeout(800).catch(() => {});
     // 5) Consultar.
     await fr.getByText("Consultar", { exact: false }).first().click({ timeout: 4000 }).catch(() => {});
     hecho.consultado = true;
