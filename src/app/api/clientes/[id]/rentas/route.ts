@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
-import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas } from "@/lib/db";
+import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas, getWebhookLogRTT } from "@/lib/db";
 import { generarReporteRentas } from "@/lib/reporteRentasBot";
 
 export const runtime = "nodejs";
@@ -12,7 +12,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const sol = await getSolicitudRentas(params.id);
   const { dominio } = await getRttConfig();
-  return NextResponse.json({ solicitud: sol, dominioOk: !!dominio });
+  // Bitácora de la nube (últimos correos recibidos por el webhook) filtrada a
+  // este RUC → para ver si el correo del reporte ya llegó y qué pasó con él.
+  const log = (await getWebhookLogRTT()) ?? [];
+  const bitacora = log.filter((e) => e.ruc === cliente.ruc).slice(0, 6);
+  return NextResponse.json({ solicitud: sol, dominioOk: !!dominio, bitacora });
 }
 
 // POST → dispara el bot: login → menú → Reporte de Rentas → Generar. SUNAT lo

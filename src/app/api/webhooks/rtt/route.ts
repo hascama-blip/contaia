@@ -109,8 +109,15 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, id: sol.id, estado: sol.estado });
 }
 
-// Extrae el RUC del sub-address: reportes+RUC20123456789@dominio
+// Extrae el RUC del sub-address: reportes+RUC20123456789@dominio (RTT) o
+// reportes+RENTAS10727195594@dominio (rentas). Ojo: en "+RENTAS10727195594@" la
+// "S" queda pegada al número, así que \b(\d{11})\b NO engancha → hay que
+// contemplar ambos prefijos y, de último recurso, cualquier corrida de 11 dígitos.
 function extraerRuc(s: string): string {
-  const m = String(s || "").match(/\+RUC(\d{11})@/i) || String(s || "").match(/\bRUC(\d{11})\b/i) || String(s || "").match(/\b(\d{11})\b/);
+  const str = String(s || "");
+  const m =
+    str.match(/\+(?:RUC|RENTAS)(\d{11})@/i) ||
+    str.match(/(?:RUC|RENTAS)(\d{11})/i) ||
+    str.match(/(\d{11})/);
   return m ? m[1] : "";
 }
