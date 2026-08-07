@@ -11,6 +11,8 @@ export default function NuevoClientePage() {
   const [form, setForm] = useState({
     razonSocial: "",
     ruc: "",
+    // Solo RUC 10: "con" (negocio → SIRE) o "sin" (sin SIRE).
+    negocio: "",
     email: "",
     telefono: "",
     // Credenciales SOL: usuario + clave (obligatorios) y API (opcional).
@@ -82,6 +84,11 @@ export default function NuevoClientePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Persona natural (RUC 10): hay que definir si tiene negocio (SIRE) o no.
+    if (form.ruc.startsWith("10") && !form.negocio) {
+      setError("Indica si la persona natural (RUC 10) tiene negocio o no (define si lleva SIRE).");
+      return;
+    }
     // Usuario + Clave SOL son obligatorios (habilitan el diagnóstico previo).
     if (!form.solUser.trim() || !form.solPass.trim()) {
       setError("El Usuario SOL y la Clave SOL son obligatorios para el diagnóstico.");
@@ -96,6 +103,7 @@ export default function NuevoClientePage() {
         body: JSON.stringify({
           razonSocial: form.razonSocial,
           ruc: form.ruc,
+          negocio: form.ruc.startsWith("10") ? form.negocio : undefined,
           email: form.email,
           telefono: form.telefono,
           // Inyecta la fecha opcional de inicio de actividades en el SUNAT.
@@ -272,6 +280,27 @@ export default function NuevoClientePage() {
             required
           />
         </div>
+
+        {/* RUC 10 (persona natural): con negocio (SIRE) o sin negocio (sin SIRE). */}
+        {form.ruc.startsWith("10") && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+            <p className="text-sm font-semibold text-slate-700">Persona natural (RUC 10) *</p>
+            <p className="mb-2 text-xs text-slate-500">
+              ¿Tiene <b>negocio</b> (rentas de 3ª categoría)? Con negocio está obligada a <b>SIRE</b>;
+              sin negocio <b>no</b> lleva SIRE.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" name="negocio" checked={form.negocio === "con"} onChange={() => set("negocio", "con")} />
+                Con negocio <span className="text-xs text-emerald-600">(habilita SIRE)</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" name="negocio" checked={form.negocio === "sin"} onChange={() => set("negocio", "sin")} />
+                Sin negocio <span className="text-xs text-slate-400">(sin SIRE)</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>

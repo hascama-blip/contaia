@@ -2,6 +2,14 @@
 
 export type NivelRiesgo = "bajo" | "medio" | "alto" | "critico";
 
+/** ¿El contribuyente está OBLIGADO a llevar/presentar SIRE? RUC 20 (empresa) →
+ *  sí; RUC 10 (persona natural) → solo si tiene negocio (rentas de 3ª cat.).
+ *  Una persona natural SIN negocio no está obligada a SIRE. */
+export function llevaSire(c: { ruc?: string; negocio?: "con" | "sin" | null }): boolean {
+  if (/^10/.test(String(c?.ruc || ""))) return c?.negocio !== "sin";
+  return true;
+}
+
 export interface SunatInfo {
   ruc: string;
   razonSocial: string;
@@ -116,6 +124,9 @@ export interface Cliente {
   ownerId?: string;
   razonSocial: string;
   ruc: string;
+  /** Solo RUC 10 (persona natural): "con" negocio (obligado a SIRE) o "sin"
+   *  negocio (NO obligado a SIRE). Para RUC 20 no aplica (siempre lleva SIRE). */
+  negocio?: "con" | "sin";
   email: string;
   telefono: string;
   createdAt: string;

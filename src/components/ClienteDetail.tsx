@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Cliente } from "@/lib/types";
+import { llevaSire } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
@@ -303,9 +304,16 @@ export default function ClienteDetail({
           />
 
           {/* ───── 2 · Estado SIRE (presentado / no presentado) ───── */}
-          <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
-
-          <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
+          {llevaSire(cliente) ? (
+            <>
+              <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
+              <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
+            </>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <b>SIRE deshabilitado.</b> Esta persona natural (RUC 10) es <b>sin negocio</b>, por lo que <b>no está obligada</b> a llevar ni presentar SIRE. Los pasos de SIRE se omiten.
+            </div>
+          )}
 
           {/* ───── 3 · Deudas (Fraccionamiento F36) — solo Usuario + Clave SOL ───── */}
           <FaseHeader n="3" titulo="Deudas (Fraccionamiento Art. 36)" detalle="Solo Usuario + Clave SOL." />
@@ -316,15 +324,18 @@ export default function ClienteDetail({
             inicial={cliente.deudasF36 ?? null}
           />
 
-          {/* ───── 4 · Extracción SIRE (montos) — requiere API ───── */}
-          <FaseHeader n="4" titulo="Extracción SIRE (montos)" detalle="Coloca y bloquea la API para sacar compras/ventas." />
-
-          <SunatPanel
-            clienteId={cliente.id}
-            inicialSire={cliente.sire ?? []}
-            inicialCred={cliente.credSire ?? null}
-            puedeApi={puedeApi}
-          />
+          {/* ───── 4 · Extracción SIRE (montos) — requiere API. Solo si lleva SIRE. ───── */}
+          {llevaSire(cliente) && (
+            <>
+              <FaseHeader n="4" titulo="Extracción SIRE (montos)" detalle="Coloca y bloquea la API para sacar compras/ventas." />
+              <SunatPanel
+                clienteId={cliente.id}
+                inicialSire={cliente.sire ?? []}
+                inicialCred={cliente.credSire ?? null}
+                puedeApi={puedeApi}
+              />
+            </>
+          )}
 
           {/* ───── 5 · Comparativo mensual (DJ 621 vs SIRE) ───── */}
           <FaseHeader n="5" titulo="Comparativo mensual" detalle="Sube el PDF de la DJ mensual (621) vs SIRE." />

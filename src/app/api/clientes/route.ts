@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     ruc: body.ruc,
     email: body.email ?? "",
     telefono: body.telefono ?? "",
+    negocio: body.negocio === "con" || body.negocio === "sin" ? body.negocio : undefined,
     sunat,
     ownerId: user.id,
   });

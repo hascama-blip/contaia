@@ -763,6 +763,7 @@ export async function createCliente(data: {
   telefono: string;
   sunat?: SunatInfo | null;
   ownerId?: string;
+  negocio?: "con" | "sin";
 }): Promise<Cliente> {
   const store = await readStore();
   const cliente: Cliente = {
@@ -770,6 +771,7 @@ export async function createCliente(data: {
     ownerId: data.ownerId,
     razonSocial: data.razonSocial.trim(),
     ruc: data.ruc.trim(),
+    negocio: /^10/.test(data.ruc.trim()) ? (data.negocio === "sin" ? "sin" : data.negocio === "con" ? "con" : undefined) : undefined,
     email: data.email.trim(),
     telefono: data.telefono.trim(),
     createdAt: new Date().toISOString(),
