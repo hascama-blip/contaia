@@ -792,12 +792,17 @@ export async function createCliente(data: {
 
 export async function updateCliente(
   id: string,
-  patch: Partial<Pick<Cliente, "razonSocial" | "ruc" | "email" | "telefono">>
+  patch: Partial<Pick<Cliente, "razonSocial" | "ruc" | "email" | "telefono" | "negocio">>
 ): Promise<Cliente | null> {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === id);
   if (!cliente) return null;
-  Object.assign(cliente, patch);
+  const { negocio, ...resto } = patch as any;
+  Object.assign(cliente, resto);
+  // "negocio" (con/sin) solo aplica a RUC 10 (persona natural).
+  if (negocio !== undefined) {
+    if (/^10/.test(cliente.ruc) && (negocio === "con" || negocio === "sin")) cliente.negocio = negocio;
+  }
   await writeStore(store);
   return cliente;
 }

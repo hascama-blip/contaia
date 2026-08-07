@@ -42,6 +42,25 @@ export default function ClienteDetail({
   // Fechas que decolecta NO entrega: se ingresan a mano y se guardan.
   const [fInscripcion, setFInscripcion] = useState(inicial.sunat?.fechaInscripcion ?? "");
   const [fInicio, setFInicio] = useState(inicial.sunat?.fechaInicioActividades ?? "");
+  // RUC 10: con/sin negocio (define si lleva SIRE). Editable.
+  const [negocio, setNegocio] = useState<string>(inicial.negocio ?? "");
+
+  async function guardarNegocio(valor: "con" | "sin") {
+    setNegocio(valor);
+    setBusy("negocio");
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ negocio: valor }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { notify("err", data.error ?? "No se pudo guardar."); return; }
+      setCliente(data.cliente);
+      notify("ok", valor === "con" ? "Marcada como CON negocio — SIRE habilitado." : "Marcada como SIN negocio — SIRE deshabilitado.");
+      router.refresh();
+    } finally { setBusy(null); }
+  }
 
   async function guardarFechasSunat() {
     setBusy("fechas");
@@ -244,6 +263,27 @@ export default function ClienteDetail({
                     {busy === "fechas" ? "Guardando…" : "Guardar fechas"}
                   </button>
                 </div>
+                {/* RUC 10: cambiar con/sin negocio (habilita/deshabilita SIRE). */}
+                {cliente.ruc.startsWith("10") && (
+                  <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                    <p className="mb-1 text-xs font-semibold text-slate-700">Persona natural (RUC 10) — ¿con negocio?</p>
+                    <p className="mb-2 text-[11px] text-slate-500">
+                      Con negocio (rentas de 3ª cat.) está obligada a <b>SIRE</b>; sin negocio <b>no</b> lleva SIRE.
+                      Al cambiarlo se habilitan/deshabilitan los pasos de SIRE.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="radio" name="negocio-edit" checked={negocio === "con"} disabled={busy === "negocio"} onChange={() => guardarNegocio("con")} />
+                        Con negocio <span className="text-xs text-emerald-600">(SIRE)</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="radio" name="negocio-edit" checked={negocio === "sin"} disabled={busy === "negocio"} onChange={() => guardarNegocio("sin")} />
+                        Sin negocio <span className="text-xs text-slate-400">(sin SIRE)</span>
+                      </label>
+                      {busy === "negocio" && <span className="text-[11px] text-slate-400">Guardando…</span>}
+                    </div>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <p className="text-xs uppercase text-slate-400">Tributos / régimen</p>
                   <div className="mt-1 flex flex-wrap gap-1">
