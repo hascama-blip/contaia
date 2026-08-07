@@ -305,29 +305,49 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     }
     hecho.rucEmisorPedido = item.rucEmisor;
     hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
-    // 3) Tipo de comprobante (dropdown Angular): abrir y elegir la opción EXACTA.
-    //    OJO: NO escribir en ningún input aquí (el "último input" es Número y se
-    //    corrompía la consulta). Solo abrir y clicar la opción.
+    // 3) Tipo de comprobante. Es un <select> NATIVO ("Factura/Boleta/…"): lo más
+    //    fiable es selectOption sobre el propio <select>. Si no fuera nativo, se
+    //    usa el respaldo del dropdown "Seleccionar" + clic en la opción.
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
     const keyw = TIPO_KEYS[item.tipo] ?? "factura";
-    await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(900).catch(() => {});
-    // Diagnóstico: capturar las opciones reales del dropdown para calibrar labels.
-    hecho.tipoOpciones = await fr
-      .locator('mat-option, [role="option"], li, .dropdown-item, .mat-option')
-      .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).slice(0, 25)).catch(() => []);
-    // Diag extra: volcado del overlay (CDK/menu) para ver cómo viene el dropdown.
-    hecho.overlay = await fr.evaluate(() => {
-      const o = document.querySelector(".cdk-overlay-container, .cdk-overlay-pane, .mat-select-panel, .mat-menu-panel");
-      return o ? (o as HTMLElement).innerText.replace(/\s+/g, " ").trim().slice(0, 300) : "(sin overlay)";
-    }).catch(() => "");
-    // 1) etiqueta exacta; 2) por palabra clave distintiva (recibo/boleta/…).
-    const opt = fr.getByText(label, { exact: true });
-    if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
-    else {
-      const porClave = fr.getByText(new RegExp(keyw, "i")).last();
-      if (await porClave.count().catch(() => 0)) await porClave.click({ timeout: 2500 }).catch(() => {});
-      else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+    let tipoOk = false;
+    const selects = fr.locator("select");
+    const nSel = await selects.count().catch(() => 0);
+    for (let k = 0; k < nSel; k++) {
+      const se = selects.nth(k);
+      const opciones = await se.locator("option").allInnerTexts().catch(() => []) as string[];
+      // El <select> del tipo trae Factura/Boleta/Nota de crédito/débito.
+      if (!opciones.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) continue;
+      hecho.tipoOpciones = opciones.map((o) => o.trim()).filter(Boolean).slice(0, 25);
+      // Elegir la opción por etiqueta exacta; si no calza, por palabra clave.
+      const objetivo = opciones.find((o) => o.trim().toLowerCase() === label.toLowerCase())
+        || opciones.find((o) => new RegExp(keyw, "i").test(o));
+      if (objetivo) {
+        await se.selectOption({ label: objetivo }).catch(async () => {
+          await se.selectOption({ index: opciones.indexOf(objetivo) }).catch(() => {});
+        });
+        // Disparar change por si Angular escucha el evento nativo.
+        await se.evaluate((el: any) => el.dispatchEvent(new Event("change", { bubbles: true }))).catch(() => {});
+        hecho.tipoSelectNativo = true;
+        hecho.tipoVal = await se.evaluate((el: any) => el.options[el.selectedIndex]?.text || "").catch(() => "");
+        tipoOk = true;
+      }
+      break;
+    }
+    if (!tipoOk) {
+      // Respaldo: dropdown custom "Seleccionar" + clic en la opción.
+      await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(900).catch(() => {});
+      hecho.tipoOpciones = await fr
+        .locator('mat-option, [role="option"], li, .dropdown-item, .mat-option')
+        .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).slice(0, 25)).catch(() => []);
+      const opt = fr.getByText(label, { exact: true });
+      if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
+      else {
+        const porClave = fr.getByText(new RegExp(keyw, "i")).last();
+        if (await porClave.count().catch(() => 0)) await porClave.click({ timeout: 2500 }).catch(() => {});
+        else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+      }
     }
     hecho.tipo = label;
     await page.waitForTimeout(500).catch(() => {});
