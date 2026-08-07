@@ -25,6 +25,10 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   // Comprobantes que no se pudieron bajar + cuántos reintentos se han hecho.
   const [fallidos, setFallidos] = useState<any[]>([]);
   const [reintentos, setReintentos] = useState(0);
+  // Periodo (YYYYMM) cuando la relación vino del SIRE — para nombrar el acumulado.
+  const [periodoSire, setPeriodoSire] = useState<string>("");
+  // Comprobante cuyo PDF se está generando (serie-número), para el spinner.
+  const [pdfBusy, setPdfBusy] = useState<string>("");
 
   const MAX_REINTENTOS = 2;
   // Tamaño de tanda: el frontend parte la relación y llama a la API por bloques
@@ -41,6 +45,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo leer la relación."); return; }
       setRelacion(data.items ?? []);
+      setPeriodoSire("");
       setRelNombre(file.name);
       setInfo(`Relación cargada: ${data.total} comprobante(s) por descargar.`);
     } catch {
@@ -98,6 +103,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo cargar la relación del SIRE."); return; }
       setRelacion(data.items ?? []);
+      setPeriodoSire(periodo);
       setRelNombre(`Detalle SIRE compras ${periodo}`);
       setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) de compras (${periodo}).`);
     } catch {
@@ -174,25 +180,53 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     }
   }
 
+  async function bajarBlob(body: any, nombre: string) {
+    const res = await fetch("/api/facturas-xml/excel", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!res.ok) { setError("No se pudo generar el Excel."); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   async function descargarExcel() {
     setBusy(true);
+    try { await bajarBlob({ facturas, detalle: true }, "comprobantes-xml.xlsx"); }
+    finally { setBusy(false); }
+  }
+
+  // Excel ACUMULADO del mes (una fila por comprobante + totales).
+  async function descargarExcelMes() {
+    setBusy(true);
     try {
-      const res = await fetch("/api/facturas-xml/excel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facturas, detalle: true }),
+      await bajarBlob(
+        { facturas, resumen: true, periodo: periodoSire },
+        periodoSire ? `compras-xml-${periodoSire}.xlsx` : "compras-xml-acumulado.xlsx"
+      );
+    } finally { setBusy(false); }
+  }
+
+  // PDF de UN comprobante (representación impresa, estilo buzón: fila + botón).
+  async function descargarPdf(f: any) {
+    const clave = f.serieNumero || `${f.serie}-${f.numero}`;
+    setError(null); setPdfBusy(clave);
+    try {
+      const res = await fetch("/api/facturas-xml/pdf", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
       });
-      if (!res.ok) { setError("No se pudo generar el Excel."); return; }
+      if (!res.ok) { setError("No se pudo generar el PDF del comprobante."); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = "comprobantes-xml.xlsx";
+      a.href = url; a.download = `${String(clave).replace(/[^\w.-]/g, "_")}.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-    } finally {
-      setBusy(false);
-    }
+    } catch { setError("Error de red al generar el PDF."); }
+    finally { setPdfBusy(""); }
   }
 
   return (
@@ -264,9 +298,14 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
             : "⬇ Descargar XML de SUNAT"}
         </button>
         {facturas.length > 0 && (
-          <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>
-            ⬇ Excel con el detalle
-          </button>
+          <>
+            <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>
+              ⬇ Excel con el detalle
+            </button>
+            <button className="btn-ghost" onClick={descargarExcelMes} disabled={busy} title="Una fila por comprobante + totales del mes">
+              ⬇ Excel del mes (acumulado)
+            </button>
+          </>
         )}
         <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
           <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
@@ -378,24 +417,41 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
 
       {facturas.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-xs">
+          <div className="mb-1 text-[11px] font-bold uppercase text-slate-500">
+            Comprobantes descargados ({facturas.length}) — descarga el PDF de cada uno a la derecha
+          </div>
+          <table className="w-full min-w-[620px] text-xs">
             <thead>
               <tr className="text-left text-[10px] uppercase text-slate-400">
                 <th className="py-1">Serie-Número</th>
                 <th className="py-1">Fecha</th>
                 <th className="py-1">Proveedor</th>
                 <th className="py-1 text-right">Total</th>
+                <th className="py-1 text-right">PDF</th>
               </tr>
             </thead>
             <tbody>
-              {facturas.map((f, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="py-1 text-slate-600">{f.serieNumero}</td>
-                  <td className="py-1 text-slate-500">{f.fecha}</td>
-                  <td className="py-1 text-slate-600">{f.razonSocialEmisor || f.rucEmisor}</td>
-                  <td className="py-1 text-right tabular-nums text-slate-700">{Number(f.total).toFixed(2)}</td>
-                </tr>
-              ))}
+              {facturas.map((f, i) => {
+                const clave = f.serieNumero || `${f.serie}-${f.numero}`;
+                return (
+                  <tr key={i} className="border-t border-slate-100">
+                    <td className="py-1 text-slate-600">{f.serieNumero}</td>
+                    <td className="py-1 text-slate-500">{f.fecha}</td>
+                    <td className="py-1 text-slate-600">{f.razonSocialEmisor || f.rucEmisor}</td>
+                    <td className="py-1 text-right tabular-nums text-slate-700">{Number(f.total).toFixed(2)}</td>
+                    <td className="py-1 text-right">
+                      <button
+                        className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                        onClick={() => descargarPdf(f)}
+                        disabled={pdfBusy === clave}
+                        title="Descargar la representación impresa (PDF) de este comprobante"
+                      >
+                        {pdfBusy === clave ? "…" : "⬇ PDF"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

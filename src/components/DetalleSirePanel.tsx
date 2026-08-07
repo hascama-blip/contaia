@@ -56,26 +56,34 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
     }
   }
 
-  async function descargarExcel() {
+  async function descargar(endpoint: string, nombre: string, extra: any = {}) {
     const periodo = `${anio}${String(mes).padStart(2, "0")}`;
     setBusy(true);
     try {
-      const res = await fetch("/api/sire-detalle/excel", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodo, ventas: esVentas ? bloque : undefined, compras: esVentas ? undefined : bloque }),
+        body: JSON.stringify({ periodo, ...extra }),
       });
-      if (!res.ok) { setError("No se pudo generar el Excel."); return; }
+      if (!res.ok) { setError("No se pudo generar el archivo."); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `detalle-sire-${tipo}-${periodo}.xlsx`;
+      a.href = url; a.download = nombre.replace("{periodo}", periodo);
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } finally {
       setBusy(false);
     }
   }
+
+  const descargarExcel = () =>
+    descargar("/api/sire-detalle/excel", `detalle-sire-${tipo}-{periodo}.xlsx`, {
+      ventas: esVentas ? bloque : undefined, compras: esVentas ? undefined : bloque,
+    });
+  // Plantilla de relación (formato Comprobantes XML) para las compras.
+  const descargarPlantilla = () =>
+    descargar("/api/sire-detalle/plantilla", `relacion-comprobantes-{periodo}.xlsx`, { compras: bloque });
 
   const anios = [hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2];
   const hayDatos = (bloque?.filas?.length ?? 0) > 0;
@@ -112,6 +120,11 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
         </button>
         {hayDatos && (
           <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>⬇ Excel</button>
+        )}
+        {!esVentas && hayDatos && (
+          <button className="btn-ghost" onClick={descargarPlantilla} disabled={busy} title="Excel con el formato de la plantilla para subir al módulo de Comprobantes XML">
+            ⬇ Plantilla para XML
+          </button>
         )}
         <label className="ml-auto flex items-center gap-2 text-xs text-slate-500" title="Vuelve a consultar SUNAT en vez de usar lo guardado">
           <input type="checkbox" checked={refrescar} onChange={(e) => setRefrescar(e.target.checked)} /> 🔄 Refrescar

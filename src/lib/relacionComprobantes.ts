@@ -59,6 +59,22 @@ export async function plantillaRelacionXlsx(): Promise<Buffer> {
   return Buffer.from(buf);
 }
 
+/** Genera la plantilla YA LLENA con la relaci\u00f3n dada (mismas columnas que la
+ *  plantilla en blanco), lista para subir tal cual al m\u00f3dulo de Comprobantes XML. */
+export async function plantillaRelacionLlenaXlsx(items: ItemRelacion[]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Relaci\u00f3n");
+  ws.columns = COLS as any;
+  ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } };
+  ws.getColumn("monto").numFmt = "#,##0.00";
+  for (const it of items) {
+    ws.addRow({ rucEmisor: it.rucEmisor, tipo: it.tipo, serie: it.serie, numero: it.numero, fecha: it.fecha, monto: it.monto || 0 });
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
 const norm = (s: any) =>
   String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 

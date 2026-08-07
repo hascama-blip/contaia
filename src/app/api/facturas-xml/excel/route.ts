@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No hay facturas que exportar." }, { status: 400 });
   }
 
+  if (body?.resumen) return resumenMes(rows, String(body?.periodo ?? ""));
   if (body?.detalle) return detalleCompleto(rows);
 
   const wb = new ExcelJS.Workbook();
@@ -58,6 +59,52 @@ export async function POST(req: NextRequest) {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="facturas-xml.xlsx"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+// Excel ACUMULADO del mes: una fila por comprobante (nivel documento) + fila de
+// TOTALES. Es el resumen de compras XML del periodo consultado.
+async function resumenMes(rows: any[], periodo: string) {
+  const wb = new ExcelJS.Workbook();
+  const titulo = /^\d{6}$/.test(periodo) ? `Compras ${periodo.slice(4, 6)}-${periodo.slice(0, 4)}` : "Compras del mes";
+  const ws = wb.addWorksheet(titulo.slice(0, 31));
+  ws.columns = [
+    { header: "Fecha", key: "fecha", width: 12 },
+    { header: "Tipo", key: "tipo", width: 16 },
+    { header: "Serie-Número", key: "serieNumero", width: 18 },
+    { header: "RUC emisor", key: "rucEmisor", width: 14 },
+    { header: "Proveedor", key: "razonSocial", width: 38 },
+    { header: "Moneda", key: "moneda", width: 8 },
+    { header: "Base", key: "base", width: 14 },
+    { header: "IGV", key: "igv", width: 12 },
+    { header: "Total", key: "total", width: 14 },
+    { header: "Glosa", key: "glosa", width: 50 },
+  ];
+  ws.getRow(1).font = HEADER_FONT;
+  ws.getRow(1).fill = HEADER_FILL;
+  let tBase = 0, tIgv = 0, tTotal = 0;
+  for (const r of rows) {
+    const base = Number(r.base) || 0, igv = Number(r.igv) || 0, total = Number(r.total) || 0;
+    tBase += base; tIgv += igv; tTotal += total;
+    ws.addRow({
+      fecha: r.fecha ?? "", tipo: r.tipo ?? "", serieNumero: r.serieNumero ?? "",
+      rucEmisor: r.rucEmisor ?? "", razonSocial: r.razonSocialEmisor ?? r.razonSocial ?? "",
+      moneda: r.moneda ?? "", base, igv, total, glosa: r.glosa ?? "",
+    });
+  }
+  const totalRow = ws.addRow({ razonSocial: `TOTAL (${rows.length} comprobantes)`, base: tBase, igv: tIgv, total: tTotal });
+  totalRow.font = { bold: true };
+  totalRow.getCell("razonSocial").alignment = { horizontal: "right" };
+  ["base", "igv", "total"].forEach((k) => (ws.getColumn(k).numFmt = "#,##0.00"));
+
+  const buf = await wb.xlsx.writeBuffer();
+  const nombre = /^\d{6}$/.test(periodo) ? `compras-xml-${periodo}.xlsx` : "compras-xml-acumulado.xlsx";
+  return new NextResponse(buf as unknown as BodyInit, {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${nombre}"`,
       "Cache-Control": "no-store",
     },
   });
