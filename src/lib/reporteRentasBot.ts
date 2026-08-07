@@ -228,23 +228,35 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
       }
     }
 
-    // Detectar el mensaje de éxito de SUNAT.
+    // Detectar el mensaje de éxito de SUNAT. Evitamos palabras que ya aparecen
+    // en la página fija ("correo electrónico", "generar reporte", "rentas") para
+    // no marcar éxito por error; el modal de alerta se registra aparte.
+    const RE_EXITO = /se ha enviado|ser[áa] enviado|se enviar[áa]|se ha generado|reporte ser[áa]|su solicitud (ha|fue|se)/i;
+    const RE_ALERTA = /alerta|debe tener|no se ha|no existe|no se encontr|error|inv[áa]lid/i;
     let trasGen = "";
     for (let i = 0; i < 8; i++) {
       await page.waitForTimeout(1000).catch(() => {});
       for (const f of todosLosFrames(ctx)) {
         const t = (await f.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
-        if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|se generar|generado con|éxito|exito/i.test(t)) { trasGen = t; break; }
+        if (RE_EXITO.test(t)) { trasGen = t; break; }
         if (t && !trasGen) trasGen = t;
       }
-      if (/se ha enviado|enviad|se enviar|correo electr[óo]nico|su solicitud|se generar|generado con|éxito|exito/i.test(trasGen)) break;
+      if (RE_EXITO.test(trasGen)) break;
     }
-    const exito = /se ha enviado|enviad|se enviar|su solicitud|se generar|generado con|éxito|exito|correo electr[óo]nico/i.test(trasGen);
+    // Éxito real = mensaje de envío y SIN alerta de error (correo largo, etc.).
+    const textoTotal = (modalTxt + " " + trasGen);
+    const exito = RE_EXITO.test(textoTotal) && !RE_ALERTA.test(modalTxt);
     pasos.push({ paso: "generar", clico: generado, modal: modalTxt, confirmado, exito, respuesta: trasGen.slice(0, 250) });
 
-    // Si pulsamos el botón, damos la solicitud por buena aunque el texto no
-    // confirme (el resultado real llega por correo al webhook).
-    return { ok: generado, error: generado ? undefined : "No se pudo pulsar Generar Reporte.", diag: { pasos } };
+    // Si SUNAT mostró una alerta (p.ej. correo demasiado largo), NO envió →
+    // devolvemos error para no dejar la solicitud "esperando" eternamente.
+    if (RE_ALERTA.test(modalTxt)) {
+      return { ok: false, error: `SUNAT rechazó el envío: ${modalTxt.replace(/\s*Aceptar\s*$/i, "").trim()}`, diag: { pasos } };
+    }
+    if (!generado) return { ok: false, error: "No se pudo pulsar Generar Reporte.", diag: { pasos } };
+    // Botón pulsado y sin alerta → damos la solicitud por buena (el resultado
+    // real llega por correo al webhook).
+    return { ok: true, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error generando el reporte de rentas.", diag: { pasos } };
   } finally {

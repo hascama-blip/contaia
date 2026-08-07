@@ -74,6 +74,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message ?? "error parseando el correo" }, { status: 400 });
   }
 
+  // ¿Reporte de Rentas? Su dirección es CORTA (SUNAT exige <40 chars): la parte
+  // local son 9 dígitos (el RUC 10 sin el "10" inicial). Ej.: 258426270@dominio.
+  // Se detecta ANTES de la validación del RUC porque no lleva sub-address +RUC.
+  const addrLocal = (String(recipiente).match(/([A-Za-z0-9._%+\-]+)@/) || [])[1] || "";
+  if (/^\d{9}$/.test(addrLocal)) {
+    const rucR = "10" + addrLocal;
+    if (!pdf) {
+      await registrarWebhookRTT({ ruc: rucR, resultado: "rentas: correo recibido pero SIN PDF", from }).catch(() => {});
+      return NextResponse.json({ error: "rentas sin PDF" }, { status: 422 });
+    }
+    const sr = await guardarReporteRentasPorRuc(rucR, pdf);
+    if (!sr) {
+      await registrarWebhookRTT({ ruc: rucR, tienePdf: true, resultado: "rentas: OK pero sin solicitud en proceso para ese RUC", from }).catch(() => {});
+      return NextResponse.json({ error: `rentas: sin solicitud en proceso para ${rucR}` }, { status: 404 });
+    }
+    await registrarWebhookRTT({ ruc: rucR, tienePdf: true, resultado: "OK: reporte de rentas guardado y parseado", from }).catch(() => {});
+    return NextResponse.json({ ok: true, tipo: "rentas", estado: sr.estado });
+  }
+
   if (!/^\d{11}$/.test(ruc)) {
     await registrarWebhookRTT({ ruc, tienePdf: !!pdf, tieneXml: !!xml, resultado: "correo recibido, pero SIN RUC en el destinatario (+RUC…@)", from }).catch(() => {});
     return NextResponse.json({ error: "sin RUC en el destinatario (+RUC…@)" }, { status: 400 });

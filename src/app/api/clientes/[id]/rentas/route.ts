@@ -36,7 +36,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { dominio } = await getRttConfig();
   if (!dominio) return NextResponse.json({ error: "Falta configurar el dominio del webhook (RTT_DOMINIO)." }, { status: 400 });
 
-  const emailDestino = `reportes+RENTAS${cliente.ruc}@${dominio}`;
+  // ⚠️ El formulario de rentas de SUNAT EXIGE que el correo tenga menos de 40
+  // caracteres (a diferencia del RTT). Como rentas es solo para RUC 10 (persona
+  // natural), usamos el RUC SIN el "10" inicial (9 dígitos = DNI + verificador)
+  // como parte local → `258426270@reportes.radartributaria.com` = 38 chars. El
+  // webhook reconstruye el RUC anteponiendo "10".
+  const parteLocal = cliente.ruc.startsWith("10") ? cliente.ruc.slice(2) : cliente.ruc;
+  const emailDestino = `${parteLocal}@${dominio}`;
 
   if (body.diagnostico === true) {
     const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio, diagnostico: true });
