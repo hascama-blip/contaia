@@ -707,8 +707,21 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
             const fx = parseFacturaXml(x);
             if (fx && fx.rucEmisor) { facturas.push(fx); nuevas.push(fx); }
           }
-          if (!nuevas.length) marcarFallo(item, "el archivo no era un XML de comprobante");
-          else {
+          if (!nuevas.length) {
+            // Diagnóstico: ¿qué se descargó realmente? (firma/tipo/muestra).
+            const firma = buf.slice(0, 8).toString("latin1");
+            const cabeza = buf.slice(0, 400).toString("utf-8");
+            const tipoArch = esZip(buf) ? "zip"
+              : firma.startsWith("%PDF") ? "pdf"
+              : /<\?xml|<Invoice|<CreditNote|<DebitNote|<ApplicationResponse/i.test(cabeza) ? "xml(otro-root)"
+              : /<!doctype|<html/i.test(cabeza) ? "html" : "otro";
+            const nombresZip = esZip(buf) ? extraerDeZip(buf, [".xml", ".pdf", ".txt", ".zip", ".cdr", ".html"]).map((z) => z.name).slice(0, 8) : [];
+            marcarFallo(item, "el archivo descargado no era un XML de comprobante", {
+              ...llenado,
+              arch: { tipoArch, len: buf.length, firma: firma.replace(/[^\x20-\x7e]/g, "."), muestra: cabeza.replace(/\s+/g, " ").slice(0, 220), nombresZip },
+              iconosModal: dxml.iconos,
+            });
+          } else {
             // PDF OFICIAL de SUNAT (ícono rojo del modal): se adjunta a la factura.
             const pdfBuf = await descargarPdfResultado(fr, s.page).catch(() => null);
             if (pdfBuf && pdfBuf.slice(0, 4).toString("latin1") === "%PDF") {
