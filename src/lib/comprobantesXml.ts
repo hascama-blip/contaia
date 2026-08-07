@@ -757,7 +757,10 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
           const nuevas: FacturaXml[] = [];
           for (const x of xmls) {
             const fx = parseFacturaXml(x);
-            if (fx && fx.rucEmisor) { facturas.push(fx); nuevas.push(fx); }
+            if (fx && fx.rucEmisor) {
+              fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); // XML crudo para descargar
+              facturas.push(fx); nuevas.push(fx);
+            }
           }
           if (!nuevas.length) {
             // Diagnóstico: ¿qué se descargó realmente? (firma/tipo/muestra).

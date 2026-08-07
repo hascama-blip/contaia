@@ -6,289 +6,168 @@ import { getSolPass, getSolUser } from "@/lib/solSession";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
-// Descarga los XML de comprobantes RECIBIDOS (compras) desde SUNAT SOL a partir
-// de la relación subida y los arma en un Excel (reusa el Excel de detalle de
-// facturas XML). No pide mes/año: se descarga tal cual la relación, por orden y
-// número de comprobante.
+type EstadoFila = { estado: "pendiente" | "extrayendo" | "ok" | "error"; factura?: any; motivo?: string };
+
+// Descarga los XML de comprobantes RECIBIDOS (compras) desde SUNAT SOL, UNO POR
+// UNO a demanda (clic por fila). Extraer de a uno, a ritmo humano, evita que
+// SUNAT frene las consultas ("Error del Servidor / reintentar en 5 min"). Al
+// final se arma el Excel consolidado y el ZIP con todo lo extraído.
 export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string }) {
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [diagModo, setDiagModo] = useState(false);
-  const [diag, setDiag] = useState<string | null>(null);
-  const [facturas, setFacturas] = useState<any[]>([]);
+  const [busyRel, setBusyRel] = useState(false);
   const [relacion, setRelacion] = useState<any[]>([]);
   const [relNombre, setRelNombre] = useState<string | null>(null);
+  const [periodoSire, setPeriodoSire] = useState<string>("");
   const hoyD = new Date();
   const [sireMes, setSireMes] = useState(hoyD.getMonth() + 1);
   const [sireAnio, setSireAnio] = useState(hoyD.getFullYear());
-  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
-  // Comprobantes que no se pudieron bajar + cuántos reintentos se han hecho.
-  const [fallidos, setFallidos] = useState<any[]>([]);
-  const [reintentos, setReintentos] = useState(0);
-  // Periodo (YYYYMM) cuando la relación vino del SIRE — para nombrar el acumulado.
-  const [periodoSire, setPeriodoSire] = useState<string>("");
-  // Comprobante cuyo PDF se está generando (serie-número), para el spinner.
-  const [pdfBusy, setPdfBusy] = useState<string>("");
 
-  const MAX_REINTENTOS = 2;
-  // Tamaño de tanda: el frontend parte la relación y llama a la API por bloques
-  // para que ninguna petición dure demasiado (proxy/timeout) y se vea el avance.
-  const TANDA = 10;
+  // Estado por fila (índice de la relación) y control de cupo.
+  const [filas, setFilas] = useState<Record<number, EstadoFila>>({});
+  const [consumido, setConsumido] = useState(false);
+  const [filaBusy, setFilaBusy] = useState<number | null>(null);
+  const [auto, setAuto] = useState(false); // "extraer todas" en curso
+  const [genBusy, setGenBusy] = useState(false);
+
+  const estadoDe = (i: number): EstadoFila => filas[i] ?? { estado: "pendiente" };
+  const facturasOk = () =>
+    relacion.map((_, i) => filas[i]).filter((f) => f?.estado === "ok" && f.factura).map((f) => f!.factura);
+  const nOk = relacion.filter((_, i) => filas[i]?.estado === "ok").length;
 
   async function subirRelacion(file: File) {
-    setError(null); setInfo(null);
-    setBusy(true);
+    setError(null); setInfo(null); setBusyRel(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/comprobantes-xml/parsear", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo leer la relación."); return; }
-      setRelacion(data.items ?? []);
-      setPeriodoSire("");
-      setRelNombre(file.name);
-      setInfo(`Relación cargada: ${data.total} comprobante(s) por descargar.`);
-    } catch {
-      setError("Error de red al subir la relación.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function llamarTanda(body: any) {
-    const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    return { res, data };
-  }
-
-  /** Procesa una lista de comprobantes en tandas, acumulando sobre `acum` y
-   *  devolviendo los que fallaron. `consumir` = si esta corrida gasta 1 consulta
-   *  (solo la primera; los reintentos NO gastan). Lanza en 401/429 (cortan). */
-  async function procesarLista(items: any[], acum: any[], consumir: boolean): Promise<any[]> {
-    const solPass = getSolPass(clienteId);
-    const solUser = getSolUser(clienteId);
-    const total = items.length;
-    const nuevosFallidos: any[] = [];
-    // parte 0 = consume cupo. Para NO consumir (reintentos), empezamos en 1.
-    let parte = consumir ? 0 : 1;
-    let hechos = 0;
-    setProgreso({ hechos: 0, total });
-    for (let inicio = 0; inicio < total; inicio += TANDA, parte++) {
-      // El bloque puede venir de la relación (ítems) o de la lista de fallidos
-      // ({item, motivo}); normalizamos a ítem limpio antes de mandarlo.
-      const bloque = items.slice(inicio, inicio + TANDA).map((it: any) => it.item ?? it);
-      const { res, data } = await llamarTanda({ solUser, solPass, relacion: bloque, parte });
-      if (res.status === 401) throw { corte: data.error ?? "SUNAT rechazó el inicio de sesión." };
-      if (res.status === 429) throw { corte: data.error ?? "Sin consultas disponibles." };
-      if (res.status === 503 || data.sunatCaido) throw { corte: data.error ?? "SUNAT no está disponible ahora. Reintenta en unos minutos." };
-      if (Array.isArray(data.facturas)) acum.push(...data.facturas);
-      // Guardamos el fallo completo ({item, motivo}) para mostrarlo y reintentar.
-      if (Array.isArray(data.fallidos)) nuevosFallidos.push(...data.fallidos);
-      hechos += bloque.length;
-      setFacturas([...acum]);
-      setProgreso({ hechos: Math.min(hechos, total), total });
-    }
-    return nuevosFallidos;
+      setRelacion(data.items ?? []); setFilas({}); setConsumido(false);
+      setPeriodoSire(""); setRelNombre(file.name);
+      setInfo(`Relación cargada: ${data.total} comprobante(s). Extrae uno por uno con el botón de cada fila.`);
+    } catch { setError("Error de red al subir la relación."); }
+    finally { setBusyRel(false); }
   }
 
   async function cargarDesdeSire() {
-    setError(null); setInfo(null);
+    setError(null); setInfo(null); setBusyRel(true);
     const periodo = `${sireAnio}${String(sireMes).padStart(2, "0")}`;
-    setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire-detalle/relacion?periodo=${periodo}&tipo=compras`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo cargar la relación del SIRE."); return; }
-      setRelacion(data.items ?? []);
-      setPeriodoSire(periodo);
-      setRelNombre(`Detalle SIRE compras ${periodo}`);
-      setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) de compras (${periodo}).`);
-    } catch {
-      setError("Error de red al cargar la relación del SIRE.");
-    } finally {
-      setBusy(false);
-    }
+      setRelacion(data.items ?? []); setFilas({}); setConsumido(false);
+      setPeriodoSire(periodo); setRelNombre(`Detalle SIRE compras ${periodo}`);
+      setInfo(`Relación cargada del SIRE: ${data.total} comprobante(s) (${periodo}). Extrae uno por uno.`);
+    } catch { setError("Error de red al cargar la relación del SIRE."); }
+    finally { setBusyRel(false); }
   }
 
-  async function extraer() {
-    setError(null); setInfo(null); setDiag(null); setProgreso(null);
-    setFallidos([]); setReintentos(0);
+  // Extrae UN comprobante (login + consulta + descarga XML/PDF de esa fila).
+  async function extraerFila(i: number): Promise<boolean> {
+    const item = relacion[i];
+    if (!item) return false;
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
-    if (!solPass) { setError("Carga tus accesos SOL (arriba) para descargar los XML."); return; }
-    if (!relacion.length) { setError("Sube primero la relación de comprobantes (usa la plantilla)."); return; }
-    setBusy(true);
-    setFacturas([]);
+    if (!solPass) { setError("Carga tu Clave SOL (arriba) para extraer."); return false; }
+    setError(null);
+    setFilas((p) => ({ ...p, [i]: { estado: "extrayendo" } }));
+    setFilaBusy(i);
     try {
-      // Modo diagnóstico: una sola tanda chica (para calibrar sin ruido).
-      if (diagModo) {
-        const { res, data } = await llamarTanda({ solUser, solPass, relacion: relacion.slice(0, 3), diagnostico: true, parte: 0 });
-        if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-        if (!res.ok) { setError(data.error ?? "No se pudo descargar los comprobantes."); return; }
-        setFacturas(data.facturas ?? []);
-        setInfo(`${data.descargados ?? 0} comprobante(s) descargado(s) (diagnóstico).`);
-        return;
-      }
-
-      const total = relacion.length;
-      const acum: any[] = [];
-      const fallos = await procesarLista(relacion, acum, true);
-      setFallidos(fallos);
-      setInfo(
-        `${acum.length} de ${total} comprobante(s) descargado(s).` +
-        (fallos.length ? ` ${fallos.length} no se pudieron bajar (revisa la lista y reintenta).` : "")
-      );
-    } catch (e: any) {
-      setError(e?.corte ?? "Error de red al descargar los comprobantes.");
-    } finally {
-      setBusy(false);
-      setProgreso(null);
-    }
+      // parte 0 = consume 1 cupo (solo la 1ª vez); el resto no consume.
+      const parte = consumido ? 1 : 0;
+      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solUser, solPass, relacion: [item], parte }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: data.error ?? "Login SOL falló" } })); return false; }
+      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas((p) => ({ ...p, [i]: { estado: "pendiente" } })); return false; }
+      if (!consumido && res.ok) setConsumido(true);
+      const factura = Array.isArray(data.facturas) ? data.facturas[0] : null;
+      if (factura) { setFilas((p) => ({ ...p, [i]: { estado: "ok", factura } })); return true; }
+      const motivo = (Array.isArray(data.fallidos) && data.fallidos[0]?.motivo) || data.error || "SUNAT no devolvió el comprobante.";
+      setFilas((p) => ({ ...p, [i]: { estado: "error", motivo } }));
+      return false;
+    } catch {
+      setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: "Error de red" } }));
+      return false;
+    } finally { setFilaBusy(null); }
   }
 
-  /** Reintenta SOLO los comprobantes fallidos (máx. 2 veces, sin gastar cupo). */
-  async function reintentar() {
-    if (!fallidos.length || reintentos >= MAX_REINTENTOS) return;
-    setError(null); setInfo(null);
-    const pendientes = fallidos;
-    setBusy(true);
+  // Extrae TODAS las pendientes, una por una con una pausa (ritmo humano).
+  async function extraerTodas() {
+    setAuto(true); setError(null);
     try {
-      const acum = [...facturas];
-      const fallos = await procesarLista(pendientes, acum, false);
-      const intentoActual = reintentos + 1;
-      setReintentos(intentoActual);
-      setFacturas([...acum]);
-      setFallidos(fallos);
-      if (!fallos.length) {
-        setInfo(`¡Listo! Se recuperaron los ${pendientes.length} pendiente(s). Total: ${acum.length}.`);
-      } else if (intentoActual >= MAX_REINTENTOS) {
-        setInfo(
-          `Tras ${MAX_REINTENTOS} reintentos, ${fallos.length} comprobante(s) siguen sin descargar. ` +
-          `Es un problema temporal de SUNAT (su portal no los está entregando): intenta más tarde o descárgalos manualmente.`
-        );
-      } else {
-        setInfo(`Se recuperaron ${pendientes.length - fallos.length}; quedan ${fallos.length}. Puedes reintentar de nuevo.`);
+      for (let i = 0; i < relacion.length; i++) {
+        const est = filas[i]?.estado;
+        if (est === "ok") continue;
+        await extraerFila(i);
+        // Pausa entre comprobantes para no gatillar el límite de SUNAT.
+        await new Promise((r) => setTimeout(r, 6000));
       }
-    } catch (e: any) {
-      setError(e?.corte ?? "Error de red al reintentar.");
-    } finally {
-      setBusy(false);
-      setProgreso(null);
-    }
+    } finally { setAuto(false); }
   }
 
-  async function bajarBlob(body: any, nombre: string) {
-    const res = await fetch("/api/facturas-xml/excel", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    if (!res.ok) { setError("No se pudo generar el Excel."); return; }
-    const blob = await res.blob();
+  function bajarBlob(blob: Blob, nombre: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = nombre;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }
-
-  async function descargarExcel() {
-    setBusy(true);
-    try { await bajarBlob({ facturas, detalle: true }, "comprobantes-xml.xlsx"); }
-    finally { setBusy(false); }
+  function b64ToU8(b64: string): Uint8Array {
+    const bin = atob(b64); const by = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+    return by;
   }
+  const claveDe = (f: any) => String(f.serieNumero || `${f.serie}-${f.numero}`).replace(/[^\w.-]/g, "_") || "comprobante";
 
-  // Excel ACUMULADO del mes (una fila por comprobante + totales).
-  async function descargarExcelMes() {
-    setBusy(true);
-    try {
-      await bajarBlob(
-        { facturas, resumen: true, periodo: periodoSire },
-        periodoSire ? `compras-xml-${periodoSire}.xlsx` : "compras-xml-acumulado.xlsx"
-      );
-    } finally { setBusy(false); }
+  function descargarXml(f: any) {
+    if (!f.xmlBase64) { setError("Este comprobante no tiene el XML guardado."); return; }
+    bajarBlob(new Blob([b64ToU8(f.xmlBase64)], { type: "application/xml" }), `${claveDe(f)}.xml`);
   }
-
-  // TODAS las facturas en un ZIP (los PDF acumulados) — para no bajarlas una por
-  // una. Usa el PDF oficial capturado (pdfBase64); los que no lo tengan se
-  // generan al vuelo. El ZIP se arma en el navegador (instantáneo).
-  async function descargarZip() {
-    if (!facturas.length) return;
-    setError(null); setBusy(true);
-    try {
-      const files: Record<string, Uint8Array> = {};
-      const usados: Record<string, number> = {};
-      const faltan: { f: any; nombre: string }[] = [];
-      const nombreUnico = (base: string) => {
-        let n = base.replace(/[^\w.-]/g, "_") || "comprobante";
-        if (usados[n] != null) { usados[n] += 1; n = `${n}_${usados[n]}`; } else usados[n] = 0;
-        return n;
-      };
-      for (const f of facturas) {
-        const nombre = nombreUnico(f.serieNumero || `${f.serie}-${f.numero}`);
-        if (f.pdfBase64) {
-          const bin = atob(f.pdfBase64);
-          const by = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
-          files[`${nombre}.pdf`] = by;
-        } else {
-          faltan.push({ f, nombre });
-        }
-      }
-      // Los que no traen PDF oficial: se generan (representación) para incluirlos.
-      for (const { f, nombre } of faltan) {
-        try {
-          const res = await fetch("/api/facturas-xml/pdf", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
-          });
-          if (res.ok) files[`${nombre}.pdf`] = new Uint8Array(await res.arrayBuffer());
-        } catch { /* se omite ese */ }
-      }
-      if (!Object.keys(files).length) { setError("No hay PDFs para armar el ZIP."); return; }
-      const zipped = zipSync(files, { level: 0 }); // PDFs ya comprimidos → store
-      const blob = new Blob([zipped], { type: "application/zip" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = periodoSire ? `facturas-${periodoSire}.zip` : "facturas-xml.zip";
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("No se pudo armar el ZIP de facturas.");
-    } finally { setBusy(false); }
-  }
-
-  // PDF de UN comprobante (fila + botón, estilo buzón). Si se capturó el PDF
-  // OFICIAL de SUNAT (f.pdfBase64), se baja ese; si no, la representación generada.
   async function descargarPdf(f: any) {
-    const clave = f.serieNumero || `${f.serie}-${f.numero}`;
-    const nombre = `${String(clave).replace(/[^\w.-]/g, "_")}.pdf`;
-    setError(null); setPdfBusy(clave);
-    try {
-      let blob: Blob | null = null;
-      if (f.pdfBase64) {
-        // PDF oficial de SUNAT ya capturado: decodificar base64 → blob.
-        const bin = atob(f.pdfBase64);
-        const by = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
-        blob = new Blob([by], { type: "application/pdf" });
-      } else {
-        const res = await fetch("/api/facturas-xml/pdf", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }),
-        });
-        if (!res.ok) { setError("No se pudo generar el PDF del comprobante."); return; }
-        blob = await res.blob();
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = nombre;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    } catch { setError("Error de red al generar el PDF."); }
-    finally { setPdfBusy(""); }
+    if (f.pdfBase64) { bajarBlob(new Blob([b64ToU8(f.pdfBase64)], { type: "application/pdf" }), `${claveDe(f)}.pdf`); return; }
+    // Sin PDF oficial: generar la representación.
+    const res = await fetch("/api/facturas-xml/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factura: f }) });
+    if (!res.ok) { setError("No se pudo generar el PDF."); return; }
+    bajarBlob(await res.blob(), `${claveDe(f)}.pdf`);
   }
+
+  // ZIP con XML + PDF de todo lo extraído.
+  function descargarZip() {
+    const fs = facturasOk();
+    if (!fs.length) { setError("Aún no has extraído comprobantes."); return; }
+    const files: Record<string, Uint8Array> = {};
+    const usados: Record<string, number> = {};
+    for (const f of fs) {
+      let base = claveDe(f);
+      if (usados[base] != null) { usados[base]++; base = `${base}_${usados[base]}`; } else usados[base] = 0;
+      if (f.xmlBase64) files[`${base}.xml`] = b64ToU8(f.xmlBase64);
+      if (f.pdfBase64) files[`${base}.pdf`] = b64ToU8(f.pdfBase64);
+    }
+    if (!Object.keys(files).length) { setError("No hay archivos que empaquetar."); return; }
+    const zipped = zipSync(files, { level: 0 });
+    bajarBlob(new Blob([zipped], { type: "application/zip" }), periodoSire ? `comprobantes-${periodoSire}.zip` : "comprobantes-xml.zip");
+  }
+
+  async function descargarExcel(resumen: boolean) {
+    const fs = facturasOk();
+    if (!fs.length) { setError("Aún no has extraído comprobantes."); return; }
+    setGenBusy(true);
+    try {
+      const res = await fetch("/api/facturas-xml/excel", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resumen ? { facturas: fs, resumen: true, periodo: periodoSire } : { facturas: fs, detalle: true }),
+      });
+      if (!res.ok) { setError("No se pudo generar el Excel."); return; }
+      bajarBlob(await res.blob(), resumen ? (periodoSire ? `compras-xml-${periodoSire}.xlsx` : "compras-xml-acumulado.xlsx") : "comprobantes-xml.xlsx");
+    } finally { setGenBusy(false); }
+  }
+
+  const hayRel = relacion.length > 0;
 
   return (
     <section className="card p-5">
@@ -297,44 +176,28 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         <span className="badge bg-slate-100 text-slate-500">Solo Usuario + Clave SOL</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Sube la <strong>relación de comprobantes</strong> (con la plantilla). El sistema descarga sus
-        <strong> XML de compras</strong> directo de SUNAT (Consulta de comprobantes, SEE-SOL), en el
-        mismo orden y número que la relación, y los arma en un <strong>Excel</strong> con el detalle.
+        Sube la <strong>relación de comprobantes</strong> (o cárgala del SIRE) y extrae los XML
+        <strong> uno por uno</strong> con el botón de cada fila. Extraer de a uno, a tu ritmo, evita que
+        SUNAT frene las consultas. Al final descargas el <strong>Excel consolidado</strong> y el ZIP.
       </p>
 
-      {/* Relación de comprobantes: descargar plantilla + subir la llena */}
+      {/* Relación: plantilla + subir + SIRE */}
       <div className="mb-4 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
-        <p className="mb-2 text-xs font-semibold text-brand-800">Relación de comprobantes a descargar</p>
+        <p className="mb-2 text-xs font-semibold text-brand-800">Relación de comprobantes a extraer</p>
         <div className="flex flex-wrap items-center gap-2">
-          <a
-            href="/api/comprobantes-xml/plantilla"
-            className="btn-ghost text-sm"
-            download
-          >
-            ⬇ Descargar plantilla (Excel)
-          </a>
-          <label className={`btn-primary cursor-pointer text-sm ${busy ? "pointer-events-none opacity-50" : ""}`}>
+          <a href="/api/comprobantes-xml/plantilla" className="btn-ghost text-sm" download>⬇ Descargar plantilla (Excel)</a>
+          <label className={`btn-primary cursor-pointer text-sm ${busyRel ? "pointer-events-none opacity-50" : ""}`}>
             ⬆ Subir relación llena
-            <input
-              type="file"
-              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirRelacion(f); e.currentTarget.value = ""; }}
-            />
+            <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirRelacion(f); e.currentTarget.value = ""; }} />
           </label>
           {relNombre && (
             <span className="text-xs text-emerald-700">
               ✓ {relNombre} · {relacion.length} comprobante(s)
-              <button className="ml-2 text-slate-400 underline" onClick={() => { setRelacion([]); setRelNombre(null); }}>quitar</button>
+              <button className="ml-2 text-slate-400 underline" onClick={() => { setRelacion([]); setRelNombre(null); setFilas({}); }}>quitar</button>
             </span>
           )}
         </div>
-        <p className="mt-2 text-[10px] text-slate-400">
-          Descarga la plantilla, complétala (RUC emisor, tipo, serie, número, fecha, monto) y súbela.
-          Se descargan tal cual, por orden y número de comprobante.
-        </p>
-
-        {/* O cargar la relación directamente del Detalle SIRE (compras) guardado. */}
         <div className="mt-3 border-t border-brand-200 pt-3">
           <p className="mb-1 text-[11px] font-semibold text-brand-800">…o usa el Detalle SIRE (compras) ya extraído</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -344,181 +207,84 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
             <select className="input h-8 py-0 text-xs" value={sireAnio} onChange={(e) => setSireAnio(Number(e.target.value))}>
               {[hoyD.getFullYear(), hoyD.getFullYear() - 1, hoyD.getFullYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button className="btn-ghost text-sm" onClick={cargarDesdeSire} disabled={busy}>📋 Cargar del SIRE</button>
+            <button className="btn-ghost text-sm" onClick={cargarDesdeSire} disabled={busyRel}>📋 Cargar del SIRE</button>
           </div>
-          <p className="mt-1 text-[10px] text-slate-400">
-            Trae la lista de compras que extrajiste en <strong>Detalle SIRE</strong> y descarga sus XML (con glosa). Debes haberlo extraído antes ahí.
-          </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <button className="btn-primary" onClick={extraer} disabled={busy}>
-          {busy
-            ? progreso ? `Descargando ${progreso.hechos}/${progreso.total}…` : "Descargando…"
-            : "⬇ Descargar XML de SUNAT"}
-        </button>
-        {facturas.length > 0 && (
-          <>
-            <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>
-              ⬇ Excel con el detalle
+      {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
+      {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+
+      {hayRel && (
+        <>
+          {/* Acciones globales */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button className="btn-primary text-sm" onClick={extraerTodas} disabled={auto || filaBusy !== null}>
+              {auto ? "Extrayendo todas…" : "▶ Extraer todas (una por una)"}
             </button>
-            <button className="btn-ghost" onClick={descargarExcelMes} disabled={busy} title="Una fila por comprobante + totales del mes">
-              ⬇ Excel del mes (acumulado)
-            </button>
-            <button className="btn-primary" onClick={descargarZip} disabled={busy} title="Todas las facturas (PDF) en un solo ZIP">
-              ⬇ Todas las facturas (ZIP)
-            </button>
-          </>
-        )}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
-          Modo diagnóstico
-        </label>
-      </div>
-
-      {relacion.length > 0 && facturas.length === 0 && (
-        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-          <div className="bg-slate-50 px-3 py-1 text-[11px] font-bold uppercase text-slate-500">
-            Relación cargada ({relacion.length}) — esto es lo que se descargará
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[10px] uppercase text-slate-400">
-                <th className="px-3 py-1">RUC Emisor</th>
-                <th className="px-3 py-1">Tipo</th>
-                <th className="px-3 py-1">Serie</th>
-                <th className="px-3 py-1">Número</th>
-              </tr>
-            </thead>
-            <tbody>
-              {relacion.slice(0, 12).map((r: any, i: number) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="px-3 py-1 text-slate-600">{r.rucEmisor}</td>
-                  <td className="px-3 py-1 text-slate-600">{r.tipo}</td>
-                  <td className="px-3 py-1 text-slate-600">{r.serie}</td>
-                  <td className="px-3 py-1 text-slate-600">{r.numero}</td>
-                </tr>
-              ))}
-              {relacion.length > 12 && (
-                <tr><td className="px-3 py-1 text-slate-400" colSpan={4}>… y {relacion.length - 12} más</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {progreso && (
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs text-slate-500">
-            <span>Descargando XML de SUNAT…</span>
-            <span>{progreso.hechos}/{progreso.total}</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full rounded-full bg-brand-600 transition-all"
-              style={{ width: `${Math.round((progreso.hechos / Math.max(1, progreso.total)) * 100)}%` }}
-            />
-          </div>
-          <p className="mt-1 text-[10px] text-slate-400">
-            No cierres esta pestaña. Cada comprobante toma unos segundos; el total puede tardar varios minutos.
-          </p>
-        </div>
-      )}
-
-      {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
-      {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-      {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
-
-      {/* Comprobantes que NO se pudieron descargar + reintento (máx. 2). */}
-      {fallidos.length > 0 && !busy && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-amber-800">
-              ⚠ {fallidos.length} comprobante(s) no se descargaron
-            </p>
-            {reintentos < MAX_REINTENTOS ? (
-              <button className="btn-primary text-sm" onClick={reintentar} disabled={busy}>
-                🔁 Reintentar los que faltan ({reintentos + 1}/{MAX_REINTENTOS})
-              </button>
-            ) : (
-              <span className="badge bg-red-100 text-red-700">Sin más reintentos</span>
+            <span className="text-xs text-slate-500">{nOk}/{relacion.length} extraídos</span>
+            {nOk > 0 && (
+              <>
+                <button className="btn-ghost text-sm" onClick={() => descargarExcel(true)} disabled={genBusy}>⬇ Excel consolidado</button>
+                <button className="btn-ghost text-sm" onClick={() => descargarExcel(false)} disabled={genBusy}>⬇ Excel detalle</button>
+                <button className="btn-ghost text-sm" onClick={descargarZip}>⬇ Todo (ZIP)</button>
+              </>
             )}
           </div>
-          {reintentos >= MAX_REINTENTOS && (
-            <p className="mt-2 text-xs text-red-700">
-              Tras {MAX_REINTENTOS} reintentos siguen sin bajar. Es un <strong>problema temporal de SUNAT</strong>
-              {" "}(su portal no los está entregando). Intenta más tarde o descárgalos manualmente.
-            </p>
-          )}
-          <div className="mt-2 max-h-40 overflow-auto rounded border border-amber-200 bg-white">
-            <table className="w-full text-xs">
-              <thead>
+
+          {/* Tabla por fila */}
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[640px] text-xs">
+              <thead className="bg-slate-50">
                 <tr className="text-left text-[10px] uppercase text-slate-400">
-                  <th className="px-2 py-1">RUC Emisor</th>
-                  <th className="px-2 py-1">Tipo</th>
-                  <th className="px-2 py-1">Serie-Número</th>
-                  <th className="px-2 py-1">Motivo</th>
+                  <th className="px-3 py-1">RUC Emisor</th>
+                  <th className="px-3 py-1">Tipo</th>
+                  <th className="px-3 py-1">Serie-Número</th>
+                  <th className="px-3 py-1">Proveedor / estado</th>
+                  <th className="px-3 py-1 text-right">Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {fallidos.map((f: any, i: number) => {
-                  const it = f.item ?? f;
+                {relacion.map((r, i) => {
+                  const e = estadoDe(i);
                   return (
-                    <tr key={i} className="border-t border-amber-100">
-                      <td className="px-2 py-1 text-slate-600">{it.rucEmisor}</td>
-                      <td className="px-2 py-1 text-slate-600">{it.tipo}</td>
-                      <td className="px-2 py-1 font-medium text-slate-700">{it.serie}-{it.numero}</td>
-                      <td className="px-2 py-1 text-slate-500">{f.motivo ?? "—"}</td>
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="px-3 py-1 text-slate-600">{r.rucEmisor}</td>
+                      <td className="px-3 py-1 text-slate-600">{r.tipo}</td>
+                      <td className="px-3 py-1 font-medium text-slate-700">{r.serie}-{r.numero}</td>
+                      <td className="px-3 py-1">
+                        {e.estado === "ok" && <span className="text-slate-600">{e.factura?.razonSocialEmisor || "✓ extraído"}</span>}
+                        {e.estado === "extrayendo" && <span className="text-amber-600">Extrayendo…</span>}
+                        {e.estado === "error" && <span className="text-red-600" title={e.motivo}>⚠ {e.motivo?.slice(0, 60)}</span>}
+                        {e.estado === "pendiente" && <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-3 py-1 text-right">
+                        {e.estado === "ok" ? (
+                          <span className="inline-flex gap-1">
+                            <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarXml(e.factura)}>XML</button>
+                            <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
+                          </span>
+                        ) : (
+                          <button
+                            className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            onClick={() => extraerFila(i)}
+                            disabled={auto || filaBusy !== null}
+                          >
+                            {e.estado === "extrayendo" ? "…" : e.estado === "error" ? "🔁 Reintentar" : "⬇ Extraer"}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {facturas.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <div className="mb-1 text-[11px] font-bold uppercase text-slate-500">
-            Comprobantes descargados ({facturas.length}) — descarga el PDF de cada uno a la derecha
-          </div>
-          <table className="w-full min-w-[620px] text-xs">
-            <thead>
-              <tr className="text-left text-[10px] uppercase text-slate-400">
-                <th className="py-1">Serie-Número</th>
-                <th className="py-1">Fecha</th>
-                <th className="py-1">Proveedor</th>
-                <th className="py-1 text-right">Total</th>
-                <th className="py-1 text-right">PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {facturas.map((f, i) => {
-                const clave = f.serieNumero || `${f.serie}-${f.numero}`;
-                return (
-                  <tr key={i} className="border-t border-slate-100">
-                    <td className="py-1 text-slate-600">{f.serieNumero}</td>
-                    <td className="py-1 text-slate-500">{f.fecha}</td>
-                    <td className="py-1 text-slate-600">{f.razonSocialEmisor || f.rucEmisor}</td>
-                    <td className="py-1 text-right tabular-nums text-slate-700">{Number(f.total).toFixed(2)}</td>
-                    <td className="py-1 text-right">
-                      <button
-                        className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
-                        onClick={() => descargarPdf(f)}
-                        disabled={pdfBusy === clave}
-                        title="Descargar la representación impresa (PDF) de este comprobante"
-                      >
-                        {pdfBusy === clave ? "…" : "⬇ PDF"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+          <p className="mt-2 text-[10px] text-slate-400">
+            Consejo: si SUNAT responde “Error del Servidor”, espera unos minutos y reintenta esa fila. Extraer de a
+            uno (o con la pausa de “Extraer todas”) reduce ese bloqueo.
+          </p>
+        </>
       )}
     </section>
   );

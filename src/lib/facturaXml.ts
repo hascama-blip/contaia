@@ -58,6 +58,8 @@ export interface FacturaXml {
   glosa: string;
   /** PDF OFICIAL de SUNAT (ícono rojo del modal) en base64, si se capturó. */
   pdfBase64?: string;
+  /** XML crudo del comprobante en base64 (para descargarlo tal cual). */
+  xmlBase64?: string;
 }
 
 function asArray<T>(x: T | T[] | undefined): T[] {
