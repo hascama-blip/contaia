@@ -87,6 +87,17 @@ async function clicTexto(ctx: any, textos: string[]): Promise<boolean> {
   return false;
 }
 
+/** Cierra anuncios/avisos flotantes de SUNAT (novedades, encuestas, etc.)
+ *  pulsando "Ver más tarde"/"Ahora no"/"Omitir". Textos específicos para NO
+ *  tocar los botones del formulario (Consultar/Limpiar/Aceptar). */
+async function cerrarAnuncios(ctx: any): Promise<boolean> {
+  return await clicTexto(ctx, [
+    "Ver más tarde", "Ver mas tarde", "Recordar más tarde", "Recordarme más tarde",
+    "Más tarde", "Mas tarde", "Ahora no", "En otro momento", "Omitir",
+    "No, gracias", "Cerrar aviso", "Saltar",
+  ]);
+}
+
 /** Clic NATIVO por texto (exact y luego parcial) en cualquier frame. Es el
  *  método que sí funciona en el menú SOL (mismo que usa el F36). */
 async function clicNativo(ctx: any, textos: string[], timeout = 4000): Promise<string | null> {
@@ -178,6 +189,8 @@ async function loginSol(params: ComprobantesParams, pasos: any[]) {
       await clicTexto(ctx, ["Continuar sin confirmar", "Continuar"]);
       await page.waitForTimeout(1800);
     }
+    // Cerrar anuncio flotante de novedades si aparece ("Ver más tarde"…).
+    await cerrarAnuncios(ctx);
     // Detección de login idéntica a fraccionamiento/buzón/RTT (probada).
     url = page.url();
     const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
@@ -618,6 +631,9 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
       }
       pasos.push({ paso: "menu-form", formOk });
     }
+
+    // Cerrar anuncio flotante si apareció sobre el formulario ("Ver más tarde"…).
+    await cerrarAnuncios(s.ctx);
 
     // Volcado del formulario (antes de llenar).
     const estructura = await volcarEstructura(s.ctx);
