@@ -335,64 +335,51 @@ async function llenarYConsultar(fr: any, page: any, item: ItemRelacion): Promise
     }
     hecho.rucEmisorPedido = item.rucEmisor;
     hecho.rucEmisorVal = await rucInput.inputValue().catch(() => "");
-    // 3) TIPO de comprobante (<select> nativo). RECIÉN aquí (con el RUC puesto) el
-    //    dropdown está poblado; se espera a que esté listo y se usa selectOption.
+    // 3) TIPO de comprobante: es un DESPLEGABLE CON BUSCADOR (no un <select>
+    //    simple). Como a mano: se ABRE el desplegable y se CLICA "Factura" en la
+    //    lista. (selectOption sobre el <select> oculto NO sincroniza el widget →
+    //    SUNAT recibe el tipo vacío → "Error del Servidor".)
     const label = TIPO_LABEL[item.tipo] ?? "Factura";
     const keyw = TIPO_KEYS[item.tipo] ?? "factura";
     let tipoOk = false;
-    let se: any = null;
-    let opciones: string[] = [];
-    // Buscar el <select> del tipo en TODOS los frames de la página, con espera
-    // (se renderiza de forma intermitente tras validar el RUC).
-    const framesPagina = () => { try { return fr.page().frames(); } catch { return [fr]; } };
-    for (let w = 0; w < 16 && !se; w++) {
-      for (const f2 of framesPagina()) {
-        const selects = f2.locator("select");
-        const nSel = await selects.count().catch(() => 0);
-        for (let k = 0; k < nSel; k++) {
-          const cand = selects.nth(k);
-          const ops = await cand.locator("option").allInnerTexts().catch(() => []) as string[];
-          if (ops.some((o) => /factura|boleta|cr[eé]dito|d[eé]bito|recibo/i.test(o))) { se = cand; opciones = ops; break; }
-        }
-        if (se) break;
-      }
-      if (!se) await page.waitForTimeout(500).catch(() => {});
-    }
-    if (se) {
-      hecho.tipoOpciones = opciones.map((o) => o.trim()).filter(Boolean).slice(0, 25);
-      const objetivo = opciones.find((o) => o.trim().toLowerCase() === label.toLowerCase())
-        || opciones.find((o) => new RegExp(keyw, "i").test(o));
-      if (objetivo) {
-        await se.selectOption({ label: objetivo }).catch(async () => {
-          await se.selectOption({ index: opciones.indexOf(objetivo) }).catch(() => {});
-        });
-        await se.evaluate((el: any) => el.dispatchEvent(new Event("change", { bubbles: true }))).catch(() => {});
-        hecho.tipoSelectNativo = true;
-        hecho.tipoVal = await se.evaluate((el: any) => el.options[el.selectedIndex]?.text || "").catch(() => "");
-        tipoOk = true;
-      }
-    }
-    if (!tipoOk) {
-      // Respaldo: dropdown custom "Seleccionar" + clic en la opción.
-      await fr.getByText("Seleccionar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
-      await page.waitForTimeout(900).catch(() => {});
-      hecho.tipoOpciones = await fr
-        .locator('mat-option, [role="option"], li, .dropdown-item, .mat-option')
-        .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).slice(0, 25)).catch(() => []);
-      const opt = fr.getByText(label, { exact: true });
-      if (await opt.count().catch(() => 0)) await opt.first().click({ timeout: 3000 }).catch(() => {});
+    // ¿Está abierto el panel de opciones? (aparecen otras opciones de la lista).
+    const panelListo = async () =>
+      (await fr.getByText(/Boleta de Venta|Comprobante de Percepci|Recibo por Honorarios|Liquidaci[oó]n de compra/i).first().count().catch(() => 0)) > 0;
+    // 3a) Abrir el desplegable (clic en el control que muestra "Seleccionar").
+    for (let intento = 0; intento < 4 && !(await panelListo()); intento++) {
+      const trig = fr.getByText("Seleccionar", { exact: true }).first();
+      if (await trig.count().catch(() => 0)) await trig.click({ timeout: 3000 }).catch(() => {});
       else {
-        const porClave = fr.getByText(new RegExp(keyw, "i")).last();
-        if (await porClave.count().catch(() => 0)) await porClave.click({ timeout: 2500 }).catch(() => {});
-        else await fr.getByText(label, { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+        const combo = fr.locator('[role="combobox"], .p-dropdown, .ng-select, ng-select, select').first();
+        if (await combo.count().catch(() => 0)) await combo.click({ force: true, timeout: 3000 }).catch(() => {});
       }
+      await page.waitForTimeout(700).catch(() => {});
+    }
+    // 3b) Volcado de opciones visibles (diagnóstico).
+    hecho.tipoOpciones = await fr
+      .locator('[role="option"], .p-dropdown-item, .ng-option, li, .dropdown-item')
+      .allInnerTexts().then((a: string[]) => a.map((t) => t.trim()).filter(Boolean).filter((t) => t.length < 50).slice(0, 30)).catch(() => []);
+    // 3c) Si hay buscador dentro del panel, filtrar por "Factura".
+    const buscador = fr.locator('.p-dropdown-filter, input.p-dropdown-filter, .ng-input > input, input[type="search"], input[aria-label*="Search" i], input[aria-label*="Buscar" i]').first();
+    if (await buscador.count().catch(() => 0)) {
+      await buscador.fill(label).catch(() => {});
+      await page.waitForTimeout(700).catch(() => {});
+    }
+    // 3d) Clic en la opción EXACTA "Factura" (no "Factura - Nota de Crédito").
+    const opcionExacta = fr.getByRole("option", { name: new RegExp(`^\\s*${label}\\s*$`, "i") }).first();
+    if (await opcionExacta.count().catch(() => 0)) { await opcionExacta.click({ timeout: 3000 }).catch(() => {}); tipoOk = true; }
+    else {
+      const porTexto = fr.getByText(label, { exact: true }).first();
+      if (await porTexto.count().catch(() => 0)) { await porTexto.click({ timeout: 3000 }).catch(() => {}); tipoOk = true; }
     }
     hecho.tipo = label;
+    hecho.tipoOk = tipoOk;
     // Confirmar que el tipo quedó seleccionado (muestra su etiqueta en aria-label).
     let tipoConfirmado = false;
     for (let w = 0; w < 8 && !tipoConfirmado; w++) {
       await page.waitForTimeout(400).catch(() => {});
-      tipoConfirmado = (await fr.locator(`input[aria-label*="${label}" i]`).count().catch(() => 0)) > 0;
+      tipoConfirmado = (await fr.locator(`input[aria-label*="${label}" i]`).count().catch(() => 0)) > 0
+        || (await fr.getByText(new RegExp(`Tipo de comprobante[^]{0,25}${label}`, "i")).first().count().catch(() => 0)) > 0;
     }
     hecho.tipoConfirmado = tipoConfirmado;
     // 4) Serie y Número.
