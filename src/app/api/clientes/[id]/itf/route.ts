@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
+import { setItfReporte } from "@/lib/db";
 import { consultarItf } from "@/lib/itf";
 
 export const runtime = "nodejs";
@@ -21,5 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio, diagnostico: body.diagnostico === true });
   if (body.diagnostico === true) return NextResponse.json({ diag: r.diag });
   if (!r.ok) return NextResponse.json({ error: r.error ?? "No se pudo consultar el ITF.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
+  // Persistimos el reporte (aunque venga vacío) para el informe.
+  if (r.itf) await setItfReporte(params.id, r.itf).catch(() => {});
   return NextResponse.json({ itf: r.itf, diag: r.diag });
 }

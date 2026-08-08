@@ -854,6 +854,15 @@ export async function createCliente(data: {
   return cliente;
 }
 
+/** Guarda el último reporte de ITF consultado (para mostrarlo en el informe). */
+export async function setItfReporte(clienteId: string, itf: { ejercicio: string; filas: any[]; total: number } | null): Promise<void> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return;
+  cliente.itf = itf ? { ...itf, consultadoEn: new Date().toISOString() } : null;
+  await writeStore(store);
+}
+
 export async function updateCliente(
   id: string,
   patch: Partial<Pick<Cliente, "razonSocial" | "ruc" | "email" | "telefono" | "negocio">>

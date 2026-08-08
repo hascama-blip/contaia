@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getClienteDeUsuario } from "@/lib/db";
+import { getClienteDeUsuario, getSolicitudRentas } from "@/lib/db";
 import { requireUser, studioId } from "@/lib/auth";
 import { generarDiagnostico } from "@/lib/diagnostico";
-import { compararDeclaracionSire } from "@/lib/declaracion";
-import { compararAnual } from "@/lib/declaracionAnual";
 import { etiquetaPeriodo } from "@/lib/sire";
 import { PrintButton, DescargarPdfBtn } from "@/components/PrintButton";
 import { LogoAsenco } from "@/components/Logo";
 import { fmtFecha, fmtSoles } from "@/components/ui";
+import { llevaSire, esPersonaNatural } from "@/lib/types";
 import type { BuzonMensaje } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,18 +27,13 @@ export default async function InformePage({ params }: { params: { id: string } }
   // el estado y los montos "no aplican".
   const sireNoObligado = Boolean(cliente.sireEstado?.noObligado) || sire.some((s) => s.noObligado);
 
-  // Comparativo declaración mensual vs SIRE (por periodo con declaración cargada).
-  const declaraciones = cliente.declaraciones ?? [];
-  const sirePorPeriodo = new Map(sire.map((s) => [s.periodo, s]));
-  const comparativos = declaraciones.map((dec) =>
-    compararDeclaracionSire(dec, sirePorPeriodo.get(dec.periodo) ?? null)
-  );
-  const totalDeclaraciones = declaraciones.length;
-  const periodosConDiferencia = comparativos.filter((c) => c.hayDiferencias).length;
-
-  // Comparativo de DJ anuales (Formulario 710), año vs año.
-  const declAnuales = cliente.declaracionesAnuales ?? [];
-  const compAnual = declAnuales.length >= 2 ? compararAnual(declAnuales) : null;
+  // Módulos por tipo de contribuyente. Persona natural (RUC 10/15): reporte de
+  // rentas 4ta/5ta e ITF. Empresa (RUC 20) o persona natural con negocio: SIRE.
+  const personaNatural = esPersonaNatural(cliente.ruc);
+  const obligadoSire = llevaSire(cliente);
+  const solRentas = personaNatural ? await getSolicitudRentas(cliente.id) : null;
+  const rentas = solRentas?.reporte ?? null;
+  const itf = cliente.itf ?? null;
 
   // Deudas tributarias extraídas de SUNAT (Fraccionamiento F36).
   const deudasF36 = cliente.deudasF36?.tablas ?? [];
@@ -69,14 +63,10 @@ export default async function InformePage({ params }: { params: { id: string } }
     observacionesFinal.push({ nivel: "alto", texto: `Buzón SOL: ${nPeligrosos} mensaje(s) de fiscalización / procedimientos no contenciosos. Atención inmediata.` });
   if (nUrgentes > 0)
     observacionesFinal.push({ nivel: "medio", texto: `Buzón SOL: ${nUrgentes} mensaje(s) de cobranza / valores. Revisar y responder.` });
-  if (periodosConDiferencia > 0)
-    observacionesFinal.push({ nivel: "medio", texto: `${periodosConDiferencia} periodo(s) con diferencias entre la declaración mensual y el SIRE. Conciliar.` });
-  if (compAnual) {
-    for (const c of compAnual.cuadre.filter((c) => !c.cuadra))
-      observacionesFinal.push({ nivel: "medio", texto: `Balance ${c.ejercicio}: no cuadra (dif. ${fmtSoles(c.diferencia)}). Revisar Estados Financieros.` });
-    for (const o of compAnual.observaciones.slice(0, 4))
-      observacionesFinal.push({ nivel: "info", texto: `DJ anual — ${o}` });
-  }
+  if (rentas && (rentas.totalRetencion ?? 0) > 0)
+    observacionesFinal.push({ nivel: "info", texto: `Rentas 4ta/5ta: retenciones por ${fmtSoles(rentas.totalRetencion)} en el ejercicio ${rentas.anio || ""}. Considerar en la declaración anual.` });
+  if (itf && (itf.total ?? 0) > 0)
+    observacionesFinal.push({ nivel: "info", texto: `ITF por ${fmtSoles(itf.total)} en el ejercicio ${itf.ejercicio || ""}.` });
   for (const h of d.hallazgos.filter((h) => h.severidad === "alto" || h.severidad === "critico"))
     observacionesFinal.push({ nivel: "alto", texto: h.titulo });
   // Acumulados de TODOS los periodos consultados (ventas/compras SUNAT).
@@ -147,7 +137,7 @@ export default async function InformePage({ params }: { params: { id: string } }
             <p><span className="text-slate-400">RUC:</span> {cliente.ruc}</p>
             <p><span className="text-slate-400">Email:</span> {cliente.email || "—"}</p>
             <p><span className="text-slate-400">Teléfono:</span> {cliente.telefono || "—"}</p>
-            <p><span className="text-slate-400">Declaraciones comparadas:</span> {totalDeclaraciones}</p>
+            <p><span className="text-slate-400">Tipo:</span> {personaNatural ? (obligadoSire ? "Persona natural con negocio" : "Persona natural") : "Empresa"}</p>
           </div>
         </section>
 
@@ -176,7 +166,8 @@ export default async function InformePage({ params }: { params: { id: string } }
           )}
         </section>
 
-        {/* ===== Resumen (puntaje + acumulados) ===== */}
+        {/* ===== Resumen (acumulados SIRE) — solo si lleva SIRE ===== */}
+        {obligadoSire && (
         <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="sec-h">Resumen</h3>
           <div className="grid gap-4 md:grid-cols-2">
@@ -196,6 +187,7 @@ export default async function InformePage({ params }: { params: { id: string } }
             <KpiSmall label="IGV compras (acum.)" value={fmtSoles(igvComprasAcum)} />
           </div>
         </section>
+        )}
 
         {/* ===== Gráfico de ingresos (ventas) vs gastos (compras) por periodo ===== */}
         {datosGrafico.length >= 2 && (
@@ -414,136 +406,70 @@ export default async function InformePage({ params }: { params: { id: string } }
           </section>
         )}
 
-        {/* ===== 5) COMPARATIVO MENSUAL — Declaración vs SIRE ===== */}
-        {totalDeclaraciones > 0 && (
+        {/* ===== Reporte de Rentas y Retenciones (4ta/5ta) — persona natural ===== */}
+        {personaNatural && rentas && (
           <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="sec-h">
-              Declaración mensual vs SIRE
-            </h3>
-            <p className="mb-3 text-sm text-slate-600">
-              Se compararon {totalDeclaraciones} declaración(es) contra el registro SIRE.
-              {periodosConDiferencia > 0 ? (
-                <> <strong className="text-red-600">{periodosConDiferencia} periodo(s) con diferencias</strong> que requieren conciliación.</>
-              ) : (
-                <> Sin diferencias relevantes: lo declarado cuadra con el SIRE.</>
-              )}
+            <h3 className="sec-h">Reporte de Rentas y Retenciones (4ta / 5ta)</h3>
+            <p className="mb-3 text-xs text-slate-500">
+              Ejercicio {rentas.anio || "—"} · Renta 4ta {fmtSoles(rentas.totalRenta4ta ?? 0)} · Renta 5ta {fmtSoles(rentas.totalRenta5ta ?? 0)} · Total retención {fmtSoles(rentas.totalRetencion ?? 0)}
             </p>
-            <div className="space-y-4">
-              {comparativos.map((comp, idx) => {
-                const noPresento = declaraciones[idx]?.noPresento;
-                if (noPresento) {
-                  return (
-                    <div key={comp.periodo + idx} className="evitar-corte flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3">
-                      <p className="text-sm font-semibold text-slate-700">{etiquetaPeriodo(comp.periodo)}</p>
-                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">NO PRESENTÓ</span>
-                    </div>
-                  );
-                }
-                return (
-                <div key={comp.periodo + idx} className="evitar-corte rounded-lg border border-slate-200 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-700">
-                      {etiquetaPeriodo(comp.periodo)}
-                    </p>
-                    {comp.hayDiferencias ? (
-                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                        Con diferencias
-                      </span>
-                    ) : (
-                      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                        Cuadra
-                      </span>
-                    )}
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs uppercase text-slate-400">
-                        <th className="py-1">Concepto</th>
-                        <th className="py-1 text-right">Declarado</th>
-                        <th className="py-1 text-right">SIRE</th>
-                        <th className="py-1 text-right">Diferencia</th>
-                        <th className="py-1 text-right">%</th>
+            {(rentas.porEmpleador ?? []).map((g: any, i: number) => (
+              <div key={i} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">{g.empleador}</div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left uppercase text-slate-400">
+                      <th className="px-3 py-1">Periodo</th><th className="px-3 py-1">Concepto</th>
+                      <th className="px-3 py-1 text-right">Monto de renta</th>
+                      <th className="px-3 py-1 text-right">Monto de retención</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(g.filas ?? []).map((f: any, j: number) => (
+                      <tr key={j} className="border-t border-slate-100">
+                        <td className="px-3 py-1 text-slate-600">{f.periodoTxt}</td>
+                        <td className="px-3 py-1 text-slate-600">{f.concepto} categoría</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-slate-700">{fmtSoles(f.renta)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-slate-700">{fmtSoles(f.retencion)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {comp.filas.map((f) => (
-                        <tr key={f.concepto} className="border-t border-slate-100">
-                          <td className="py-1 text-slate-600">{f.concepto}</td>
-                          <td className="py-1 text-right">{fmtSoles(f.declarado)}</td>
-                          <td className="py-1 text-right">
-                            {f.estado === "sin-sire" ? "—" : fmtSoles(f.sire)}
-                          </td>
-                          <td
-                            className={`py-1 text-right font-medium ${
-                              f.estado === "alerta" ? "text-red-600" : "text-slate-600"
-                            }`}
-                          >
-                            {f.estado === "sin-sire" ? "—" : fmtSoles(f.diferencia)}
-                          </td>
-                          <td
-                            className={`py-1 text-right ${
-                              f.estado === "alerta" ? "text-red-600" : "text-slate-500"
-                            }`}
-                          >
-                            {f.estado === "sin-sire" ? "—" : `${f.porcentaje.toFixed(1)}%`}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                );
-              })}
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </section>
         )}
 
-        {/* DJ Anual — comparativo año vs año (Formulario 710) */}
-        {compAnual && (
+        {/* ===== ITF — persona natural ===== */}
+        {personaNatural && itf && (
           <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="sec-h">
-              DJ Anual — comparativo año vs año
-            </h3>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {compAnual.cuadre.map((c) => (
-                <span
-                  key={c.ejercicio}
-                  className={`rounded px-2 py-0.5 text-xs font-semibold ${
-                    c.cuadra ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {c.ejercicio}: {c.cuadra ? "Balance cuadra" : `No cuadra (dif. ${fmtInt(c.diferencia)})`}
-                </span>
-              ))}
-            </div>
-
-            {compAnual.observaciones.length > 0 && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="mb-1 text-xs font-bold uppercase text-amber-700">Observaciones — variaciones importantes</p>
-                <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-700">
-                  {compAnual.observaciones.map((o, i) => (
-                    <li key={i}>{o}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <p className="rompe-no mb-1 text-xs font-bold uppercase tracking-wide text-brand-700">Estados Financieros</p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <MiniTablaInforme titulo="Activo" filas={compAnual.activo} ejercicios={compAnual.ejercicios} />
-              <div className="space-y-3">
-                <MiniTablaInforme titulo="Pasivo" filas={compAnual.pasivo} ejercicios={compAnual.ejercicios} />
-                <MiniTablaInforme titulo="Patrimonio" filas={compAnual.patrimonio} ejercicios={compAnual.ejercicios} />
-              </div>
-            </div>
-
-            <p className="rompe-no mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-brand-700">Estado de Resultados</p>
-            {compAnual.resultadosVacio ? (
+            <h3 className="sec-h">ITF — Impuesto a las Transacciones Financieras</h3>
+            {(!itf.filas || itf.filas.length === 0) ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                No se registraron movimientos: no hubo operaciones en el año.
+                No cuenta con registros de ITF{itf.ejercicio ? ` en el ejercicio ${itf.ejercicio}` : ""}.
               </p>
             ) : (
-              <MiniTablaInforme titulo="" filas={compAnual.resultados} ejercicios={compAnual.ejercicios} />
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                    <th className="py-1.5">Periodo</th><th className="py-1.5">Concepto</th>
+                    <th className="py-1.5 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {itf.filas.map((f: any, i: number) => (
+                    <tr key={i}>
+                      <td className="py-1.5 text-slate-700">{f.periodo}</td>
+                      <td className="py-1.5 text-slate-600">{f.concepto}</td>
+                      <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtSoles(f.monto)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-50">
+                    <td className="py-1.5 text-right font-medium text-slate-500" colSpan={2}>Total</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold text-slate-700">{fmtSoles(itf.total)}</td>
+                  </tr>
+                </tbody>
+              </table>
             )}
           </section>
         )}

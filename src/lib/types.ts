@@ -130,9 +130,11 @@ export interface Cliente {
   ownerId?: string;
   razonSocial: string;
   ruc: string;
-  /** Solo RUC 10 (persona natural): "con" negocio (obligado a SIRE) o "sin"
+  /** Persona natural (RUC 10/15): "con" negocio (obligado a SIRE) o "sin"
    *  negocio (NO obligado a SIRE). Para RUC 20 no aplica (siempre lleva SIRE). */
   negocio?: "con" | "sin";
+  /** Último reporte de ITF consultado (persona natural), para el informe. */
+  itf?: { ejercicio: string; filas: { periodo: string; concepto: string; monto: number }[]; total: number; consultadoEn: string } | null;
   email: string;
   telefono: string;
   createdAt: string;
