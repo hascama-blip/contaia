@@ -113,11 +113,23 @@ async function volcar(ctx: any): Promise<any> {
 /** ¿Este frame es el del ITF? (por URL de la app o texto propio). */
 async function frameItf(ctx: any): Promise<any> {
   for (const fr of todosLosFrames(ctx)) {
-    if (/itf|transacc|financ/i.test(fr.url())) return fr;
+    if (/itf|transacc|financ|0695/i.test(fr.url())) return fr;
     const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
-    if (/Impuesto a las Transacciones Financieras|\bITF\b/i.test(txt)) return fr;
+    if (/Impuesto a las Transacciones Financieras|Consulta ITF|Formulario 0695|\bITF\b/i.test(txt)) return fr;
   }
   return null;
+}
+
+/** Lee todas las tablas de un frame como filas de texto (para ver el reporte). */
+async function leerTablas(frame: any): Promise<string[][][]> {
+  return frame.evaluate(() => {
+    const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+    return (Array.from(document.querySelectorAll("table")) as HTMLTableElement[])
+      .map((tb) => (Array.from(tb.querySelectorAll("tr")) as HTMLTableRowElement[])
+        .map((tr) => (Array.from(tr.querySelectorAll("th,td")) as HTMLElement[]).map((td) => norm(td.textContent)))
+        .filter((r) => r.some((c) => c)))
+      .filter((rows) => rows.length).slice(0, 12);
+  }).catch(() => []);
 }
 
 export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
@@ -155,16 +167,22 @@ export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
     }
     if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal).", diag: { pasos } };
 
-    // 2) Buscar el módulo de ITF por el menú (candidatos por nombre).
+    // 2) Ir a "Consulta de ITF" (menú confirmado). Si algún día capturamos el
+    //    code del acceso directo, se puede setear ITF_CODE para ir por URL.
+    const CODE = process.env.ITF_CODE;
+    if (CODE) {
+      await page.goto(`https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=${CODE}&s=ww1`, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+      await page.waitForTimeout(2000).catch(() => {});
+    }
     let fr: any = await frameItf(ctx);
     let opcion: string | null = null;
     if (!fr) {
       opcion = await clicMenu(ctx, [
+        "Consulta de ITF",
+        "Consulta ITF",
         "ITF",
         "Impuesto a las Transacciones Financieras",
         "Transacciones Financieras",
-        "Consulta de ITF",
-        "Reporte de ITF",
       ]);
     }
     for (let i = 0; i < 12 && !fr; i++) {
@@ -175,16 +193,54 @@ export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
     const menu = await opcionesDeMenu(ctx);
     pasos.push({ paso: "menu", encontrado: !!fr, onclick: opcion, opcionesMenu: menu });
 
-    // 3) (Cuando sepamos el formulario) seleccionar ejercicio y consultar.
-    //    Por ahora volcamos la estructura para calibrar.
-    const estructura = await volcar(ctx);
-    pasos.push({ paso: "estructura", ...estructura });
+    // 3) Formulario 0695: Periodo Inicial (aaaamm) y Periodo Final (aaaamm).
+    //    año → {año}01 a {año}12. Son los dos primeros campos de texto.
+    const ej = (params.ejercicio || "2025").replace(/\D/g, "").slice(0, 4);
+    const perIni = `${ej}01`, perFin = `${ej}12`;
+    let periodosOk = false;
+    if (fr) {
+      const inputs = fr.locator('input[type="text"], input:not([type])');
+      const n = await inputs.count().catch(() => 0);
+      if (n >= 2) {
+        await inputs.nth(0).fill(perIni).catch(() => {});
+        await inputs.nth(1).fill(perFin).catch(() => {});
+        const v0 = await inputs.nth(0).inputValue().catch(() => "");
+        const v1 = await inputs.nth(1).inputValue().catch(() => "");
+        periodosOk = /\d{6}/.test(v0) && /\d{6}/.test(v1);
+      }
+    }
+    const estructuraForm = await volcar(ctx);
+    pasos.push({ paso: "form", periodosOk, perIni, perFin, ...estructuraForm });
+
+    // 4) Siguiente → el reporte se muestra en pantalla.
+    let siguiente = false;
+    if (fr) {
+      siguiente = await clickAny(fr, ['input[value="Siguiente" i]', '#btnSiguiente', 'button:has-text("Siguiente")']);
+      if (!siguiente) siguiente = !!(await clickEnFrame(fr, ["Siguiente", "Continuar"]));
+    }
+    await page.waitForTimeout(3500).catch(() => {});
+    const frRep = (await frameItf(ctx)) || fr;
+    const tablas = frRep ? await leerTablas(frRep) : [];
+    pasos.push({ paso: "reporte", siguiente, tablas });
+
+    // 5) Parse best-effort: filas con periodo (aaaamm) y un monto.
+    const filas: ItfFila[] = [];
+    for (const rows of tablas) for (const celdas of rows) {
+      const per = celdas.find((c) => /^\d{6}$/.test(c));
+      const montoTxt = [...celdas].reverse().find((c) => /\d[\d.,]*\d|\d/.test(c) && !/^\d{6}$/.test(c) && /[.,]\d|^\d+$/.test(c));
+      if (per && montoTxt) {
+        const monto = Number(montoTxt.replace(/[^\d.-]/g, "")) || 0;
+        const concepto = celdas.filter((c) => c !== per && c !== montoTxt).join(" ").slice(0, 60);
+        filas.push({ periodo: `${per.slice(0, 4)}/${per.slice(4)}`, concepto, monto });
+      }
+    }
+    const total = filas.reduce((a, x) => a + x.monto, 0);
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
     if (!fr) return { ok: false, error: "No se encontró el módulo de ITF en el menú. Usa Modo diagnóstico y pásame la traza.", diag: { pasos } };
+    if (!filas.length) return { ok: false, error: "Se llegó al formulario pero no se pudo leer el reporte. Usa Modo diagnóstico y pásame la traza.", diag: { pasos } };
 
-    // Placeholder: hasta calibrar el formulario, devolvemos la estructura.
-    return { ok: false, error: "Módulo de ITF localizado; falta calibrar la lectura del reporte. Usa Modo diagnóstico.", diag: { pasos } };
+    return { ok: true, itf: { ejercicio: ej, filas, total }, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error consultando el ITF.", diag: { pasos } };
   } finally {
