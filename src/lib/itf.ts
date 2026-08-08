@@ -113,7 +113,7 @@ async function volcar(ctx: any): Promise<any> {
 /** ¿Este frame es el del ITF? (por URL de la app o texto propio). */
 async function frameItf(ctx: any): Promise<any> {
   for (const fr of todosLosFrames(ctx)) {
-    if (/itf|transacc|financ|0695/i.test(fr.url())) return fr;
+    if (/itconitf|itf|transacc|financ|0695/i.test(fr.url())) return fr;
     const txt = (await fr.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
     if (/Impuesto a las Transacciones Financieras|Consulta ITF|Formulario 0695|\bITF\b/i.test(txt)) return fr;
   }
@@ -167,13 +167,13 @@ export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
     }
     if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal).", diag: { pasos } };
 
-    // 2) Ir a "Consulta de ITF" (menú confirmado). Si algún día capturamos el
-    //    code del acceso directo, se puede setear ITF_CODE para ir por URL.
-    const CODE = process.env.ITF_CODE;
-    if (CODE) {
-      await page.goto(`https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=${CODE}&s=ww1`, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
-      await page.waitForTimeout(2000).catch(() => {});
-    }
+    // 2) Ir DIRECTO a "Consulta de ITF" por la URL de ejecución del menú
+    //    (code descubierto por DevTools: 13.6.1.1.1 → app cl-at-itconitf).
+    //    Respaldo: clic en la opción del menú.
+    const CODE = process.env.ITF_CODE || "13.6.1.1.1";
+    await page.goto(`https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=${CODE}&s=ww1`, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(2500).catch(() => {});
+    await cerrarPantallas(ctx, page);
     let fr: any = await frameItf(ctx);
     let opcion: string | null = null;
     if (!fr) {
