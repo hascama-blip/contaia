@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
 import { HeaderNav } from "@/components/HeaderNav";
+import PlanesModal from "@/components/PlanesModal";
 import { SupremoProvider } from "@/components/SupremoContext";
 import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default async function RootLayout({
             </div>
           </header>
         )}
+        {user && <PlanesModal />}
         <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">
           <SupremoProvider value={supremo}>{children}</SupremoProvider>
         </main>

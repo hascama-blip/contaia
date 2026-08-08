@@ -53,6 +53,8 @@ export default function LoginPage() {
         setAviso(data.mensaje ?? "Tu solicitud de acceso fue enviada. Espera la aprobación.");
         return;
       }
+      // Al ingresar, marca para mostrar la ventana de planes una vez.
+      try { localStorage.setItem("mostrar_planes", "1"); } catch { /* */ }
       router.replace(next);
       router.refresh();
     } finally {

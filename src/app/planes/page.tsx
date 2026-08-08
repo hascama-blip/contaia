@@ -1,161 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { PLANES, CONTACTO, mailtoPlan } from "@/lib/planes";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Adquirir módulos — Radar Tributario" };
-
-// Contacto para adquirir / cotizar planes.
-const CONTACTO = "dascama@gmail.com";
-const mailto = (plan: string) =>
-  `mailto:${CONTACTO}?subject=${encodeURIComponent(`Quiero adquirir el ${plan} — Radar Tributario`)}`;
-
-interface Plan {
-  nombre: string;
-  precio: string;
-  precioAntes?: string;
-  periodo?: string;
-  etiqueta?: string;
-  resumen: string;
-  destacado?: boolean;
-  cta: string;
-  ctaHref: string;
-  ctaEstilo: "primary" | "accent" | "ghost";
-  incluidos: { titulo: string; puntos: string[] }[];
-  proximamente?: { titulo: string; puntos: string[] };
-}
-
-const PLANES: Plan[] = [
-  {
-    nombre: "Plan Básico",
-    precio: "Gratis",
-    resumen: "Para empezar: consulta básica y el reporte analítico de auditoría.",
-    cta: "Empezar gratis",
-    ctaHref: "/",
-    ctaEstilo: "ghost",
-    incluidos: [
-      {
-        titulo: "Módulo de Consultas — 2 por semana",
-        puntos: [
-          "Consulta el estado del RUC en SUNAT (razón social, estado y condición de domicilio).",
-          "Actividad económica y datos generales del contribuyente.",
-          "Límite: 2 consultas a la semana.",
-        ],
-      },
-      {
-        titulo: "Reporte Analítico de Auditoría",
-        puntos: [
-          "Diagnóstico tributario del contribuyente con hallazgos y score de riesgo.",
-          "Revisión del buzón electrónico (mensajes peligrosos y urgentes) y deudas.",
-          "Dashboard e informe de gerencia imprimible (contingencias, buzón y gráficos en una hoja).",
-        ],
-      },
-    ],
-  },
-  {
-    nombre: "Plan Regular",
-    precio: "S/ 4.99",
-    precioAntes: "S/ 9.99",
-    periodo: "/mes",
-    etiqueta: "Lanzamiento −50%",
-    resumen: "Más consultas y el módulo de consultas tributarias.",
-    cta: "Solicitar plan",
-    ctaHref: "",
-    ctaEstilo: "primary",
-    incluidos: [
-      {
-        titulo: "Todo lo del Plan Básico",
-        puntos: [
-          "Módulo de Consultas y Reporte Analítico de Auditoría incluidos.",
-          "Consultas ampliadas a 3 por semana.",
-        ],
-      },
-      {
-        titulo: "Módulo de Consultas Tributarias",
-        puntos: [
-          "Ficha RUC completa: representantes legales, establecimientos anexos y condición de domicilio.",
-          "Validación de comprobantes y verificación de proveedores/clientes por RUC.",
-          "Consulta de deudas y situación tributaria del contribuyente.",
-          "Exporta los resultados para tu expediente.",
-        ],
-      },
-    ],
-  },
-  {
-    nombre: "Plan Premium",
-    precio: "S/ 29.90",
-    periodo: "/mes",
-    resumen: "El detalle real del SIRE y el Reporte Tributario para Terceros, automáticos.",
-    destacado: true,
-    cta: "Solicitar Premium",
-    ctaHref: "",
-    ctaEstilo: "accent",
-    incluidos: [
-      {
-        titulo: "Todo lo del Plan Regular",
-        puntos: [
-          "Consultas, Reporte Analítico de Auditoría y Consultas Tributarias incluidos.",
-        ],
-      },
-      {
-        titulo: "Módulo Detalle SIRE",
-        puntos: [
-          "Compras y ventas reales por periodo (RCE / RVIE) directo de SUNAT.",
-          "Acumulado anual y estado presentado / no presentado por mes.",
-          "Cruce del SIRE contra tu sistema contable, comprobante por comprobante.",
-        ],
-      },
-      {
-        titulo: "Reporte Tributario para Terceros (RTT)",
-        puntos: [
-          "Genera el RTT en SUNAT de forma automática (llega a la nube, sin revisar correos).",
-          "Descarga el PDF y el XML del reporte cuando esté listo.",
-        ],
-      },
-      {
-        titulo: "Soporte 24/7",
-        puntos: [
-          "Atención prioritaria por cualquier canal, en cualquier momento.",
-        ],
-      },
-    ],
-    proximamente: {
-      titulo: "Próximamente",
-      puntos: [
-        "Módulo Comprobantes XML: descarga tus facturas en bloque (todas juntas, no una por una).",
-        "Detalle de facturas en Excel con glosa, para facilitar tus registros contables.",
-      ],
-    },
-  },
-  {
-    nombre: "Plan de Equipo",
-    precio: "A cotizar",
-    resumen: "Para empresas: gestionen en equipo todas las empresas a su cargo.",
-    cta: "Solicitar cotización",
-    ctaHref: "",
-    ctaEstilo: "primary",
-    incluidos: [
-      {
-        titulo: "Todo lo del Plan Premium",
-        puntos: [
-          "Todos los módulos anteriores incluidos.",
-        ],
-      },
-      {
-        titulo: "Equipo y gestión",
-        puntos: [
-          "3 usuarios adicionales para tu empresa.",
-          "Gestionen en equipo todas las empresas a su cargo.",
-        ],
-      },
-      {
-        titulo: "Soporte 24/7",
-        puntos: [
-          "Atención prioritaria por cualquier canal, en cualquier momento.",
-        ],
-      },
-    ],
-  },
-];
 
 export default async function Page() {
   await requireUser();
@@ -231,7 +79,7 @@ export default async function Page() {
             </div>
 
             <a
-              href={p.ctaHref || mailto(p.nombre)}
+              href={p.ctaHref || mailtoPlan(p.nombre)}
               className={`mt-5 w-full text-center ${
                 p.ctaEstilo === "accent" ? "btn-accent" : p.ctaEstilo === "ghost" ? "btn-ghost" : "btn-primary"
               }`}
