@@ -25,6 +25,7 @@ export function HeaderNav({
     { href: "/clientes", label: "Clientes" },
     ...(admin ? [{ href: "/equipo", label: "Equipo" }, { href: "/actividad", label: "Actividad" }] : []),
     ...(supremo ? [{ href: "/supremo", label: "Supremo" }] : []),
+    { href: "/planes", label: "Adquirir módulos" },
   ];
 
   const iniciales = nombre.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "U";
@@ -41,7 +42,7 @@ export function HeaderNav({
       {/* Navegación de escritorio */}
       <nav className="hidden items-center gap-1 text-sm md:flex">
         {links.map((l) => (
-          <Link key={l.href} href={l.href} className={`rounded-lg px-3 py-2 hover:bg-slate-100 ${l.href === "/supremo" ? "font-semibold text-brand-700" : ""}`}>
+          <Link key={l.href} href={l.href} className={`rounded-lg px-3 py-2 hover:bg-slate-100 ${l.href === "/supremo" ? "font-semibold text-brand-700" : ""} ${l.href === "/planes" ? "font-semibold text-accent-600" : ""}`}>
             {l.label}
           </Link>
         ))}
@@ -84,7 +85,7 @@ export function HeaderNav({
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className={`rounded-lg px-3 py-2.5 hover:bg-slate-100 ${l.href === "/supremo" ? "font-semibold text-brand-700" : "text-slate-700"}`}
+                className={`rounded-lg px-3 py-2.5 hover:bg-slate-100 ${l.href === "/supremo" ? "font-semibold text-brand-700" : l.href === "/planes" ? "font-semibold text-accent-600" : "text-slate-700"}`}
               >
                 {l.label}
               </Link>
