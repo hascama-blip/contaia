@@ -27,6 +27,8 @@ export interface ReporteRentas {
   documento: string;
   filas: FilaRenta[];
   porEmpleador: GrupoEmpleador[];
+  totalRenta4ta: number;
+  totalRenta5ta: number;
   totalRetencion4ta: number;
   totalRetencion5ta: number;
   totalRetencion: number;
@@ -53,20 +55,25 @@ export function parseReporteRentas(texto: string): ReporteRentas {
   const t = String(texto || "").replace(/\s+/g, " ").trim();
 
   const anio = (t.match(/A[ñn]o consultado:\s*(\d{4})/i) || [])[1] || "";
-  const titular = (t.match(/Reporte de Rentas y Retenciones\s+(.+?)\s+DNI/i) || [])[1]?.trim() || "";
-  const documento = (t.match(/(DNI|RUC|C\.?E\.?)\s*[-\s]*([\d]{6,12})/i) || []).slice(1).join(" ").trim() || "";
+  // El titular es el nombre EN MAYÚSCULAS que precede a "DNI -" (tras la fecha).
+  const titular =
+    (t.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ&.'\- ]{4,}?)\s*(?:DNI|RUC|C\.?E\.?)\s*[-–]/) || [])[1]?.replace(/\s+/g, " ").trim() ||
+    (t.match(/Reporte de Rentas y Retenciones\s+(.+?)\s+DNI/i) || [])[1]?.trim() || "";
+  const documento = (t.match(/(DNI|RUC|C\.?E\.?)\s*[-–\s]*([\d]{6,12})/i) || []).slice(1).join(" ").trim() || "";
 
-  // Cada fila: <empleador> <MMYYYY> <4ta|5ta> categoría S/ <retención> S/ <renta>.
-  // El empleador no tiene dígitos; se captura de forma no-voraz hasta el periodo.
+  // Cada fila: <empleador> <MMYYYY> <4ta|5ta> categoría S/ <renta> S/ <retención>.
+  // ⚠️ El PDF lista PRIMERO "Monto de renta" y LUEGO "Monto de retención"
+  // (m[4]=renta, m[5]=retención). El empleador no tiene dígitos; se captura de
+  // forma no-voraz hasta el periodo.
   const re = /([A-Za-zÁÉÍÓÚÑáéíóúñ&.,()\-\/ ]+?)\s(\d{6})\s(4ta|5ta)\s*categor[íi]a\s*S\/\s*([\d.,]+)\s*S\/\s*([\d.,]+)/gi;
   const filas: FilaRenta[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(t)) !== null) {
     // Limpia el empleador de la cabecera que queda pegada en la 1ª fila del grupo
-    // ("…Monto de retenciónMonto de renta EMPLEADOR"). Greedy hasta la cabecera.
+    // ("…Monto de rentaMonto de retención EMPLEADOR"). Greedy hasta la cabecera.
     let emp = m[1]
-      .replace(/^.*Monto de renta\s*/i, "")
       .replace(/^.*Monto de retenci[óo]n\s*/i, "")
+      .replace(/^.*Monto de renta\s*/i, "")
       .replace(/^(Periodo|Concepto|Empleador)\s*/i, "")
       .replace(/^[-\s]+/, "")
       .trim();
@@ -77,8 +84,8 @@ export function parseReporteRentas(texto: string): ReporteRentas {
       periodo,
       periodoTxt: `${mm}/${yy}`,
       concepto: /4ta/i.test(m[3]) ? "4ta" : "5ta",
-      retencion: num(m[4]),
-      renta: num(m[5]),
+      renta: num(m[4]),       // 1ª columna = Monto de renta
+      retencion: num(m[5]),   // 2ª columna = Monto de retención
     });
   }
 
@@ -99,12 +106,13 @@ export function parseReporteRentas(texto: string): ReporteRentas {
     };
   });
 
-  const totalRetencion4ta = filas.filter((f) => f.concepto === "4ta").reduce((a, x) => a + x.retencion, 0);
-  const totalRetencion5ta = filas.filter((f) => f.concepto === "5ta").reduce((a, x) => a + x.retencion, 0);
+  const sum4ta = (k: "renta" | "retencion") => filas.filter((f) => f.concepto === "4ta").reduce((a, x) => a + x[k], 0);
+  const sum5ta = (k: "renta" | "retencion") => filas.filter((f) => f.concepto === "5ta").reduce((a, x) => a + x[k], 0);
   return {
     anio, titular, documento, filas, porEmpleador,
-    totalRetencion4ta, totalRetencion5ta,
-    totalRetencion: totalRetencion4ta + totalRetencion5ta,
+    totalRenta4ta: sum4ta("renta"), totalRenta5ta: sum5ta("renta"),
+    totalRetencion4ta: sum4ta("retencion"), totalRetencion5ta: sum5ta("retencion"),
+    totalRetencion: filas.reduce((a, x) => a + x.retencion, 0),
     totalRenta: filas.reduce((a, x) => a + x.renta, 0),
   };
 }
