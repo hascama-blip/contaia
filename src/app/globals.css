@@ -23,6 +23,11 @@ body {
   .card {
     @apply rounded-xl border border-slate-200 bg-white shadow-sm;
   }
+  /* Tabla del reporte de 4ta categoría (HTML inyectado de SUNAT). */
+  .cuarta-tabla table { @apply w-full border-collapse text-xs; }
+  .cuarta-tabla th, .cuarta-tabla td { @apply border border-slate-200 px-2 py-1 text-left align-middle whitespace-nowrap text-slate-700; }
+  .cuarta-tabla th { @apply bg-slate-50 font-semibold text-slate-600; }
+  .cuarta-tabla tr:first-child td, .cuarta-tabla tr:nth-child(2) td { @apply bg-slate-50 font-semibold text-slate-600; }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition;
   }

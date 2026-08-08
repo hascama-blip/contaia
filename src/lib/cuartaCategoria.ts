@@ -23,7 +23,7 @@ export interface CuartaResultado {
   ok: boolean;
   loginError?: boolean;
   error?: string;
-  cuarta?: { mes: string; anio: string; tablas: string[][][] };
+  cuarta?: { mes: string; anio: string; html: string };
   diag?: { pasos: any[] };
 }
 
@@ -94,16 +94,34 @@ async function volcar(ctx: any): Promise<any> {
   }
   return { frames };
 }
-/** Lee todas las tablas de un frame como filas de texto (para ver el reporte). */
-async function leerTablas(frame: any): Promise<string[][][]> {
+/** Extrae SOLO la tabla de datos del reporte (la de honorarios/renta), como
+ *  HTML limpio (sin scripts/links) para renderizarla tal cual la muestra SUNAT. */
+async function leerTablaCuartaHTML(frame: any): Promise<string> {
   return frame.evaluate(() => {
     const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
-    return (Array.from(document.querySelectorAll("table")) as HTMLTableElement[])
-      .map((tb) => (Array.from(tb.querySelectorAll("tr")) as HTMLTableRowElement[])
-        .map((tr) => (Array.from(tr.querySelectorAll("th,td")) as HTMLElement[]).map((td) => norm(td.textContent)))
-        .filter((r) => r.some((c) => c)))
-      .filter((rows) => rows.length > 1).slice(0, 12);
-  }).catch(() => []);
+    const tablas = Array.from(document.querySelectorAll("table")) as HTMLTableElement[];
+    let best: HTMLTableElement | null = null;
+    let bestScore = -1;
+    for (const tb of tablas) {
+      const txt = norm(tb.innerText);
+      if (!txt) continue;
+      const filas = Array.from(tb.querySelectorAll("tr"));
+      const cols = Math.max(0, ...filas.map((tr) => tr.querySelectorAll("th,td").length));
+      const datos = /Honorarios|Renta Bruta|Total Neto Recibido|Documento Emitido/i.test(txt) ? 1000 : 0;
+      const fecha = /\d{2}\/\d{2}\/\d{4}/.test(txt) ? 200 : 0;
+      const score = datos + fecha + cols * 10 + filas.length;
+      if (score > bestScore) { bestScore = score; best = tb; }
+    }
+    if (!best) return "";
+    const clone = best.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll("script,a,img,input,button,style").forEach((e) => e.remove());
+    clone.querySelectorAll("*").forEach((e) => {
+      for (const at of Array.from(e.attributes)) {
+        if (/^on/i.test(at.name) || at.name === "href" || at.name === "class" || at.name === "id") e.removeAttribute(at.name);
+      }
+    });
+    return clone.outerHTML;
+  }).catch(() => "");
 }
 
 /** ¿Este frame es el del reporte de 4ta categoría? */
@@ -187,14 +205,14 @@ export async function consultarCuartaCategoria(params: CuartaParams): Promise<Cu
     }
     await page.waitForTimeout(3500).catch(() => {});
     const frRep = (await frameCuarta(ctx)) || fr;
-    const tablas = frRep ? await leerTablas(frRep) : [];
-    pasos.push({ paso: "reporte", buscado, tablas });
+    const html = frRep ? await leerTablaCuartaHTML(frRep) : "";
+    pasos.push({ paso: "reporte", buscado, htmlLen: html.length });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
     if (!fr) return { ok: false, error: "No se encontró el formulario de Cuarta Categoría. Usa Modo diagnóstico.", diag: { pasos } };
 
-    // Sin tablas = sin ingresos de 4ta en ese periodo (no es error).
-    return { ok: true, cuarta: { mes, anio, tablas }, diag: { pasos } };
+    // Sin tabla = sin ingresos de 4ta en ese periodo (no es error).
+    return { ok: true, cuarta: { mes, anio, html }, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error consultando la Cuarta Categoría.", diag: { pasos } };
   } finally {

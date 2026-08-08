@@ -18,7 +18,7 @@ export default function CuartaCategoriaFlow({ clientes }: { clientes: ClienteOpt
   const [solPass, setSolPass] = useState("");
   const [mes, setMes] = useState("01");
   const [anio, setAnio] = useState(String(new Date().getFullYear()));
-  const [tablas, setTablas] = useState<string[][][]>([]);
+  const [html, setHtml] = useState<string>("");
   const [consultado, setConsultado] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function CuartaCategoriaFlow({ clientes }: { clientes: ClienteOpt
   function elegir(id: string) {
     setClienteId(id);
     setSolUser(clientes.find((c) => c.id === id)?.solUser ?? "");
-    setTablas([]); setConsultado(false); setError(null); setDiag(null);
+    setHtml(""); setConsultado(false); setError(null); setDiag(null);
   }
 
   async function buscar() {
@@ -51,7 +51,7 @@ export default function CuartaCategoriaFlow({ clientes }: { clientes: ClienteOpt
       const data = await res.json().catch(() => ({}));
       if (modoDiag && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (!res.ok) { setError(data.error ?? "No se pudo consultar."); return; }
-      setTablas(data.cuarta?.tablas ?? []);
+      setHtml(data.cuarta?.html ?? "");
       setConsultado(true);
     } catch (e: any) {
       setError(e?.name === "AbortError" ? "Tardó demasiado (SUNAT lento o bloqueado). Reintenta en unos minutos." : "Se cortó la conexión con SUNAT.");
@@ -125,29 +125,17 @@ export default function CuartaCategoriaFlow({ clientes }: { clientes: ClienteOpt
         </div>
       )}
 
-      {consultado && tablas.length === 0 && (
+      {consultado && !html && (
         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
           No se encontraron ingresos de cuarta categoría en {mes}/{anio}.
         </div>
       )}
-      {tablas.map((rows, ti) => (
-        <div key={ti} className="card overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((celdas, r) => (
-                  <tr key={r} className={r === 0 ? "bg-slate-50 text-left text-xs uppercase text-slate-400" : ""}>
-                    {celdas.map((c, i) => (r === 0
-                      ? <th key={i} className="px-3 py-2 whitespace-nowrap">{c}</th>
-                      : <td key={i} className="px-3 py-2 text-slate-700 whitespace-nowrap">{c}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {html && (
+        <div className="card p-3">
+          <p className="mb-2 text-xs font-semibold text-slate-500">Reporte de Ingresos de Cuarta Categoría — {mes}/{anio}</p>
+          <div className="cuarta-tabla overflow-x-auto" dangerouslySetInnerHTML={{ __html: html }} />
         </div>
-      ))}
+      )}
     </section>
   );
 }
