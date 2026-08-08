@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
-import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas, getWebhookLogRTT } from "@/lib/db";
+import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas, getWebhookLogRTT, leerPdfRentas } from "@/lib/db";
 import { generarReporteRentas } from "@/lib/reporteRentasBot";
 
 export const runtime = "nodejs";
@@ -10,7 +10,20 @@ export const maxDuration = 200;
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  const sol = await getSolicitudRentas(params.id);
+  let sol = await getSolicitudRentas(params.id);
+  // Auto-corrección: si el reporte fue parseado con una versión antigua (renta y
+  // retención cruzadas → sin `totalRenta4ta`), re-parseamos el PDF ya guardado
+  // sin volver a SUNAT. Es una sola vez (luego ya trae el campo nuevo).
+  if (sol?.rutaPdf && sol.reporte && (sol.reporte as any).totalRenta4ta === undefined) {
+    const buf = await leerPdfRentas(sol.rutaPdf);
+    if (buf) {
+      try {
+        const { textoDePdf, parseReporteRentas } = await import("@/lib/reporteRentas");
+        const reporte = parseReporteRentas(await textoDePdf(buf));
+        sol = (await setEstadoRentas(params.id, sol.estado, { reporte })) ?? sol;
+      } catch { /* si falla el re-parseo, se queda el reporte previo */ }
+    }
+  }
   const { dominio } = await getRttConfig();
   // Bitácora de la nube (últimos correos recibidos por el webhook) filtrada a
   // este RUC → para ver si el correo del reporte ya llegó y qué pasó con él.
