@@ -69,13 +69,13 @@ export default function LoginPage() {
       </div>
       <div className="card p-6">
         <h1 className="text-xl font-bold text-slate-800">
-          {modo === "login" ? "Iniciar sesión" : modo === "registro" ? "Solicitar acceso" : "Recuperar contraseña"}
+          {modo === "login" ? "Iniciar sesión" : modo === "registro" ? "Crear cuenta" : "Recuperar contraseña"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {modo === "login"
             ? "Entra a tu espacio de trabajo."
             : modo === "registro"
-              ? "Solicita acceso: un administrador revisará tu pedido y te habilitará el ingreso."
+              ? "Crea tu cuenta y entra al instante — sin esperas ni aprobaciones."
               : "Pon tu correo y te enviaremos un enlace para crear una nueva contraseña."}
         </p>
 
@@ -124,7 +124,7 @@ export default function LoginPage() {
             </div>
           )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Solicitar acceso" : "Enviar enlace"}
+            {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Crear cuenta" : "Enviar enlace"}
           </button>
         </form>
 
@@ -143,7 +143,7 @@ export default function LoginPage() {
             <>
               ¿No tienes cuenta?{" "}
               <button className="font-semibold text-brand-600 hover:underline" onClick={() => { setModo("registro"); setError(null); setAviso(null); }}>
-                Solicitar acceso
+                Crear cuenta
               </button>
             </>
           ) : (
