@@ -13,6 +13,7 @@ export default function ItfPanel({ clienteId, solUserGuardado }: { clienteId: st
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [itf, setItf] = useState<any>(null);
+  const [consultado, setConsultado] = useState(false);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export default function ItfPanel({ clienteId, solUserGuardado }: { clienteId: st
       if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (!res.ok) { setError(data.error ?? "No se pudo consultar el ITF."); return; }
       setItf(data.itf ?? null);
+      setConsultado(true);
     } catch { setError("Error de red."); }
     finally { setBusy(false); }
   }
@@ -58,7 +60,13 @@ export default function ItfPanel({ clienteId, solUserGuardado }: { clienteId: st
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {diagModo && diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
-      {itf && (
+      {consultado && itf && (!itf.filas || itf.filas.length === 0) && (
+        <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+          No cuenta con registros de ITF{itf.ejercicio ? ` en el ejercicio ${itf.ejercicio}` : ""}.
+        </div>
+      )}
+
+      {itf && itf.filas && itf.filas.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
           <div className="bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">Ejercicio {itf.ejercicio || "—"}</div>
           <table className="w-full text-xs">

@@ -238,8 +238,9 @@ export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
     if (!fr) return { ok: false, error: "No se encontró el módulo de ITF en el menú. Usa Modo diagnóstico y pásame la traza.", diag: { pasos } };
-    if (!filas.length) return { ok: false, error: "Se llegó al formulario pero no se pudo leer el reporte. Usa Modo diagnóstico y pásame la traza.", diag: { pasos } };
 
+    // Llegó al formulario y consultó. Sin filas = no tiene registros de ITF en
+    // el periodo (no es error): el panel muestra "No cuenta con registros de ITF".
     return { ok: true, itf: { ejercicio: ej, filas, total }, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error consultando el ITF.", diag: { pasos } };
