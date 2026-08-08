@@ -382,11 +382,18 @@ export default function ClienteDetail({
                 inicialCred={cliente.credSire ?? null}
                 puedeApi={puedeApi}
               />
+              {/* RUC 10 con negocio: además, su ITF (persona natural). */}
+              {cliente.ruc.startsWith("10") && (
+                <>
+                  <FaseHeader n="4b" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
+                  <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
+                </>
+              )}
             </>
           ) : (
             <>
               <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
-              <ItfPanel clienteId={cliente.id} />
+              <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
             </>
           )}
 
