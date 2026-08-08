@@ -4,27 +4,30 @@ import { requireUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Adquirir módulos — Radar Tributario" };
 
-// Contacto para adquirir/cotizar planes (ajustable).
-const CONTACTO = "hascama@asencoauditores.com";
+// Contacto para adquirir / cotizar planes.
+const CONTACTO = "dascama@gmail.com";
 const mailto = (plan: string) =>
   `mailto:${CONTACTO}?subject=${encodeURIComponent(`Quiero adquirir el ${plan} — Radar Tributario`)}`;
 
 interface Plan {
   nombre: string;
-  precioNota: string;
+  precio: string;
+  precioAntes?: string;
+  periodo?: string;
+  etiqueta?: string;
   resumen: string;
   destacado?: boolean;
   cta: string;
   ctaHref: string;
   ctaEstilo: "primary" | "accent" | "ghost";
-  incluidos: { antes?: string; titulo: string; puntos: string[] }[];
+  incluidos: { titulo: string; puntos: string[] }[];
   proximamente?: { titulo: string; puntos: string[] };
 }
 
 const PLANES: Plan[] = [
   {
-    nombre: "Plan Gratis",
-    precioNota: "Sin costo",
+    nombre: "Plan Básico",
+    precio: "Gratis",
     resumen: "Para empezar: consulta básica y el reporte analítico de auditoría.",
     cta: "Empezar gratis",
     ctaHref: "/",
@@ -50,7 +53,10 @@ const PLANES: Plan[] = [
   },
   {
     nombre: "Plan Regular",
-    precioNota: "Todo lo del Gratis, y más",
+    precio: "S/ 4.99",
+    precioAntes: "S/ 9.99",
+    periodo: "/mes",
+    etiqueta: "Lanzamiento −50%",
     resumen: "Más consultas y el módulo de consultas tributarias.",
     cta: "Solicitar plan",
     ctaHref: "",
@@ -59,7 +65,7 @@ const PLANES: Plan[] = [
       {
         titulo: "Módulo de Consultas — 3 por semana",
         puntos: [
-          "Todo lo del plan Gratis.",
+          "Todo lo del plan Básico.",
           "Límite ampliado: 3 consultas a la semana.",
         ],
       },
@@ -76,7 +82,8 @@ const PLANES: Plan[] = [
   },
   {
     nombre: "Plan Premium",
-    precioNota: "Todo lo del Regular, y más",
+    precio: "S/ 29.90",
+    periodo: "/mes",
     resumen: "El detalle real del SIRE y el Reporte Tributario para Terceros, automáticos.",
     destacado: true,
     cta: "Solicitar Premium",
@@ -110,9 +117,9 @@ const PLANES: Plan[] = [
   },
   {
     nombre: "Plan Personalizado",
-    precioNota: "Para empresas grandes",
+    precio: "A cotizar",
     resumen: "A la medida de estudios y empresas con alto volumen.",
-    cta: "Contactar",
+    cta: "Solicitar cotización",
     ctaHref: "",
     ctaEstilo: "primary",
     incluidos: [
@@ -157,7 +164,19 @@ export default async function Page() {
             )}
 
             <h2 className="text-lg font-bold text-slate-800">{p.nombre}</h2>
-            <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-brand-600">{p.precioNota}</p>
+
+            {/* Precio */}
+            <div className="mt-1 flex items-end gap-2">
+              <span className="text-2xl font-extrabold text-slate-900">{p.precio}</span>
+              {p.periodo && <span className="pb-1 text-xs text-slate-400">{p.periodo}</span>}
+              {p.precioAntes && <span className="pb-1 text-sm text-slate-400 line-through">{p.precioAntes}</span>}
+            </div>
+            {p.etiqueta && (
+              <span className="mt-1 inline-flex w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                {p.etiqueta}
+              </span>
+            )}
+
             <p className="mt-2 text-sm text-slate-500">{p.resumen}</p>
 
             <div className="mt-4 flex-1 space-y-4">
