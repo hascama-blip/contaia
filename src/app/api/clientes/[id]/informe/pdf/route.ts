@@ -41,7 +41,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       },
     ]);
     const page = await ctx.newPage();
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+    // "load" es más robusto que "networkidle" (que puede colgarse y hacer fallar
+    // el PDF). Damos una pausa corta para que termine de pintar el informe.
+    await page.goto(url, { waitUntil: "load", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(1800).catch(() => {});
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,

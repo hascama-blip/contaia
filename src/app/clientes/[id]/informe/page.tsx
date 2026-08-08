@@ -407,9 +407,15 @@ export default async function InformePage({ params }: { params: { id: string } }
         )}
 
         {/* ===== Reporte de Rentas y Retenciones (4ta/5ta) — persona natural ===== */}
-        {personaNatural && rentas && (
+        {personaNatural && (
           <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">Reporte de Rentas y Retenciones (4ta / 5ta)</h3>
+            {!rentas ? (
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                Aún no se ha generado el reporte de rentas.
+              </p>
+            ) : (
+            <>
             <p className="mb-3 text-xs text-slate-500">
               Ejercicio {rentas.anio || "—"} · Renta 4ta {fmtSoles(rentas.totalRenta4ta ?? 0)} · Renta 5ta {fmtSoles(rentas.totalRenta5ta ?? 0)} · Total retención {fmtSoles(rentas.totalRetencion ?? 0)}
             </p>
@@ -437,16 +443,18 @@ export default async function InformePage({ params }: { params: { id: string } }
                 </table>
               </div>
             ))}
+            </>
+            )}
           </section>
         )}
 
         {/* ===== ITF — persona natural ===== */}
-        {personaNatural && itf && (
+        {personaNatural && (
           <section className="mt-5 isla rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="sec-h">ITF — Impuesto a las Transacciones Financieras</h3>
-            {(!itf.filas || itf.filas.length === 0) ? (
+            {(!itf || !itf.filas || itf.filas.length === 0) ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                No cuenta con registros de ITF{itf.ejercicio ? ` en el ejercicio ${itf.ejercicio}` : ""}.
+                {itf ? `No cuenta con registros de ITF${itf.ejercicio ? ` en el ejercicio ${itf.ejercicio}` : ""}.` : "Aún no se ha consultado el ITF."}
               </p>
             ) : (
               <table className="w-full text-sm">
