@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
+import { esPersonaNatural } from "@/lib/types";
 import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas, getWebhookLogRTT, leerPdfRentas } from "@/lib/db";
 import { generarReporteRentas } from "@/lib/reporteRentasBot";
 
@@ -50,11 +51,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!dominio) return NextResponse.json({ error: "Falta configurar el dominio del webhook (RTT_DOMINIO)." }, { status: 400 });
 
   // ⚠️ El formulario de rentas de SUNAT EXIGE que el correo tenga menos de 40
-  // caracteres (a diferencia del RTT). Como rentas es solo para RUC 10 (persona
-  // natural), usamos el RUC SIN el "10" inicial (9 dígitos = DNI + verificador)
-  // como parte local → `258426270@reportes.radartributaria.com` = 38 chars. El
-  // webhook reconstruye el RUC anteponiendo "10".
-  const parteLocal = cliente.ruc.startsWith("10") ? cliente.ruc.slice(2) : cliente.ruc;
+  // caracteres (a diferencia del RTT). Rentas es solo para persona natural
+  // (RUC 10 o 15, ambos empiezan con "1"), así que usamos el RUC SIN el primer
+  // dígito "1" (10 dígitos) como parte local → `0727195594@dominio` = 39 chars.
+  // El webhook reconstruye el RUC anteponiendo "1" (sirve para 10 y 15).
+  const parteLocal = esPersonaNatural(cliente.ruc) ? cliente.ruc.slice(1) : cliente.ruc;
   const emailDestino = `${parteLocal}@${dominio}`;
 
   if (body.diagnostico === true) {

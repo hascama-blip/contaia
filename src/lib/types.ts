@@ -2,11 +2,17 @@
 
 export type NivelRiesgo = "bajo" | "medio" | "alto" | "critico";
 
+/** ¿Es persona natural? RUC 10 (con DNI) o RUC 15 (extranjero). A ambos se les
+ *  aplican las MISMAS reglas: con/sin negocio, rentas 4ta/5ta e ITF. */
+export function esPersonaNatural(ruc?: string | null): boolean {
+  return /^(10|15)/.test(String(ruc || ""));
+}
+
 /** ¿El contribuyente está OBLIGADO a llevar/presentar SIRE? RUC 20 (empresa) →
- *  sí; RUC 10 (persona natural) → solo si tiene negocio (rentas de 3ª cat.).
+ *  sí; persona natural (RUC 10/15) → solo si tiene negocio (rentas de 3ª cat.).
  *  Una persona natural SIN negocio no está obligada a SIRE. */
 export function llevaSire(c: { ruc?: string; negocio?: "con" | "sin" | null }): boolean {
-  if (/^10/.test(String(c?.ruc || ""))) return c?.negocio !== "sin";
+  if (esPersonaNatural(c?.ruc)) return c?.negocio !== "sin";
   return true;
 }
 

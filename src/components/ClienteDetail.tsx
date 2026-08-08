@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Cliente } from "@/lib/types";
-import { llevaSire } from "@/lib/types";
+import { llevaSire, esPersonaNatural } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import BuzonPanel from "./BuzonPanel";
@@ -263,10 +263,10 @@ export default function ClienteDetail({
                     {busy === "fechas" ? "Guardando…" : "Guardar fechas"}
                   </button>
                 </div>
-                {/* RUC 10: cambiar con/sin negocio (habilita/deshabilita SIRE). */}
-                {cliente.ruc.startsWith("10") && (
+                {/* Persona natural (RUC 10/15): cambiar con/sin negocio (habilita/deshabilita SIRE). */}
+                {esPersonaNatural(cliente.ruc) && (
                   <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-                    <p className="mb-1 text-xs font-semibold text-slate-700">Persona natural (RUC 10) — ¿con negocio?</p>
+                    <p className="mb-1 text-xs font-semibold text-slate-700">Persona natural (RUC 10/15) — ¿con negocio?</p>
                     <p className="mb-2 text-[11px] text-slate-500">
                       Con negocio (rentas de 3ª cat.) está obligada a <b>SIRE</b>; sin negocio <b>no</b> lleva SIRE.
                       Al cambiarlo se habilitan/deshabilitan los pasos de SIRE.
@@ -348,8 +348,8 @@ export default function ClienteDetail({
             <>
               <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
               <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
-              {/* RUC 10 con negocio: además puede sacar su reporte de 4ta/5ta (persona natural). */}
-              {cliente.ruc.startsWith("10") && (
+              {/* Persona natural con negocio: además puede sacar su reporte de 4ta/5ta. */}
+              {esPersonaNatural(cliente.ruc) && (
                 <>
                   <FaseHeader n="2b" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
                   <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
@@ -382,8 +382,8 @@ export default function ClienteDetail({
                 inicialCred={cliente.credSire ?? null}
                 puedeApi={puedeApi}
               />
-              {/* RUC 10 con negocio: además, su ITF (persona natural). */}
-              {cliente.ruc.startsWith("10") && (
+              {/* Persona natural con negocio: además, su ITF. */}
+              {esPersonaNatural(cliente.ruc) && (
                 <>
                   <FaseHeader n="4b" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
                   <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />

@@ -75,11 +75,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ¿Reporte de Rentas? Su dirección es CORTA (SUNAT exige <40 chars): la parte
-  // local son 9 dígitos (el RUC 10 sin el "10" inicial). Ej.: 258426270@dominio.
-  // Se detecta ANTES de la validación del RUC porque no lleva sub-address +RUC.
+  // local es el RUC de persona natural (10/15) SIN el primer dígito "1" → 10
+  // dígitos; el webhook antepone "1". Ej.: 0727195594@dominio → 10727195594.
+  // (Legacy: 9 dígitos → se anteponía "10".) Se detecta ANTES de la validación
+  // del RUC porque no lleva sub-address +RUC.
   const addrLocal = (String(recipiente).match(/([A-Za-z0-9._%+\-]+)@/) || [])[1] || "";
-  if (/^\d{9}$/.test(addrLocal)) {
-    const rucR = "10" + addrLocal;
+  const rucCorto = /^\d{10}$/.test(addrLocal) ? "1" + addrLocal : /^\d{9}$/.test(addrLocal) ? "10" + addrLocal : "";
+  if (rucCorto) {
+    const rucR = rucCorto;
     if (!pdf) {
       await registrarWebhookRTT({ ruc: rucR, resultado: "rentas: correo recibido pero SIN PDF", from }).catch(() => {});
       return NextResponse.json({ error: "rentas sin PDF" }, { status: 422 });

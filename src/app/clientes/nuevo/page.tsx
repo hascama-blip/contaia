@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SunatInfo } from "@/lib/types";
+import { esPersonaNatural } from "@/lib/types";
 import { CondicionBadge, EstadoBadge } from "@/components/ui";
 import { setSolPass } from "@/lib/solSession";
 
@@ -84,9 +85,9 @@ export default function NuevoClientePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    // Persona natural (RUC 10): hay que definir si tiene negocio (SIRE) o no.
-    if (form.ruc.startsWith("10") && !form.negocio) {
-      setError("Indica si la persona natural (RUC 10) tiene negocio o no (define si lleva SIRE).");
+    // Persona natural (RUC 10/15): hay que definir si tiene negocio (SIRE) o no.
+    if (esPersonaNatural(form.ruc) && !form.negocio) {
+      setError("Indica si la persona natural (RUC 10/15) tiene negocio o no (define si lleva SIRE).");
       return;
     }
     // Usuario + Clave SOL son obligatorios (habilitan el diagnóstico previo).
@@ -103,7 +104,7 @@ export default function NuevoClientePage() {
         body: JSON.stringify({
           razonSocial: form.razonSocial,
           ruc: form.ruc,
-          negocio: form.ruc.startsWith("10") ? form.negocio : undefined,
+          negocio: esPersonaNatural(form.ruc) ? form.negocio : undefined,
           email: form.email,
           telefono: form.telefono,
           // Inyecta la fecha opcional de inicio de actividades en el SUNAT.
@@ -281,10 +282,10 @@ export default function NuevoClientePage() {
           />
         </div>
 
-        {/* RUC 10 (persona natural): con negocio (SIRE) o sin negocio (sin SIRE). */}
-        {form.ruc.startsWith("10") && (
+        {/* Persona natural (RUC 10/15): con negocio (SIRE) o sin negocio (sin SIRE). */}
+        {esPersonaNatural(form.ruc) && (
           <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-            <p className="text-sm font-semibold text-slate-700">Persona natural (RUC 10) *</p>
+            <p className="text-sm font-semibold text-slate-700">Persona natural (RUC 10/15) *</p>
             <p className="mb-2 text-xs text-slate-500">
               ¿Tiene <b>negocio</b> (rentas de 3ª categoría)? Con negocio está obligada a <b>SIRE</b>;
               sin negocio <b>no</b> lleva SIRE.
