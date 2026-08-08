@@ -86,8 +86,25 @@ export function estadoNavegadores() {
   return { activos: navegadoresActivos, enCola: turnosEnEspera.length, maximo: MAX_NAVEGADORES };
 }
 
+// Proxy de salida (opcional). Para escalar a muchos usuarios sin que SUNAT
+// bloquee la IP del servidor: se enruta cada sesión por un proxy ROTATIVO
+// (idealmente residencial/móvil de Perú) → cada login sale con otra IP.
+// Se configura con variables de entorno:
+//   PROXY_SERVER   = "http://gateway.proveedor.com:7000"  (o socks5://…)
+//   PROXY_USERNAME = usuario del proxy (con proveedor rotativo, cada conexión
+//                    suele salir con IP distinta automáticamente)
+//   PROXY_PASSWORD = clave del proxy
+function proxyDeEnv(): { server: string; username?: string; password?: string } | undefined {
+  const server = (process.env.PROXY_SERVER || "").trim();
+  if (!server) return undefined;
+  const username = (process.env.PROXY_USERNAME || "").trim() || undefined;
+  const password = (process.env.PROXY_PASSWORD || "").trim() || undefined;
+  return { server, username, password };
+}
+
 // Lanza el Chromium local (@sparticuz en Render; el instalado en local).
 async function lanzarLocal(chromium: any) {
+  const proxy = proxyDeEnv();
   try {
     const sparticuz = (await import("@sparticuz/chromium")).default as any;
     const executablePath = await sparticuz.executablePath();
@@ -96,12 +113,13 @@ async function lanzarLocal(chromium: any) {
         headless: true,
         executablePath,
         args: [...(sparticuz.args ?? []), ...ARGS_LIGEROS],
+        ...(proxy ? { proxy } : {}),
       });
     }
   } catch {
     /* fallback al Chromium local instalado */
   }
-  return chromium.launch({ headless: true, args: ARGS_LIGEROS });
+  return chromium.launch({ headless: true, args: ARGS_LIGEROS, ...(proxy ? { proxy } : {}) });
 }
 
 // Lanza el Chromium local RESPETANDO la cola: espera turno, y libera el cupo
