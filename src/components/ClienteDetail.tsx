@@ -348,6 +348,13 @@ export default function ClienteDetail({
             <>
               <FaseHeader n="2" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (rápido)." />
               <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
+              {/* RUC 10 con negocio: además puede sacar su reporte de 4ta/5ta (persona natural). */}
+              {cliente.ruc.startsWith("10") && (
+                <>
+                  <FaseHeader n="2b" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
+                  <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
+                </>
+              )}
             </>
           ) : (
             <>
