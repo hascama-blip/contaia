@@ -3,7 +3,9 @@ import { listClientes } from "@/lib/db";
 import { requireUser, studioId, modulosDelEstudio } from "@/lib/auth";
 import ConsultasFlow from "@/components/ConsultasFlow";
 import DeudasF36Flow from "@/components/DeudasF36Flow";
+import CuartaCategoriaFlow from "@/components/CuartaCategoriaFlow";
 import { ModuloBloqueado } from "@/components/ModuloBloqueado";
+import { esPersonaNatural } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Consultas tributarias — Radar Tributario" };
@@ -33,6 +35,13 @@ export default async function Page() {
       <ConsultasFlow clientes={lista} />
       <hr className="border-slate-200" />
       <DeudasF36Flow clientes={lista} />
+      {/* Cuarta Categoría (consulta mensual): solo persona natural (RUC 10/15). */}
+      {lista.some((c) => esPersonaNatural(c.ruc)) && (
+        <>
+          <hr className="border-slate-200" />
+          <CuartaCategoriaFlow clientes={lista.filter((c) => esPersonaNatural(c.ruc))} />
+        </>
+      )}
     </div>
   );
 }
