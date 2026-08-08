@@ -835,7 +835,7 @@ export async function createCliente(data: {
     ownerId: data.ownerId,
     razonSocial: data.razonSocial.trim(),
     ruc: data.ruc.trim(),
-    negocio: /^10/.test(data.ruc.trim()) ? (data.negocio === "sin" ? "sin" : data.negocio === "con" ? "con" : undefined) : undefined,
+    negocio: /^(10|15)/.test(data.ruc.trim()) ? (data.negocio === "sin" ? "sin" : data.negocio === "con" ? "con" : undefined) : undefined,
     email: data.email.trim(),
     telefono: data.telefono.trim(),
     createdAt: new Date().toISOString(),
@@ -863,9 +863,9 @@ export async function updateCliente(
   if (!cliente) return null;
   const { negocio, ...resto } = patch as any;
   Object.assign(cliente, resto);
-  // "negocio" (con/sin) solo aplica a RUC 10 (persona natural).
+  // "negocio" (con/sin) solo aplica a persona natural (RUC 10 o 15).
   if (negocio !== undefined) {
-    if (/^10/.test(cliente.ruc) && (negocio === "con" || negocio === "sin")) cliente.negocio = negocio;
+    if (/^(10|15)/.test(cliente.ruc) && (negocio === "con" || negocio === "sin")) cliente.negocio = negocio;
   }
   await writeStore(store);
   return cliente;
