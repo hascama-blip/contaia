@@ -63,10 +63,10 @@ const PLANES: Plan[] = [
     ctaEstilo: "primary",
     incluidos: [
       {
-        titulo: "Módulo de Consultas — 3 por semana",
+        titulo: "Todo lo del Plan Básico",
         puntos: [
-          "Todo lo del plan Básico.",
-          "Límite ampliado: 3 consultas a la semana.",
+          "Módulo de Consultas y Reporte Analítico de Auditoría incluidos.",
+          "Consultas ampliadas a 3 por semana.",
         ],
       },
       {
@@ -91,6 +91,12 @@ const PLANES: Plan[] = [
     ctaEstilo: "accent",
     incluidos: [
       {
+        titulo: "Todo lo del Plan Regular",
+        puntos: [
+          "Consultas, Reporte Analítico de Auditoría y Consultas Tributarias incluidos.",
+        ],
+      },
+      {
         titulo: "Módulo Detalle SIRE",
         puntos: [
           "Compras y ventas reales por periodo (RCE / RVIE) directo de SUNAT.",
@@ -103,33 +109,48 @@ const PLANES: Plan[] = [
         puntos: [
           "Genera el RTT en SUNAT de forma automática (llega a la nube, sin revisar correos).",
           "Descarga el PDF y el XML del reporte cuando esté listo.",
-          "Una casilla por empresa: se actualiza sola en cada generación.",
+        ],
+      },
+      {
+        titulo: "Soporte 24/7",
+        puntos: [
+          "Atención prioritaria por cualquier canal, en cualquier momento.",
         ],
       },
     ],
     proximamente: {
       titulo: "Próximamente",
       puntos: [
-        "Comprobantes XML masivos desde SUNAT: descarga y consolida todos los comprobantes del mes en Excel y ZIP, sin bajarlos uno por uno.",
-        "SIRE automático: extracción programada de compras y ventas de todos los periodos, sin intervención.",
+        "Módulo Comprobantes XML: descarga tus facturas en bloque (todas juntas, no una por una).",
+        "Detalle de facturas en Excel con glosa, para facilitar tus registros contables.",
       ],
     },
   },
   {
-    nombre: "Plan Personalizado",
+    nombre: "Plan de Equipo",
     precio: "A cotizar",
-    resumen: "A la medida de estudios y empresas con alto volumen.",
+    resumen: "Para empresas: gestionen en equipo todas las empresas a su cargo.",
     cta: "Solicitar cotización",
     ctaHref: "",
     ctaEstilo: "primary",
     incluidos: [
       {
-        titulo: "Todo incluido, a tu medida",
+        titulo: "Todo lo del Plan Premium",
         puntos: [
-          "Todos los módulos, sin límite de consultas ni de clientes.",
-          "Usuarios y equipos ilimitados con control de accesos.",
-          "Integraciones con tu sistema contable y flujos a medida.",
-          "Soporte dedicado y prioridad en nuevas funciones.",
+          "Todos los módulos anteriores incluidos.",
+        ],
+      },
+      {
+        titulo: "Equipo y gestión",
+        puntos: [
+          "3 usuarios adicionales para tu empresa.",
+          "Gestionen en equipo todas las empresas a su cargo.",
+        ],
+      },
+      {
+        titulo: "Soporte 24/7",
+        puntos: [
+          "Atención prioritaria por cualquier canal, en cualquier momento.",
         ],
       },
     ],
