@@ -52,6 +52,13 @@ const OPCIONES: Opcion[] = [
       "Solicita el RTT de SUNAT y recíbelo automáticamente por webhook de correo, con trazabilidad de cada estado (creado → en proceso → listo). Descarga el PDF/XML cuando llega.",
   },
   {
+    href: "/herramientas/conciliacion",
+    icono: "⚖️",
+    titulo: "Conciliación bancaria",
+    detalle:
+      "Sube el extracto bancario (PDF), el libro banco contable y la caja virtual (Excel): el sistema cruza por N° de operación y entrega el Excel conciliado con lo que falta contabilizar.",
+  },
+  {
     href: "/herramientas/analisis-compras",
     icono: "📊",
     titulo: "Análisis de compras para RTP",
