@@ -9,8 +9,8 @@ const soles = (n: any) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { min
 // Como el RTT: dispara el bot (Generar Reporte en SOL) → SUNAT lo manda por
 // correo → el webhook lo captura y PARSEA → aquí se muestra el detalle.
 export default function RentasPanel({
-  clienteId, solUserGuardado, inicial,
-}: { clienteId: string; solUserGuardado?: string; inicial?: any }) {
+  clienteId, solUserGuardado, inicial, sinGenerar,
+}: { clienteId: string; solUserGuardado?: string; inicial?: any; sinGenerar?: boolean }) {
   const [sol, setSol] = useState<any>(inicial ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +68,13 @@ export default function RentasPanel({
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button className="btn-primary" onClick={generar} disabled={busy}>
-          {busy ? "Generando…" : "📄 Generar Reporte de Rentas"}
-        </button>
+        {sinGenerar ? (
+          <span className="text-xs text-slate-500">Se genera desde <b>⚡ Extraer todo</b> (arriba), en una sola sesión.</span>
+        ) : (
+          <button className="btn-primary" onClick={generar} disabled={busy}>
+            {busy ? "Generando…" : "📄 Generar Reporte de Rentas"}
+          </button>
+        )}
         {sol && (
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
             sol.estado === "listo" ? "bg-emerald-100 text-emerald-700" :
@@ -83,9 +87,11 @@ export default function RentasPanel({
             ⬇ Descargar PDF
           </a>
         )}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
-        </label>
+        {!sinGenerar && (
+          <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}

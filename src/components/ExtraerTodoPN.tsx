@@ -40,7 +40,8 @@ export default function ExtraerTodoPN({ clienteId, solUserGuardado }: { clienteI
         <div>
           <h2 className="font-semibold text-slate-800">⚡ Extraer todo (una sola sesión)</h2>
           <p className="text-xs text-slate-500">
-            Genera el Reporte de Rentas (4ta/5ta) y consulta el ITF con <b>un solo inicio de sesión</b> en SUNAT
+            Con <b>un solo inicio de sesión</b> en SUNAT: consulta el <b>buzón</b>, genera el pedido de
+            <b> fraccionamiento</b>, genera el <b>Reporte de Rentas (4ta/5ta)</b> y consulta el <b>ITF</b>
             (reduce el riesgo de bloqueo). Usa la Clave SOL que cargues en los apartados de abajo.
           </p>
         </div>
@@ -51,6 +52,8 @@ export default function ExtraerTodoPN({ clienteId, solUserGuardado }: { clienteI
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       {res && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Estado titulo="Buzón" r={res.buzon} okTxt={res.buzon?.omitido ? (res.buzon.nota ?? "omitido") : `${res.buzon?.mensajes ?? 0} mensaje(s) · ${res.buzon?.peligrosos ?? 0} peligroso(s)`} />
+          <Estado titulo="Fraccionamiento" r={res.fraccionamiento} okTxt={res.fraccionamiento?.omitido ? (res.fraccionamiento.nota ?? "omitido") : `Pedido generado${res.fraccionamiento?.numPedido ? ` N° ${res.fraccionamiento.numPedido}` : ""} — usa Verificar/Extraer`} />
           <Estado titulo="Rentas 4ta/5ta" r={res.rentas} okTxt="Solicitado — llegará por la nube" />
           <Estado titulo="ITF" r={res.itf} okTxt={res.itf?.registros ? `${res.itf.registros} registro(s)` : "Sin registros de ITF"} />
         </div>

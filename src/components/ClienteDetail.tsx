@@ -347,6 +347,7 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             yaConsultado={Boolean(cliente.buzon)}
+            sinConsultar={esPersonaNatural(cliente.ruc)}
           />
 
           {/* ───── 2 · Estado SIRE (con negocio) · o Reporte 4ta/5ta (sin negocio) ───── */}
@@ -358,14 +359,14 @@ export default function ClienteDetail({
               {esPersonaNatural(cliente.ruc) && (
                 <>
                   <FaseHeader n="2b" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
-                  <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
+                  <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} sinGenerar />
                 </>
               )}
             </>
           ) : (
             <>
               <FaseHeader n="2" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
-              <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
+              <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} sinGenerar />
             </>
           )}
 
@@ -376,6 +377,7 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             inicial={cliente.deudasF36 ?? null}
+            sinGenerar={esPersonaNatural(cliente.ruc)}
           />
 
           {/* ───── 4 · Extracción SIRE (con negocio) · o ITF (sin negocio) ───── */}
@@ -392,14 +394,14 @@ export default function ClienteDetail({
               {esPersonaNatural(cliente.ruc) && (
                 <>
                   <FaseHeader n="4b" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
-                  <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
+                  <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={cliente.itf ?? null} sinConsultar />
                 </>
               )}
             </>
           ) : (
             <>
               <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
-              <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
+              <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={cliente.itf ?? null} sinConsultar />
             </>
           )}
 

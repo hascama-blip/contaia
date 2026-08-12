@@ -1,5 +1,6 @@
 import type { BuzonMensaje, BuzonResultado } from "./types";
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
+import { abrirSesionSunat } from "./sunatSesion";
 
 // ============================================================
 //  Buzón electrónico SUNAT (vía portal SOL con navegador Playwright)
@@ -190,48 +191,19 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
   let browser: any = null;
 
   try {
-    browser = await lanzarNavegador();
-    const ctx = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    });
-    await bloquearRecursos(ctx);
-    const page = await ctx.newPage();
-
-    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(2500);
-    pasos.push({ paso: "login-page", url: page.url(), title: await page.title().catch(() => "") });
-
-    const okRuc = await rellenar(page, ["#txtRuc", 'input[name="ruc"]', 'input[formcontrolname="ruc"]', '#ruc'], ruc);
-    const okUser = await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', 'input[formcontrolname="usuario"]', '#usuario'], solUser);
-    const okPass = await rellenar(page, ["#txtContrasena", 'input[type="password"]', 'input[formcontrolname="password"]', '#password'], solPass);
-    pasos.push({ paso: "credenciales", rucOk: okRuc, userOk: okUser, passOk: okPass });
-
-    await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'button:has-text("Iniciar")', 'button:has-text("Aceptar")', 'input[type="submit"]']);
-    await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(3000);
-    const cuerpoLogin = (await page.evaluate(() => document.body?.innerText ?? "").catch(() => "")) as string;
-    pasos.push({
-      paso: "post-login",
-      url: page.url(),
-      title: await page.title().catch(() => ""),
-      textoVisible: cuerpoLogin.slice(0, 300),
-    });
-
-    // ¿Login rechazado por clave/usuario incorrecto? SUNAT deja el mensaje en la
-    // misma página. En ese caso NO se debe consumir un uso ni guardar consulta.
-    const claveMal =
-      /(usuario|clave|contrase).{0,40}(incorrect|no es v[aá]lid|inv[aá]lid|no coincide|err[oó]ne)/i.test(cuerpoLogin) ||
-      /(usuario|clave) (y|o) (clave|contrase).{0,20}(incorrect|no v[aá]lid)/i.test(cuerpoLogin) ||
-      /ingres[oó] mal|datos de acceso incorrect|no se pudo autenticar/i.test(cuerpoLogin) ||
-      /oauth2\/error|autenticamenuinternet\?error|loginmenusol.*error/i.test(page.url());
-    if (claveMal && !diagnostico) {
+    // Sesión compartida con caché de cookies: si "Extraer todo" (u otro módulo)
+    // ya inició sesión hace poco para este RUC, aquí se REUTILIZA sin más login.
+    const sesion = await abrirSesionSunat({ ruc, solUser, solPass }, pasos);
+    browser = sesion.browser;
+    const ctx = sesion.ctx;
+    const page = sesion.page;
+    if (sesion.loginError && !diagnostico) {
       return {
         mensajes: [],
         peligrosos: [],
         urgentes: [],
         loginError: true,
-        error: "Usuario o Clave SOL incorrectos. Verifica tus accesos y vuelve a intentar (no se consumió ninguna consulta).",
+        error: "Usuario o Clave SOL incorrectos, o bloqueo temporal de SUNAT. Verifica tus accesos (no se consumió ninguna consulta).",
       };
     }
 

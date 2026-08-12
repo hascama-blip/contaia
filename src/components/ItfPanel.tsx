@@ -9,11 +9,11 @@ const soles = (n: any) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { min
 // SUNAT lo muestra EN PANTALLA (no llega por correo): el bot entra a SOL, abre
 // el módulo de ITF y lee el reporte. En calibración: Modo diagnóstico vuelca el
 // menú y la estructura del formulario.
-export default function ItfPanel({ clienteId, solUserGuardado }: { clienteId: string; solUserGuardado?: string }) {
+export default function ItfPanel({ clienteId, solUserGuardado, inicial, sinConsultar }: { clienteId: string; solUserGuardado?: string; inicial?: any; sinConsultar?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [itf, setItf] = useState<any>(null);
-  const [consultado, setConsultado] = useState(false);
+  const [itf, setItf] = useState<any>(inicial ?? null);
+  const [consultado, setConsultado] = useState(Boolean(inicial));
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
@@ -49,12 +49,18 @@ export default function ItfPanel({ clienteId, solUserGuardado }: { clienteId: st
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button className="btn-primary" onClick={consultar} disabled={busy}>
-          {busy ? "Consultando…" : "🔎 Consultar ITF"}
-        </button>
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
-        </label>
+        {sinConsultar ? (
+          <span className="text-xs text-slate-500">Se consulta desde <b>⚡ Extraer todo</b> (arriba), en una sola sesión.</span>
+        ) : (
+          <>
+            <button className="btn-primary" onClick={consultar} disabled={busy}>
+              {busy ? "Consultando…" : "🔎 Consultar ITF"}
+            </button>
+            <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+              <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+            </label>
+          </>
+        )}
       </div>
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}

@@ -23,10 +23,12 @@ export default function BuzonPanel({
   clienteId,
   solUserGuardado,
   yaConsultado,
+  sinConsultar,
 }: {
   clienteId: string;
   solUserGuardado: string;
   yaConsultado?: boolean;
+  sinConsultar?: boolean;
 }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null);
   const [consultadoAt, setConsultadoAt] = useState<string | null>(null);
@@ -127,10 +129,14 @@ export default function BuzonPanel({
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button className="btn-primary" onClick={extraer} disabled={busy}>
-          {busy ? "Consultando…" : mensajes ? "Actualizar buzón" : "Consultar buzón"}
-        </button>
-        {puedeDiag && (
+        {sinConsultar ? (
+          <span className="text-xs text-slate-500">Se consulta desde <b>⚡ Extraer todo</b> (arriba), en una sola sesión.</span>
+        ) : (
+          <button className="btn-primary" onClick={extraer} disabled={busy}>
+            {busy ? "Consultando…" : mensajes ? "Actualizar buzón" : "Consultar buzón"}
+          </button>
+        )}
+        {!sinConsultar && puedeDiag && (
           <label className="flex items-center gap-2 text-xs text-slate-500">
             <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} />
             Modo diagnóstico

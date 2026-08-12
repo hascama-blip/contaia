@@ -54,10 +54,12 @@ export default function DeudasF36Panel({
   clienteId,
   solUserGuardado,
   inicial,
+  sinGenerar,
 }: {
   clienteId: string;
   solUserGuardado: string;
   inicial: Inicial | null | undefined;
+  sinGenerar?: boolean;
 }) {
   const [tablas, setTablas] = useState<Tabla[]>(inicial?.tablas ?? []);
   const [at, setAt] = useState<string | null>(inicial?.at ?? null);
@@ -163,9 +165,11 @@ export default function DeudasF36Panel({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button className="btn-ghost" onClick={generar} disabled={busy !== null}>
-          {busy === "gen" ? "Generando…" : "1) Generar pedido"}
-        </button>
+        {!sinGenerar && (
+          <button className="btn-ghost" onClick={generar} disabled={busy !== null}>
+            {busy === "gen" ? "Generando…" : "1) Generar pedido"}
+          </button>
+        )}
         <button className="btn-ghost" onClick={verificar} disabled={busy !== null}>
           {busy === "ver" ? "Verificando…" : "🔄 Verificar estado"}
         </button>
