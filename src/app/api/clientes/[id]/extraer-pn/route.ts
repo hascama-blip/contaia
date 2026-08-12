@@ -23,9 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const user = await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  if (!esPersonaNatural(cliente.ruc)) {
-    return NextResponse.json({ error: "Solo para persona natural (RUC 10/15)." }, { status: 400 });
-  }
+  const personaNatural = esPersonaNatural(cliente.ruc);
 
   const body = await req.json().catch(() => ({}));
   const solUser = (typeof body.solUser === "string" && body.solUser) || cliente.credSire?.solUser || "";
@@ -67,28 +65,31 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     } catch (e: any) { salida.fraccionamiento = { ok: false, error: e?.message ?? "Error en fraccionamiento." }; }
   }
 
-  // 3) RENTAS 4ta/5ta — dispara el bot (llega por la nube). Reutiliza la sesión.
-  const { dominio } = await getRttConfig();
-  if (dominio) {
-    const emailDestino = `${cliente.ruc.slice(1)}@${dominio}`;
-    const sol = await upsertSolicitudRentas({ clienteId: params.id, ruc: cliente.ruc, emailDestino, solicitadoPor: user.id });
+  // 3) y 4) RENTAS 4ta/5ta + ITF — SOLO persona natural (RUC 10/15).
+  if (personaNatural) {
+    // Rentas: dispara el bot (llega por la nube). Reutiliza la sesión.
+    const { dominio } = await getRttConfig();
+    if (dominio) {
+      const emailDestino = `${cliente.ruc.slice(1)}@${dominio}`;
+      const sol = await upsertSolicitudRentas({ clienteId: params.id, ruc: cliente.ruc, emailDestino, solicitadoPor: user.id });
+      try {
+        const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
+        if (r.loginError) { await setEstadoRentas(params.id, "error", { error: r.error }); return errLogin(r.error); }
+        if (!r.ok) { await setEstadoRentas(params.id, "error", { error: r.error }); salida.rentas = { ok: false, error: r.error }; }
+        else salida.rentas = { ok: true, estado: sol.estado };
+      } catch (e: any) { salida.rentas = { ok: false, error: e?.message ?? "Error en rentas." }; }
+    } else {
+      salida.rentas = { ok: false, error: "Falta configurar el dominio del webhook (RTT_DOMINIO)." };
+    }
+
+    // ITF — en pantalla. Reutiliza la sesión.
     try {
-      const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
-      if (r.loginError) { await setEstadoRentas(params.id, "error", { error: r.error }); return errLogin(r.error); }
-      if (!r.ok) { await setEstadoRentas(params.id, "error", { error: r.error }); salida.rentas = { ok: false, error: r.error }; }
-      else salida.rentas = { ok: true, estado: sol.estado };
-    } catch (e: any) { salida.rentas = { ok: false, error: e?.message ?? "Error en rentas." }; }
-  } else {
-    salida.rentas = { ok: false, error: "Falta configurar el dominio del webhook (RTT_DOMINIO)." };
+      const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio });
+      if (r.loginError) return errLogin(r.error);
+      if (r.ok && r.itf) { await setItfReporte(params.id, r.itf).catch(() => {}); salida.itf = { ok: true, registros: r.itf.filas.length, total: r.itf.total }; }
+      else salida.itf = { ok: false, error: r.error };
+    } catch (e: any) { salida.itf = { ok: false, error: e?.message ?? "Error en ITF." }; }
   }
 
-  // 4) ITF — en pantalla. Reutiliza la sesión.
-  try {
-    const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio });
-    if (r.loginError) return errLogin(r.error);
-    if (r.ok && r.itf) { await setItfReporte(params.id, r.itf).catch(() => {}); salida.itf = { ok: true, registros: r.itf.filas.length, total: r.itf.total }; }
-    else salida.itf = { ok: false, error: r.error };
-  } catch (e: any) { salida.itf = { ok: false, error: e?.message ?? "Error en ITF." }; }
-
-  return NextResponse.json({ ok: true, ...salida });
+  return NextResponse.json({ ok: true, personaNatural, ...salida });
 }

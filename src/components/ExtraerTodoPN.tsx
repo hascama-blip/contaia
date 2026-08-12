@@ -6,7 +6,7 @@ import { getSolPass, getSolUser } from "@/lib/solSession";
 
 // "Extraer todo (persona natural)": en UNA sola sesión SUNAT genera el Reporte
 // de Rentas 4ta/5ta y consulta el ITF (el 2º reutiliza el login del 1º).
-export default function ExtraerTodoPN({ clienteId, solUserGuardado }: { clienteId: string; solUserGuardado?: string }) {
+export default function ExtraerTodoPN({ clienteId, solUserGuardado, personaNatural }: { clienteId: string; solUserGuardado?: string; personaNatural?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +40,10 @@ export default function ExtraerTodoPN({ clienteId, solUserGuardado }: { clienteI
         <div>
           <h2 className="font-semibold text-slate-800">⚡ Extraer todo (una sola sesión)</h2>
           <p className="text-xs text-slate-500">
-            Con <b>un solo inicio de sesión</b> en SUNAT: consulta el <b>buzón</b>, genera el pedido de
-            <b> fraccionamiento</b>, genera el <b>Reporte de Rentas (4ta/5ta)</b> y consulta el <b>ITF</b>
-            (reduce el riesgo de bloqueo). Usa la Clave SOL que cargues en los apartados de abajo.
+            Con <b>un solo inicio de sesión</b> en SUNAT: consulta el <b>buzón</b> y genera el pedido de
+            <b> fraccionamiento</b>{personaNatural ? <>, genera el <b>Reporte de Rentas (4ta/5ta)</b> y consulta el <b>ITF</b></> : null}
+            {" "}(reduce el riesgo de bloqueo). Usa la Clave SOL que cargues en los apartados de abajo. El
+            SIRE se extrae aparte (usa su propia API, no el login SOL).
           </p>
         </div>
         <button className="btn-primary" onClick={extraer} disabled={busy}>

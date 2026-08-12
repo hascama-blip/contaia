@@ -335,10 +335,13 @@ export default function ClienteDetail({
             )}
           </section>
 
-          {/* Persona natural: extraer Rentas + ITF con un solo login. */}
-          {esPersonaNatural(cliente.ruc) && (
-            <ExtraerTodoPN clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
-          )}
+          {/* Extraer todo con un solo login SOL (buzón + fraccionamiento; y, en
+              persona natural, además rentas 4ta/5ta + ITF). */}
+          <ExtraerTodoPN
+            clienteId={cliente.id}
+            solUserGuardado={cliente.credSire?.solUser ?? ""}
+            personaNatural={esPersonaNatural(cliente.ruc)}
+          />
 
           {/* ───── 1 · Buzón electrónico (solo Usuario + Clave SOL) ───── */}
           <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL." />
@@ -347,7 +350,7 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             yaConsultado={Boolean(cliente.buzon)}
-            sinConsultar={esPersonaNatural(cliente.ruc)}
+            sinConsultar
           />
 
           {/* ───── 2 · Estado SIRE (con negocio) · o Reporte 4ta/5ta (sin negocio) ───── */}
@@ -377,7 +380,7 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             inicial={cliente.deudasF36 ?? null}
-            sinGenerar={esPersonaNatural(cliente.ruc)}
+            sinGenerar
           />
 
           {/* ───── 4 · Extracción SIRE (con negocio) · o ITF (sin negocio) ───── */}
