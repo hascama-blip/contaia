@@ -5,7 +5,7 @@
 // login SOL → acceso directo (code=11.5.1.1.12, app cpelec001Alias) → elegir
 // Mes + Año → "Buscar" → leer el reporte. Modo diagnóstico vuelca la estructura.
 
-import { lanzarNavegador, bloquearRecursos } from "./navegador";
+import { abrirSesionSunat, MSG_LOGIN_ERROR } from "./sunatSesion";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -139,35 +139,12 @@ export async function consultarCuartaCategoria(params: CuartaParams): Promise<Cu
   let browser: any = null;
   const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 180000);
   try {
-    browser = await lanzarNavegador();
-    const ctx = await browser.newContext({ acceptDownloads: true, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" });
-    await bloquearRecursos(ctx);
-    autoAceptarDialogos(ctx);
-    const page = await ctx.newPage();
-
-    // 1) Login (con reintento).
-    let loginError = true, url = "";
-    for (let intento = 0; intento < 2 && loginError; intento++) {
-      let navOk = false;
-      for (let i = 0; i < 3 && !navOk; i++) {
-        try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 }); navOk = true; } catch { await page.waitForTimeout(2000).catch(() => {}); }
-      }
-      if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 }).catch(() => {});
-      await page.waitForTimeout(2500).catch(() => {});
-      await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
-      await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
-      await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
-      await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
-      await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-      await page.waitForTimeout(3000).catch(() => {});
-      await cerrarPantallas(ctx, page);
-      url = page.url();
-      const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
-      loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
-      pasos.push({ paso: "login", url, loginError, intento: intento + 1 });
-      if (loginError) await page.waitForTimeout(2500).catch(() => {});
-    }
-    if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal).", diag: { pasos } };
+    // Sesión compartida (reutiliza cookies si otro módulo ya logueó hace poco).
+    const sesion = await abrirSesionSunat({ ruc: params.ruc, solUser: params.solUser, solPass: params.solPass }, pasos);
+    browser = sesion.browser;
+    const ctx = sesion.ctx;
+    const page = sesion.page;
+    if (sesion.loginError) return { ok: false, loginError: true, error: MSG_LOGIN_ERROR, diag: { pasos } };
 
     // 2) Acceso directo al "Reporte de Ingresos de Cuarta Categoría".
     const CODE = process.env.CUARTA_CODE || "11.5.1.1.12";

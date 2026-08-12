@@ -11,6 +11,7 @@ import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
 import RentasPanel from "./RentasPanel";
 import ItfPanel from "./ItfPanel";
+import ExtraerTodoPN from "./ExtraerTodoPN";
 import DeudasF36Panel from "./DeudasF36Panel";
 import {
   CondicionBadge,
@@ -333,6 +334,11 @@ export default function ClienteDetail({
               </p>
             )}
           </section>
+
+          {/* Persona natural: extraer Rentas + ITF con un solo login. */}
+          {esPersonaNatural(cliente.ruc) && (
+            <ExtraerTodoPN clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
+          )}
 
           {/* ───── 1 · Buzón electrónico (solo Usuario + Clave SOL) ───── */}
           <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL." />
