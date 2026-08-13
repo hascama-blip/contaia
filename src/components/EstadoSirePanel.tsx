@@ -39,9 +39,7 @@ export default function EstadoSirePanel({
   const [noObligado, setNoObligado] = useState(false);
   const [at, setAt] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  // API SIRE (client_id/secret) editable aquí mismo: el estado SIRE la necesita.
-  const [cid, setCid] = useState(inicialCred?.clientId ?? "");
-  const [csec, setCsec] = useState(inicialCred?.clientSecret ?? "");
+  // API SIRE (client_id/secret): se carga UNA sola vez arriba, en "Accesos del cliente".
 
   // Carga el estado guardado al abrir (sin re-consultar SUNAT).
   useEffect(() => {
@@ -50,7 +48,7 @@ export default function EstadoSirePanel({
       .then((d) => { if (Array.isArray(d?.estados) && d.estados.length) { setEstados(d.estados); setAt(d.at ?? null); setNoObligado(Boolean(d.noObligado)); } });
   }, [clienteId]);
 
-  const apiLista = Boolean(cid.trim() && csec.trim());
+  const apiLista = Boolean((inicialCred?.clientId ?? "").trim() && (inicialCred?.clientSecret ?? "").trim());
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
   const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
 
@@ -74,14 +72,14 @@ export default function EstadoSirePanel({
     setError(null); setDiag(null);
     const solPass = getSolPass(clienteId);
     if (!inicialCred?.solUser || !solPass) { setError("Carga tus accesos SOL (arriba) para el estado."); return; }
-    if (!apiLista) { setError("Falta el API (client_id/secret). Colócala en el paso de extracción SIRE más abajo."); return; }
+    if (!apiLista) { setError("Falta el API SIRE (client_id/secret). Cárgala arriba, en 'Accesos del cliente'."); return; }
     if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
     setBusy(true);
     try {
       const res = await fetch(`/api/clientes/${clienteId}/sire-estado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodos: rangoPeriodos(periodoDesde, periodoHasta), solPass, clientId: cid.trim(), clientSecret: csec.trim(), diagnostico: diagModo }),
+        body: JSON.stringify({ periodos: rangoPeriodos(periodoDesde, periodoHasta), solPass, clientId: (inicialCred?.clientId ?? "").trim(), clientSecret: (inicialCred?.clientSecret ?? "").trim(), diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo consultar el estado."); return; }
@@ -109,26 +107,11 @@ export default function EstadoSirePanel({
       </p>
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{info}</div>}
 
-      <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          API SIRE (obligatoria para el estado)
-        </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div>
-            <label className="label">client_id</label>
-            <input className="input" value={cid} onChange={(e) => setCid(e.target.value)} placeholder="client_id de la app SIRE" />
-          </div>
-          <div>
-            <label className="label">client_secret</label>
-            <input className="input" type="password" value={csec} onChange={(e) => setCsec(e.target.value)} placeholder="client_secret" />
-          </div>
+      {!apiLista && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          El estado SIRE usa la <b>API OAuth</b> de SUNAT. Carga el <b>client_id/secret</b> arriba en <b>“Accesos del cliente”</b> para habilitar el botón.
         </div>
-        {!apiLista && (
-          <p className="mt-2 text-[11px] text-amber-700">
-            El estado SIRE usa la API OAuth de SUNAT (no scraping). Ingresa el client_id y client_secret para habilitar el botón.
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="rounded-lg border border-slate-200 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Rango (desde → hasta)</p>

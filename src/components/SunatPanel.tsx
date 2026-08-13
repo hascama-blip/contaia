@@ -37,11 +37,9 @@ export default function SunatPanel({
   const hoy = new Date();
   // Usuario SOL viene de los accesos guardados; la Clave SOL se lee de la sesión.
   const solUser = inicialCred?.solUser ?? "";
-  const [clientId, setClientId] = useState(inicialCred?.clientId ?? "");
-  const [clientSecret, setClientSecret] = useState(inicialCred?.clientSecret ?? "");
-  // La API guardada queda BLOQUEADA (solo lectura) y habilita la extracción.
-  const [apiBloqueada, setApiBloqueada] = useState(Boolean(inicialCred?.clientId && inicialCred?.clientSecret));
-  const [guardandoApi, setGuardandoApi] = useState(false);
+  // API SIRE (client_id/secret): se carga UNA sola vez arriba, en "Accesos del cliente".
+  const clientId = inicialCred?.clientId ?? "";
+  const clientSecret = inicialCred?.clientSecret ?? "";
 
   const [mesDesde, setMesDesde] = useState(1);
   const [anioDesde, setAnioDesde] = useState(hoy.getFullYear());
@@ -58,7 +56,7 @@ export default function SunatPanel({
 
   const periodoDesde = `${anioDesde}${String(mesDesde).padStart(2, "0")}`;
   const periodoHasta = `${anioHasta}${String(mesHasta).padStart(2, "0")}`;
-  const apiLista = Boolean(clientId && clientSecret && apiBloqueada);
+  const apiLista = Boolean(clientId && clientSecret);
 
   function rangoPeriodos(desde: string, hasta: string): string[] {
     const out: string[] = [];
@@ -74,28 +72,6 @@ export default function SunatPanel({
       guard++;
     }
     return out;
-  }
-
-  async function guardarApi() {
-    if (!solUser.trim()) { setError("Carga el Usuario SOL en los accesos de arriba."); return; }
-    if (!clientId.trim() || !clientSecret.trim()) { setError("Ingresa el client_id y el client_secret."); return; }
-    setGuardandoApi(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/clientes/${clienteId}/credenciales`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, clientId, clientSecret }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo guardar la API."); return; }
-      setApiBloqueada(true);
-      router.refresh();
-    } catch {
-      setError("Error de red al guardar la API.");
-    } finally {
-      setGuardandoApi(false);
-    }
   }
 
   async function consultarSire(simulado: boolean, periodoOverride?: string): Promise<boolean> {
@@ -172,45 +148,16 @@ export default function SunatPanel({
         <span className="badge bg-slate-100 text-slate-500">Requiere API</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
-        Extrae los montos (RVIE/RCE) y el estado <b>presentado / no presentado</b> por periodo.
-        Necesita la <b>API (client_id/secret)</b> colocada y bloqueada.
+        Extrae los montos (RVIE/RCE) por periodo. Usa la <b>API (client_id/secret)</b> que cargaste
+        una sola vez arriba, en “Accesos del cliente”.
       </p>
 
-      {/* API: colocar y bloquear */}
-      <div className="rounded-lg border border-slate-200 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          API SUNAT (SIRE)
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label">
-              client_id {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
-            </label>
-            <input className={`input ${apiBloqueada || !puedeApi ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} value={puedeApi ? clientId : (clientId ? "••••••••" : "")} onChange={(e) => setClientId(e.target.value)} readOnly={apiBloqueada || !puedeApi} autoComplete="off" />
-          </div>
-          <div>
-            <label className="label">
-              client_secret {apiBloqueada && <span className="ml-1 text-xs font-normal text-emerald-600">🔒 bloqueado</span>}
-            </label>
-            <input className={`input ${apiBloqueada || !puedeApi ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""}`} type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} readOnly={apiBloqueada || !puedeApi} autoComplete="new-password" />
-          </div>
-        </div>
-        {!puedeApi ? (
-          <p className="mt-2 text-xs text-slate-400">
-            🔒 Solo el <b>administrador</b> del estudio puede editar el API. Tú puedes extraer con la <b>Clave SOL</b>.
-          </p>
-        ) : apiBloqueada ? (
-          <p className="mt-2 text-xs text-slate-400">
-            API guardada y bloqueada. Para extraer solo se pide la <b>Clave SOL</b>.{" "}
-            <button type="button" className="text-brand-600 hover:underline" onClick={() => setApiBloqueada(false)}>Editar API</button>
-          </p>
+      {/* La API SIRE se carga UNA vez arriba, en "Accesos del cliente". */}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+        {apiLista ? (
+          <span className="text-slate-500">🔑 API SIRE <b className="text-emerald-600">cargada</b> (desde “Accesos del cliente”, arriba). Para extraer solo se usa la <b>Clave SOL</b>.</span>
         ) : (
-          <div className="mt-2 flex items-center gap-3">
-            <button type="button" className="btn-primary" onClick={guardarApi} disabled={guardandoApi}>
-              {guardandoApi ? "Guardando…" : "Guardar y bloquear API"}
-            </button>
-            <span className="text-xs text-slate-400">Coloca la API en campo para habilitar el SIRE.</span>
-          </div>
+          <span className="text-amber-700">Falta el <b>API SIRE</b> (client_id/secret). Cárgala arriba en <b>“Accesos del cliente”</b> (botón “Cambiar”) para habilitar la extracción.</span>
         )}
       </div>
 

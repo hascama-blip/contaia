@@ -192,7 +192,12 @@ export default function ClienteDetail({
       </div>
 
       {/* Accesos SOL: se cargan 1 vez y los usan todos los módulos */}
-      <AccesosSol clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
+      <AccesosSol
+        clienteId={cliente.id}
+        solUserGuardado={cliente.credSire?.solUser ?? ""}
+        llevaSire={llevaSire(cliente)}
+        inicialCred={cliente.credSire ? { clientId: cliente.credSire.clientId ?? "", clientSecret: cliente.credSire.clientSecret ?? "" } : null}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Columna izquierda: SUNAT + documentos */}
