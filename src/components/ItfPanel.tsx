@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
 const soles = (n: any) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -16,6 +16,12 @@ export default function ItfPanel({ clienteId, solUserGuardado, inicial, sinConsu
   const [consultado, setConsultado] = useState(Boolean(inicial));
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+
+  // Cuando "⚡ Extraer todo" guarda el ITF y refresca el server, el prop `inicial`
+  // llega actualizado: lo sincronizamos al estado (useState solo toma el 1er valor).
+  useEffect(() => {
+    if (inicial) { setItf(inicial); setConsultado(true); }
+  }, [inicial]);
 
   async function consultar() {
     setError(null); setDiag(null);

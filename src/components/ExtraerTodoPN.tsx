@@ -29,6 +29,10 @@ export default function ExtraerTodoPN({ clienteId, solUserGuardado, personaNatur
       if (!r.ok) { setError(data.error ?? "No se pudo extraer."); setRes(data.parcial ?? null); return; }
       setRes(data);
       router.refresh();
+      // Avisa a los paneles de abajo (buzón, deudas, ITF) que recarguen su data
+      // guardada: router.refresh() actualiza el server, pero los paneles cargan
+      // su estado en el montaje y no se re-disparan solos.
+      try { window.dispatchEvent(new Event("radar:extraido")); } catch { /* */ }
     } catch (e: any) {
       setError(e?.name === "AbortError" ? "Tardó demasiado (SUNAT lento o bloqueado)." : "Error de red.");
     } finally { clearTimeout(tope); setBusy(false); }

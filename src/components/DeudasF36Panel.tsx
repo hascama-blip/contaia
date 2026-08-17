@@ -87,6 +87,13 @@ export default function DeudasF36Panel({
   }, [clienteId]);
   useEffect(() => { cargar(); }, [cargar]);
 
+  // Recarga cuando "⚡ Extraer todo" termina (generó el pedido en el server).
+  useEffect(() => {
+    const h = () => cargar();
+    window.addEventListener("radar:extraido", h);
+    return () => window.removeEventListener("radar:extraido", h);
+  }, [cargar]);
+
   function accesos() {
     const solUser = solUserGuardado;
     const solPass = getSolPass(clienteId);

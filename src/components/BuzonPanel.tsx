@@ -67,6 +67,13 @@ export default function BuzonPanel({
 
   useEffect(() => { cargarGuardados(); cargarSeguimientos(); }, [cargarGuardados, cargarSeguimientos]);
 
+  // Recarga cuando "⚡ Extraer todo" termina (guardó el buzón en el server).
+  useEffect(() => {
+    const h = () => { cargarGuardados(); cargarSeguimientos(); };
+    window.addEventListener("radar:extraido", h);
+    return () => window.removeEventListener("radar:extraido", h);
+  }, [cargarGuardados, cargarSeguimientos]);
+
   async function extraer() {
     setError(null); setDiag(null);
     const solUser = solUserGuardado;
