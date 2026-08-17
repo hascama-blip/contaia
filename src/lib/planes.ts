@@ -2,6 +2,10 @@
 
 export interface Plan {
   nombre: string;
+  /** Id interno del plan (para asignarlo desde el panel del supremo). */
+  planId: "basico" | "regular" | "premium" | "equipo";
+  /** true = gratis: el botón solo entra al servicio (no manda WhatsApp). */
+  gratis?: boolean;
   precio: string;
   precioAntes?: string;
   periodo?: string;
@@ -20,9 +24,25 @@ export const CONTACTO = "dascama@gmail.com";
 export const mailtoPlan = (plan: string) =>
   `mailto:${CONTACTO}?subject=${encodeURIComponent(`Quiero adquirir el ${plan} — Radar Tributario`)}`;
 
+// WhatsApp donde llegan las solicitudes de plan (solo dígitos, con código país).
+// Configurable por entorno; por defecto el número acordado.
+export const WHATSAPP = (
+  process.env.NEXT_PUBLIC_WHATSAPP ||
+  process.env.WHATSAPP_NUMERO ||
+  "51922574348"
+).replace(/[^0-9]/g, "");
+
+/** Link de WhatsApp con el mensaje de solicitud de plan ya armado. */
+export function waPlan(nombre: string, plan: string, perfil: string): string {
+  const msg = `hola, soy ${nombre} con el perfil ${perfil} y quiero el plan ${plan} deseo su metodo de pago para poder acceder al plan.`;
+  return `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`;
+}
+
 export const PLANES: Plan[] = [
   {
     nombre: "Plan Básico",
+    planId: "basico",
+    gratis: true,
     precio: "Gratis",
     resumen: "Para empezar: consulta básica y el reporte analítico de auditoría.",
     cta: "Empezar gratis",
@@ -49,6 +69,7 @@ export const PLANES: Plan[] = [
   },
   {
     nombre: "Plan Regular",
+    planId: "regular",
     precio: "S/ 9.99",
     precioAntes: "S/ 19.98",
     periodo: "/mes",
@@ -78,6 +99,7 @@ export const PLANES: Plan[] = [
   },
   {
     nombre: "Plan Premium",
+    planId: "premium",
     precio: "S/ 19.99",
     precioAntes: "S/ 39.98",
     periodo: "/mes",
@@ -126,6 +148,7 @@ export const PLANES: Plan[] = [
   },
   {
     nombre: "Plan de Equipo",
+    planId: "equipo",
     precio: "A cotizar",
     resumen: "Para empresas: gestionen en equipo todas las empresas a su cargo.",
     cta: "Solicitar cotización",

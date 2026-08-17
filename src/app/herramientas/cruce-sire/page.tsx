@@ -9,7 +9,7 @@ export const metadata = { title: "Comparativo SIRE vs Contabilidad — Radar Tri
 export default async function Page() {
   const user = await requireUser();
   const mods = await modulosDelEstudio(user);
-  if (!mods.has("m2")) return <ModuloBloqueado nombre="Comparativo SIRE vs sistema contable" />;
+  if (!mods.has("cruce-sire")) return <ModuloBloqueado nombre="Comparativo SIRE vs sistema contable" />;
   return (
     <div className="space-y-4">
       <div>

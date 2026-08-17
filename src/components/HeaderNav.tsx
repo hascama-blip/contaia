@@ -10,10 +10,12 @@ export function HeaderNav({
   nombre,
   admin,
   supremo,
+  equipo,
 }: {
   nombre: string;
   admin: boolean;
   supremo: boolean;
+  equipo?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -23,7 +25,8 @@ export function HeaderNav({
     { href: "/", label: "Inicio" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/clientes", label: "Clientes" },
-    ...(admin ? [{ href: "/equipo", label: "Equipo" }, { href: "/actividad", label: "Actividad" }] : []),
+    ...(admin && equipo ? [{ href: "/equipo", label: "Equipo" }] : []),
+    ...(admin ? [{ href: "/actividad", label: "Actividad" }] : []),
     ...(supremo ? [{ href: "/supremo", label: "Supremo" }] : []),
     { href: "/planes", label: "Adquirir módulos" },
   ];

@@ -146,8 +146,11 @@ const LIMITE_USOS = 3;
 const VENTANA_USOS = 7 * 24 * 60 * 60 * 1000;
 
 function calcUsos(u: Usuario) {
-  // Ilimitado si es el supremo (dueño de la plataforma) o tiene módulos de paga.
-  const pago = u.rol === "supremo" || (u.modulos?.length ?? 0) > 0;
+  // Ilimitado si es el supremo, tiene un plan de paga (regular+) o módulos (legacy).
+  const pago =
+    u.rol === "supremo" ||
+    (!!u.plan && u.plan !== "basico") ||
+    (u.modulos?.length ?? 0) > 0;
   const desde = u.usosGratis?.desde ?? "";
   const t = desde ? new Date(desde).getTime() : 0;
   const expirado = !t || Date.now() - t >= VENTANA_USOS;
@@ -172,8 +175,8 @@ export async function consumirUso(adminId: string): Promise<void> {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === adminId);
   if (!u) return;
-  if ((u.modulos?.length ?? 0) > 0) return; // ilimitado
   const c = calcUsos(u);
+  if (c.pago) return; // ilimitado (supremo / plan de paga / módulos)
   const desde = c.expirado ? new Date().toISOString() : (u.usosGratis?.desde as string);
   const usados = c.expirado ? 1 : (u.usosGratis?.usados ?? 0) + 1;
   u.usosGratis = { usados, desde };
@@ -240,6 +243,19 @@ export async function setModulosUsuario(
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
   u.modulos = Array.from(new Set(modulos));
+  await writeStore(store);
+  return u;
+}
+
+/** El supremo asigna el PLAN de un estudio (basico/regular/premium/equipo). */
+export async function setPlanUsuario(
+  userId: string,
+  plan: "basico" | "regular" | "premium" | "equipo"
+): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
+  if (!u) return null;
+  u.plan = plan;
   await writeStore(store);
   return u;
 }

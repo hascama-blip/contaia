@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PLANES, mailtoPlan } from "@/lib/planes";
+import { PLANES } from "@/lib/planes";
 
 // Ventana de planes que aparece al INGRESAR (el login setea localStorage
 // "mostrar_planes"). Se muestra una vez por ingreso; el usuario elige o cierra.
@@ -73,7 +73,7 @@ export default function PlanesModal() {
                 )}
               </ul>
 
-              {p.ctaEstilo === "ghost" ? (
+              {p.gratis ? (
                 <button
                   onClick={cerrar}
                   className="btn-ghost mt-3 w-full text-center text-xs"
@@ -81,13 +81,13 @@ export default function PlanesModal() {
                   {p.cta}
                 </button>
               ) : (
-                <a
-                  href={mailtoPlan(p.nombre)}
+                <Link
+                  href="/planes"
                   onClick={cerrar}
                   className={`mt-3 w-full text-center text-xs ${p.ctaEstilo === "accent" ? "btn-accent" : "btn-primary"}`}
                 >
                   {p.cta}
-                </a>
+                </Link>
               )}
             </div>
           ))}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, esAdmin, hashPassword, publicUser } from "@/lib/auth";
+import { requireUser, esAdmin, esSupremo, planDelEstudio, hashPassword, publicUser } from "@/lib/auth";
 import { listSubUsuarios, createUser, deleteSubUsuario, getUserByEmail } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -16,6 +16,14 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!esAdmin(user)) return NextResponse.json({ error: "Solo el administrador." }, { status: 403 });
+
+  // Agregar operarios/equipo solo está disponible en el Plan de Equipo.
+  if (!esSupremo(user) && (await planDelEstudio(user)) !== "equipo") {
+    return NextResponse.json(
+      { error: "Agregar operarios está disponible solo en el Plan de Equipo. Solicítalo desde “Adquirir módulos”." },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json().catch(() => ({}));
   const nombre = String(body?.nombre ?? "").trim();

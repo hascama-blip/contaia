@@ -4,7 +4,7 @@ import { LogoAsenco } from "@/components/Logo";
 import { HeaderNav } from "@/components/HeaderNav";
 import PlanesModal from "@/components/PlanesModal";
 import { SupremoProvider } from "@/components/SupremoContext";
-import { getCurrentUser, esAdmin, esSupremo, ensureSupremo } from "@/lib/auth";
+import { getCurrentUser, esAdmin, esSupremo, ensureSupremo, planDelEstudio } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,6 +25,8 @@ export default async function RootLayout({
   const user = await getCurrentUser();
   const admin = esAdmin(user);
   const supremo = esSupremo(user);
+  // El menú "Equipo" solo para el Plan de Equipo (o supremo).
+  const equipo = user ? supremo || (await planDelEstudio(user)) === "equipo" : false;
   return (
     <html lang="es">
       <body>
@@ -38,6 +40,7 @@ export default async function RootLayout({
                 nombre={user.nombre + (admin ? "" : " · operador")}
                 admin={admin}
                 supremo={supremo}
+                equipo={equipo}
               />
             </div>
           </header>

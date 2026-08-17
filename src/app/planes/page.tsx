@@ -1,12 +1,18 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
-import { PLANES, CONTACTO, mailtoPlan } from "@/lib/planes";
+import { PLANES, CONTACTO, waPlan } from "@/lib/planes";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Adquirir módulos — Radar Tributario" };
 
 export default async function Page() {
-  await requireUser();
+  const user = await requireUser();
+
+  // Link de "perfil" del solicitante (para que el supremo lo identifique y le dé el acceso).
+  const h = headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host") ?? "radartributaria.com"}`;
+  const perfil = `${origin}/supremo?u=${user.id}`;
 
   return (
     <div className="space-y-6">
@@ -78,14 +84,23 @@ export default async function Page() {
               )}
             </div>
 
-            <a
-              href={p.ctaHref || mailtoPlan(p.nombre)}
-              className={`mt-5 w-full text-center ${
-                p.ctaEstilo === "accent" ? "btn-accent" : p.ctaEstilo === "ghost" ? "btn-ghost" : "btn-primary"
-              }`}
-            >
-              {p.cta}
-            </a>
+            {p.gratis ? (
+              <Link
+                href={p.ctaHref || "/"}
+                className={`mt-5 w-full text-center ${p.ctaEstilo === "ghost" ? "btn-ghost" : "btn-primary"}`}
+              >
+                {p.cta}
+              </Link>
+            ) : (
+              <a
+                href={waPlan(user.nombre, p.nombre, perfil)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`mt-5 w-full text-center ${p.ctaEstilo === "accent" ? "btn-accent" : "btn-primary"}`}
+              >
+                {p.cta}
+              </a>
+            )}
           </div>
         ))}
       </div>

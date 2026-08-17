@@ -10,13 +10,16 @@ interface Solicitud {
   estado?: "pendiente" | "aprobado" | "rechazado";
   decididoAt?: string;
   modulos?: string[];
+  plan?: "basico" | "regular" | "premium" | "equipo";
   operadores?: number;
 }
 
-const MODULOS = [
-  { key: "m2", label: "Mód. 2 · Comparativo SIRE" },
-  { key: "m3", label: "Mód. 3 · Masivo Contasis" },
-  { key: "m4", label: "Mód. 4 · Consultas tributarias" },
+// Planes que el supremo asigna (cada uno desbloquea sus módulos).
+const PLANES_OPC: { key: "basico" | "regular" | "premium" | "equipo"; label: string; desc: string }[] = [
+  { key: "basico", label: "Básico (gratis)", desc: "Reporte analítico de auditoría" },
+  { key: "regular", label: "Regular", desc: "+ Consultas tributarias" },
+  { key: "premium", label: "Premium", desc: "+ Detalle SIRE y RTT" },
+  { key: "equipo", label: "Plan de Equipo", desc: "Premium + operarios (equipo)" },
 ];
 
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";
@@ -33,7 +36,11 @@ function fmt(iso?: string) {
 }
 
 export default function SupremoPanel() {
-  const [filtro, setFiltro] = useState<Filtro>("pendiente");
+  // Si se entró por /supremo?u=<id> (link de un solicitante), mostrar TODAS y resaltarlo.
+  const destacadoId = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("u")
+    : null;
+  const [filtro, setFiltro] = useState<Filtro>(destacadoId ? "todas" : "pendiente");
   const [lista, setLista] = useState<Solicitud[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -128,18 +135,16 @@ export default function SupremoPanel() {
     } finally { setBusy(null); }
   }
 
-  async function toggleModulo(s: Solicitud, key: string) {
-    const actuales = new Set(s.modulos ?? []);
-    if (actuales.has(key)) actuales.delete(key); else actuales.add(key);
+  async function cambiarPlan(s: Solicitud, plan: string) {
     setBusy(s.id); setError(null);
     try {
       const res = await fetch("/api/supremo/solicitudes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: s.id, modulos: Array.from(actuales) }),
+        body: JSON.stringify({ userId: s.id, plan }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo actualizar los módulos."); return; }
+      if (!res.ok) { setError(data.error ?? "No se pudo asignar el plan."); return; }
       await cargar();
     } finally { setBusy(null); }
   }
@@ -306,7 +311,7 @@ export default function SupremoPanel() {
                   <th className="px-4 py-2">Solicitante</th>
                   <th className="px-4 py-2">Correo</th>
                   <th className="px-4 py-2">Estado</th>
-                  <th className="px-4 py-2">Módulos de paga</th>
+                  <th className="px-4 py-2">Plan</th>
                   <th className="px-4 py-2 text-right">Acción</th>
                 </tr>
               </thead>
@@ -316,7 +321,7 @@ export default function SupremoPanel() {
                   const b = BADGE[est] ?? BADGE.aprobado;
                   return (
                     <Fragment key={s.id}>
-                    <tr>
+                    <tr className={destacadoId === s.id ? "bg-amber-50 ring-2 ring-amber-300" : ""}>
                       <td className="px-4 py-2 font-medium text-slate-700">
                         {s.nombre}
                         <p className="text-[11px] font-normal text-slate-400">{fmt(s.createdAt)}</p>
@@ -335,17 +340,17 @@ export default function SupremoPanel() {
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex flex-col gap-1">
-                          {MODULOS.map((m) => {
-                            const on = (s.modulos ?? []).includes(m.key);
+                          {PLANES_OPC.map((pl) => {
+                            const on = (s.plan ?? "basico") === pl.key;
                             return (
-                              <label key={m.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                              <label key={pl.key} className="flex items-center gap-1.5 text-xs text-slate-600" title={pl.desc}>
                                 <input
                                   type="checkbox"
                                   checked={on}
                                   disabled={busy !== null}
-                                  onChange={() => toggleModulo(s, m.key)}
+                                  onChange={() => cambiarPlan(s, pl.key)}
                                 />
-                                <span className={on ? "font-semibold text-emerald-700" : ""}>{m.label}</span>
+                                <span className={on ? "font-semibold text-emerald-700" : ""}>{pl.label}</span>
                               </label>
                             );
                           })}

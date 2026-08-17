@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { esSupremo, getCurrentUser, publicUser, hashPassword } from "@/lib/auth";
-import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPasswordUsuario, conteoOperadores } from "@/lib/db";
-import { MODULO_KEYS } from "@/lib/modulos";
+import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPlanUsuario, setPasswordUsuario, conteoOperadores } from "@/lib/db";
+import { TODOS_MODULO_KEYS, PLAN_ORDEN, type PlanId } from "@/lib/modulos";
 
 export const runtime = "nodejs";
 
@@ -42,9 +42,19 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, usuario: publicUser(u) });
   }
 
-  // Desbloqueo de módulos de paga (m2/m3/m4).
+  // Asignación de PLAN (basico/regular/premium/equipo) — controla los módulos.
+  if (typeof body?.plan === "string") {
+    if (!PLAN_ORDEN.includes(body.plan as PlanId)) {
+      return NextResponse.json({ error: "Plan inválido." }, { status: 400 });
+    }
+    const u = await setPlanUsuario(userId, body.plan as PlanId);
+    if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
+    return NextResponse.json({ ok: true, usuario: publicUser(u) });
+  }
+
+  // Desbloqueo de módulos sueltos (legacy, aún soportado).
   if (Array.isArray(body?.modulos)) {
-    const mods = body.modulos.map((m: any) => String(m)).filter((m: string) => MODULO_KEYS.includes(m));
+    const mods = body.modulos.map((m: any) => String(m)).filter((m: string) => TODOS_MODULO_KEYS.includes(m));
     const u = await setModulosUsuario(userId, mods);
     if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
     return NextResponse.json({ ok: true, usuario: publicUser(u) });

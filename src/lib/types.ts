@@ -115,8 +115,11 @@ export interface Usuario {
   estado?: "pendiente" | "aprobado" | "rechazado";
   /** Fecha en que el supremo decidió (aprobó/rechazó). */
   decididoAt?: string;
-  /** Módulos de paga desbloqueados por el supremo (keys: "m2","m3","m4"). */
+  /** Módulos de paga desbloqueados por el supremo (legacy, keys sueltas). */
   modulos?: string[];
+  /** Plan asignado por el supremo. De aquí se derivan los módulos.
+   *  undefined = "basico" (gratis). */
+  plan?: "basico" | "regular" | "premium" | "equipo";
   /** Recuperación de contraseña: hash del token + expiración (un solo uso). */
   resetTokenHash?: string;
   resetTokenExp?: string;

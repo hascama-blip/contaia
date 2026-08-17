@@ -13,7 +13,7 @@ export const metadata = { title: "Consultas tributarias — Radar Tributario" };
 export default async function Page() {
   const user = await requireUser();
   const mods = await modulosDelEstudio(user);
-  if (!mods.has("m4")) return <ModuloBloqueado nombre="Consultas tributarias" />;
+  if (!mods.has("consultas")) return <ModuloBloqueado nombre="Consultas tributarias" />;
   const clientes = await listClientes(studioId(user));
   const lista = clientes.map((c) => ({
     id: c.id,

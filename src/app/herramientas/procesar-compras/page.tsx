@@ -9,7 +9,7 @@ export const metadata = { title: "Masivo SIRE → Contabilidad — Radar Tributa
 export default async function Page() {
   const user = await requireUser();
   const mods = await modulosDelEstudio(user);
-  if (!mods.has("m3")) return <ModuloBloqueado nombre="Masivo SIRE → Contabilidad (Contasis)" />;
+  if (!mods.has("procesar-compras")) return <ModuloBloqueado nombre="Masivo SIRE → Contabilidad (Contasis)" />;
   return (
     <div className="space-y-5">
       <div>

@@ -102,13 +102,21 @@ export function esSupremo(u: Usuario | null | undefined): boolean {
   return Boolean(u) && u!.rol === "supremo";
 }
 
-/** Módulos de paga habilitados para el estudio del usuario. El supremo tiene
- *  todos; el resto hereda los del admin del estudio (operadores incluidos). */
-export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
-  const { MODULO_KEYS } = await import("./modulos");
-  if (esSupremo(u)) return new Set(MODULO_KEYS);
+/** Plan del estudio al que pertenece el usuario. El supremo = "equipo" (todo).
+ *  Los operadores heredan el plan de su admin. */
+export async function planDelEstudio(u: Usuario): Promise<import("./modulos").PlanId> {
+  if (esSupremo(u)) return "equipo";
   const admin = u.parentId ? await getUserById(u.parentId) : u;
-  return new Set(admin?.modulos ?? []);
+  return (admin?.plan ?? "basico") as import("./modulos").PlanId;
+}
+
+/** Módulos habilitados para el estudio del usuario, según su PLAN. El supremo
+ *  tiene TODOS (incluye utilitarios); el resto según el plan del admin. */
+export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
+  const { TODOS_MODULO_KEYS, modulosDePlan } = await import("./modulos");
+  if (esSupremo(u)) return new Set(TODOS_MODULO_KEYS);
+  const admin = u.parentId ? await getUserById(u.parentId) : u;
+  return new Set(modulosDePlan(admin?.plan as import("./modulos").PlanId | undefined));
 }
 
 /** ¿Puede ingresar a la plataforma? El supremo siempre; un operador si su
