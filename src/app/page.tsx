@@ -3,6 +3,7 @@ import { listClientes } from "@/lib/db";
 import { requireUser, studioId, modulosDelEstudio } from "@/lib/auth";
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
+import UtilitariosSeccion from "@/components/UtilitariosSeccion";
 
 export const dynamic = "force-dynamic";
 
@@ -157,20 +158,14 @@ export default async function MenuPage() {
         })}
       </div>
 
-      {/* Utilitarios */}
-      <div className="pt-2">
-        <div className="mb-3 flex items-center gap-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">🧰 Utilitarios</h2>
-          <div className="h-px flex-1 bg-slate-200" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {UTILITARIOS.map((o) => {
-            const mod = moduloPorHref(o.href);
-            const bloqueado = mod ? !mods.has(mod.key) : false;
-            return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
-          })}
-        </div>
-      </div>
+      {/* Utilitarios (retráctil) */}
+      <UtilitariosSeccion>
+        {UTILITARIOS.map((o) => {
+          const mod = moduloPorHref(o.href);
+          const bloqueado = mod ? !mods.has(mod.key) : false;
+          return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
+        })}
+      </UtilitariosSeccion>
 
       <p className="text-center text-xs text-slate-400">
         {clientes.length} cliente(s) registrado(s) · selecciona una sección para empezar.
