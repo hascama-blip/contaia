@@ -32,8 +32,8 @@ export default async function RootLayout({
       <body>
         {user && (
           <header className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
-              <Link href="/" className="flex shrink-0 items-center" translate="no">
+            <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-10">
+              <Link href="/" className="mr-2 flex shrink-0 items-center lg:mr-6" translate="no">
                 <LogoAsenco />
               </Link>
               <HeaderNav

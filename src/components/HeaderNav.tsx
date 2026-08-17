@@ -25,8 +25,7 @@ export function HeaderNav({
     { href: "/", label: "Inicio" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/clientes", label: "Clientes" },
-    ...(admin && equipo ? [{ href: "/equipo", label: "Equipo" }] : []),
-    ...(admin ? [{ href: "/actividad", label: "Actividad" }] : []),
+    ...(admin && equipo ? [{ href: "/equipo", label: "Equipo" }, { href: "/actividad", label: "Actividad" }] : []),
     ...(supremo ? [{ href: "/supremo", label: "Supremo" }] : []),
     { href: "/planes", label: "Adquirir módulos" },
   ];
@@ -43,7 +42,7 @@ export function HeaderNav({
   return (
     <>
       {/* Navegación de escritorio */}
-      <nav className="hidden items-center gap-1 text-sm md:flex">
+      <nav className="hidden items-center gap-0.5 text-sm md:flex lg:gap-1.5">
         {links.map((l) => (
           <Link key={l.href} href={l.href} className={`rounded-lg px-3 py-2 hover:bg-slate-100 ${l.href === "/supremo" ? "font-semibold text-brand-700" : ""} ${l.href === "/planes" ? "font-semibold text-accent-600" : ""}`}>
             {l.label}
