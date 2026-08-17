@@ -8,6 +8,7 @@
 // El login y la evasión de pantallas flotantes son los mismos helpers del RTT.
 
 import { abrirSesionSunat, MSG_LOGIN_ERROR } from "./sunatSesion";
+import { resolverCaptchaSiHay } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -175,7 +176,9 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     if (!fr) return { ok: false, error: "No se encontró el formulario del Reporte de Rentas en el menú. Usa Modo diagnóstico.", diag: { pasos } };
     if (!correoOk) return { ok: false, error: "Se llegó al formulario pero no se pudo escribir el correo. Usa Modo diagnóstico.", diag: { pasos } };
 
-    // 4) Generar Reporte.
+    // 4) Generar Reporte. Si el formulario trae captcha (Cloudflare Turnstile),
+    //    resolverlo ANTES de "Generar" (no-op si no hay widget o no hay key).
+    await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
     let generado = false;
     for (const sel of ['#btnGenerar', 'button:has-text("Generar Reporte")', 'a:has-text("Generar Reporte")', 'input[value*="Generar" i]', 'button:has-text("Generar")', 'a:has-text("Generar")']) {
       const el = fr.locator(sel).first();

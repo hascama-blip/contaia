@@ -27,9 +27,9 @@ export interface CaptchaDetectado {
   tipo: "turnstile";
 }
 
-/** Busca un widget Turnstile en TODOS los frames. Devuelve sitekey + URL top. */
+/** Busca un widget Turnstile en TODOS los frames. Devuelve sitekey + la URL del
+ *  FRAME que lo contiene (Turnstile ata el token a esa URL, no a la del top). */
 export async function detectarTurnstile(ctx: any, page: any): Promise<CaptchaDetectado | null> {
-  const url = page.url();
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
       const sitekey = await fr
@@ -48,7 +48,13 @@ export async function detectarTurnstile(ctx: any, page: any): Promise<CaptchaDet
           return null;
         })
         .catch(() => null);
-      if (sitekey) return { sitekey, url, tipo: "turnstile" };
+      if (sitekey) {
+        // URL del frame que contiene el widget (si es "about:blank", cae al top).
+        let url = "";
+        try { url = fr.url(); } catch { /* */ }
+        if (!url || url === "about:blank") url = page.url();
+        return { sitekey, url, tipo: "turnstile" };
+      }
     }
   }
   return null;
