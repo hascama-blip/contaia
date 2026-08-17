@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId, modulosDelEstudio } from "@/lib/auth";
+import { requireUser, studioId, modulosDelEstudio, esSupremo } from "@/lib/auth";
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 import UtilitariosSeccion from "@/components/UtilitariosSeccion";
@@ -158,14 +158,16 @@ export default async function MenuPage() {
         })}
       </div>
 
-      {/* Utilitarios (retráctil) */}
-      <UtilitariosSeccion>
-        {UTILITARIOS.map((o) => {
-          const mod = moduloPorHref(o.href);
-          const bloqueado = mod ? !mods.has(mod.key) : false;
-          return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
-        })}
-      </UtilitariosSeccion>
+      {/* Utilitarios (retráctil) — solo el supremo */}
+      {esSupremo(user) && (
+        <UtilitariosSeccion>
+          {UTILITARIOS.map((o) => {
+            const mod = moduloPorHref(o.href);
+            const bloqueado = mod ? !mods.has(mod.key) : false;
+            return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
+          })}
+        </UtilitariosSeccion>
+      )}
 
       <p className="text-center text-xs text-slate-400">
         {clientes.length} cliente(s) registrado(s) · selecciona una sección para empezar.
