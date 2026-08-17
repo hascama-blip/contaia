@@ -40,12 +40,31 @@ export default async function InformePage({ params }: { params: { id: string } }
   const idxDeudaCol = (headers: string[]) =>
     headers.findIndex((h) => /deuda a acogerse|deuda|importe|monto/i.test(h));
   const aNum = (s: string) => Number(String(s).replace(/[^\d.-]/g, "")) || 0;
-  const totalDeuda = deudasF36.reduce((acc, t) => {
+  // Las deudas AUTOLIQUIDADAS/RELIQUIDADAS NO se pagan/acogen aquí: se ignoran del
+  // total a pagar (se muestran aparte, informativas).
+  const esAutoliquidada = (pestana: string) => /autoliquid|reliquid/i.test(pestana);
+  const sumaTabla = (t: (typeof deudasF36)[number]) => {
     const ci = idxDeudaCol(t.headers);
-    if (ci < 0) return acc;
-    return acc + t.filas.reduce((a, f) => a + aNum(f[ci] ?? ""), 0);
-  }, 0);
+    if (ci < 0) return 0;
+    return t.filas.reduce((a, f) => a + aNum(f[ci] ?? ""), 0);
+  };
+  // Total a acoger = solo secciones NO autoliquidadas.
+  const totalDeuda = deudasF36
+    .filter((t) => !esAutoliquidada(t.pestana))
+    .reduce((acc, t) => acc + sumaTabla(t), 0);
+  // Autoliquidadas: monto y conteo aparte (informativo, no se paga).
+  const totalAutoliquidada = deudasF36
+    .filter((t) => esAutoliquidada(t.pestana))
+    .reduce((acc, t) => acc + sumaTabla(t), 0);
+  const nAutoliquidada = deudasF36
+    .filter((t) => esAutoliquidada(t.pestana))
+    .reduce((a, t) => a + t.filas.length, 0);
+  // Conteo total (todas las secciones) para decidir si mostrar el bloque.
   const nDeudas = deudasF36.reduce((a, t) => a + t.filas.length, 0);
+  // Conteo de deudas a acoger (excluye autoliquidadas) para la observación.
+  const nDeudasAcogible = deudasF36
+    .filter((t) => !esAutoliquidada(t.pestana))
+    .reduce((a, t) => a + t.filas.length, 0);
   const nPeligrosos = cliente.buzon?.peligrosos?.length ?? 0;
   const nUrgentes = cliente.buzon?.urgentes?.length ?? 0;
 
@@ -56,7 +75,9 @@ export default async function InformePage({ params }: { params: { id: string } }
   if (sunat && sunat.condicion.toUpperCase() !== "HABIDO")
     observacionesFinal.push({ nivel: "alto", texto: `Condición de domicilio: ${sunat.condicion}. Actualizar para volver a HABIDO.` });
   if (totalDeuda > 0)
-    observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias en SUNAT por ${fmtSoles(totalDeuda)} (${nDeudas} valor(es)). Evaluar pago o fraccionamiento.` });
+    observacionesFinal.push({ nivel: "alto", texto: `Deudas tributarias en SUNAT por ${fmtSoles(totalDeuda)} (${nDeudasAcogible} valor(es)). Evaluar pago o fraccionamiento.` });
+  if (nAutoliquidada > 0)
+    observacionesFinal.push({ nivel: "info", texto: `Deudas autoliquidadas/reliquidadas por ${fmtSoles(totalAutoliquidada)} (${nAutoliquidada}): NO se acogen al fraccionamiento (autodeterminadas); se excluyen del total a pagar.` });
   if (cliente.deudasF36?.nota)
     observacionesFinal.push({ nivel: "alto", texto: `SUNAT (fraccionamiento): ${cliente.deudasF36.nota}` });
   if (nPeligrosos > 0)
@@ -319,7 +340,14 @@ export default async function InformePage({ params }: { params: { id: string } }
               const idxDeuda = t.headers.findIndex((h) => /deuda a acogerse|deuda|importe|monto/i.test(h));
               return (
                 <div key={t.pestana} className="evitar-corte mb-3 overflow-hidden rounded-lg border border-slate-200">
-                  <div className="bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">{t.pestana}</div>
+                  <div className="flex items-center justify-between gap-2 bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">
+                    <span>{t.pestana}</span>
+                    {esAutoliquidada(t.pestana) && (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-amber-700">
+                        No se acoge · no suma al total
+                      </span>
+                    )}
+                  </div>
                   <table className="w-full table-fixed text-[11px]">
                     <thead>
                       <tr className="border-b border-slate-200 text-left uppercase text-slate-400">
