@@ -10,6 +10,7 @@
 // La Clave SOL NUNCA se guarda; solo cookies de sesión efímeras en RAM.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
+import { resolverCaptchaSiHay } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -107,10 +108,19 @@ async function loginCompleto(ctx: any, page: any, c: CredsSol, pasos: any[]): Pr
     await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], c.ruc);
     await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], c.solUser);
     await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], c.solPass);
+    // Si SUNAT muestra un captcha (Cloudflare Turnstile), resolverlo ANTES de enviar.
+    // No-op si no hay widget o no hay CAPSOLVER_KEY (no rompe el login normal).
+    await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
     await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
     await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(3000).catch(() => {});
     await cerrarPantallas(ctx, page);
+    // Si tras enviar apareció un desafío Cloudflare (interstitial), resolverlo y esperar.
+    if (await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false)) {
+      await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(2500).catch(() => {});
+      await cerrarPantallas(ctx, page);
+    }
     const url = page.url();
     const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
     loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);

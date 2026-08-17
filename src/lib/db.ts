@@ -50,7 +50,16 @@ interface Store {
    *  en toda la plataforma (evita crear cuentas falsas para reconsultar). */
   rucsRegistrados?: Record<string, { studioId: string; clienteId: string; ownerNombre?: string; at: string }>;
   /** Configuración global de la plataforma (la administra el supremo). */
-  config?: { browserWsUrl?: string; rttDominio?: string; rttSecret?: string };
+  config?: {
+    browserWsUrl?: string;
+    rttDominio?: string;
+    rttSecret?: string;
+    /** Integraciones antibloqueo SUNAT (captcha + proxy residencial). */
+    capsolverKey?: string;
+    proxyServer?: string;
+    proxyUser?: string;
+    proxyPass?: string;
+  };
   /** Solicitudes de RTT (Reporte Tributario para Terceros) con su trazabilidad. */
   rtt?: SolicitudRTT[];
   /** Bitácora de los últimos correos recibidos por el webhook del RTT (diagnóstico). */
@@ -348,6 +357,41 @@ export async function setBrowserWsUrl(url: string): Promise<void> {
   const store = await readStore();
   if (!store.config) store.config = {};
   store.config.browserWsUrl = url.trim();
+  await writeStore(store);
+}
+
+// ---- Integraciones antibloqueo SUNAT (captcha + proxy) ---------------------
+// El supremo las carga desde su panel (o por variables de entorno, que tienen
+// prioridad). Sirven para evadir el captcha (CapSolver) y el bloqueo por IP
+// (proxy residencial). Los secretos NO se exponen enteros en la UI.
+
+export interface IntegracionesConfig {
+  capsolverKey: string;
+  proxyServer: string;
+  proxyUser: string;
+  proxyPass: string;
+}
+
+/** Config efectiva (entorno tiene prioridad; si no, lo guardado en la app). */
+export async function getIntegraciones(): Promise<IntegracionesConfig> {
+  const store = await readStore();
+  const c = store.config ?? {};
+  return {
+    capsolverKey: (process.env.CAPSOLVER_KEY || c.capsolverKey || "").trim(),
+    proxyServer: (process.env.PROXY_SERVER || c.proxyServer || "").trim(),
+    proxyUser: (process.env.PROXY_USERNAME || c.proxyUser || "").trim(),
+    proxyPass: (process.env.PROXY_PASSWORD || c.proxyPass || "").trim(),
+  };
+}
+
+/** Guarda las integraciones (solo lo que venga definido). "" borra el valor. */
+export async function setIntegraciones(patch: Partial<IntegracionesConfig>): Promise<void> {
+  const store = await readStore();
+  if (!store.config) store.config = {};
+  if (patch.capsolverKey !== undefined) store.config.capsolverKey = patch.capsolverKey.trim();
+  if (patch.proxyServer !== undefined) store.config.proxyServer = patch.proxyServer.trim();
+  if (patch.proxyUser !== undefined) store.config.proxyUser = patch.proxyUser.trim();
+  if (patch.proxyPass !== undefined) store.config.proxyPass = patch.proxyPass.trim();
   await writeStore(store);
 }
 

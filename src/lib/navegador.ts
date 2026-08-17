@@ -94,17 +94,27 @@ export function estadoNavegadores() {
 //   PROXY_USERNAME = usuario del proxy (con proveedor rotativo, cada conexión
 //                    suele salir con IP distinta automáticamente)
 //   PROXY_PASSWORD = clave del proxy
-function proxyDeEnv(): { server: string; username?: string; password?: string } | undefined {
-  const server = (process.env.PROXY_SERVER || "").trim();
+async function proxyConfig(): Promise<{ server: string; username?: string; password?: string } | undefined> {
+  // Entorno primero; si no, lo que el supremo guardó en la app.
+  let server = (process.env.PROXY_SERVER || "").trim();
+  let username = (process.env.PROXY_USERNAME || "").trim();
+  let password = (process.env.PROXY_PASSWORD || "").trim();
+  if (!server) {
+    try {
+      const { getIntegraciones } = await import("./db");
+      const g = await getIntegraciones();
+      server = g.proxyServer;
+      username = g.proxyUser;
+      password = g.proxyPass;
+    } catch { /* si no se puede leer el store, sin proxy */ }
+  }
   if (!server) return undefined;
-  const username = (process.env.PROXY_USERNAME || "").trim() || undefined;
-  const password = (process.env.PROXY_PASSWORD || "").trim() || undefined;
-  return { server, username, password };
+  return { server, username: username || undefined, password: password || undefined };
 }
 
 // Lanza el Chromium local (@sparticuz en Render; el instalado en local).
 async function lanzarLocal(chromium: any) {
-  const proxy = proxyDeEnv();
+  const proxy = await proxyConfig();
   try {
     const sparticuz = (await import("@sparticuz/chromium")).default as any;
     const executablePath = await sparticuz.executablePath();

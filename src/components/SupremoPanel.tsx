@@ -60,6 +60,14 @@ export default function SupremoPanel() {
   // Copia de seguridad (backup/restauración de la base de datos).
   const [bkBusy, setBkBusy] = useState<string | null>(null);
   const [bkMsg, setBkMsg] = useState<string | null>(null);
+  // Integraciones antibloqueo (captcha + proxy).
+  const [integ, setInteg] = useState<any>(null);
+  const [capKey, setCapKey] = useState("");
+  const [pxServer, setPxServer] = useState("");
+  const [pxUser, setPxUser] = useState("");
+  const [pxPass, setPxPass] = useState("");
+  const [integBusy, setIntegBusy] = useState<string | null>(null);
+  const [integMsg, setIntegMsg] = useState<string | null>(null);
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -95,6 +103,36 @@ export default function SupremoPanel() {
       .then((d) => d && setUrlGuardada({ configurada: d.configurada, preview: d.preview }))
       .catch(() => {});
   }, []);
+
+  const cargarInteg = useCallback(() => {
+    fetch("/api/supremo/integraciones")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setInteg(d);
+        setPxServer(d.proxy?.server ?? "");
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { cargarInteg(); }, [cargarInteg]);
+
+  async function guardarInteg(patch: Record<string, string>, etiqueta: string) {
+    setIntegBusy(etiqueta); setIntegMsg(null);
+    try {
+      const res = await fetch("/api/supremo/integraciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setIntegMsg(d.error ?? "No se pudo guardar."); return; }
+      setIntegMsg("✅ Guardado.");
+      setCapKey(""); setPxUser(""); setPxPass("");
+      cargarInteg();
+    } catch {
+      setIntegMsg("Error de red al guardar.");
+    } finally { setIntegBusy(null); }
+  }
 
   async function guardarUrl(valor?: string) {
     setGuardarBusy(true);
@@ -540,6 +578,109 @@ export default function SupremoPanel() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Integraciones antibloqueo SUNAT (captcha + proxy) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-800">🛡️ Antibloqueo SUNAT (captcha + proxy)</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Para que las extracciones funcionen aunque SUNAT muestre captcha (Cloudflare Turnstile) o
+          bloquee la IP del servidor. Se guardan aquí (cifrado en la base) o por variables de entorno
+          (estas tienen prioridad). Los secretos no se muestran completos.
+        </p>
+
+        {/* CapSolver (captcha) */}
+        <div className="mt-3 rounded-lg border border-slate-200 p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-700">CapSolver — resolución de captcha</p>
+            {integ?.capsolver && (
+              <span className={`text-[11px] ${integ.capsolver.configurada ? "text-emerald-600" : "text-slate-400"}`}>
+                {integ.capsolver.configurada
+                  ? `✓ configurada (${integ.capsolver.fuente}) ${integ.capsolver.preview}`
+                  : "no configurada"}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={capKey}
+              onChange={(e) => setCapKey(e.target.value)}
+              placeholder="CAPSOLVER_KEY (clientKey de capsolver.com)"
+              className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+              type="password"
+              autoComplete="off"
+            />
+            <button
+              onClick={() => guardarInteg({ capsolverKey: capKey.trim() }, "cap")}
+              disabled={integBusy !== null || !capKey.trim()}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {integBusy === "cap" ? "Guardando…" : "💾 Guardar key"}
+            </button>
+            {integ?.capsolver?.configurada && integ.capsolver.fuente === "app" && (
+              <button
+                onClick={() => guardarInteg({ capsolverKey: "" }, "cap")}
+                disabled={integBusy !== null}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                🗑️ Quitar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Proxy residencial */}
+        <div className="mt-3 rounded-lg border border-slate-200 p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-700">Proxy residencial — evita bloqueo por IP</p>
+            {integ?.proxy && (
+              <span className={`text-[11px] ${integ.proxy.configurado ? "text-emerald-600" : "text-slate-400"}`}>
+                {integ.proxy.configurado ? `✓ activo (${integ.proxy.fuente})` : "no configurado"}
+              </span>
+            )}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <input
+              value={pxServer}
+              onChange={(e) => setPxServer(e.target.value)}
+              placeholder="http://host:puerto (o socks5://)"
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500 sm:col-span-3"
+              autoComplete="off"
+            />
+            <input
+              value={pxUser}
+              onChange={(e) => setPxUser(e.target.value)}
+              placeholder="usuario del proxy"
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+              autoComplete="off"
+            />
+            <input
+              value={pxPass}
+              onChange={(e) => setPxPass(e.target.value)}
+              placeholder="clave del proxy"
+              type="password"
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+              autoComplete="new-password"
+            />
+            <button
+              onClick={() => guardarInteg({ proxyServer: pxServer.trim(), proxyUser: pxUser.trim(), proxyPass: pxPass.trim() }, "px")}
+              disabled={integBusy !== null}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {integBusy === "px" ? "Guardando…" : "💾 Guardar proxy"}
+            </button>
+          </div>
+          {integ?.proxy?.configurado && integ.proxy.fuente === "app" && (
+            <button
+              onClick={() => guardarInteg({ proxyServer: "", proxyUser: "", proxyPass: "" }, "px")}
+              disabled={integBusy !== null}
+              className="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              🗑️ Quitar proxy
+            </button>
+          )}
+        </div>
+        {integMsg && <p className="mt-2 text-xs text-slate-600">{integMsg}</p>}
       </div>
 
       {/* Copia de seguridad (backup / restauración) */}
