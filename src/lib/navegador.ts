@@ -109,6 +109,19 @@ async function proxyConfig(): Promise<{ server: string; username?: string; passw
     } catch { /* si no se puede leer el store, sin proxy */ }
   }
   if (!server) return undefined;
+  // Normaliza el server: Playwright quiere "scheme://host:puerto" SIN credenciales
+  // embebidas ni barra final. Si vienen dentro del URL (user:pass@host), se extraen.
+  try {
+    const conEsquema = /^[a-z0-9]+:\/\//i.test(server) ? server : `http://${server}`;
+    const u = new URL(conEsquema);
+    if (u.username && !username) username = decodeURIComponent(u.username);
+    if (u.password && !password) password = decodeURIComponent(u.password);
+    const puerto = u.port ? `:${u.port}` : "";
+    server = `${u.protocol}//${u.hostname}${puerto}`;
+  } catch {
+    // Si no parsea como URL, al menos quita la barra final.
+    server = server.replace(/\/+$/, "");
+  }
   return { server, username: username || undefined, password: password || undefined };
 }
 
