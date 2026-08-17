@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
   }
 
-  const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
+  const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true, forzarLogin: body.forzarLogin === true });
   if (r.ok && r.tablas && !body.diagnostico) {
     await setDeudasF36(cliente.id, r.tablas, r.nota).catch(() => {}); // reemplaza lo anterior
     if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);

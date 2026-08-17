@@ -12,7 +12,7 @@
 // para calibrar selectores (igual que se hizo con SIRE/buzón).
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
-import { abrirSesionSunat } from "./sunatSesion";
+import { abrirSesionSunat, olvidarSesion } from "./sunatSesion";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -23,6 +23,8 @@ export interface FraccParams {
   solUser: string;
   solPass: string;
   diagnostico?: boolean;
+  /** Descarta la sesión cacheada para forzar un LOGIN real (probar captcha). */
+  forzarLogin?: boolean;
 }
 
 export interface TablaDeuda {
@@ -362,6 +364,11 @@ async function loginSol(params: FraccParams, pasos: any[]) {
   // Sesión compartida con caché de cookies: si el buzón/rentas/ITF ya inició
   // sesión hace poco para este mismo RUC, aquí se REUTILIZA sin otro login
   // (menos logins = menos captcha/bloqueo de SUNAT).
+  // "Forzar login limpio" (diagnóstico): descarta la caché para provocar un
+  // login real y poder verificar el captcha.
+  if (params.forzarLogin) {
+    olvidarSesion({ ruc: params.ruc, solUser: params.solUser, solPass: params.solPass });
+  }
   return abrirSesionSunat({ ruc: params.ruc, solUser: params.solUser, solPass: params.solPass }, pasos);
 }
 

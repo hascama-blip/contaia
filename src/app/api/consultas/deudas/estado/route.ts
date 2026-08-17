@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
 
-  const r = await verificarEstadoPedidoF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true });
+  const r = await verificarEstadoPedidoF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true, forzarLogin: body.forzarLogin === true });
   if (r.ok && r.estado && !body.diagnostico) {
     await setDeudaEstadoF36(cliente.id, {
       estado: r.estado,

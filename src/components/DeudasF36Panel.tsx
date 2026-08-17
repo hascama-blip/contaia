@@ -72,6 +72,7 @@ export default function DeudasF36Panel({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [modoDiag, setModoDiag] = useState(false);
+  const [forzarLogin, setForzarLogin] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const puedeDiag = usePuedeDiag();
 
@@ -105,7 +106,7 @@ export default function DeudasF36Panel({
     const a = accesos(); if (!a) return;
     setBusy("gen"); setError(null); setDiag(null); setInfo("Generando el pedido de deuda en SUNAT… (puede tardar 1-3 min)");
     try {
-      const { ok, data } = await postF36("generar", { clienteId, ...a, forzar: true, diagnostico: modoDiag });
+      const { ok, data } = await postF36("generar", { clienteId, ...a, forzar: true, diagnostico: modoDiag, forzarLogin });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
       if (!ok) { setError(data.error ?? "No se pudo generar."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
       setEstado("en-proceso");
@@ -120,7 +121,7 @@ export default function DeudasF36Panel({
     const a = accesos(); if (!a) return;
     setBusy("ver"); setError(null); setDiag(null); setInfo("Verificando el estado del pedido en SUNAT…");
     try {
-      const { ok, data } = await postF36("estado", { clienteId, ...a, diagnostico: modoDiag });
+      const { ok, data } = await postF36("estado", { clienteId, ...a, diagnostico: modoDiag, forzarLogin });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
       if (!ok) { setError(data.error ?? "No se pudo verificar."); return; }
       if (data.estado) { setEstado(data.estado); setNumPedido(data.numPedido ?? null); setFechaPedido(data.fechaPedido ?? null); setVerificadoAt(new Date().toISOString()); }
@@ -133,7 +134,7 @@ export default function DeudasF36Panel({
     const a = accesos(); if (!a) return;
     setBusy("ext"); setError(null); setDiag(null); setInfo("Extrayendo las deudas (las pestañas)…");
     try {
-      const { ok, data } = await postF36("extraer", { clienteId, ...a, forzar: true, diagnostico: modoDiag });
+      const { ok, data } = await postF36("extraer", { clienteId, ...a, forzar: true, diagnostico: modoDiag, forzarLogin });
       if (modoDiag) { setDiag(JSON.stringify(data, null, 2)); setInfo(null); return; }
       if (!ok) { setError(data.error ?? "No se pudo extraer."); if (data.diag) setDiag(JSON.stringify(data.diag, null, 2)); return; }
       if (Array.isArray(data.tablas)) { setTablas(data.tablas); setNota(data.nota ?? null); if (data.at) setAt(data.at); setEstado("extraido"); }
@@ -187,6 +188,12 @@ export default function DeudasF36Panel({
           <label className="flex items-center gap-2 text-xs text-slate-500">
             <input type="checkbox" checked={modoDiag} onChange={(e) => setModoDiag(e.target.checked)} />
             Modo diagnóstico
+          </label>
+        )}
+        {puedeDiag && (
+          <label className="flex items-center gap-2 text-xs text-slate-500" title="Descarta la sesión cacheada para forzar un login real y poder verificar el captcha.">
+            <input type="checkbox" checked={forzarLogin} onChange={(e) => setForzarLogin(e.target.checked)} />
+            Forzar login limpio
           </label>
         )}
       </div>
