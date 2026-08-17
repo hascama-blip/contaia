@@ -14,7 +14,8 @@ interface Opcion {
   destacado?: boolean;
 }
 
-const OPCIONES: Opcion[] = [
+// Módulos principales (arriba).
+const PRINCIPALES: Opcion[] = [
   {
     href: "/clientes",
     icono: "📑",
@@ -31,11 +32,11 @@ const OPCIONES: Opcion[] = [
       "Extrae los mensajes del buzón electrónico SUNAT con sus asuntos y descarga, mensaje por mensaje, el PDF adjunto de cada notificación.",
   },
   {
-    href: "/herramientas/comprobantes-xml",
-    icono: "📥",
-    titulo: "Comprobantes XML (SUNAT)",
+    href: "/herramientas/rtt",
+    icono: "📄",
+    titulo: "Reporte Tributario para Terceros (RTT)",
     detalle:
-      "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
+      "Solicita el RTT de SUNAT y recíbelo automáticamente por webhook de correo, con trazabilidad de cada estado (creado → en proceso → listo). Descarga el PDF/XML cuando llega.",
   },
   {
     href: "/herramientas/detalle-sire",
@@ -44,13 +45,10 @@ const OPCIONES: Opcion[] = [
     detalle:
       "Extrae el detalle de la propuesta SUNAT (compras RCE y ventas RVIE, cada uno por separado) comprobante por comprobante desde la API oficial, y descárgalo en Excel.",
   },
-  {
-    href: "/herramientas/rtt",
-    icono: "📄",
-    titulo: "Reporte Tributario para Terceros (RTT)",
-    detalle:
-      "Solicita el RTT de SUNAT y recíbelo automáticamente por webhook de correo, con trazabilidad de cada estado (creado → en proceso → listo). Descarga el PDF/XML cuando llega.",
-  },
+];
+
+// Utilitarios (abajo).
+const UTILITARIOS: Opcion[] = [
   {
     href: "/herramientas/conciliacion",
     icono: "⚖️",
@@ -61,12 +59,61 @@ const OPCIONES: Opcion[] = [
   {
     href: "/herramientas/analisis-compras",
     icono: "📊",
-    titulo: "Análisis de compras para RTP",
+    titulo: "Análisis para RTP",
     detalle:
       "Sube el Libro Diario y obtén el análisis de la cuenta clase 9 (gastos por función: administración, ventas, financieros), un dashboard de compras/gastos para gerencia y el informe en Excel.",
-    destacado: true,
+  },
+  {
+    href: "/herramientas/comprobantes-xml",
+    icono: "📥",
+    titulo: "Comprobante XML SUNAT",
+    detalle:
+      "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
   },
 ];
+
+function Tarjeta({ o, bloqueado }: { o: Opcion; bloqueado: boolean }) {
+  if (bloqueado) {
+    return (
+      <div
+        className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 opacity-90"
+        title="Módulo de paga — pídelo al administrador"
+      >
+        <div className="flex items-center gap-3">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-slate-200 text-2xl grayscale">
+            {o.icono}
+          </span>
+          <h2 className="text-base font-bold text-slate-500">{o.titulo}</h2>
+        </div>
+        <p className="mt-3 text-sm text-slate-400">{o.detalle}</p>
+        <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-400">
+          🔒 Bloqueado (de paga)
+        </span>
+      </div>
+    );
+  }
+  return (
+    <Link
+      href={o.href}
+      className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        o.destacado ? "border-accent-300" : "border-slate-200 hover:border-brand-200"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-2xl">
+          {o.icono}
+        </span>
+        <h2 className="text-base font-bold text-slate-800 group-hover:text-brand-700">
+          {o.titulo}
+        </h2>
+      </div>
+      <p className="mt-3 text-sm text-slate-500">{o.detalle}</p>
+      <span className="mt-4 text-sm font-semibold text-brand-600 group-hover:underline">
+        Entrar →
+      </span>
+    </Link>
+  );
+}
 
 export default async function MenuPage() {
   const user = await requireUser();
@@ -101,54 +148,28 @@ export default async function MenuPage() {
       {/* Recordatorios de buzón (plazos de atención vencidos / por vencer) */}
       <RecordatoriosBanner />
 
-      {/* Menú de tarjetas */}
+      {/* Módulos principales */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {OPCIONES.map((o) => {
+        {PRINCIPALES.map((o) => {
           const mod = moduloPorHref(o.href);
           const bloqueado = mod ? !mods.has(mod.key) : false;
-          if (bloqueado) {
-            return (
-              <div
-                key={o.titulo}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 opacity-90"
-                title="Módulo de paga — pídelo al administrador"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-slate-200 text-2xl grayscale">
-                    {o.icono}
-                  </span>
-                  <h2 className="text-base font-bold text-slate-500">{o.titulo}</h2>
-                </div>
-                <p className="mt-3 text-sm text-slate-400">{o.detalle}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-400">
-                  🔒 Bloqueado (de paga)
-                </span>
-              </div>
-            );
-          }
-          return (
-            <Link
-              key={o.titulo}
-              href={o.href}
-              className={`group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                o.destacado ? "border-accent-300" : "border-slate-200 hover:border-brand-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-2xl">
-                  {o.icono}
-                </span>
-                <h2 className="text-base font-bold text-slate-800 group-hover:text-brand-700">
-                  {o.titulo}
-                </h2>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">{o.detalle}</p>
-              <span className="mt-4 text-sm font-semibold text-brand-600 group-hover:underline">
-                Entrar →
-              </span>
-            </Link>
-          );
+          return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
         })}
+      </div>
+
+      {/* Utilitarios */}
+      <div className="pt-2">
+        <div className="mb-3 flex items-center gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">🧰 Utilitarios</h2>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {UTILITARIOS.map((o) => {
+            const mod = moduloPorHref(o.href);
+            const bloqueado = mod ? !mods.has(mod.key) : false;
+            return <Tarjeta key={o.titulo} o={o} bloqueado={bloqueado} />;
+          })}
+        </div>
       </div>
 
       <p className="text-center text-xs text-slate-400">
