@@ -12,6 +12,7 @@
 // (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
+import { resolverCaptchaSiHay } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -304,6 +305,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     if (!escrito) {
       return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
     }
+
+    // El formulario RTT trae Cloudflare Turnstile (campo cf-turnstile-response).
+    // Resolverlo ANTES de "Enviar" (no-op si no hay widget o no hay CAPSOLVER_KEY).
+    const captchaOk = await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
+    if (captchaOk) await page.waitForTimeout(1200).catch(() => {});
 
     // Enviar dentro del frame del RTT. El botón corre la reCAPTCHA v3 (rellena
     // tokenCaptchaV3) y hace el POST; por eso se hace CLIC (no POST directo) y el
