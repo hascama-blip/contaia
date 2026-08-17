@@ -146,6 +146,15 @@ export default async function MenuPage() {
         </div>
       </section>
 
+      {/* Fuente oficial de los datos */}
+      <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+        <span className="text-sm font-medium text-slate-500">Información extraída de:</span>
+        <img src="/logo-sunat.png" alt="SUNAT" className="h-8 w-auto" />
+        <span className="hidden text-xs text-slate-400 sm:inline">
+          · Fuentes oficiales SUNAT (SIRE, buzón electrónico, RUC y reportes) en tiempo real.
+        </span>
+      </div>
+
       {/* Recordatorios de buzón (plazos de atención vencidos / por vencer) */}
       <RecordatoriosBanner />
 
