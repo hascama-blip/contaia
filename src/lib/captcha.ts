@@ -25,6 +25,8 @@ export interface CaptchaDetectado {
   sitekey: string;
   url: string;
   tipo: "turnstile";
+  /** Hay widget Turnstile pero no se pudo extraer el sitekey (no se puede resolver). */
+  sinSitekey?: boolean;
 }
 
 /** Busca un widget Turnstile en TODOS los frames. Devuelve sitekey + la URL del
@@ -32,28 +34,34 @@ export interface CaptchaDetectado {
 export async function detectarTurnstile(ctx: any, page: any): Promise<CaptchaDetectado | null> {
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
-      const sitekey = await fr
+      const r = await fr
         .evaluate(() => {
-          // 1) div.cf-turnstile con data-sitekey (lo más común).
-          const el = document.querySelector("[data-sitekey]") as HTMLElement | null;
-          if (el?.getAttribute("data-sitekey")) return el.getAttribute("data-sitekey");
-          // 2) iframe de challenges.cloudflare.com con sitekey en el src.
-          const ifr = Array.from(document.querySelectorAll("iframe"))
-            .map((f) => (f as HTMLIFrameElement).src || "")
-            .find((s) => /challenges\.cloudflare\.com/.test(s));
-          if (ifr) {
-            const m = /\/(0x[a-zA-Z0-9]+)\//.exec(ifr) || /[?&]k=([^&]+)/.exec(ifr);
-            if (m) return decodeURIComponent(m[1]);
+          const out: { sitekey: string | null; hayWidget: boolean } = { sitekey: null, hayWidget: false };
+          // ¿Hay Turnstile? Señales: input de respuesta, div.cf-turnstile o el iframe.
+          const resp = document.querySelector('[name="cf-turnstile-response"], [id^="cf-chl-widget"]');
+          const div = document.querySelector(".cf-turnstile, [data-sitekey]") as HTMLElement | null;
+          const ifr = Array.from(document.querySelectorAll("iframe")).map((f) => (f as HTMLIFrameElement).src || "");
+          const cfIfr = ifr.find((s) => /challenges\.cloudflare\.com/.test(s));
+          out.hayWidget = Boolean(resp || div || cfIfr);
+          // 1) data-sitekey en el div.
+          if (div?.getAttribute("data-sitekey")) { out.sitekey = div.getAttribute("data-sitekey"); return out; }
+          // 2) sitekey en el src del iframe de cloudflare.
+          if (cfIfr) {
+            const m = /\/(0x[a-zA-Z0-9_-]+)\//.exec(cfIfr) || /[?&]k=([^&]+)/.exec(cfIfr);
+            if (m) { out.sitekey = decodeURIComponent(m[1]); return out; }
           }
-          return null;
+          // 3) Fallback: sitekey Turnstile (0x4AAAAAAA…) en el HTML/JS de la página.
+          const html = document.documentElement.outerHTML;
+          const m2 = /(0x4[A-Za-z0-9_-]{20,})/.exec(html) || /sitekey["']?\s*[:=]\s*["']([^"']+)["']/i.exec(html);
+          if (m2) out.sitekey = m2[1];
+          return out;
         })
-        .catch(() => null);
-      if (sitekey) {
-        // URL del frame que contiene el widget (si es "about:blank", cae al top).
+        .catch(() => null as any);
+      if (r?.hayWidget) {
         let url = "";
         try { url = fr.url(); } catch { /* */ }
         if (!url || url === "about:blank") url = page.url();
-        return { sitekey, url, tipo: "turnstile" };
+        return { sitekey: r.sitekey || "", url, tipo: "turnstile", sinSitekey: !r.sitekey };
       }
     }
   }
@@ -112,11 +120,13 @@ async function capsolverTurnstile(clientKey: string, sitekey: string, url: strin
   return null;
 }
 
-/** Inyecta el token en los campos de respuesta de todos los frames. */
-async function inyectarToken(ctx: any, token: string): Promise<void> {
+/** Inyecta el token en los campos de respuesta de todos los frames.
+ *  Devuelve cuántos campos llenó (para diagnóstico). */
+async function inyectarToken(ctx: any, token: string): Promise<number> {
+  let total = 0;
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
-      await fr
+      const n = await fr
         .evaluate((tok: string) => {
           const sel = [
             'input[name="cf-turnstile-response"]',
@@ -125,25 +135,20 @@ async function inyectarToken(ctx: any, token: string): Promise<void> {
             'textarea[name="g-recaptcha-response"]',
             '[id^="cf-chl-widget"][id$="_response"]',
           ];
-          let puesto = false;
+          let puestos = 0;
           for (const s of sel) {
             document.querySelectorAll(s).forEach((el) => {
               (el as HTMLInputElement).value = tok;
-              puesto = true;
+              puestos++;
             });
           }
-          // Callback de Turnstile si el widget lo expone.
-          try {
-            const w = window as any;
-            if (w.turnstile && typeof w.turnstile.getResponse === "function") {
-              // algunos formularios leen el token vía turnstile.getResponse()
-            }
-          } catch { /* */ }
-          return puesto;
+          return puestos;
         }, token)
-        .catch(() => {});
+        .catch(() => 0);
+      total += Number(n) || 0;
     }
   }
+  return total;
 }
 
 /**
@@ -164,12 +169,19 @@ export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [
   if (!info) {
     // Reporta si hay OTRO captcha (para saber que hay que adaptar el proveedor).
     const otro = await detectarOtroCaptcha(ctx);
-    if (otro) pasos.push({ paso: "captcha", detectado: otro, resuelto: false, nota: "tipo no soportado aún" });
+    pasos.push(otro
+      ? { paso: "captcha", detectado: otro, resuelto: false, nota: "tipo no soportado aún" }
+      : { paso: "captcha", detectado: "ninguno", resuelto: false, nota: "no se vio widget" });
+    return false;
+  }
+
+  if (info.sinSitekey) {
+    pasos.push({ paso: "captcha", detectado: "turnstile", resuelto: false, nota: "widget presente pero no se pudo leer el sitekey", url: info.url });
     return false;
   }
 
   if (!clientKey) {
-    pasos.push({ paso: "captcha", detectado: "turnstile", resuelto: false, nota: "falta CAPSOLVER_KEY" });
+    pasos.push({ paso: "captcha", detectado: "turnstile", sitekey: info.sitekey, resuelto: false, nota: "falta CAPSOLVER_KEY" });
     return false;
   }
 
@@ -179,7 +191,7 @@ export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [
     return false;
   }
 
-  await inyectarToken(ctx, token);
-  pasos.push({ paso: "captcha", detectado: "turnstile", resuelto: true, proveedor: "capsolver" });
+  const inyecciones = await inyectarToken(ctx, token);
+  pasos.push({ paso: "captcha", detectado: "turnstile", sitekey: info.sitekey, resuelto: true, proveedor: "capsolver", inyecciones });
   return true;
 }

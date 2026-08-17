@@ -278,7 +278,12 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
 
-    if (params.diagnostico) return { ok: false, diag: { pasos } };
+    // En diagnóstico: probar el captcha (detección + resolución) y mostrarlo en la
+    // traza, SIN llegar a Enviar. Así se valida el Turnstile de punta a punta.
+    if (params.diagnostico) {
+      await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
+      return { ok: false, diag: { pasos } };
+    }
 
     if (!frameRTT) {
       return {
