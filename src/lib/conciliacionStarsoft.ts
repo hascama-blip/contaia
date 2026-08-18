@@ -29,19 +29,34 @@ const num = (s: any): number => {
 const opKey = (s: any): string => String(s ?? "").replace(/\s+/g, "").replace(/^0+(?=\d)/, "").trim();
 const opRaw = (s: any): string => String(s ?? "").replace(/\s+/g, " ").trim();
 
-/** Normaliza fecha a "YYYY-MM-DD". Acepta d/m/yy, dd/mm/yyyy, Date. */
-function fechaISO(v: any): string {
+/** Normaliza fecha a "YYYY-MM-DD" con formato explícito (dmy o mdy). */
+function fechaISO(v: any, fmt: "dmy" | "mdy" = "dmy"): string {
   if (v instanceof Date && !isNaN(v.getTime())) {
     return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
   }
   const s = String(v ?? "").trim();
   const m = /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/.exec(s);
   if (m) {
-    let [, d, mo, y] = m;
+    let a = m[1], b = m[2], y = m[3];
+    let d: string, mo: string;
+    if (fmt === "mdy") { mo = a; d = b; } else { d = a; mo = b; }
     if (y.length === 2) y = "20" + y;
     return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
   return s;
+}
+
+/** Detecta si una columna de fechas viene como d/m/y o m/d/y. Si algún valor
+ *  tiene el 1er número > 12 → d/m; si el 2do > 12 → m/d. Por defecto d/m (Perú). */
+function detectarFormatoFecha(valores: any[]): "dmy" | "mdy" {
+  for (const v of valores) {
+    const m = /^(\d{1,2})[/\-](\d{1,2})[/\-]\d{2,4}$/.exec(String(v ?? "").trim());
+    if (!m) continue;
+    const a = Number(m[1]), b = Number(m[2]);
+    if (a > 12) return "dmy";
+    if (b > 12) return "mdy";
+  }
+  return "dmy";
 }
 
 function leerHojas(buf: Buffer): Record<string, string[][]> {
@@ -104,8 +119,14 @@ export interface ParConciliado {
   banco: BancoMov;
   std: StdMov;
   difMonto: number;
-  via: "operacion" | "monto+fecha";
+  via: "operacion" | "monto+fecha" | "monto+dia";
   cliente?: string;
+}
+export interface DiaResumen {
+  dia: string;
+  bancoAbono: number; bancoCargo: number;
+  stdDebe: number; stdHaber: number;
+  difAbono: number; difCargo: number;
 }
 
 // ---- Parsers ---------------------------------------------------------------
@@ -140,6 +161,8 @@ export function parseBancoStarsoft(buf: Buffer, sel?: string[]): BancoMov[] {
     const iSuc = idxDe(H, "SUCURSAL-AGENCIA", "SUCURSAL");
     let iOp = idxDe(H, "OPERACION-NUMERO", "OPERACION", "NUMERO");
     if (iOp < 0) iOp = iSuc >= 0 ? iSuc + 1 : 7;            // OP va tras SUCURSAL
+    // Formato de fecha de ESTA hoja (algunas vienen d/m, otras m/d).
+    const fmt = detectarFormatoFecha(filas.slice(hRow + 1).map((f) => f?.[iF]));
     for (let i = hRow + 1; i < filas.length; i++) {
       const f = filas[i]; if (!f) continue;
       const fecha = f[iF]; if (!fecha || !String(fecha).trim()) continue;
@@ -147,7 +170,7 @@ export function parseBancoStarsoft(buf: Buffer, sel?: string[]): BancoMov[] {
       if (!cargo && !abono) continue;
       movs.push({
         cuenta: sn,
-        fecha: fechaISO(fecha), fechaRaw: String(fecha).trim(),
+        fecha: fechaISO(fecha, fmt), fechaRaw: String(fecha).trim(),
         referencia: String(f[iRef] ?? "").trim(),
         cargo, abono,
         monto: abono || cargo, tipo: abono ? "ABONO" : "CARGO",
@@ -237,14 +260,20 @@ export interface ResultadoConc {
   conciliados: ParConciliado[];
   bancoSolo: BancoMov[];   // en banco, sin contable
   stdSolo: StdMov[];       // en contable, sin banco
+  porDia: DiaResumen[];    // análisis por día (banco vs contable)
   resumen: {
     bancoTotal: number; stdTotal: number; conciliados: number;
-    porOperacion: number; porMontoFecha: number;
+    porOperacion: number; porMontoFecha: number; porMontoDia: number;
     bancoSolo: number; stdSolo: number; montoConciliado: number;
   };
 }
 
-const TOL = 0.5; // tolerancia de monto (soles)
+/** Diferencia en días entre dos fechas ISO (99 si no comparables). */
+function diffDias(a: string, b: string): number {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (!iso.test(a) || !iso.test(b)) return a === b ? 0 : 99;
+  return Math.round(Math.abs(Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000);
+}
 
 export function conciliar(
   banco: BancoMov[],
@@ -258,6 +287,9 @@ export function conciliar(
   std.forEach((s, i) => { if (s.op) { const a = byOp.get(s.op) ?? []; a.push(i); byOp.set(s.op, a); } });
   const byMontoFecha = new Map<string, number[]>();
   std.forEach((s, i) => { const k = `${s.importe.toFixed(2)}|${s.fecha}`; const a = byMontoFecha.get(k) ?? []; a.push(i); byMontoFecha.set(k, a); });
+  // Índice por monto (para el respaldo monto + día ±1, sin importar el banco).
+  const byMonto = new Map<string, number[]>();
+  std.forEach((s, i) => { const k = s.importe.toFixed(2); const a = byMonto.get(k) ?? []; a.push(i); byMonto.set(k, a); });
 
   const clienteDe = (s: StdMov): string => {
     if (!s.docCobrado) return "";
@@ -270,7 +302,7 @@ export function conciliar(
   const bancoSolo: BancoMov[] = [];
 
   for (const b of banco) {
-    let elegido = -1; let via: "operacion" | "monto+fecha" = "operacion";
+    let elegido = -1; let via: ParConciliado["via"] = "operacion";
     // 1) por N° de operación (elige el de monto más cercano no usado).
     if (b.op && b.op !== "0") {
       const cand = (byOp.get(b.op) ?? []).filter((i) => !stdUsado.has(i));
@@ -284,6 +316,17 @@ export function conciliar(
       const cand = (byMontoFecha.get(`${b.monto.toFixed(2)}|${b.fecha}`) ?? []).filter((i) => !stdUsado.has(i));
       if (cand.length) { elegido = cand[0]; via = "monto+fecha"; }
     }
+    // 3) respaldo: MONTO + DÍA (±1). La cajera pudo poner el banco equivocado en la
+    //    caja virtual → se concilia por monto/día sin importar la cuenta contable.
+    if (elegido < 0) {
+      const cand = (byMonto.get(b.monto.toFixed(2)) ?? []).filter((i) => !stdUsado.has(i));
+      let best = -1, bestDiff = 99;
+      for (const i of cand) {
+        const d = diffDias(b.fecha, std[i].fecha);
+        if (d <= 1 && d < bestDiff) { bestDiff = d; best = i; }
+      }
+      if (best >= 0) { elegido = best; via = "monto+dia"; }
+    }
     if (elegido >= 0) {
       stdUsado.add(elegido);
       const s = std[elegido];
@@ -294,12 +337,25 @@ export function conciliar(
   }
   const stdSolo = std.filter((_, i) => !stdUsado.has(i));
 
+  // Análisis por día: banco (seleccionado) vs contable, para cuadrar por día.
+  const dias = new Map<string, DiaResumen>();
+  const dget = (d: string): DiaResumen => {
+    let r = dias.get(d); if (!r) { r = { dia: d, bancoAbono: 0, bancoCargo: 0, stdDebe: 0, stdHaber: 0, difAbono: 0, difCargo: 0 }; dias.set(d, r); } return r;
+  };
+  for (const b of banco) { const r = dget(b.fecha); r.bancoAbono += b.abono; r.bancoCargo += b.cargo; }
+  for (const s of std) { const r = dget(s.fecha); if (s.dh === "H") r.stdHaber += s.importe; else r.stdDebe += s.importe; }
+  const porDia = [...dias.values()]
+    .map((r) => ({ ...r, difAbono: +(r.bancoAbono - r.stdDebe).toFixed(2), difCargo: +(r.bancoCargo - r.stdHaber).toFixed(2) }))
+    .sort((a, b) => a.dia.localeCompare(b.dia));
+
   const porOperacion = conciliados.filter((c) => c.via === "operacion").length;
+  const porMontoFecha = conciliados.filter((c) => c.via === "monto+fecha").length;
+  const porMontoDia = conciliados.filter((c) => c.via === "monto+dia").length;
   return {
-    conciliados, bancoSolo, stdSolo,
+    conciliados, bancoSolo, stdSolo, porDia,
     resumen: {
       bancoTotal: banco.length, stdTotal: std.length, conciliados: conciliados.length,
-      porOperacion, porMontoFecha: conciliados.length - porOperacion,
+      porOperacion, porMontoFecha, porMontoDia,
       bancoSolo: bancoSolo.length, stdSolo: stdSolo.length,
       montoConciliado: +conciliados.reduce((a, c) => a + c.banco.monto, 0).toFixed(2),
     },
@@ -328,14 +384,17 @@ export async function excelConciliacionStarsoft(r: ResultadoConc): Promise<Buffe
     { header: "Doc. cobrado", key: "doc", width: 18 },
     { header: "Cliente", key: "cli", width: 34 },
     { header: "Glosa", key: "glosa", width: 44 },
-    { header: "Cruce", key: "via", width: 12 },
+    { header: "Cruce", key: "via", width: 14 },
   ];
+  const VIA_TXT: Record<string, string> = { operacion: "N° operación", "monto+fecha": "monto+fecha", "monto+dia": "monto+día (±1)" };
   for (const c of r.conciliados) {
-    s1.addRow({
+    const row = s1.addRow({
       cuenta: c.banco.cuenta, fb: c.banco.fechaRaw, op: c.op, ref: c.banco.referencia, tipo: c.banco.tipo,
       mb: c.banco.monto, cta: c.std.ctaContable, comp: c.std.comprobante, dh: c.std.dh, ic: c.std.importe,
-      dif: c.difMonto, doc: c.std.docCobrado, cli: c.cliente ?? "", glosa: c.std.glosa, via: c.via,
+      dif: c.difMonto, doc: c.std.docCobrado, cli: c.cliente ?? "", glosa: c.std.glosa,
+      via: VIA_TXT[c.via] ?? c.via,
     });
+    if (c.via === "monto+dia") row.getCell("via").font = { color: { argb: "FFB45309" } };
   }
 
   // Hoja 2: No concilia (unión banco-sin-contable + contable-sin-banco)
@@ -358,22 +417,40 @@ export async function excelConciliacionStarsoft(r: ResultadoConc): Promise<Buffe
     s2.addRow({ origen: "CONTABLE sin banco", cuenta: s.ctaContable, fecha: s.fecha, op: s.opRaw, tipo: s.dh, monto: s.importe, comp: s.comprobante, doc: s.docCobrado, ref: s.glosa });
   }
 
-  // Hoja 3: Resumen
-  const s3 = wb.addWorksheet("Resumen");
+  // Hoja 3: Análisis por día (banco vs contable — para cuadrar aunque la cajera
+  // haya puesto el banco equivocado).
+  const s3 = wb.addWorksheet("Por día");
+  s3.columns = [
+    { header: "Día", key: "dia", width: 12 },
+    { header: "Banco ABONO", key: "ba", width: 14 },
+    { header: "Contable DEBE", key: "sd", width: 14 },
+    { header: "Dif. ingresos", key: "da", width: 14 },
+    { header: "Banco CARGO", key: "bc", width: 14 },
+    { header: "Contable HABER", key: "sh", width: 14 },
+    { header: "Dif. egresos", key: "dc", width: 14 },
+  ];
+  for (const d of r.porDia) {
+    const row = s3.addRow({ dia: d.dia, ba: d.bancoAbono, sd: d.stdDebe, da: d.difAbono, bc: d.bancoCargo, sh: d.stdHaber, dc: d.difCargo });
+    if (Math.abs(d.difAbono) >= 0.5) row.getCell("da").font = { color: { argb: "FFB45309" }, bold: true };
+    if (Math.abs(d.difCargo) >= 0.5) row.getCell("dc").font = { color: { argb: "FFB45309" }, bold: true };
+  }
+
+  // Hoja 4: Resumen
+  const s4 = wb.addWorksheet("Resumen");
   const R = r.resumen;
   ([
-    ["Movimientos banco", R.bancoTotal],
+    ["Movimientos banco (cuentas elegidas)", R.bancoTotal],
     ["Movimientos contables (104x)", R.stdTotal],
     ["Conciliados", R.conciliados],
     ["  · por N° operación", R.porOperacion],
-    ["  · por monto+fecha", R.porMontoFecha],
+    ["  · por monto + fecha", R.porMontoFecha],
+    ["  · por monto + día (±1)  [banco mal asignado por cajera]", R.porMontoDia],
     ["Banco sin contabilizar", R.bancoSolo],
     ["Contable sin banco", R.stdSolo],
     ["Monto conciliado (S/)", R.montoConciliado],
-  ] as [string, any][]).forEach(([k, v]) => s3.addRow([k, v]));
+  ] as [string, any][]).forEach(([k, v]) => s4.addRow([k, v]));
 
-  for (const s of [s1, s2, s3]) {
-    s.getRow(1).font = { bold: true };
+  for (const s of [s1, s2, s3, s4]) {
     s.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
     s.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   }

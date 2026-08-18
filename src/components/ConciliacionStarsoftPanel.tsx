@@ -4,7 +4,7 @@ import { useState } from "react";
 
 interface Resumen {
   bancoTotal: number; stdTotal: number; conciliados: number;
-  porOperacion: number; porMontoFecha: number;
+  porOperacion: number; porMontoFecha: number; porMontoDia: number;
   bancoSolo: number; stdSolo: number; montoConciliado: number;
 }
 
@@ -167,7 +167,7 @@ export default function ConciliacionStarsoftPanel() {
 
       {resumen && (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat t="Conciliados" v={resumen.conciliados} sub={`${resumen.porOperacion} op · ${resumen.porMontoFecha} m+f`} ok />
+          <Stat t="Conciliados" v={resumen.conciliados} sub={`${resumen.porOperacion} op · ${resumen.porMontoFecha} m+f · ${resumen.porMontoDia} m+día`} ok />
           <Stat t="Monto conciliado" v={`S/ ${resumen.montoConciliado.toLocaleString("es-PE")}`} />
           <Stat t="Banco sin contab." v={resumen.bancoSolo} warn />
           <Stat t="Contable sin banco" v={resumen.stdSolo} warn />
