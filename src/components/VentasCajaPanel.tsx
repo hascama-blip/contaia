@@ -12,7 +12,7 @@ interface Detalle { archivo: string; filas: number; periodo: string }
 
 export default function VentasCajaPanel() {
   const [ventas, setVentas] = useState<File[]>([]);
-  const [caja, setCaja] = useState<File | null>(null);
+  const [caja, setCaja] = useState<File[]>([]);
   const [banco, setBanco] = useState<File[]>([]);
   const [hojasBanco, setHojasBanco] = useState<string[]>([]);
   const [hojasSel, setHojasSel] = useState<string[]>([]);
@@ -38,12 +38,12 @@ export default function VentasCajaPanel() {
   async function procesar() {
     setError(null); setResumen(null); setDescarga(null); setDetalle(null);
     if (!ventas.length) { setError("Sube el/los Libro(s) de Ventas (Excel o ZIP)."); return; }
-    if (!caja) { setError("Sube el Excel de la Caja Virtual."); return; }
+    if (!caja.length) { setError("Sube el/los Excel de la Caja Virtual."); return; }
     setBusy(true);
     try {
       const fd = new FormData();
       ventas.forEach((f) => fd.append("ventas", f));
-      fd.append("caja", caja);
+      caja.forEach((f) => fd.append("caja", f));
       if (banco.length) { banco.forEach((f) => fd.append("banco", f)); hojasSel.forEach((h) => fd.append("bancoHoja", h)); }
       const res = await fetch("/api/ventas-caja", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
@@ -95,13 +95,17 @@ export default function VentasCajaPanel() {
 
         <div className="rounded-xl border-2 border-dashed border-slate-300 p-4">
           <p className="mb-2 text-sm font-semibold text-slate-700">2) Caja Virtual</p>
-          <p className="mb-2 text-[11px] text-slate-500">El reporte de ingresos (todo el periodo). .xlsx</p>
+          <p className="mb-2 text-[11px] text-slate-500">El reporte de ingresos — <b>uno o varios</b> (todo el periodo o por mes). .xlsx</p>
           <input
-            type="file" accept=".xls,.xlsx"
-            onChange={(e) => setCaja(e.target.files?.[0] ?? null)}
+            type="file" multiple accept=".xls,.xlsx"
+            onChange={(e) => setCaja(Array.from(e.target.files ?? []))}
             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-brand-700"
           />
-          {caja && <p className="mt-2 text-[11px] text-slate-500">• {caja.name}</p>}
+          {caja.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-[11px] text-slate-500">
+              {caja.map((f) => <li key={f.name}>• {f.name}</li>)}
+            </ul>
+          )}
         </div>
 
         <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 md:col-span-2">

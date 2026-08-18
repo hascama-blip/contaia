@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { unzipSync } from "fflate";
-import { parseLibroVentas, parseCajaVirtual, conciliarVentasCaja, excelVentasCaja, type VentaRow } from "@/lib/ventasCaja";
+import { parseLibroVentas, parseCajaVirtual, conciliarVentasCaja, excelVentasCaja, type VentaRow, type CajaRow } from "@/lib/ventasCaja";
 import { parseBancoStarsoft } from "@/lib/conciliacionStarsoft";
 
 export const runtime = "nodejs";
@@ -20,13 +20,12 @@ export async function POST(req: NextRequest) {
   if (!form) return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });
 
   const ventasFiles = form.getAll("ventas").filter((v): v is File => v instanceof File && v.size > 0);
-  const cajaF = form.get("caja");
-  const fCaja = cajaF instanceof File && cajaF.size > 0 ? cajaF : null;
+  const cajaFiles = form.getAll("caja").filter((v): v is File => v instanceof File && v.size > 0);
   const bancoFiles = form.getAll("banco").filter((v): v is File => v instanceof File && v.size > 0); // opcional, varios
 
   if (!ventasFiles.length) return NextResponse.json({ error: "Adjunta el/los Libro(s) de Ventas (Excel o ZIP)." }, { status: 400 });
-  if (!fCaja) return NextResponse.json({ error: "Adjunta el Excel de la Caja Virtual." }, { status: 400 });
-  for (const f of [...ventasFiles, fCaja, ...bancoFiles]) {
+  if (!cajaFiles.length) return NextResponse.json({ error: "Adjunta el/los Excel de la Caja Virtual." }, { status: 400 });
+  for (const f of [...ventasFiles, ...cajaFiles, ...bancoFiles]) {
     if (f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 40 MB.` }, { status: 400 });
   }
 
@@ -55,7 +54,8 @@ export async function POST(req: NextRequest) {
     }
     if (!ventas.length) return NextResponse.json({ error: "Los Excel de ventas no tienen filas con Documento válido." }, { status: 422 });
 
-    const caja = parseCajaVirtual(Buffer.from(await fCaja.arrayBuffer()));
+    const caja: CajaRow[] = [];
+    for (const cf of cajaFiles) caja.push(...parseCajaVirtual(Buffer.from(await cf.arrayBuffer())));
     if (!caja.length) return NextResponse.json({ error: "La Caja Virtual no tiene comprobantes legibles." }, { status: 422 });
 
     // Banco (opcional, varios archivos): suma de ABONOS (ingresos) por mes.
