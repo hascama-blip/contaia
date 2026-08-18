@@ -13,7 +13,7 @@ interface Detalle { archivo: string; filas: number; periodo: string }
 export default function VentasCajaPanel() {
   const [ventas, setVentas] = useState<File[]>([]);
   const [caja, setCaja] = useState<File | null>(null);
-  const [banco, setBanco] = useState<File | null>(null);
+  const [banco, setBanco] = useState<File[]>([]);
   const [hojasBanco, setHojasBanco] = useState<string[]>([]);
   const [hojasSel, setHojasSel] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -22,11 +22,12 @@ export default function VentasCajaPanel() {
   const [detalle, setDetalle] = useState<Detalle[] | null>(null);
   const [descarga, setDescarga] = useState<{ nombre: string; b64: string } | null>(null);
 
-  async function elegirBanco(f: File | null) {
-    setBanco(f); setHojasBanco([]); setHojasSel([]);
-    if (!f) return;
+  async function elegirBanco(files: File[]) {
+    setBanco(files); setHojasBanco([]); setHojasSel([]);
+    if (!files.length) return;
     try {
-      const fd = new FormData(); fd.append("banco", f);
+      const fd = new FormData();
+      files.forEach((f) => fd.append("banco", f));
       const res = await fetch("/api/conciliacion-starsoft/hojas", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(data.hojas)) setHojasBanco(data.hojas);
@@ -43,7 +44,7 @@ export default function VentasCajaPanel() {
       const fd = new FormData();
       ventas.forEach((f) => fd.append("ventas", f));
       fd.append("caja", caja);
-      if (banco) { fd.append("banco", banco); hojasSel.forEach((h) => fd.append("bancoHoja", h)); }
+      if (banco.length) { banco.forEach((f) => fd.append("banco", f)); hojasSel.forEach((h) => fd.append("bancoHoja", h)); }
       const res = await fetch("/api/ventas-caja", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
@@ -105,13 +106,17 @@ export default function VentasCajaPanel() {
 
         <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 md:col-span-2">
           <p className="mb-2 text-sm font-semibold text-slate-700">3) Banco <span className="font-normal text-slate-400">(opcional)</span></p>
-          <p className="mb-2 text-[11px] text-slate-500">FORMATO BANCO STARSOFT. Si lo subes, agrega la fila <b>Banco (abonos)</b> al resumen de ingresos por mes.</p>
+          <p className="mb-2 text-[11px] text-slate-500">FORMATO BANCO STARSOFT — <b>uno o varios</b> (por mes). Agrega la fila <b>Banco (abonos)</b> al resumen; suma los abonos de las cuentas elegidas en todos los archivos.</p>
           <input
-            type="file" accept=".xls,.xlsx"
-            onChange={(e) => elegirBanco(e.target.files?.[0] ?? null)}
+            type="file" multiple accept=".xls,.xlsx"
+            onChange={(e) => elegirBanco(Array.from(e.target.files ?? []))}
             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-slate-700"
           />
-          {banco && <p className="mt-2 text-[11px] text-slate-500">• {banco.name}</p>}
+          {banco.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-[11px] text-slate-500">
+              {banco.map((f) => <li key={f.name}>• {f.name}</li>)}
+            </ul>
+          )}
           {hojasBanco.length > 0 && (
             <div className="mt-2">
               <div className="mb-1 flex items-center justify-between">

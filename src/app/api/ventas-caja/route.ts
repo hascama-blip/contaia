@@ -22,12 +22,11 @@ export async function POST(req: NextRequest) {
   const ventasFiles = form.getAll("ventas").filter((v): v is File => v instanceof File && v.size > 0);
   const cajaF = form.get("caja");
   const fCaja = cajaF instanceof File && cajaF.size > 0 ? cajaF : null;
-  const bancoF = form.get("banco");
-  const fBanco = bancoF instanceof File && bancoF.size > 0 ? bancoF : null; // opcional
+  const bancoFiles = form.getAll("banco").filter((v): v is File => v instanceof File && v.size > 0); // opcional, varios
 
   if (!ventasFiles.length) return NextResponse.json({ error: "Adjunta el/los Libro(s) de Ventas (Excel o ZIP)." }, { status: 400 });
   if (!fCaja) return NextResponse.json({ error: "Adjunta el Excel de la Caja Virtual." }, { status: 400 });
-  for (const f of [...ventasFiles, fCaja, ...(fBanco ? [fBanco] : [])]) {
+  for (const f of [...ventasFiles, fCaja, ...bancoFiles]) {
     if (f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 40 MB.` }, { status: 400 });
   }
 
@@ -59,16 +58,18 @@ export async function POST(req: NextRequest) {
     const caja = parseCajaVirtual(Buffer.from(await fCaja.arrayBuffer()));
     if (!caja.length) return NextResponse.json({ error: "La Caja Virtual no tiene comprobantes legibles." }, { status: 422 });
 
-    // Banco (opcional): suma de ABONOS (ingresos) por mes, para el resumen mensual.
+    // Banco (opcional, varios archivos): suma de ABONOS (ingresos) por mes.
     // Solo las hojas (cuentas) elegidas de la empresa; si no se eligen, todas.
     let bancoAbonoPorMes: Record<string, number> | undefined;
-    if (fBanco) {
+    if (bancoFiles.length) {
       const hojas = form.getAll("bancoHoja").map((v) => String(v).trim()).filter(Boolean);
-      const movs = parseBancoStarsoft(Buffer.from(await fBanco.arrayBuffer()), hojas.length ? hojas : undefined);
       bancoAbonoPorMes = {};
-      for (const m of movs) {
-        const ym = (m.fecha || "").slice(0, 7);
-        if (/^\d{4}-\d{2}$/.test(ym) && m.abono) bancoAbonoPorMes[ym] = (bancoAbonoPorMes[ym] ?? 0) + m.abono;
+      for (const bf of bancoFiles) {
+        const movs = parseBancoStarsoft(Buffer.from(await bf.arrayBuffer()), hojas.length ? hojas : undefined);
+        for (const m of movs) {
+          const ym = (m.fecha || "").slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym) && m.abono) bancoAbonoPorMes[ym] = (bancoAbonoPorMes[ym] ?? 0) + m.abono;
+        }
       }
     }
 
