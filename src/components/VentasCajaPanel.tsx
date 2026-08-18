@@ -14,11 +14,25 @@ export default function VentasCajaPanel() {
   const [ventas, setVentas] = useState<File[]>([]);
   const [caja, setCaja] = useState<File | null>(null);
   const [banco, setBanco] = useState<File | null>(null);
+  const [hojasBanco, setHojasBanco] = useState<string[]>([]);
+  const [hojasSel, setHojasSel] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [detalle, setDetalle] = useState<Detalle[] | null>(null);
   const [descarga, setDescarga] = useState<{ nombre: string; b64: string } | null>(null);
+
+  async function elegirBanco(f: File | null) {
+    setBanco(f); setHojasBanco([]); setHojasSel([]);
+    if (!f) return;
+    try {
+      const fd = new FormData(); fd.append("banco", f);
+      const res = await fetch("/api/conciliacion-starsoft/hojas", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.hojas)) setHojasBanco(data.hojas);
+    } catch { /* */ }
+  }
+  const toggleHoja = (h: string) => setHojasSel((p) => p.includes(h) ? p.filter((x) => x !== h) : [...p, h]);
 
   async function procesar() {
     setError(null); setResumen(null); setDescarga(null); setDetalle(null);
@@ -29,7 +43,7 @@ export default function VentasCajaPanel() {
       const fd = new FormData();
       ventas.forEach((f) => fd.append("ventas", f));
       fd.append("caja", caja);
-      if (banco) fd.append("banco", banco);
+      if (banco) { fd.append("banco", banco); hojasSel.forEach((h) => fd.append("bancoHoja", h)); }
       const res = await fetch("/api/ventas-caja", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
@@ -94,10 +108,33 @@ export default function VentasCajaPanel() {
           <p className="mb-2 text-[11px] text-slate-500">FORMATO BANCO STARSOFT. Si lo subes, agrega la fila <b>Banco (abonos)</b> al resumen de ingresos por mes.</p>
           <input
             type="file" accept=".xls,.xlsx"
-            onChange={(e) => setBanco(e.target.files?.[0] ?? null)}
+            onChange={(e) => elegirBanco(e.target.files?.[0] ?? null)}
             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-slate-700"
           />
           {banco && <p className="mt-2 text-[11px] text-slate-500">• {banco.name}</p>}
+          {hojasBanco.length > 0 && (
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-600">Cuentas de la empresa ({hojasSel.length})</label>
+                <div className="flex gap-2 text-[11px]">
+                  <button type="button" className="text-brand-600 hover:underline" onClick={() => setHojasSel([...hojasBanco])}>Todas</button>
+                  <button type="button" className="text-slate-400 hover:underline" onClick={() => setHojasSel([])}>Ninguna</button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {hojasBanco.map((h) => {
+                  const on = hojasSel.includes(h);
+                  return (
+                    <button key={h} type="button" onClick={() => toggleHoja(h)}
+                      className={`rounded-md px-2 py-1 text-[11px] font-medium ${on ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                      {on ? "✓ " : ""}{h}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[10px] text-slate-400">Elige solo las cuentas de esta empresa. Si no eliges ninguna, se suman todas.</p>
+            </div>
+          )}
         </div>
       </div>
 

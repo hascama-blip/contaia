@@ -60,9 +60,11 @@ export async function POST(req: NextRequest) {
     if (!caja.length) return NextResponse.json({ error: "La Caja Virtual no tiene comprobantes legibles." }, { status: 422 });
 
     // Banco (opcional): suma de ABONOS (ingresos) por mes, para el resumen mensual.
+    // Solo las hojas (cuentas) elegidas de la empresa; si no se eligen, todas.
     let bancoAbonoPorMes: Record<string, number> | undefined;
     if (fBanco) {
-      const movs = parseBancoStarsoft(Buffer.from(await fBanco.arrayBuffer()));
+      const hojas = form.getAll("bancoHoja").map((v) => String(v).trim()).filter(Boolean);
+      const movs = parseBancoStarsoft(Buffer.from(await fBanco.arrayBuffer()), hojas.length ? hojas : undefined);
       bancoAbonoPorMes = {};
       for (const m of movs) {
         const ym = (m.fecha || "").slice(0, 7);

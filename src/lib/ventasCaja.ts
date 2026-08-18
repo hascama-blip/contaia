@@ -253,21 +253,30 @@ export async function excelVentasCaja(r: ResultadoVC): Promise<Buffer> {
   const sumFila = (vals: number[]) => vals.reduce((a, b) => a + b, 0);
   const filaContab = r.porMes.map((m) => m.contabilidad);
   const filaCaja = r.porMes.map((m) => m.cajaVirtual);
+  const filaBanco = r.porMes.map((m) => m.banco ?? 0);
   s0.addRow(["Contabilidad (ventas)", ...filaContab, +sumFila(filaContab).toFixed(2)]);
   s0.addRow(["Caja Virtual", ...filaCaja, +sumFila(filaCaja).toFixed(2)]);
+  if (conBanco) s0.addRow(["Banco (abonos)", ...filaBanco, +sumFila(filaBanco).toFixed(2)]);
+
+  // Filas de diferencias entre fuentes de evidencia de ingresos.
+  const difFilas: [string, number[]][] = [
+    ["Dif. Caja − Contabilidad", r.porMes.map((m) => +(m.cajaVirtual - m.contabilidad).toFixed(2))],
+  ];
   if (conBanco) {
-    const filaBanco = r.porMes.map((m) => m.banco ?? 0);
-    s0.addRow(["Banco (abonos)", ...filaBanco, +sumFila(filaBanco).toFixed(2)]);
+    difFilas.push(["Dif. Banco − Contabilidad", r.porMes.map((m) => +((m.banco ?? 0) - m.contabilidad).toFixed(2))]);
+    difFilas.push(["Dif. Banco − Caja", r.porMes.map((m) => +((m.banco ?? 0) - m.cajaVirtual).toFixed(2))]);
   }
-  const filaDif = r.porMes.map((m) => +(m.cajaVirtual - m.contabilidad).toFixed(2));
-  s0.addRow(["Dif. Caja − Contabilidad", ...filaDif, +sumFila(filaDif).toFixed(2)]);
+  const difStart = s0.rowCount + 1;
+  for (const [label, vals] of difFilas) s0.addRow([label, ...vals, +sumFila(vals).toFixed(2)]);
+
   // Formato número a las celdas de montos.
   s0.eachRow((row, i) => { if (i > 1) row.eachCell((cell, c) => { if (c > 1) cell.numFmt = "#,##0.00"; }); });
-  s0.getColumn(1).width = 26;
+  s0.getColumn(1).width = 28;
   for (let c = 2; c <= encab.length; c++) s0.getColumn(c).width = 14;
-  // Resalta diferencias significativas en la fila de diferencia.
-  const difRowIdx = conBanco ? 5 : 4;
-  s0.getRow(difRowIdx).eachCell((cell, c) => { if (c > 1 && Math.abs(Number(cell.value) || 0) >= 1) cell.font = { color: { argb: "FFB45309" }, bold: true }; });
+  // Resalta las diferencias significativas.
+  for (let ri = difStart; ri < difStart + difFilas.length; ri++) {
+    s0.getRow(ri).eachCell((cell, c) => { if (c > 1 && Math.abs(Number(cell.value) || 0) >= 1) cell.font = { color: { argb: "FFB45309" }, bold: true }; });
+  }
 
   const s1 = wb.addWorksheet("Conciliado");
   s1.columns = [
