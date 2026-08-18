@@ -148,10 +148,17 @@ export function parseCajaVirtual(buf: Buffer): CajaRow[] {
 }
 
 // ---- Conciliación ----------------------------------------------------------
+export interface MesResumen {
+  mes: string;               // "YYYY-MM"
+  contabilidad: number;      // ingresos del Libro de Ventas
+  cajaVirtual: number;       // ingresos de la Caja Virtual
+  banco: number | null;      // abonos del banco (null si no se subió)
+}
 export interface ResultadoVC {
   conciliados: ConcVenta[];
   faltanEnCaja: VentaRow[];     // ventas sin pago en la caja
   cajaSinVenta: CajaRow[];      // comprobantes de caja (fact/bol) sin venta
+  porMes: MesResumen[];         // ingresos por mes: contabilidad vs caja vs banco
   resumen: {
     ventasTotal: number; cajaTotal: number;
     conciliados: number; faltanEnCaja: number; cajaSinVenta: number;
@@ -160,7 +167,11 @@ export interface ResultadoVC {
   };
 }
 
-export function conciliarVentasCaja(ventas: VentaRow[], caja: CajaRow[]): ResultadoVC {
+export function conciliarVentasCaja(
+  ventas: VentaRow[],
+  caja: CajaRow[],
+  bancoAbonoPorMes?: Record<string, number>,
+): ResultadoVC {
   // Agrupa caja por comprobante (suma pagos parciales).
   const grupos = new Map<string, { total: number; n: number; rows: CajaRow[] }>();
   for (const c of caja) {
@@ -197,11 +208,24 @@ export function conciliarVentasCaja(ventas: VentaRow[], caja: CajaRow[]): Result
     return scope ? mesesVentas.has(c.ym) : true;
   });
 
+  // Ingresos por mes: Contabilidad (ventas) vs Caja Virtual vs Banco (opcional).
+  const cont: Record<string, number> = {}, cajaM: Record<string, number> = {};
+  const meses = new Set<string>();
+  for (const v of ventas) { if (!v.mes) continue; meses.add(v.mes); cont[v.mes] = (cont[v.mes] ?? 0) + v.total; }
+  for (const c of caja) { if (!c.ym) continue; meses.add(c.ym); cajaM[c.ym] = (cajaM[c.ym] ?? 0) + c.total; }
+  if (bancoAbonoPorMes) for (const m of Object.keys(bancoAbonoPorMes)) if (/^\d{4}-\d{2}$/.test(m)) meses.add(m);
+  const porMes: MesResumen[] = [...meses].sort().map((m) => ({
+    mes: m,
+    contabilidad: +(cont[m] ?? 0).toFixed(2),
+    cajaVirtual: +(cajaM[m] ?? 0).toFixed(2),
+    banco: bancoAbonoPorMes ? +(bancoAbonoPorMes[m] ?? 0).toFixed(2) : null,
+  }));
+
   const montoVentas = +ventas.reduce((a, v) => a + v.total, 0).toFixed(2);
   const montoConciliado = +conciliados.reduce((a, c) => a + c.venta.total, 0).toFixed(2);
   const montoFaltante = +faltanEnCaja.reduce((a, v) => a + v.total, 0).toFixed(2);
   return {
-    conciliados, faltanEnCaja, cajaSinVenta,
+    conciliados, faltanEnCaja, cajaSinVenta, porMes,
     resumen: {
       ventasTotal: ventas.length, cajaTotal: caja.length,
       conciliados: conciliados.length, faltanEnCaja: faltanEnCaja.length, cajaSinVenta: cajaSinVenta.length,
@@ -212,9 +236,38 @@ export function conciliarVentasCaja(ventas: VentaRow[], caja: CajaRow[]): Result
 }
 
 // ---- Excel de salida -------------------------------------------------------
+const MES_NOMBRE = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+const etiquetaMes = (ym: string): string => {
+  const m = /^(\d{4})-(\d{2})$/.exec(ym); return m ? `${MES_NOMBRE[Number(m[2])] ?? m[2]} ${m[1]}` : ym;
+};
+
 export async function excelVentasCaja(r: ResultadoVC): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Radar Tributar IA";
+
+  // Hoja 1: Ingresos por mes (Contabilidad vs Caja Virtual vs Banco).
+  const conBanco = r.porMes.some((m) => m.banco !== null);
+  const s0 = wb.addWorksheet("Ingresos por mes");
+  const encab = ["Concepto", ...r.porMes.map((m) => etiquetaMes(m.mes)), "Total"];
+  s0.addRow(encab);
+  const sumFila = (vals: number[]) => vals.reduce((a, b) => a + b, 0);
+  const filaContab = r.porMes.map((m) => m.contabilidad);
+  const filaCaja = r.porMes.map((m) => m.cajaVirtual);
+  s0.addRow(["Contabilidad (ventas)", ...filaContab, +sumFila(filaContab).toFixed(2)]);
+  s0.addRow(["Caja Virtual", ...filaCaja, +sumFila(filaCaja).toFixed(2)]);
+  if (conBanco) {
+    const filaBanco = r.porMes.map((m) => m.banco ?? 0);
+    s0.addRow(["Banco (abonos)", ...filaBanco, +sumFila(filaBanco).toFixed(2)]);
+  }
+  const filaDif = r.porMes.map((m) => +(m.cajaVirtual - m.contabilidad).toFixed(2));
+  s0.addRow(["Dif. Caja − Contabilidad", ...filaDif, +sumFila(filaDif).toFixed(2)]);
+  // Formato número a las celdas de montos.
+  s0.eachRow((row, i) => { if (i > 1) row.eachCell((cell, c) => { if (c > 1) cell.numFmt = "#,##0.00"; }); });
+  s0.getColumn(1).width = 26;
+  for (let c = 2; c <= encab.length; c++) s0.getColumn(c).width = 14;
+  // Resalta diferencias significativas en la fila de diferencia.
+  const difRowIdx = conBanco ? 5 : 4;
+  s0.getRow(difRowIdx).eachCell((cell, c) => { if (c > 1 && Math.abs(Number(cell.value) || 0) >= 1) cell.font = { color: { argb: "FFB45309" }, bold: true }; });
 
   const s1 = wb.addWorksheet("Conciliado");
   s1.columns = [
@@ -277,7 +330,7 @@ export async function excelVentasCaja(r: ResultadoVC): Promise<Buffer> {
     ["Monto faltante en caja (S/)", R.montoFaltante],
   ] as [string, any][]).forEach(([k, v]) => s4.addRow([k, v]));
 
-  for (const s of [s1, s2, s3, s4]) {
+  for (const s of [s0, s1, s2, s3, s4]) {
     s.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
     s.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   }

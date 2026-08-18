@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { unzipSync } from "fflate";
 import { parseLibroVentas, parseCajaVirtual, conciliarVentasCaja, excelVentasCaja, type VentaRow } from "@/lib/ventasCaja";
+import { parseBancoStarsoft } from "@/lib/conciliacionStarsoft";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -21,10 +22,12 @@ export async function POST(req: NextRequest) {
   const ventasFiles = form.getAll("ventas").filter((v): v is File => v instanceof File && v.size > 0);
   const cajaF = form.get("caja");
   const fCaja = cajaF instanceof File && cajaF.size > 0 ? cajaF : null;
+  const bancoF = form.get("banco");
+  const fBanco = bancoF instanceof File && bancoF.size > 0 ? bancoF : null; // opcional
 
   if (!ventasFiles.length) return NextResponse.json({ error: "Adjunta el/los Libro(s) de Ventas (Excel o ZIP)." }, { status: 400 });
   if (!fCaja) return NextResponse.json({ error: "Adjunta el Excel de la Caja Virtual." }, { status: 400 });
-  for (const f of [...ventasFiles, fCaja]) {
+  for (const f of [...ventasFiles, fCaja, ...(fBanco ? [fBanco] : [])]) {
     if (f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 40 MB.` }, { status: 400 });
   }
 
@@ -56,7 +59,18 @@ export async function POST(req: NextRequest) {
     const caja = parseCajaVirtual(Buffer.from(await fCaja.arrayBuffer()));
     if (!caja.length) return NextResponse.json({ error: "La Caja Virtual no tiene comprobantes legibles." }, { status: 422 });
 
-    const r = conciliarVentasCaja(ventas, caja);
+    // Banco (opcional): suma de ABONOS (ingresos) por mes, para el resumen mensual.
+    let bancoAbonoPorMes: Record<string, number> | undefined;
+    if (fBanco) {
+      const movs = parseBancoStarsoft(Buffer.from(await fBanco.arrayBuffer()));
+      bancoAbonoPorMes = {};
+      for (const m of movs) {
+        const ym = (m.fecha || "").slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(ym) && m.abono) bancoAbonoPorMes[ym] = (bancoAbonoPorMes[ym] ?? 0) + m.abono;
+      }
+    }
+
+    const r = conciliarVentasCaja(ventas, caja, bancoAbonoPorMes);
     const excel = await excelVentasCaja(r);
     return NextResponse.json({
       ok: true,

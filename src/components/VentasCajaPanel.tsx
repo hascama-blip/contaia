@@ -13,6 +13,7 @@ interface Detalle { archivo: string; filas: number; periodo: string }
 export default function VentasCajaPanel() {
   const [ventas, setVentas] = useState<File[]>([]);
   const [caja, setCaja] = useState<File | null>(null);
+  const [banco, setBanco] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resumen, setResumen] = useState<Resumen | null>(null);
@@ -28,6 +29,7 @@ export default function VentasCajaPanel() {
       const fd = new FormData();
       ventas.forEach((f) => fd.append("ventas", f));
       fd.append("caja", caja);
+      if (banco) fd.append("banco", banco);
       const res = await fetch("/api/ventas-caja", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
@@ -54,10 +56,10 @@ export default function VentasCajaPanel() {
     <section className="card p-5">
       <h3 className="font-semibold text-slate-800">🧾 Ventas vs Caja Virtual</h3>
       <p className="mt-1 text-xs text-slate-500">
-        Sube el <b>Libro de Ventas por mes</b> (uno o varios Excel, o un <b>ZIP</b> con todos) y la
-        <b> Caja Virtual</b> de la empresa. Cruza por <b>N° de comprobante</b> (serie‑número, suma
-        pagos parciales) y descarga el Excel: hoja <b>Conciliado</b>, hoja <b>Faltan en Caja</b>
-        (ventas sin cobro) y <b>En Caja sin Venta</b>.
+        Sube el <b>Libro de Ventas por mes</b> (uno o varios Excel, o un <b>ZIP</b>) y la
+        <b> Caja Virtual</b>; opcional el <b>Banco</b>. Descarga el Excel con: <b>Ingresos por mes</b>
+        (Contabilidad vs Caja Virtual vs Banco), <b>Conciliado</b> (por N° de comprobante),
+        <b>Faltan en Caja</b> (ventas sin cobro) y <b>En Caja sin Venta</b>.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -85,6 +87,17 @@ export default function VentasCajaPanel() {
             className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-brand-700"
           />
           {caja && <p className="mt-2 text-[11px] text-slate-500">• {caja.name}</p>}
+        </div>
+
+        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 md:col-span-2">
+          <p className="mb-2 text-sm font-semibold text-slate-700">3) Banco <span className="font-normal text-slate-400">(opcional)</span></p>
+          <p className="mb-2 text-[11px] text-slate-500">FORMATO BANCO STARSOFT. Si lo subes, agrega la fila <b>Banco (abonos)</b> al resumen de ingresos por mes.</p>
+          <input
+            type="file" accept=".xls,.xlsx"
+            onChange={(e) => setBanco(e.target.files?.[0] ?? null)}
+            className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-slate-700"
+          />
+          {banco && <p className="mt-2 text-[11px] text-slate-500">• {banco.name}</p>}
         </div>
       </div>
 
