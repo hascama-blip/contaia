@@ -95,7 +95,7 @@ export default function VentasCajaPanel() {
 
         <div className="rounded-xl border-2 border-dashed border-slate-300 p-4">
           <p className="mb-2 text-sm font-semibold text-slate-700">2) Caja Virtual</p>
-          <p className="mb-2 text-[11px] text-slate-500">El reporte de ingresos — <b>uno o varios</b> (todo el periodo o por mes). .xlsx</p>
+          <p className="mb-2 text-[11px] text-slate-500">El reporte de ingresos — <b>uno o varios</b> (todo el periodo o por mes). Acepta el reporte de Caja Virtual o un Registro de Ventas. .xlsx</p>
           <input
             type="file" multiple accept=".xls,.xlsx"
             onChange={(e) => setCaja(Array.from(e.target.files ?? []))}

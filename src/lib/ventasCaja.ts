@@ -119,14 +119,21 @@ export function parseLibroVentas(buf: Buffer, mesForzado?: string): VentaRow[] {
 
 export function parseCajaVirtual(buf: Buffer): CajaRow[] {
   const filas = leerHoja(buf);
+  // Detecta el formato: Caja Virtual (Comprobante+Total) o Registro de Ventas
+  // (Documento+Total) usado como caja. Así la zona de Caja acepta ambos.
   let h = filas.findIndex((f) => f.some((c) => /COMPROBANTE/i.test(c)) && f.some((c) => /TOTAL/i.test(c)));
+  let formato: "caja" | "ventas" = "caja";
+  if (h < 0) {
+    h = filas.findIndex((f) => f.some((c) => /DOCUMENTO/i.test(c)) && f.some((c) => /TOTAL/i.test(c)));
+    formato = "ventas";
+  }
   if (h < 0) h = 0;
   const H = filas[h];
   const iF = idxDe(H, "FECHA PAGO", "FECHA");
-  const iTC = idxDe(H, "TIPO COMPROBANTE");
-  const iC = idxDe(H, "COMPROBANTE");
+  const iC = formato === "caja" ? idxDe(H, "COMPROBANTE") : idxDe(H, "DOCUMENTO");
+  const iTC = formato === "caja" ? idxDe(H, "TIPO COMPROBANTE") : idxDe(H, "[T/D]", "T/D");
   const iTot = idxDe(H, "TOTAL");
-  const iCon = idxDe(H, "CONTRATANTE");
+  const iCon = formato === "caja" ? idxDe(H, "CONTRATANTE") : idxDe(H, "NOMBRE O RAZON SOCIAL", "NOMBRE");
   const iTP = idxDe(H, "TIPO PAGO");
   const iB = idxDe(H, "BANCO / FECHA VISA", "BANCO");
   const fmt = detectarFmt(filas.slice(h + 1).map((f) => f?.[iF]));
