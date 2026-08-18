@@ -131,17 +131,24 @@ export function parseCajaVirtual(buf: Buffer): CajaRow[] {
   const iB = idxDe(H, "BANCO / FECHA VISA", "BANCO");
   const fmt = detectarFmt(filas.slice(h + 1).map((f) => f?.[iF]));
   const out: CajaRow[] = [];
+  let ultimoYm = "";      // arrastre: si una fila con comprobante no trae fecha
+  let ultimaFecha = "";   // (reporte con fecha agrupada), hereda la de arriba.
   for (let i = h + 1; i < filas.length; i++) {
     const f = filas[i]; if (!f) continue;
     const c = String(f[iC] ?? "").trim();
     const comp = compKey(c);
+    // Actualiza el "último visto" con cualquier fila que traiga fecha (aunque no
+    // sea comprobante), para que el arrastre sea correcto.
+    const fRaw = String(f[iF] ?? "").trim();
+    const ymFila = ymDe(f[iF], fmt);
+    if (ymFila) { ultimoYm = ymFila; ultimaFecha = fRaw; }
     if (!comp) continue;
     out.push({
-      fechaPago: String(f[iF] ?? "").trim(), tipoComp: String(f[iTC] ?? "").trim().toUpperCase(),
+      fechaPago: fRaw || ultimaFecha, tipoComp: String(f[iTC] ?? "").trim().toUpperCase(),
       comprobante: compBonito(c), comp,
       total: num(f[iTot]), contratante: String(f[iCon] ?? "").trim(),
       tipoPago: String(f[iTP] ?? "").trim(), banco: String(f[iB] ?? "").trim(),
-      ym: ymDe(f[iF], fmt),
+      ym: ymFila || ultimoYm,   // sin fecha propia → hereda el mes de arriba
     });
   }
   return out;
