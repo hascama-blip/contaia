@@ -119,21 +119,22 @@ export function parseLibroVentas(buf: Buffer, mesForzado?: string): VentaRow[] {
 
 export function parseCajaVirtual(buf: Buffer): CajaRow[] {
   const filas = leerHoja(buf);
-  // Detecta el formato: Caja Virtual (Comprobante+Total) o Registro de Ventas
-  // (Documento+Total) usado como caja. Así la zona de Caja acepta ambos.
+  // Detecta el formato de la Caja Virtual:
+  //  - "caja": Comprobante + Total (reporte de ingresos).
+  //  - "ventas": Documento + Total (Registro de Ventas usado como caja).
+  //  - "curso": Reporte detallado de cursos (Fecha Matricula + Pagado; SIN
+  //    comprobante — cada fila es una matrícula pagada). Solo cuenta el ingreso.
+  let formato: "caja" | "ventas" | "curso" = "caja";
   let h = filas.findIndex((f) => f.some((c) => /COMPROBANTE/i.test(c)) && f.some((c) => /TOTAL/i.test(c)));
-  let formato: "caja" | "ventas" = "caja";
-  if (h < 0) {
-    h = filas.findIndex((f) => f.some((c) => /DOCUMENTO/i.test(c)) && f.some((c) => /TOTAL/i.test(c)));
-    formato = "ventas";
-  }
+  if (h < 0) { h = filas.findIndex((f) => f.some((c) => /DOCUMENTO/i.test(c)) && f.some((c) => /TOTAL/i.test(c))); if (h >= 0) formato = "ventas"; }
+  if (h < 0) { h = filas.findIndex((f) => f.some((c) => /PAGADO/i.test(c)) && f.some((c) => /FECHA/i.test(c))); if (h >= 0) formato = "curso"; }
   if (h < 0) h = 0;
   const H = filas[h];
-  const iF = idxDe(H, "FECHA PAGO", "FECHA");
-  const iC = formato === "caja" ? idxDe(H, "COMPROBANTE") : idxDe(H, "DOCUMENTO");
-  const iTC = formato === "caja" ? idxDe(H, "TIPO COMPROBANTE") : idxDe(H, "[T/D]", "T/D");
-  const iTot = idxDe(H, "TOTAL");
-  const iCon = formato === "caja" ? idxDe(H, "CONTRATANTE") : idxDe(H, "NOMBRE O RAZON SOCIAL", "NOMBRE");
+  const iF = formato === "curso" ? idxDe(H, "FECHA MATRICULA", "FECHA") : idxDe(H, "FECHA PAGO", "FECHA");
+  const iC = formato === "caja" ? idxDe(H, "COMPROBANTE") : formato === "ventas" ? idxDe(H, "DOCUMENTO") : -1;
+  const iTC = formato === "caja" ? idxDe(H, "TIPO COMPROBANTE") : formato === "ventas" ? idxDe(H, "[T/D]", "T/D") : idxDe(H, "CURSO");
+  const iTot = formato === "curso" ? idxDe(H, "PAGADO") : idxDe(H, "TOTAL");
+  const iCon = formato === "caja" ? idxDe(H, "CONTRATANTE") : idxDe(H, "NOMBRE O RAZON SOCIAL", "CONTRATANTE", "NOMBRE");
   const iTP = idxDe(H, "TIPO PAGO");
   const iB = idxDe(H, "BANCO / FECHA VISA", "BANCO");
   const fmt = detectarFmt(filas.slice(h + 1).map((f) => f?.[iF]));
@@ -142,20 +143,22 @@ export function parseCajaVirtual(buf: Buffer): CajaRow[] {
   let ultimaFecha = "";   // (reporte con fecha agrupada), hereda la de arriba.
   for (let i = h + 1; i < filas.length; i++) {
     const f = filas[i]; if (!f) continue;
-    const c = String(f[iC] ?? "").trim();
+    const c = iC >= 0 ? String(f[iC] ?? "").trim() : "";
     const comp = compKey(c);
-    // Actualiza el "último visto" con cualquier fila que traiga fecha (aunque no
-    // sea comprobante), para que el arrastre sea correcto.
     const fRaw = String(f[iF] ?? "").trim();
     const ymFila = ymDe(f[iF], fmt);
     if (ymFila) { ultimoYm = ymFila; ultimaFecha = fRaw; }
-    if (!comp) continue;
+    const total = num(f[iTot]);
+    // "caja"/"ventas": la fila sin comprobante es detalle/pie → se salta.
+    // "curso": no hay comprobante; se cuenta cualquier fila con Pagado y fecha.
+    if (formato === "curso") { if (!total || !fRaw) continue; }
+    else if (!comp) continue;
     out.push({
-      fechaPago: fRaw || ultimaFecha, tipoComp: String(f[iTC] ?? "").trim().toUpperCase(),
+      fechaPago: fRaw || ultimaFecha, tipoComp: String(f[iTC] ?? "").trim().toUpperCase() || (formato === "curso" ? "CURSO" : ""),
       comprobante: compBonito(c), comp,
-      total: num(f[iTot]), contratante: String(f[iCon] ?? "").trim(),
+      total, contratante: String(f[iCon] ?? "").trim(),
       tipoPago: String(f[iTP] ?? "").trim(), banco: String(f[iB] ?? "").trim(),
-      ym: ymFila || ultimoYm,   // sin fecha propia → hereda el mes de arriba
+      ym: ymFila || ultimoYm,
     });
   }
   return out;
@@ -193,11 +196,15 @@ export function conciliarVentasCaja(
     g.total += c.total; g.n += 1; g.rows.push(c);
     grupos.set(c.comp, g);
   }
+  // ¿La caja trae comprobantes? (el formato "curso" no tiene → no hay cruce
+  // factura-por-factura, solo el resumen de ingresos por mes).
+  const cajaConComprobante = caja.some((c) => c.comp);
   const usados = new Set<string>();
   const conciliados: ConcVenta[] = [];
   const faltanEnCaja: VentaRow[] = [];
 
   for (const v of ventas) {
+    if (!cajaConComprobante) break;   // sin comprobantes en caja: no marcar faltantes
     const g = grupos.get(v.comp);
     if (g) {
       usados.add(v.comp);
@@ -218,6 +225,7 @@ export function conciliarVentasCaja(
   const mesesVentas = new Set(ventas.map((v) => v.mes).filter(Boolean) as string[]);
   const scope = mesesVentas.size > 0;
   const cajaSinVenta = caja.filter((c) => {
+    if (!c.comp) return false;               // filas sin comprobante (cursos) no aplican
     if (usados.has(c.comp) || /RECIBO/i.test(c.tipoComp)) return false;
     return scope ? mesesVentas.has(c.ym) : true;
   });
