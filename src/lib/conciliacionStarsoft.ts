@@ -114,10 +114,14 @@ export function listarHojasBanco(buf: Buffer): string[] {
   return Object.keys(leerHojas(buf));
 }
 
-/** Lee los movimientos del banco. Si se pasa `hoja`, SOLO esa pestaña. */
-export function parseBancoStarsoft(buf: Buffer, hoja?: string): BancoMov[] {
+/** Lee los movimientos del banco. Si se pasan `sel` (nombres de hoja), SOLO esas. */
+export function parseBancoStarsoft(buf: Buffer, sel?: string[]): BancoMov[] {
   let hojas = leerHojas(buf);
-  if (hoja && hojas[hoja]) hojas = { [hoja]: hojas[hoja] };
+  if (sel && sel.length) {
+    const filt: Record<string, string[][]> = {};
+    for (const s of sel) if (hojas[s]) filt[s] = hojas[s];
+    hojas = filt;
+  }
   const movs: BancoMov[] = [];
   for (const [sn, filas] of Object.entries(hojas)) {
     if (!filas.length) continue;

@@ -19,7 +19,7 @@ export default function ConciliacionStarsoftPanel() {
   const [sistema, setSistema] = useState<File[]>([]);
   const [banco, setBanco] = useState<File | null>(null);
   const [hojas, setHojas] = useState<string[]>([]);
-  const [hojaSel, setHojaSel] = useState("");
+  const [hojasSel, setHojasSel] = useState<string[]>([]);
   const [cargandoHojas, setCargandoHojas] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function ConciliacionStarsoftPanel() {
   const [descarga, setDescarga] = useState<{ nombre: string; b64: string } | null>(null);
 
   async function elegirBanco(f: File | null) {
-    setBanco(f); setHojas([]); setHojaSel(""); setError(null);
+    setBanco(f); setHojas([]); setHojasSel([]); setError(null);
     if (!f) return;
     setCargandoHojas(true);
     try {
@@ -37,23 +37,26 @@ export default function ConciliacionStarsoftPanel() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(data.hojas)) {
         setHojas(data.hojas);
-        if (data.hojas.length === 1) setHojaSel(data.hojas[0]);
+        if (data.hojas.length === 1) setHojasSel(data.hojas);
       } else setError(data.error ?? "No se pudieron leer las hojas del banco.");
     } catch { setError("Error leyendo las hojas del banco."); }
     finally { setCargandoHojas(false); }
   }
 
+  const toggleHoja = (h: string) =>
+    setHojasSel((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]);
+
   async function procesar() {
     setError(null); setResumen(null); setDescarga(null); setDetectados(null);
     if (!sistema.length) { setError("Sube los Excel del sistema (Standard, Ventas, Anexos)."); return; }
     if (!banco) { setError("Sube el Excel FORMATO BANCO STARSOFT."); return; }
-    if (!hojaSel) { setError("Elige la pestaña (cuenta) del banco a conciliar."); return; }
+    if (!hojasSel.length) { setError("Elige al menos una pestaña (cuenta) del banco a conciliar."); return; }
     setBusy(true);
     try {
       const fd = new FormData();
       sistema.slice(0, 3).forEach((f) => fd.append("sistema", f));
       fd.append("banco", banco);
-      fd.append("hoja", hojaSel);
+      hojasSel.forEach((h) => fd.append("hoja", h));
       const res = await fetch("/api/conciliacion-starsoft", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo conciliar."); setDetectados(data.detectados ?? null); return; }
@@ -83,7 +86,7 @@ export default function ConciliacionStarsoftPanel() {
       <h3 className="font-semibold text-slate-800">🏦 Conciliación Banco StarSoft (banco vs contable)</h3>
       <p className="mt-1 text-xs text-slate-500">
         Sube los <b>3 Excel del sistema</b> (Standard, Ventas y Anexos) en una zona y el
-        <b> FORMATO BANCO STARSOFT</b> en la otra; elige <b>una sola pestaña (cuenta)</b> del banco.
+        <b> FORMATO BANCO STARSOFT</b> en la otra; elige <b>una o varias pestañas (cuentas)</b> del banco.
         Cruza por <b>N° de operación</b> (con respaldo por monto y fecha) y descarga el Excel: hoja
         <b>Conciliado</b> y hoja <b>No concilia</b> (banco sin contabilizar + contable sin banco).
       </p>
@@ -118,22 +121,33 @@ export default function ConciliacionStarsoftPanel() {
           {cargandoHojas && <p className="mt-2 text-[11px] text-slate-400">Leyendo pestañas…</p>}
           {hojas.length > 0 && (
             <div className="mt-2">
-              <label className="mb-1 block text-[11px] font-semibold text-slate-600">Pestaña (cuenta) a conciliar</label>
-              <select
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
-                value={hojaSel}
-                onChange={(e) => setHojaSel(e.target.value)}
-              >
-                <option value="">— elige una cuenta —</option>
-                {hojas.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-600">Cuentas a conciliar ({hojasSel.length})</label>
+                <div className="flex gap-2 text-[11px]">
+                  <button type="button" className="text-brand-600 hover:underline" onClick={() => setHojasSel([...hojas])}>Todas</button>
+                  <button type="button" className="text-slate-400 hover:underline" onClick={() => setHojasSel([])}>Ninguna</button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 p-2">
+                {hojas.map((h) => {
+                  const on = hojasSel.includes(h);
+                  return (
+                    <button
+                      key={h} type="button" onClick={() => toggleHoja(h)}
+                      className={`rounded-md px-2 py-1 text-[11px] font-medium ${on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                    >
+                      {on ? "✓ " : ""}{h}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button className="btn-primary" onClick={procesar} disabled={busy || !hojaSel}>
+        <button className="btn-primary" onClick={procesar} disabled={busy || !hojasSel.length}>
           {busy ? "Conciliando…" : "Conciliar"}
         </button>
         {descarga && (

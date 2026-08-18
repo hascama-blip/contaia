@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const hoja = typeof form.get("hoja") === "string" ? String(form.get("hoja")).trim() : "";
+    const sel = form.getAll("hoja").map((v) => String(v).trim()).filter(Boolean);
     const bufBanco = Buffer.from(await fBanco.arrayBuffer());
-    const bancoMovs = parseBancoStarsoft(bufBanco, hoja || undefined);
+    const bancoMovs = parseBancoStarsoft(bufBanco, sel.length ? sel : undefined);
     if (!bancoMovs.length) {
-      return NextResponse.json({ error: `No se leyeron movimientos del banco${hoja ? ` en la hoja "${hoja}"` : ""}.` }, { status: 422 });
+      return NextResponse.json({ error: `No se leyeron movimientos del banco${sel.length ? ` en las hojas: ${sel.join(", ")}` : ""}.` }, { status: 422 });
     }
     const std = parseStandardBancos(bufStd);
     if (!std.length) {
@@ -69,9 +69,9 @@ export async function POST(req: NextRequest) {
       ok: true,
       detectados,
       resumen: r.resumen,
-      hoja: hoja || "(todas)",
+      hojas: sel.length ? sel : ["(todas)"],
       excel: excel.toString("base64"),
-      nombre: `Conciliacion_Banco_StarSoft${hoja ? "_" + hoja : ""}.xlsx`,
+      nombre: `Conciliacion_Banco_StarSoft${sel.length ? "_" + sel.join("-") : ""}.xlsx`,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error procesando la conciliación." }, { status: 500 });
