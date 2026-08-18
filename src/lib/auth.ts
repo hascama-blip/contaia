@@ -113,10 +113,13 @@ export async function planDelEstudio(u: Usuario): Promise<import("./modulos").Pl
 /** Módulos habilitados para el estudio del usuario, según su PLAN. El supremo
  *  tiene TODOS (incluye utilitarios); el resto según el plan del admin. */
 export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
-  const { TODOS_MODULO_KEYS, modulosDePlan } = await import("./modulos");
+  const { TODOS_MODULO_KEYS, modulosDePlan, UTILITARIO_KEYS } = await import("./modulos");
   if (esSupremo(u)) return new Set(TODOS_MODULO_KEYS);
   const admin = u.parentId ? await getUserById(u.parentId) : u;
-  return new Set(modulosDePlan(admin?.plan as import("./modulos").PlanId | undefined));
+  const base = modulosDePlan(admin?.plan as import("./modulos").PlanId | undefined);
+  // Utilitarios habilitados por el supremo a esta cuenta (guardados en modulos).
+  const utilGranted = (admin?.modulos ?? []).filter((k) => UTILITARIO_KEYS.includes(k));
+  return new Set([...base, ...utilGranted]);
 }
 
 /** ¿Puede ingresar a la plataforma? El supremo siempre; un operador si su

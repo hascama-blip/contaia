@@ -1,12 +1,15 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { requireUser, esSupremo, modulosDelEstudio } from "@/lib/auth";
 import AnalisisComprasPanel from "@/components/AnalisisComprasPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Análisis de compras para RTP — Radar Tributario" };
 
 export default async function Page() {
-  await requireUser();
+  const user = await requireUser();
+  const mods = await modulosDelEstudio(user);
+  if (!esSupremo(user) && !mods.has("analisis-rtp")) redirect("/");
   return (
     <div className="space-y-4">
       <div>

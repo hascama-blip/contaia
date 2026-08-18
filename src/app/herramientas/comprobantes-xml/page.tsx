@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId } from "@/lib/auth";
+import { requireUser, esSupremo, studioId, modulosDelEstudio } from "@/lib/auth";
 import ComprobantesXmlTool from "@/components/ComprobantesXmlTool";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export const metadata = { title: "Comprobantes XML (SUNAT) — Radar Tributario"
 
 export default async function Page() {
   const user = await requireUser();
+  const mods = await modulosDelEstudio(user);
+  if (!esSupremo(user) && !mods.has("comprobantes-xml")) redirect("/");
   const clientes = await listClientes(studioId(user));
   const min = clientes.map((c) => ({
     id: c.id,

@@ -174,8 +174,8 @@ export default async function MenuPage() {
         })}
       </div>
 
-      {/* Utilitarios (retráctil) — solo el supremo */}
-      {esSupremo(user) && (
+      {/* Utilitarios (retráctil) — supremo, o cuentas con algún utilitario habilitado */}
+      {(esSupremo(user) || UTILITARIOS.some((o) => { const m = moduloPorHref(o.href); return m && mods.has(m.key); })) && (
         <UtilitariosSeccion>
           {UTILITARIOS.map((o) => {
             const mod = moduloPorHref(o.href);

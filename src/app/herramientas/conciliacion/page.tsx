@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { requireUser, esSupremo, modulosDelEstudio } from "@/lib/auth";
 import ConciliacionPanel from "@/components/ConciliacionPanel";
 import ConciliacionStarsoftPanel from "@/components/ConciliacionStarsoftPanel";
 
@@ -7,7 +8,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Conciliación bancaria — Radar Tributario" };
 
 export default async function Page() {
-  await requireUser();
+  const user = await requireUser();
+  const mods = await modulosDelEstudio(user);
+  if (!esSupremo(user) && !mods.has("conciliacion")) redirect("/");
   return (
     <div className="space-y-4">
       <div>

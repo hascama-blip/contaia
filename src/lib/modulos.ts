@@ -47,6 +47,11 @@ export const MODULOS: ModuloDef[] = [
 
 export const TODOS_MODULO_KEYS = MODULOS.map((m) => m.key);
 
+// Utilitarios: por defecto solo el supremo, pero el supremo puede habilitarlos
+// por cuenta (se guardan en Usuario.modulos).
+export const UTILITARIO_KEYS = MODULOS.filter((m) => m.soloSupremo).map((m) => m.key);
+export const UTILITARIOS_DEF = MODULOS.filter((m) => m.soloSupremo);
+
 export function moduloPorHref(href: string): ModuloDef | undefined {
   return MODULOS.find((m) => href.startsWith(m.href));
 }

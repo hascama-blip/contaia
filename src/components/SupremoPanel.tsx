@@ -22,6 +22,14 @@ const PLANES_OPC: { key: "basico" | "regular" | "premium" | "equipo"; label: str
   { key: "equipo", label: "Plan de Equipo", desc: "Premium + operarios (equipo)" },
 ];
 
+// Utilitarios que el supremo puede habilitar por cuenta.
+const UTILITARIOS_OPC: { key: string; label: string }[] = [
+  { key: "conciliacion", label: "Conciliación bancaria" },
+  { key: "ventas-caja", label: "Ventas vs Caja Virtual" },
+  { key: "analisis-rtp", label: "Análisis para RTP" },
+  { key: "comprobantes-xml", label: "Comprobante XML SUNAT" },
+];
+
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";
 
 const BADGE: Record<string, { txt: string; cls: string }> = {
@@ -183,6 +191,22 @@ export default function SupremoPanel() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo asignar el plan."); return; }
+      await cargar();
+    } finally { setBusy(null); }
+  }
+
+  async function toggleUtilitario(s: Solicitud, key: string) {
+    const actuales = new Set(s.modulos ?? []);
+    if (actuales.has(key)) actuales.delete(key); else actuales.add(key);
+    setBusy(s.id); setError(null);
+    try {
+      const res = await fetch("/api/supremo/solicitudes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: s.id, modulos: Array.from(actuales) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo actualizar los utilitarios."); return; }
       await cargar();
     } finally { setBusy(null); }
   }
@@ -392,6 +416,23 @@ export default function SupremoPanel() {
                               </label>
                             );
                           })}
+                          <div className="mt-1 border-t border-slate-100 pt-1">
+                            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Utilitarios</p>
+                            {UTILITARIOS_OPC.map((u) => {
+                              const on = (s.modulos ?? []).includes(u.key);
+                              return (
+                                <label key={u.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={on}
+                                    disabled={busy !== null}
+                                    onChange={() => toggleUtilitario(s, u.key)}
+                                  />
+                                  <span className={on ? "font-semibold text-brand-700" : ""}>{u.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-2">

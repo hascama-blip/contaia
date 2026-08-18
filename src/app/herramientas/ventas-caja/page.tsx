@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser, esSupremo } from "@/lib/auth";
+import { requireUser, esSupremo, modulosDelEstudio } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import VentasCajaPanel from "@/components/VentasCajaPanel";
 
@@ -8,7 +8,8 @@ export const metadata = { title: "Ventas vs Caja Virtual — Radar Tributario" }
 
 export default async function Page() {
   const user = await requireUser();
-  if (!esSupremo(user)) redirect("/"); // utilitario: solo supremo
+  const mods = await modulosDelEstudio(user);
+  if (!esSupremo(user) && !mods.has("ventas-caja")) redirect("/"); // utilitario: supremo o habilitado
 
   return (
     <div className="space-y-4">
