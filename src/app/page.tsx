@@ -58,6 +58,13 @@ const UTILITARIOS: Opcion[] = [
       "Sube el extracto bancario (PDF), el libro banco contable y la caja virtual (Excel): el sistema cruza por N° de operación y entrega el Excel conciliado con lo que falta contabilizar.",
   },
   {
+    href: "/herramientas/ventas-caja",
+    icono: "🧾",
+    titulo: "Ventas vs Caja Virtual",
+    detalle:
+      "Sube el Libro de Ventas por mes (o un ZIP) y la Caja Virtual: cruza por N° de comprobante y entrega el Excel con lo conciliado y lo que falta cobrar/registrar.",
+  },
+  {
     href: "/herramientas/analisis-compras",
     icono: "📊",
     titulo: "Análisis para RTP",

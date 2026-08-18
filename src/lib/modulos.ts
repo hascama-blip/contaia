@@ -37,6 +37,7 @@ export const MODULOS: ModuloDef[] = [
   { key: "rtt", nombre: "Reporte Tributario para Terceros (RTT)", href: "/herramientas/rtt", planMin: "premium" },
   // Utilitarios — solo supremo
   { key: "conciliacion", nombre: "Conciliación bancaria", href: "/herramientas/conciliacion", soloSupremo: true },
+  { key: "ventas-caja", nombre: "Ventas vs Caja Virtual", href: "/herramientas/ventas-caja", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
   { key: "comprobantes-xml", nombre: "Comprobante XML SUNAT", href: "/herramientas/comprobantes-xml", soloSupremo: true },
   // Legacy (no están en el menú; se conservan como solo-supremo)
