@@ -26,6 +26,7 @@ const PLANES_OPC: { key: "basico" | "regular" | "premium" | "equipo"; label: str
 const UTILITARIOS_OPC: { key: string; label: string }[] = [
   { key: "conciliacion", label: "Conciliación bancaria" },
   { key: "ventas-caja", label: "Ventas vs Caja Virtual" },
+  { key: "banco-word", label: "Estado de cuenta → Word" },
   { key: "analisis-rtp", label: "Análisis para RTP" },
   { key: "comprobantes-xml", label: "Comprobante XML SUNAT" },
 ];

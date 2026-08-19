@@ -72,6 +72,13 @@ const UTILITARIOS: Opcion[] = [
       "Sube el Libro Diario y obtén el análisis de la cuenta clase 9 (gastos por función: administración, ventas, financieros), un dashboard de compras/gastos para gerencia y el informe en Excel.",
   },
   {
+    href: "/herramientas/banco-word",
+    icono: "📄",
+    titulo: "Estado de cuenta (PDF) → Word",
+    detalle:
+      "Convierte el PDF del estado de cuenta del banco (BCP) en un Word con la tabla de conciliación (fecha, descripción, N° op, hora, cargo/abono, saldo) lista para llenar.",
+  },
+  {
     href: "/herramientas/comprobantes-xml",
     icono: "📥",
     titulo: "Comprobante XML SUNAT",
