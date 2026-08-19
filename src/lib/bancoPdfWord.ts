@@ -85,6 +85,37 @@ export function parseEstadoBcp(texto: string): EstadoBanco {
 const soles = (n: number): string =>
   (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** Genera el Excel (.xlsx) con la misma estructura de conciliación (montos como
+ *  número, columna CONCILIACIÓN en blanco). */
+export async function excelEstadoBanco(est: EstadoBanco): Promise<Buffer> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Radar Tributar IA";
+  const ws = wb.addWorksheet(est.cuenta ? est.cuenta.slice(-4) : "Banco");
+
+  ws.columns = [
+    { header: "FECHA", key: "fecha", width: 9 },
+    { header: "DESCRIPCIÓN", key: "desc", width: 30 },
+    { header: "NUM OP", key: "op", width: 11 },
+    { header: "HORA", key: "hora", width: 8 },
+    { header: "CARGO / ABONO", key: "monto", width: 15 },
+    { header: "SALDO CONTABLE", key: "saldo", width: 16 },
+    { header: "CONCILIACIÓN", key: "conc", width: 40 },
+  ];
+  for (const m of est.movimientos) {
+    const row = ws.addRow({ fecha: m.fecha, desc: m.descripcion, op: m.numOp, hora: m.hora, monto: m.monto, saldo: m.saldo, conc: "" });
+    row.getCell("monto").numFmt = "#,##0.00;[Red]-#,##0.00";
+    row.getCell("saldo").numFmt = "#,##0.00";
+  }
+  ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
+  ws.getRow(1).alignment = { horizontal: "center" };
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+
+  const ab = await wb.xlsx.writeBuffer();
+  return Buffer.from(ab);
+}
+
 /** Genera el Word (.docx) con la tabla de conciliación. */
 export async function wordEstadoBanco(est: EstadoBanco): Promise<Buffer> {
   const docx = await import("docx");
