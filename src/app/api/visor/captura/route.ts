@@ -29,15 +29,23 @@ export async function POST(req: NextRequest) {
   const v = datos?.visor; // payload estructurado de la extensión
 
   // Payload estructurado → matriz (cuadro año×mes).
-  if (v && (Array.isArray(v.meses) || Array.isArray(v.anios))) {
-    const anioSel = String(v.anio || "").match(/20\d{2}/)?.[0] || "";
+  if (v && (v.celdas || Array.isArray(v.meses) || Array.isArray(v.anios))) {
     const celdas: Record<string, "P" | "NP"> = {};
+    // celdas ya en formato "YYYY-MM" (DJ mensual y SIRE nuevo).
+    if (v.celdas && typeof v.celdas === "object") {
+      for (const [k, e] of Object.entries(v.celdas)) if (/^\d{4}-\d{2}$/.test(k)) celdas[k] = est(String(e));
+    }
+    // compat: meses[] + año seleccionado (SIRE viejo).
+    const anioSel = String(v.anio || "").match(/20\d{2}/)?.[0] || "";
     for (const it of (v.meses || [])) {
       const mm = MESES[String(it.mes || "").toUpperCase()] || (String(it.mes).match(/^\d{2}$/) ? String(it.mes) : "");
       if (mm && anioSel) celdas[`${anioSel}-${mm}`] = est(String(it.estado));
     }
     const anios: Record<string, "P" | "NP"> = {};
-    for (const it of (v.anios || [])) {
+    if (v.anios && !Array.isArray(v.anios) && typeof v.anios === "object") {
+      for (const [y, e] of Object.entries(v.anios)) if (/^20\d{2}$/.test(y)) anios[y] = est(String(e));
+    }
+    for (const it of (Array.isArray(v.anios) ? v.anios : [])) {
       const yy = String(it.anio || "").match(/20\d{2}/)?.[0];
       if (yy) anios[yy] = est(String(it.estado));
     }

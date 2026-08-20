@@ -100,14 +100,14 @@ function textoPagina() {
 }
 function empresaInfo() {
   var txt = document.body ? document.body.innerText : "";
-  var emp = (txt.match(/Bienvenido,\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
-  var ruc = (txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
+  var emp = (txt.match(/raz[o\\u00f3]n social:\\s*([^\\n]+)/i) || txt.match(/Bienvenido,\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
+  var ruc = (txt.match(/RUC:?\\s*(\\d{11})/i) || txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
   return { empresa: emp.trim().slice(0, 120), ruc: ruc };
 }
 function tipoActual() {
-  var u = (location.href + " " + document.title).toLowerCase();
-  if (/710|renta.?anual|declaraci.*anual/.test(u)) return "dj-anual";
-  if (/f621|form.?621|declaraci.*mensual|mis.?declaraciones|omiso|itdeclara/.test(u)) return "dj-mensual";
+  var t = (location.href + " " + document.title + " " + (document.body ? document.body.innerText : "")).toLowerCase();
+  if (/renta anual|declaraci[o\\u00f3]n.*anual|formulario 710|dj anual/.test(t)) return "dj-anual";
+  if (/declaraciones y pagos|declara f[a\\u00e1]cil|nro orden|igv.?renta mensual|pdt igv|\\b0621\\b/.test(t)) return "dj-mensual";
   return "sire";
 }
 function anioSel() {
@@ -117,25 +117,57 @@ function anioSel() {
   } catch (e) {}
   var mt = textoPagina().match(/\\b(20\\d{2})\\s*[-\\u2013]/); return mt ? mt[1] : "";
 }
-function escanear() {
+// SIRE: "MES/AÑO - Presentado / No Presentado".
+function celdasSire() {
   var txt = textoPagina();
   if (!/Presentado/i.test(txt)) return null;
   var re = /\\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SET|SEP|OCT|NOV|DIC|20\\d{2})\\s*[-\\u2013]\\s*(No\\s+Presentado|Presentado)/gi;
-  var meses = [], anios = [], sm = {}, sa = {}, m;
+  var anio = anioSel(); var celdas = {}, anios = {}, m;
   while ((m = re.exec(txt))) {
     var k = m[1].toUpperCase(); var e = /no/i.test(m[2]) ? "No Presentado" : "Presentado";
-    if (/^20\\d{2}$/.test(k)) { if (!sa[k]) { sa[k] = 1; anios.push({ anio: k, estado: e }); } }
-    else if (MESN[k]) { if (!sm[k]) { sm[k] = 1; meses.push({ mes: MESN[k], nombre: k, estado: e }); } }
+    if (/^20\\d{2}$/.test(k)) anios[k] = e;
+    else if (MESN[k] && anio) celdas[anio + "-" + MESN[k]] = e;
   }
-  if (!meses.length && !anios.length) return null;
-  meses.sort(function (a, b) { return a.mes.localeCompare(b.mes); });   // ENE..DIC
+  return (Object.keys(celdas).length || Object.keys(anios).length) ? { celdas: celdas, anios: anios } : null;
+}
+// DJ mensual: la tabla lista los PRESENTADOS (Periodo MM/AAAA + Nro Orden). El
+// rango "Desde MM/AAAA Hasta MM/AAAA" define los meses que debían estar → los que
+// faltan = No Presentó.
+function celdasDjMensual() {
+  var txt = document.body ? document.body.innerText : "";
+  var pres = {};
+  try {
+    var trs = document.querySelectorAll("tr");
+    for (var i = 0; i < trs.length; i++) {
+      var rt = trs[i].innerText || "";
+      var mp = rt.match(/\\b(0[1-9]|1[0-2])\\/(20\\d{2})\\b/);
+      var mo = rt.match(/\\b\\d{9,}\\b/);
+      if (mp && mo) pres[mp[2] + "-" + mp[1]] = 1;
+    }
+  } catch (e) {}
+  var rg = txt.match(/Desde:\\s*(\\d{2})\\/(20\\d{2})\\s*Hasta:\\s*(\\d{2})\\/(20\\d{2})/i);
+  var celdas = {};
+  if (rg) {
+    var yy = parseInt(rg[2], 10), mm = parseInt(rg[1], 10), y2 = parseInt(rg[4], 10), m2 = parseInt(rg[3], 10), g = 0;
+    while ((yy < y2 || (yy === y2 && mm <= m2)) && g < 120) {
+      var key = yy + "-" + (mm < 10 ? "0" + mm : "" + mm);
+      celdas[key] = pres[key] ? "Presentado" : "No Presentado";
+      mm++; if (mm > 12) { mm = 1; yy++; } g++;
+    }
+  } else { for (var k in pres) celdas[k] = "Presentado"; }
+  return Object.keys(celdas).length ? { celdas: celdas, anios: {} } : null;
+}
+function escanear() {
+  var tipo = tipoActual();
+  var r = tipo === "dj-mensual" ? celdasDjMensual() : celdasSire();
+  if (!r) return null;
   var info = empresaInfo();
-  return { empresa: info.empresa, ruc: info.ruc, tipo: tipoActual(), anio: anioSel(), meses: meses, anios: anios };
+  return { empresa: info.empresa, ruc: info.ruc, tipo: tipo, celdas: r.celdas, anios: r.anios };
 }
 var ultimaFirma = "";
 function enviar() {
   var v = escanear(); if (!v) return;
-  var firma = v.tipo + "|" + v.anio + "|" + v.meses.map(function (x) { return x.mes + x.estado[0]; }).join("") + "|" + v.anios.map(function (x) { return x.anio + x.estado[0]; }).join("");
+  var firma = v.tipo + "|" + Object.keys(v.celdas).sort().map(function (k) { return k + v.celdas[k][0]; }).join("") + "|" + Object.keys(v.anios).sort().map(function (y) { return y + v.anios[y][0]; }).join("");
   if (firma === ultimaFirma) return;
   ultimaFirma = firma;
   chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, datos: { visor: v } } });
