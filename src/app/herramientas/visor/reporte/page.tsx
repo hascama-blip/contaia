@@ -37,6 +37,12 @@ export default async function Page() {
   const obs = (lista: VisorMatriz[]): string[] => {
     const out: string[] = [];
     for (const m of lista.sort((a, b) => a.tipo.localeCompare(b.tipo))) {
+      // DJ anual: contingencia a nivel de ejercicio (año), no de mes.
+      if (m.tipo === "dj-anual") {
+        const aniosNp = Object.entries(m.anios).filter(([, e]) => e === "NP").map(([y]) => y).sort();
+        if (aniosNp.length) out.push(`${TIPO_LABEL[m.tipo] ?? m.tipo}: NO PRESENTÓ el ejercicio ${aniosNp.join(", ")}.`);
+        continue;
+      }
       const np = Object.entries(m.celdas).filter(([, e]) => e === "NP").map(([k]) => k).sort();
       if (np.length) {
         const porAnio = new Map<string, string[]>();
@@ -89,6 +95,23 @@ export default async function Page() {
 
                 {lista.sort((a, b) => a.tipo.localeCompare(b.tipo)).map((m, i) => {
                   const anios = aniosDe(m);
+                  // DJ anual: cuadro SOLO por año (un estado por ejercicio).
+                  if (m.tipo === "dj-anual") {
+                    return (
+                      <div key={i} className="evitar-corte">
+                        <p className="mb-1 text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>
+                        <div className="inline-block overflow-hidden rounded-lg border border-slate-200">
+                          <table className="text-center text-[11px]">
+                            <thead className="bg-slate-100 text-slate-600"><tr>{anios.map((y) => <th key={y} className="px-4 py-1.5">{y}</th>)}</tr></thead>
+                            <tbody><tr>{anios.map((y) => {
+                              const e = m.anios[y];
+                              return <td key={y} className={`px-4 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
+                            })}</tr></tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={i} className="evitar-corte">
                       <p className="mb-1 text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>

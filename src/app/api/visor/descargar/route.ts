@@ -117,11 +117,26 @@ function empresaInfo() {
 }
 function tipoActual() {
   var t = (location.href + " " + document.title + " " + (document.body ? document.body.innerText : "")).toLowerCase();
-  // DJ mensual PRIMERO (su contenido real). Evita confundirlo con el menú lateral
-  // "Declaraciones Anuales".
+  // DJ ANUAL PRIMERO: la consulta de Renta Anual (formulario 710/709 + Ejercicio).
+  // "N\\u00famero de formulario" es el ancla exclusiva de esa pantalla; el menú
+  // lateral comparte "renta anual" con la de mensual, por eso se exige el ancla.
+  if (/renta anual/.test(t) && /n[u\\u00fa]mero de formulario/.test(t)) return "dj-anual";
+  if (/formulario 710\\b|declaraci[o\\u00f3]n jurada anual del ejercicio/.test(t)) return "dj-anual";
+  // DJ mensual (su contenido real).
   if (/consulta de declaraciones y pagos|declara f[a\\u00e1]cil|nro orden|renta mensual|pdt igv|\\b0621\\b/.test(t)) return "dj-mensual";
-  if (/renta anual|formulario 710|declaraci[o\\u00f3]n jurada anual|pdt.*renta.*anual/.test(t)) return "dj-anual";
   return "sire";
+}
+// Ejercicio (año) seleccionado en el <select> de la consulta anual.
+function anioEjercicio() {
+  try {
+    var sels = document.querySelectorAll("select");
+    for (var i = 0; i < sels.length; i++) {
+      var s = sels[i];
+      var v = (s.options && s.selectedIndex >= 0) ? String(s.options[s.selectedIndex].text || s.value) : String(s.value || "");
+      var m = v.match(/^\\s*(20\\d{2})\\s*$/); if (m) return m[1];
+    }
+  } catch (e) {}
+  return "";
 }
 function anioSel() {
   try {
@@ -194,9 +209,31 @@ function celdasDjMensual() {
   } else { for (var k in pres) celdas[k] = "Presentado"; }
   return Object.keys(celdas).length ? { celdas: celdas, anios: {} } : null;
 }
+// DJ ANUAL: consulta por Ejercicio (año). Cada búsqueda da UN año:
+//  - si hay una fila con Ejercicio (20xx) + Fecha de Presentación (dd/mm/aaaa) → Presentó.
+//  - si "No hay registros disponibles" → el Ejercicio consultado = No Presentó.
+// El cuadro es SOLO por año (no meses), porque es una declaración anual.
+function celdasDjAnual() {
+  var txt = document.body ? document.body.innerText : "";
+  if (!/n[u\\u00fa]mero de formulario/i.test(txt)) return null; // ancla de la pantalla anual
+  var anios = {};
+  try {
+    var trs = document.querySelectorAll("table tr");
+    for (var i = 0; i < trs.length; i++) {
+      var rt = trs[i].innerText || "";
+      if (!/\\d{2}\\/\\d{2}\\/20\\d{2}/.test(rt)) continue;   // fila con fecha de presentación
+      var my = rt.match(/\\b(20\\d{2})\\b/);                 // 1er 20xx = Ejercicio (antes de la fecha)
+      if (my) anios[my[1]] = "Presentado";
+    }
+  } catch (e) {}
+  if (/no hay registros disponibles/i.test(txt)) {
+    var y = anioEjercicio(); if (y && !anios[y]) anios[y] = "No Presentado";
+  }
+  return Object.keys(anios).length ? { celdas: {}, anios: anios } : null;
+}
 function escanear() {
   var tipo = tipoActual();
-  var r = tipo === "dj-mensual" ? celdasDjMensual() : celdasSire();
+  var r = tipo === "dj-anual" ? celdasDjAnual() : tipo === "dj-mensual" ? celdasDjMensual() : celdasSire();
   if (!r) return null;
   var info = empresaInfo();
   return { empresa: info.empresa, ruc: info.ruc, tipo: tipo, celdas: r.celdas, anios: r.anios };

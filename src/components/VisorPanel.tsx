@@ -87,11 +87,32 @@ export default function VisorPanel() {
 
 function Cuadro({ m }: { m: Matriz }) {
   const anios = Array.from(new Set([...Object.keys(m.celdas).map((k) => k.slice(0, 4)), ...Object.keys(m.anios)])).sort();
+  const titulo = (
+    <p className="mb-1 text-sm font-semibold text-slate-800">
+      {TIPO_LABEL[m.tipo] ?? m.tipo} <span className="font-normal text-slate-400">· {m.empresa || m.ruc || "—"}{m.ruc ? ` · RUC ${m.ruc}` : ""}</span>
+    </p>
+  );
+
+  // DJ anual: cuadro SOLO por año (Presentó / No presentó por ejercicio).
+  if (m.tipo === "dj-anual") {
+    return (
+      <div>
+        {titulo}
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="text-center text-[11px]">
+            <thead className="bg-slate-50 text-slate-500"><tr>{anios.map((y) => <th key={y} className="px-3 py-1.5">{y}</th>)}</tr></thead>
+            <tbody><tr>{anios.map((y) => {
+              const e = m.anios[y];
+              return <td key={y} className={`px-3 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
+            })}</tr></tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
-      <p className="mb-1 text-sm font-semibold text-slate-800">
-        {TIPO_LABEL[m.tipo] ?? m.tipo} <span className="font-normal text-slate-400">· {m.empresa || m.ruc || "—"}{m.ruc ? ` · RUC ${m.ruc}` : ""}</span>
-      </p>
+      {titulo}
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full text-center text-[11px]">
           <thead className="bg-slate-50 text-slate-500">
