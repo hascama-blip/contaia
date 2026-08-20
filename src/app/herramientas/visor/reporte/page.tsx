@@ -25,12 +25,19 @@ export default async function Page() {
   if (!esSupremo(user) && !mods.has("visor")) redirect("/");
   const mats = await getVisorMatriz(user.id);
 
-  // Agrupa por empresa.
+  // Agrupa por empresa. Si solo hay UNA empresa detectada, todos los módulos
+  // (incluidos los que se capturaron sin identificar) van bajo ella — así no
+  // aparece un grupo suelto "Empresa" ni se parte el reporte en otra hoja.
+  const identificadas = [...new Set(mats.filter((m) => m.empresa || m.ruc).map((m) => m.empresa || m.ruc))];
   const porEmpresa = new Map<string, VisorMatriz[]>();
-  for (const m of mats) {
-    const k = m.empresa || m.ruc || "Empresa";
-    if (!porEmpresa.has(k)) porEmpresa.set(k, []);
-    porEmpresa.get(k)!.push(m);
+  if (identificadas.length === 1) {
+    porEmpresa.set(identificadas[0], mats);
+  } else {
+    for (const m of mats) {
+      const k = m.empresa || m.ruc || ""; // "" = sin identificar (sin encabezado)
+      if (!porEmpresa.has(k)) porEmpresa.set(k, []);
+      porEmpresa.get(k)!.push(m);
+    }
   }
 
   // Observaciones (lo No Presentado) de UN módulo (SIRE / DJ mensual / DJ anual).
@@ -76,7 +83,7 @@ export default async function Page() {
           </div>
         </header>
 
-        <div className="space-y-8 p-4 sm:p-6">
+        <div className="space-y-5 p-4 sm:p-6">
           {porEmpresa.size === 0 && (
             <p className="text-sm text-slate-500">Aún no hay datos capturados. Navega el SIRE / DJ con la extensión del Visor instalada.</p>
           )}
@@ -84,11 +91,13 @@ export default async function Page() {
           {[...porEmpresa].map(([empresa, lista]) => {
             const ruc = lista.find((m) => m.ruc)?.ruc;
             return (
-              <section key={empresa} className="evitar-corte space-y-6">
-                <div className="border-b border-slate-200 pb-2">
-                  <h2 className="text-lg font-bold text-slate-800">{empresa}</h2>
-                  {ruc && <p className="text-xs text-slate-500">RUC {ruc}</p>}
-                </div>
+              <section key={empresa || "sin-id"} className="space-y-4">
+                {(empresa || ruc) && (
+                  <div className="border-b border-slate-200 pb-2">
+                    {empresa && <h2 className="text-lg font-bold text-slate-800">{empresa}</h2>}
+                    {ruc && <p className="text-xs text-slate-500">RUC {ruc}</p>}
+                  </div>
+                )}
 
                 {/* Cada módulo (SIRE / DJ mensual / DJ anual) con su cuadro y SU propia
                     sección de observaciones — contingencias debajo. */}
@@ -134,19 +143,19 @@ export default async function Page() {
                     <div key={i} className="evitar-corte space-y-2">
                       <p className="text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>
                       {cuadro}
-                      <div className="pt-1">
-                        <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Observaciones — contingencias</h4>
+                      <div>
+                        <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-600">Observaciones — contingencias</h4>
                         {observaciones.length > 0 ? (
-                          <ol className="space-y-2">
+                          <ol className="space-y-1.5">
                             {observaciones.map((o, j) => (
-                              <li key={j} className="flex gap-3 rounded-lg border-l-4 border-l-red-500 bg-red-50 p-3 text-sm text-slate-700">
+                              <li key={j} className="flex gap-2 rounded-lg border-l-4 border-l-red-500 bg-red-50 px-3 py-2 text-[13px] text-slate-700">
                                 <span className="font-bold text-slate-400">{j + 1}.</span>
                                 <span>{o}<span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">[prioridad alta]</span></span>
                               </li>
                             ))}
                           </ol>
                         ) : (
-                          <p className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50 p-3 text-sm text-emerald-700">Sin contingencias en los periodos capturados.</p>
+                          <p className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">Sin contingencias en los periodos capturados.</p>
                         )}
                       </div>
                     </div>
