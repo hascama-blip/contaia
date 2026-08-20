@@ -74,6 +74,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 `;
 
   const content = `
+// Envío SEGURO: si la extensión se recargó (contexto invalidado), no lanza error.
+function SEND(payload, cb) {
+  try {
+    if (!chrome || !chrome.runtime || !chrome.runtime.id) return;
+    chrome.runtime.sendMessage({ type: "captura", payload: payload }, cb);
+  } catch (e) { /* extension context invalidated: recarga la pestaña */ }
+}
 // Puente: inyecta el hook de red en la página y reenvía capturas a Radar.
 try {
   const s = document.createElement("script");
@@ -84,7 +91,7 @@ try {
 window.addEventListener("message", (ev) => {
   const m = ev.data;
   if (!m || !m.__radarVisor) return;
-  chrome.runtime.sendMessage({ type: "captura", payload: { url: m.url, titulo: document.title, datos: m.datos } });
+  SEND({ url: m.url, titulo: document.title, datos: m.datos });
 });
 
 // --- Escáner del DOM (SIRE / DJ): lee "MES/AÑO - Presentado / No Presentado" --
@@ -181,7 +188,7 @@ function enviar() {
   var firma = v.tipo + "|" + Object.keys(v.celdas).sort().map(function (k) { return k + v.celdas[k][0]; }).join("") + "|" + Object.keys(v.anios).sort().map(function (y) { return y + v.anios[y][0]; }).join("");
   if (firma === ultimaFirma) return;
   ultimaFirma = firma;
-  chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, datos: { visor: v } } });
+  SEND({ url: location.href, titulo: document.title, datos: { visor: v } });
 }
 // Rebote LARGO: espera ~3.5s tras el último cambio (que cargue todo el desplegable).
 var deb;
@@ -199,7 +206,7 @@ chrome.runtime.onMessage.addListener((msg, s, send) => {
     var v = escanear();
     var texto = (document.body ? document.body.innerText : "").slice(0, 20000);
     ultimaFirma = "";
-    chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, texto: texto, datos: v ? { visor: v } : undefined } }, (r) => send(r));
+    SEND({ url: location.href, titulo: document.title, texto: texto, datos: v ? { visor: v } : undefined }, (r) => send(r));
     return true;
   }
 });
