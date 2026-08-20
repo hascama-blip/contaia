@@ -142,11 +142,16 @@ export default async function Page() {
                 })}
 
                 {observaciones.length > 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-700">Observaciones — contingencias</p>
-                    <ul className="space-y-0.5">
-                      {observaciones.map((o, i) => <li key={i} className="flex gap-2 text-sm text-amber-800"><span>⚠</span><span>{o}</span></li>)}
-                    </ul>
+                  <div className="evitar-corte">
+                    <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Observaciones — contingencias</h3>
+                    <ol className="space-y-2">
+                      {observaciones.map((o, i) => (
+                        <li key={i} className="flex gap-3 rounded-lg border-l-4 border-l-red-500 bg-red-50 p-3 text-sm text-slate-700">
+                          <span className="font-bold text-slate-400">{i + 1}.</span>
+                          <span>{o}<span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">[prioridad alta]</span></span>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 )}
               </section>
