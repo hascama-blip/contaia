@@ -25,17 +25,29 @@ export async function POST(req: NextRequest) {
   const texto = String(b?.texto ?? "").slice(0, 20000);
   const datos = b?.datos ?? null;
 
-  // Clasificación ligera (para el visor / reporte).
-  const t = (url + " " + titulo + " " + texto).toLowerCase();
+  // Clasificación. Preferimos los datos ESTRUCTURADOS (escaneo del DOM del SIRE).
   let tipo = "otro";
-  if (/sire|rvie|rce|migeigv|propuesta|no presentad|presentad/.test(t)) tipo = "sire";
-  else if (/renta anual|dj anual|formulario 710|declaraci[oó]n anual/.test(t)) tipo = "dj-anual";
-  else if (/declaraci[oó]n.*mensual|formulario 621|pdt 621|mensual|omiso/.test(t)) tipo = "dj-mensual";
-
   let resumen = "";
-  if (tipo === "sire") resumen = /no\s*present/.test(t) ? "SIRE: hay periodos NO presentados" : "SIRE: revisado";
-  else if (tipo === "dj-mensual") resumen = /omiso|no\s*present|sin\s*declaraci/.test(t) ? "DJ mensual: meses sin declarar" : "DJ mensual: revisado";
-  else if (tipo === "dj-anual") resumen = /no\s*present|sin\s*present|no\s*existe/.test(t) ? "DJ anual: no presentada" : "DJ anual: revisada";
+  const sire = Array.isArray(datos?.sire) ? datos.sire as { periodo: string; estado: string }[] : null;
+  if (sire && sire.length) {
+    tipo = "sire";
+    const noPres = sire.filter((p) => /no/i.test(p.estado));
+    resumen = noPres.length
+      ? `SIRE: ${noPres.length} NO presentado (${noPres.map((p) => p.periodo).join(", ")})`
+      : `SIRE: ${sire.length} periodo(s), todos presentados`;
+  } else {
+    const t = (url + " " + titulo + " " + texto).toLowerCase();
+    if (/sire|rvie|rce|migeigv|propuesta|no presentad|presentad/.test(t)) tipo = "sire";
+    else if (/renta anual|dj anual|formulario 710|declaraci[oó]n anual/.test(t)) tipo = "dj-anual";
+    else if (/declaraci[oó]n.*mensual|formulario 621|pdt 621|mensual|omiso/.test(t)) tipo = "dj-mensual";
+    if (tipo === "sire") resumen = /no\s*present/.test(t) ? "SIRE: hay periodos NO presentados" : "SIRE: revisado";
+    else if (tipo === "dj-mensual") resumen = /omiso|no\s*present|sin\s*declaraci/.test(t) ? "DJ mensual: meses sin declarar" : "DJ mensual: revisado";
+    else if (tipo === "dj-anual") resumen = /no\s*present|sin\s*present|no\s*existe/.test(t) ? "DJ anual: no presentada" : "DJ anual: revisada";
+    // Ruido común: descartar llamadas de sincronización de hora, etc.
+    if (tipo === "otro" && /gettime|\/time\/|favicon|\.css|\.js(\?|$)/i.test(url)) {
+      return NextResponse.json({ ok: true, ignorado: true }, { headers: CORS });
+    }
+  }
 
   const cap = await addVisorCaptura({ userId, url, titulo, tipo, resumen, texto, datos });
   return NextResponse.json({ ok: true, id: cap.id, tipo, resumen }, { headers: CORS });

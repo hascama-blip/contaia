@@ -50,7 +50,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Se inyecta en el CONTEXTO de la página para interceptar fetch/XHR de SUNAT.
   const inject = `
 (function () {
-  const RE = /sire|migeigv|rvierce|omisos|propuesta|declaracion|itmenu|reporte|consulta/i;
+  const RE = /rvierce|migeigv|omisos|resumencomprobantes|propuesta|padron|declaraci|reportetri|itconitf|rentasretenciones/i;
   function post(url, data) {
     try { window.postMessage({ __radarVisor: true, url: String(url), datos: data }, "*"); } catch (e) {}
   }
@@ -74,7 +74,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 `;
 
   const content = `
-// Puente: inyecta el hook en la página y reenvía capturas a Radar.
+// Puente: inyecta el hook de red en la página y reenvía capturas a Radar.
 try {
   const s = document.createElement("script");
   s.src = chrome.runtime.getURL("inject.js");
@@ -86,11 +86,44 @@ window.addEventListener("message", (ev) => {
   if (!m || !m.__radarVisor) return;
   chrome.runtime.sendMessage({ type: "captura", payload: { url: m.url, titulo: document.title, datos: m.datos } });
 });
-// Captura manual (desde el popup): manda el texto visible de la página.
+
+// --- Escáner del DOM del SIRE: lee "MES-Presentado / MES-No Presentado" ------
+var MESES = { ENE:"01",FEB:"02",MAR:"03",ABR:"04",MAY:"05",JUN:"06",JUL:"07",AGO:"08",SEP:"09",SET:"09",OCT:"10",NOV:"11",DIC:"12" };
+function escanearSire() {
+  var txt = document.body ? document.body.innerText : "";
+  if (!/Registro de Ventas|RVIE|SIRE|Presentado/i.test(txt)) return null;
+  var re = /\\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC|20\\d{2})\\s*[-\\u2013]\\s*(No\\s+Presentado|Presentado)/gi;
+  var per = [], seen = {}, m;
+  while ((m = re.exec(txt))) {
+    var k = m[1].toUpperCase();
+    if (seen[k]) continue; seen[k] = 1;
+    per.push({ periodo: k, mes: MESES[k] || k, estado: /no/i.test(m[2]) ? "No Presentado" : "Presentado" });
+  }
+  return per.length ? per : null;
+}
+var ultimaFirma = "";
+function revisarSire() {
+  var per = escanearSire();
+  if (!per) return;
+  var firma = per.map(function (p) { return p.periodo + ":" + p.estado; }).join("|");
+  if (firma === ultimaFirma) return;   // no reenviar lo mismo
+  ultimaFirma = firma;
+  chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, datos: { sire: per } } });
+}
+// Revisa al cargar, en cambios del DOM (con rebote) y cada 4s.
+try {
+  var t; var obs = new MutationObserver(function () { clearTimeout(t); t = setTimeout(revisarSire, 800); });
+  obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+} catch (e) {}
+setInterval(revisarSire, 4000);
+setTimeout(revisarSire, 1500);
+
+// Captura manual (desde el popup): manda el texto visible + lo del SIRE si hay.
 chrome.runtime.onMessage.addListener((msg, s, send) => {
   if (msg && msg.type === "capturarPagina") {
-    const texto = (document.body ? document.body.innerText : "").slice(0, 20000);
-    chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, texto } }, (r) => send(r));
+    var per = escanearSire();
+    var texto = (document.body ? document.body.innerText : "").slice(0, 20000);
+    chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, texto: texto, datos: per ? { sire: per } : undefined } }, (r) => send(r));
     return true;
   }
 });
