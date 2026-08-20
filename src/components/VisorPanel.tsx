@@ -86,7 +86,10 @@ export default function VisorPanel() {
 }
 
 function Cuadro({ m }: { m: Matriz }) {
+  // dj-anual: años del estado anual. SIRE/DJ mensual: solo años con detalle mensual
+  // (evita filas vacías de años que solo traen la marca de año, ej. 2023/2024).
   const anios = Array.from(new Set([...Object.keys(m.celdas).map((k) => k.slice(0, 4)), ...Object.keys(m.anios)])).sort();
+  const aniosMes = Array.from(new Set(Object.keys(m.celdas).map((k) => k.slice(0, 4)))).sort();
   const titulo = (
     <p className="mb-1 text-sm font-semibold text-slate-800">
       {TIPO_LABEL[m.tipo] ?? m.tipo} <span className="font-normal text-slate-400">· {m.empresa || m.ruc || "—"}{m.ruc ? ` · RUC ${m.ruc}` : ""}</span>
@@ -119,7 +122,7 @@ function Cuadro({ m }: { m: Matriz }) {
             <tr><th className="px-2 py-1.5 text-left">Año</th>{MESES.map((mm) => <th key={mm} className="px-2 py-1.5">{mm}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {anios.map((y) => (
+            {aniosMes.map((y) => (
               <tr key={y}>
                 <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
                 {Array.from({ length: 12 }, (_, k) => {

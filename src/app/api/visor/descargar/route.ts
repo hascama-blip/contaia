@@ -32,8 +32,23 @@ export async function GET(_req: NextRequest) {
   const background = sub(`
 const RADAR = "__RADAR__";
 const TOKEN = "__TOKEN__";
+// Identidad compartida entre frames (el frame del SIRE no puede leer el menú
+// superior por ser de otro origen; el frame del menú sí ve la ventana flotante).
+var identidad = { empresa: "", ruc: "" };
+function mejorIdent(a, b) {
+  b = b || {};
+  var emp = a.empresa || "";
+  if (b.empresa && !/\\.\\.\\.$/.test(b.empresa) && (b.empresa.length > emp.length || /\\.\\.\\.$/.test(emp))) emp = b.empresa;
+  else if (!emp && b.empresa) emp = b.empresa;
+  return { empresa: emp, ruc: a.ruc || b.ruc || "" };
+}
 async function enviar(payload) {
   try {
+    if (payload && payload.datos && payload.datos.visor) {
+      var v = payload.datos.visor;
+      if (!v.empresa && identidad.empresa) v.empresa = identidad.empresa;
+      if (!v.ruc && identidad.ruc) v.ruc = identidad.ruc;
+    }
     const r = await fetch(RADAR + "/api/visor/captura", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.assign({ token: TOKEN }, payload)),
@@ -43,6 +58,7 @@ async function enviar(payload) {
   } catch (e) { return { ok: false, error: String(e) }; }
 }
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "identidad") { identidad = mejorIdent(identidad, msg.payload); return; }
   if (msg && msg.type === "captura") { enviar(msg.payload).then(sendResponse); return true; }
 });
 `);
@@ -112,14 +128,44 @@ function textoPagina() {
   return partes.join(" \\n ");
 }
 function empresaInfo() {
-  var partes = [];
-  try { if (document.body) partes.push(document.body.innerText || ""); } catch (e) {}
-  try { if (window.top && window.top !== window && window.top.document.body) partes.push(window.top.document.body.innerText || ""); } catch (e) {}
-  try { if (window.parent && window.parent !== window && window.parent.document.body) partes.push(window.parent.document.body.innerText || ""); } catch (e) {}
-  var txt = partes.join("\\n");
-  var emp = (txt.match(/raz[o\\u00f3]n social:\\s*([^\\n]+)/i) || txt.match(/Bienvenido,\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
-  var ruc = (txt.match(/RUC:?\\s*(\\d{11})/i) || txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
-  return { empresa: emp.trim().slice(0, 120), ruc: ruc };
+  var emp = "", ruc = "";
+  // 1) Ventana flotante del usuario (arriba a la derecha): razón social y RUC
+  //    COMPLETOS. textContent la lee aunque esté oculta (no requiere hover).
+  try {
+    var cand = document.querySelectorAll("div,section,table,ul,td");
+    for (var i = 0; i < cand.length; i++) {
+      var tc = (cand[i].textContent || "");
+      if (tc.length > 500 || !/RUC:?\\s*\\d{11}/.test(tc)) continue;
+      if (!/(Usuario:|Ver Ficha|OPERACIONES|Actualizar datos del RUC)/i.test(tc)) continue;
+      var mr = tc.match(/RUC:?\\s*(\\d{11})/);
+      var me = tc.match(/([A-Z\\u00d1\\u00c1\\u00c9\\u00cd\\u00d3\\u00da0-9][A-Z\\u00d1\\u00c1\\u00c9\\u00cd\\u00d3\\u00da0-9 .,&'\\/-]{4,120}?)\\s*RUC:?\\s*\\d{11}/);
+      if (mr) ruc = mr[1];
+      if (me) emp = me[1].replace(/\\s+/g, " ").trim();
+      if (ruc) break;
+    }
+  } catch (e) {}
+  // 2) Respaldo: texto visible (Bienvenido / razón social) de este frame y superiores.
+  if (!emp || !ruc) {
+    var partes = [];
+    try { if (document.body) partes.push(document.body.innerText || ""); } catch (e) {}
+    try { if (window.top && window.top !== window && window.top.document.body) partes.push(window.top.document.body.innerText || ""); } catch (e) {}
+    try { if (window.parent && window.parent !== window && window.parent.document.body) partes.push(window.parent.document.body.innerText || ""); } catch (e) {}
+    var txt = partes.join("\\n");
+    if (!emp) emp = (txt.match(/raz[o\\u00f3]n social:?\\s*([^\\n]+)/i) || txt.match(/Bienvenido,?\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
+    if (!ruc) ruc = (txt.match(/RUC:?\\s*(\\d{11})/i) || txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
+  }
+  emp = String(emp).replace(/^\\s*Bienvenido,?\\s*/i, "").replace(/\\s*\\.\\.\\.$/, "").replace(/\\s+/g, " ").trim();
+  return { empresa: emp.slice(0, 140), ruc: ruc };
+}
+// Reporta la identidad (empresa/RUC) al background para que la comparta entre
+// frames de distinto origen (el frame del SIRE no puede leer el menú superior).
+function reportarIdentidad() {
+  try {
+    var info = empresaInfo();
+    if ((info.ruc && info.ruc.length === 11) || (info.empresa && info.empresa.length > 4)) {
+      if (chrome && chrome.runtime && chrome.runtime.id) chrome.runtime.sendMessage({ type: "identidad", payload: info });
+    }
+  } catch (e) {}
 }
 function tipoActual() {
   var t = (location.href + " " + document.title + " " + (document.body ? document.body.innerText : "")).toLowerCase();
@@ -280,6 +326,8 @@ try {
 } catch (e) {}
 setInterval(programar, 8000);
 setTimeout(enviar, 3000);
+setTimeout(reportarIdentidad, 1500);
+setInterval(reportarIdentidad, 5000);
 
 // Captura manual (desde el popup): fuerza el envío inmediato.
 chrome.runtime.onMessage.addListener((msg, s, send) => {

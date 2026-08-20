@@ -122,7 +122,7 @@ export default async function Page() {
                           <tr><th className="px-2 py-1.5 text-left">Año</th>{MESES.map((mm) => <th key={mm} className="px-2 py-1.5">{mm}</th>)}</tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {anios.map((y) => (
+                          {anios.filter((y) => Object.keys(m.celdas).some((k) => k.slice(0, 4) === y)).map((y) => (
                             <tr key={y}>
                               <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
                               {Array.from({ length: 12 }, (_, k) => {
