@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { visorUserByToken, addVisorCaptura } from "@/lib/db";
+import { visorUserByToken, addVisorCaptura, upsertVisorMatriz } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -8,13 +8,15 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+export async function OPTIONS() { return new NextResponse(null, { headers: CORS }); }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { headers: CORS });
-}
+const MESES: Record<string, string> = {
+  ENE: "01", FEB: "02", MAR: "03", ABR: "04", MAY: "05", JUN: "06",
+  JUL: "07", AGO: "08", SEP: "09", SET: "09", OCT: "10", NOV: "11", DIC: "12",
+};
+const NOM_MES = ["", "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+const est = (s: string): "P" | "NP" => (/no/i.test(s) ? "NP" : "P");
 
-// Recibe una captura de la extensión (autenticada por token, no por cookie).
-// Clasifica de forma ligera por la URL/contenido para el reporte.
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const userId = await visorUserByToken(String(b?.token ?? ""));
@@ -24,31 +26,39 @@ export async function POST(req: NextRequest) {
   const titulo = String(b?.titulo ?? "").slice(0, 300);
   const texto = String(b?.texto ?? "").slice(0, 20000);
   const datos = b?.datos ?? null;
+  const v = datos?.visor; // payload estructurado de la extensión
 
-  // Clasificación. Preferimos los datos ESTRUCTURADOS (escaneo del DOM del SIRE).
-  let tipo = "otro";
-  let resumen = "";
-  const sire = Array.isArray(datos?.sire) ? datos.sire as { periodo: string; estado: string }[] : null;
-  if (sire && sire.length) {
-    tipo = "sire";
-    const noPres = sire.filter((p) => /no/i.test(p.estado));
-    resumen = noPres.length
-      ? `SIRE: ${noPres.length} NO presentado (${noPres.map((p) => p.periodo).join(", ")})`
-      : `SIRE: ${sire.length} periodo(s), todos presentados`;
-  } else {
-    const t = (url + " " + titulo + " " + texto).toLowerCase();
-    if (/sire|rvie|rce|migeigv|propuesta|no presentad|presentad/.test(t)) tipo = "sire";
-    else if (/renta anual|dj anual|formulario 710|declaraci[oó]n anual/.test(t)) tipo = "dj-anual";
-    else if (/declaraci[oó]n.*mensual|formulario 621|pdt 621|mensual|omiso/.test(t)) tipo = "dj-mensual";
-    if (tipo === "sire") resumen = /no\s*present/.test(t) ? "SIRE: hay periodos NO presentados" : "SIRE: revisado";
-    else if (tipo === "dj-mensual") resumen = /omiso|no\s*present|sin\s*declaraci/.test(t) ? "DJ mensual: meses sin declarar" : "DJ mensual: revisado";
-    else if (tipo === "dj-anual") resumen = /no\s*present|sin\s*present|no\s*existe/.test(t) ? "DJ anual: no presentada" : "DJ anual: revisada";
-    // Ruido común: descartar llamadas de sincronización de hora, etc.
-    if (tipo === "otro" && /gettime|\/time\/|favicon|\.css|\.js(\?|$)/i.test(url)) {
-      return NextResponse.json({ ok: true, ignorado: true }, { headers: CORS });
+  // Payload estructurado → matriz (cuadro año×mes).
+  if (v && (Array.isArray(v.meses) || Array.isArray(v.anios))) {
+    const anioSel = String(v.anio || "").match(/20\d{2}/)?.[0] || "";
+    const celdas: Record<string, "P" | "NP"> = {};
+    for (const it of (v.meses || [])) {
+      const mm = MESES[String(it.mes || "").toUpperCase()] || (String(it.mes).match(/^\d{2}$/) ? String(it.mes) : "");
+      if (mm && anioSel) celdas[`${anioSel}-${mm}`] = est(String(it.estado));
     }
+    const anios: Record<string, "P" | "NP"> = {};
+    for (const it of (v.anios || [])) {
+      const yy = String(it.anio || "").match(/20\d{2}/)?.[0];
+      if (yy) anios[yy] = est(String(it.estado));
+    }
+    const m = await upsertVisorMatriz(userId, { empresa: v.empresa, ruc: v.ruc, tipo: v.tipo || "sire", celdas, anios });
+    const np = Object.entries(m.celdas).filter(([, e]) => e === "NP").map(([k]) => k).sort();
+    const resumen = np.length ? `${m.tipo.toUpperCase()}: ${np.length} No Presentó` : `${m.tipo.toUpperCase()}: al día`;
+    await addVisorCaptura({ userId, url, titulo, tipo: m.tipo, resumen, texto: "", datos: null });
+    return NextResponse.json({ ok: true, resumen }, { headers: CORS });
   }
 
-  const cap = await addVisorCaptura({ userId, url, titulo, tipo, resumen, texto, datos });
-  return NextResponse.json({ ok: true, id: cap.id, tipo, resumen }, { headers: CORS });
+  // Descartar ruido evidente.
+  if (/gettime|\/time\/|favicon|\.css|\.js(\?|$)/i.test(url)) {
+    return NextResponse.json({ ok: true, ignorado: true }, { headers: CORS });
+  }
+
+  // Fallback: clasificación ligera por texto.
+  const t = (url + " " + titulo + " " + texto).toLowerCase();
+  let tipo = "otro";
+  if (/sire|rvie|rce|migeigv|propuesta|no presentad|presentad/.test(t)) tipo = "sire";
+  else if (/renta anual|dj anual|formulario 710/.test(t)) tipo = "dj-anual";
+  else if (/declaraci[oó]n.*mensual|formulario 621|pdt 621|omiso/.test(t)) tipo = "dj-mensual";
+  const cap = await addVisorCaptura({ userId, url, titulo, tipo, resumen: "", texto, datos });
+  return NextResponse.json({ ok: true, id: cap.id, tipo }, { headers: CORS });
 }

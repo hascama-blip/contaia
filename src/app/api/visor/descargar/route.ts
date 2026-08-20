@@ -87,53 +87,76 @@ window.addEventListener("message", (ev) => {
   chrome.runtime.sendMessage({ type: "captura", payload: { url: m.url, titulo: document.title, datos: m.datos } });
 });
 
-// --- Escáner del DOM del SIRE: lee "MES-Presentado / MES-No Presentado" ------
-var MESES = { ENE:"01",FEB:"02",MAR:"03",ABR:"04",MAY:"05",JUN:"06",JUL:"07",AGO:"08",SEP:"09",SET:"09",OCT:"10",NOV:"11",DIC:"12" };
-// Texto de la página INCLUYENDO opciones/listas colapsadas (dropdown cerrado).
-function textoSire() {
+// --- Escáner del DOM (SIRE / DJ): lee "MES/AÑO - Presentado / No Presentado" --
+var MESN = { ENE:"01",FEB:"02",MAR:"03",ABR:"04",MAY:"05",JUN:"06",JUL:"07",AGO:"08",SEP:"09",SET:"09",OCT:"10",NOV:"11",DIC:"12" };
+function textoPagina() {
   var partes = [];
   try { if (document.body) partes.push(document.body.innerText || ""); } catch (e) {}
   try {
     var nodos = document.querySelectorAll("option, li, [role='option'], .dijitMenuItem, .ui-menu-item, td, span");
     for (var i = 0; i < nodos.length; i++) { var s = (nodos[i].textContent || "").trim(); if (s && s.length < 60) partes.push(s); }
   } catch (e) {}
-  return partes.join("\\n");
+  return partes.join(" \\n ");
 }
-function escanearSire() {
-  var txt = textoSire();
-  if (!/Registro de Ventas|RVIE|SIRE|Presentado/i.test(txt)) return null;
-  var re = /\\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC|20\\d{2})\\s*[-\\u2013]\\s*(No\\s+Presentado|Presentado)/gi;
-  var per = [], seen = {}, m;
+function empresaInfo() {
+  var txt = document.body ? document.body.innerText : "";
+  var emp = (txt.match(/Bienvenido,\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
+  var ruc = (txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
+  return { empresa: emp.trim().slice(0, 120), ruc: ruc };
+}
+function tipoActual() {
+  var u = (location.href + " " + document.title).toLowerCase();
+  if (/710|renta.?anual|declaraci.*anual/.test(u)) return "dj-anual";
+  if (/f621|form.?621|declaraci.*mensual|mis.?declaraciones|omiso|itdeclara/.test(u)) return "dj-mensual";
+  return "sire";
+}
+function anioSel() {
+  try {
+    var ins = document.querySelectorAll("input, .dijitInputInner, [role='combobox']");
+    for (var i = 0; i < ins.length; i++) { var val = (ins[i].value || ins[i].textContent || ""); var m = String(val).match(/\\b(20\\d{2})\\b/); if (m) return m[1]; }
+  } catch (e) {}
+  var mt = textoPagina().match(/\\b(20\\d{2})\\s*[-\\u2013]/); return mt ? mt[1] : "";
+}
+function escanear() {
+  var txt = textoPagina();
+  if (!/Presentado/i.test(txt)) return null;
+  var re = /\\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SET|SEP|OCT|NOV|DIC|20\\d{2})\\s*[-\\u2013]\\s*(No\\s+Presentado|Presentado)/gi;
+  var meses = [], anios = [], sm = {}, sa = {}, m;
   while ((m = re.exec(txt))) {
-    var k = m[1].toUpperCase();
-    if (seen[k]) continue; seen[k] = 1;
-    per.push({ periodo: k, mes: MESES[k] || k, estado: /no/i.test(m[2]) ? "No Presentado" : "Presentado" });
+    var k = m[1].toUpperCase(); var e = /no/i.test(m[2]) ? "No Presentado" : "Presentado";
+    if (/^20\\d{2}$/.test(k)) { if (!sa[k]) { sa[k] = 1; anios.push({ anio: k, estado: e }); } }
+    else if (MESN[k]) { if (!sm[k]) { sm[k] = 1; meses.push({ mes: MESN[k], nombre: k, estado: e }); } }
   }
-  return per.length ? per : null;
+  if (!meses.length && !anios.length) return null;
+  meses.sort(function (a, b) { return a.mes.localeCompare(b.mes); });   // ENE..DIC
+  var info = empresaInfo();
+  return { empresa: info.empresa, ruc: info.ruc, tipo: tipoActual(), anio: anioSel(), meses: meses, anios: anios };
 }
 var ultimaFirma = "";
-function revisarSire() {
-  var per = escanearSire();
-  if (!per) return;
-  var firma = per.map(function (p) { return p.periodo + ":" + p.estado; }).join("|");
-  if (firma === ultimaFirma) return;   // no reenviar lo mismo
+function enviar() {
+  var v = escanear(); if (!v) return;
+  var firma = v.tipo + "|" + v.anio + "|" + v.meses.map(function (x) { return x.mes + x.estado[0]; }).join("") + "|" + v.anios.map(function (x) { return x.anio + x.estado[0]; }).join("");
+  if (firma === ultimaFirma) return;
   ultimaFirma = firma;
-  chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, datos: { sire: per } } });
+  chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, datos: { visor: v } } });
 }
-// Revisa al cargar, en cambios del DOM (con rebote) y cada 4s.
+// Rebote LARGO: espera ~3.5s tras el último cambio (que cargue todo el desplegable).
+var deb;
+function programar() { clearTimeout(deb); deb = setTimeout(enviar, 3500); }
 try {
-  var t; var obs = new MutationObserver(function () { clearTimeout(t); t = setTimeout(revisarSire, 800); });
+  var obs = new MutationObserver(programar);
   obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 } catch (e) {}
-setInterval(revisarSire, 4000);
-setTimeout(revisarSire, 1500);
+setInterval(programar, 8000);
+setTimeout(enviar, 3000);
 
-// Captura manual (desde el popup): manda el texto visible + lo del SIRE si hay.
+// Captura manual (desde el popup): fuerza el envío inmediato.
 chrome.runtime.onMessage.addListener((msg, s, send) => {
   if (msg && msg.type === "capturarPagina") {
-    var per = escanearSire();
+    var v = escanear();
     var texto = (document.body ? document.body.innerText : "").slice(0, 20000);
-    chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, texto: texto, datos: per ? { sire: per } : undefined } }, (r) => send(r));
+    ultimaFirma = "";
+    chrome.runtime.sendMessage({ type: "captura", payload: { url: location.href, titulo: document.title, texto: texto, datos: v ? { visor: v } : undefined } }, (r) => send(r));
     return true;
   }
 });

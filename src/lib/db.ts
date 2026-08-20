@@ -66,8 +66,8 @@ interface Store {
   rttWebhookLog?: { at: string; ruc: string; tienePdf: boolean; tieneXml: boolean; resultado: string; from?: string }[];
   /** Solicitudes del Reporte de Rentas y Retenciones (4ta/5ta) por cliente. */
   rentas?: SolicitudRentas[];
-  /** Visor Tributario: token por usuario + capturas enviadas por la extensión. */
-  visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[] };
+  /** Visor Tributario: token por usuario + capturas + matriz (cuadro año×mes). */
+  visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[]; matriz?: Record<string, VisorMatriz[]> };
 }
 
 async function ensureDirs() {
@@ -1438,4 +1438,54 @@ export async function clearVisorCapturas(userId: string): Promise<void> {
   if (!store.visor?.capturas) return;
   store.visor.capturas = store.visor.capturas.filter((c) => c.userId !== userId);
   await writeStore(store);
+}
+
+// ---- Visor: matriz año×mes (SIRE / DJ mensual / DJ anual) -------------------
+
+export interface VisorMatriz {
+  empresa: string;
+  ruc: string;
+  tipo: string;                              // "sire" | "dj-mensual" | "dj-anual"
+  celdas: Record<string, "P" | "NP">;        // "YYYY-MM" -> Presentó / No Presentó
+  anios: Record<string, "P" | "NP">;         // "YYYY" -> estado a nivel año
+  at: string;
+}
+
+const claveMatriz = (empresa: string, ruc: string, tipo: string) =>
+  `${(ruc || empresa || "?").trim().toLowerCase()}|${tipo}`;
+
+/** Mezcla (upsert) lo que envió la extensión en la matriz del usuario. */
+export async function upsertVisorMatriz(userId: string, d: {
+  empresa?: string; ruc?: string; tipo?: string;
+  celdas?: Record<string, "P" | "NP">; anios?: Record<string, "P" | "NP">;
+}): Promise<VisorMatriz> {
+  const store = await readStore();
+  if (!store.visor) store.visor = {};
+  if (!store.visor.matriz) store.visor.matriz = {};
+  const lista = store.visor.matriz[userId] ?? (store.visor.matriz[userId] = []);
+  const empresa = (d.empresa || "").trim();
+  const ruc = (d.ruc || "").trim();
+  const tipo = d.tipo || "sire";
+  const clave = claveMatriz(empresa, ruc, tipo);
+  let m = lista.find((x) => claveMatriz(x.empresa, x.ruc, x.tipo) === clave);
+  if (!m) { m = { empresa, ruc, tipo, celdas: {}, anios: {}, at: "" }; lista.push(m); }
+  if (empresa && !m.empresa) m.empresa = empresa;
+  if (ruc && !m.ruc) m.ruc = ruc;
+  Object.assign(m.celdas, d.celdas ?? {});
+  Object.assign(m.anios, d.anios ?? {});
+  m.at = new Date().toISOString();
+  // Máx 40 matrices por usuario.
+  if (lista.length > 40) store.visor.matriz[userId] = lista.slice(-40);
+  await writeStore(store);
+  return m;
+}
+
+export async function getVisorMatriz(userId: string): Promise<VisorMatriz[]> {
+  const store = await readStore();
+  return store.visor?.matriz?.[userId] ?? [];
+}
+
+export async function clearVisorMatriz(userId: string): Promise<void> {
+  const store = await readStore();
+  if (store.visor?.matriz) { delete store.visor.matriz[userId]; await writeStore(store); }
 }

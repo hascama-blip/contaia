@@ -2,20 +2,17 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-interface Captura {
-  id: string; at: string; url: string; titulo: string; tipo: string; resumen?: string; tieneDatos?: boolean;
+interface Matriz {
+  empresa: string; ruc: string; tipo: string;
+  celdas: Record<string, "P" | "NP">; anios: Record<string, "P" | "NP">; at: string;
 }
 
-const TIPO_BADGE: Record<string, { txt: string; cls: string }> = {
-  sire: { txt: "SIRE", cls: "bg-blue-100 text-blue-700" },
-  "dj-mensual": { txt: "DJ mensual", cls: "bg-amber-100 text-amber-700" },
-  "dj-anual": { txt: "DJ anual", cls: "bg-purple-100 text-purple-700" },
-  otro: { txt: "Otro", cls: "bg-slate-100 text-slate-500" },
-};
+const TIPO_LABEL: Record<string, string> = { sire: "SIRE", "dj-mensual": "DJ mensual", "dj-anual": "DJ anual" };
+const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
 
 export default function VisorPanel() {
   const [token, setToken] = useState<string>("");
-  const [capturas, setCapturas] = useState<Captura[]>([]);
+  const [matriz, setMatriz] = useState<Matriz[]>([]);
   const [cargando, setCargando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -26,13 +23,13 @@ export default function VisorPanel() {
         fetch("/api/visor/capturas").then((r) => r.json()).catch(() => ({})),
       ]);
       if (t?.token) setToken(t.token);
-      if (Array.isArray(c?.capturas)) setCapturas(c.capturas);
+      if (Array.isArray(c?.matriz)) setMatriz(c.matriz);
     } finally { setCargando(false); }
   }, []);
   useEffect(() => { cargar(); }, [cargar]);
 
   async function limpiar() {
-    if (!confirm("¿Borrar todas las capturas recibidas?")) return;
+    if (!confirm("¿Borrar el cuadro capturado?")) return;
     await fetch("/api/visor/capturas", { method: "DELETE" });
     cargar();
   }
@@ -54,7 +51,8 @@ export default function VisorPanel() {
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <a className="btn-primary" href="/api/visor/descargar">⬇ Descargar extensión (ZIP)</a>
-          <button className="btn-ghost" onClick={cargar} disabled={cargando}>{cargando ? "Actualizando…" : "↻ Actualizar capturas"}</button>
+          <button className="btn-ghost" onClick={cargar} disabled={cargando}>{cargando ? "Actualizando…" : "↻ Actualizar"}</button>
+          {matriz.length > 0 && <a className="btn-accent" href="/api/visor/reporte">⬇ Descargar reporte (Excel)</a>}
         </div>
         <ol className="mt-3 list-decimal space-y-0.5 pl-5 text-[11px] text-slate-500">
           <li>Descomprime el ZIP en una carpeta.</li>
@@ -68,37 +66,53 @@ export default function VisorPanel() {
         </div>
       </section>
 
-      {/* Capturas */}
+      {/* Cuadros año×mes */}
       <section className="card p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-800">Capturas recibidas ({capturas.length})</h3>
-          {capturas.length > 0 && <button className="text-xs text-red-600 hover:underline" onClick={limpiar}>Borrar todo</button>}
+          <h3 className="font-semibold text-slate-800">Cuadro capturado</h3>
+          {matriz.length > 0 && <button className="text-xs text-red-600 hover:underline" onClick={limpiar}>Borrar todo</button>}
         </div>
-        {capturas.length === 0 ? (
-          <p className="text-sm text-slate-500">Aún no llegan capturas. Instala la extensión y navega el SIRE / DJ en SUNAT.</p>
+        {matriz.length === 0 ? (
+          <p className="text-sm text-slate-500">Aún no llega nada. Instala la extensión y navega el SIRE / DJ en SUNAT (elige año por año para que se llene el cuadro).</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-[11px] uppercase text-slate-400">
-                <tr><th className="px-3 py-2">Fecha</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Hallazgo</th><th className="px-3 py-2">Página</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {capturas.map((c) => {
-                  const b = TIPO_BADGE[c.tipo] ?? TIPO_BADGE.otro;
-                  return (
-                    <tr key={c.id}>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-500">{new Date(c.at).toLocaleString("es-PE")}</td>
-                      <td className="px-3 py-2"><span className={`badge ${b.cls}`}>{b.txt}</span></td>
-                      <td className="px-3 py-2 text-slate-700">{c.resumen || "—"} {c.tieneDatos && <span className="text-[10px] text-emerald-600">· datos</span>}</td>
-                      <td className="px-3 py-2 text-[11px] text-slate-400">{c.titulo || c.url}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {matriz.map((m, i) => <Cuadro key={i} m={m} />)}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function Cuadro({ m }: { m: Matriz }) {
+  const anios = Array.from(new Set([...Object.keys(m.celdas).map((k) => k.slice(0, 4)), ...Object.keys(m.anios)])).sort();
+  return (
+    <div>
+      <p className="mb-1 text-sm font-semibold text-slate-800">
+        {TIPO_LABEL[m.tipo] ?? m.tipo} <span className="font-normal text-slate-400">· {m.empresa || m.ruc || "—"}{m.ruc ? ` · RUC ${m.ruc}` : ""}</span>
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full text-center text-[11px]">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr><th className="px-2 py-1.5 text-left">Año</th>{MESES.map((mm) => <th key={mm} className="px-2 py-1.5">{mm}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {anios.map((y) => (
+              <tr key={y}>
+                <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
+                {Array.from({ length: 12 }, (_, k) => {
+                  const e = m.celdas[`${y}-${String(k + 1).padStart(2, "0")}`];
+                  return (
+                    <td key={k} className={`px-2 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>
+                      {e === "NP" ? "No" : e === "P" ? "Sí" : "·"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
