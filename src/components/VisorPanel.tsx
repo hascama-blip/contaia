@@ -52,7 +52,8 @@ export default function VisorPanel() {
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <a className="btn-primary" href="/api/visor/descargar">⬇ Descargar extensión (ZIP)</a>
           <button className="btn-ghost" onClick={cargar} disabled={cargando}>{cargando ? "Actualizando…" : "↻ Actualizar"}</button>
-          {matriz.length > 0 && <a className="btn-accent" href="/api/visor/reporte">⬇ Descargar reporte (Excel)</a>}
+          {matriz.length > 0 && <a className="btn-accent" href="/herramientas/visor/reporte" target="_blank" rel="noopener noreferrer">📄 Reporte (PDF)</a>}
+          {matriz.length > 0 && <a className="btn-ghost" href="/api/visor/reporte">⬇ Excel</a>}
         </div>
         <ol className="mt-3 list-decimal space-y-0.5 pl-5 text-[11px] text-slate-500">
           <li>Descomprime el ZIP en una carpeta.</li>

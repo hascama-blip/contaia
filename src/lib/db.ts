@@ -1466,16 +1466,37 @@ export async function upsertVisorMatriz(userId: string, d: {
   const empresa = (d.empresa || "").trim();
   const ruc = (d.ruc || "").trim();
   const tipo = d.tipo || "sire";
+  const identificado = Boolean(empresa || ruc);
   const clave = claveMatriz(empresa, ruc, tipo);
-  let m = lista.find((x) => claveMatriz(x.empresa, x.ruc, x.tipo) === clave);
+  // Objetivo: entrada de la misma empresa+tipo; si esta captura no trae empresa,
+  // reutiliza la última entrada identificada del mismo tipo (evita duplicar).
+  let m = identificado ? lista.find((x) => x.tipo === tipo && claveMatriz(x.empresa, x.ruc, tipo) === clave) : null;
+  if (!m) {
+    const mismos = lista.filter((x) => x.tipo === tipo);
+    m = mismos.find((x) => x.empresa || x.ruc) || mismos[mismos.length - 1] || null;
+  }
   if (!m) { m = { empresa, ruc, tipo, celdas: {}, anios: {}, at: "" }; lista.push(m); }
   if (empresa && !m.empresa) m.empresa = empresa;
   if (ruc && !m.ruc) m.ruc = ruc;
   Object.assign(m.celdas, d.celdas ?? {});
   Object.assign(m.anios, d.anios ?? {});
   m.at = new Date().toISOString();
-  // Máx 40 matrices por usuario.
-  if (lista.length > 40) store.visor.matriz[userId] = lista.slice(-40);
+  // Absorbe en `m` las entradas del mismo tipo que sean de la MISMA empresa o que
+  // no tengan empresa (capturas "sin identificar"), y elimina esos duplicados.
+  store.visor.matriz[userId] = lista.filter((x) => {
+    if (x === m || x.tipo !== tipo) return true;
+    const xId = Boolean(x.empresa || x.ruc);
+    const misma = xId && claveMatriz(x.empresa, x.ruc, tipo) === claveMatriz(m!.empresa, m!.ruc, tipo);
+    if (!xId || misma) {
+      Object.assign(m!.celdas, x.celdas); Object.assign(m!.anios, x.anios);
+      if (!m!.empresa && x.empresa) m!.empresa = x.empresa;
+      if (!m!.ruc && x.ruc) m!.ruc = x.ruc;
+      return false;
+    }
+    return true;
+  });
+  const nueva = store.visor.matriz[userId];
+  if (nueva.length > 40) store.visor.matriz[userId] = nueva.slice(-40);
   await writeStore(store);
   return m;
 }

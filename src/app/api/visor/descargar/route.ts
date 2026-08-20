@@ -106,7 +106,11 @@ function textoPagina() {
   return partes.join(" \\n ");
 }
 function empresaInfo() {
-  var txt = document.body ? document.body.innerText : "";
+  var partes = [];
+  try { if (document.body) partes.push(document.body.innerText || ""); } catch (e) {}
+  try { if (window.top && window.top !== window && window.top.document.body) partes.push(window.top.document.body.innerText || ""); } catch (e) {}
+  try { if (window.parent && window.parent !== window && window.parent.document.body) partes.push(window.parent.document.body.innerText || ""); } catch (e) {}
+  var txt = partes.join("\\n");
   var emp = (txt.match(/raz[o\\u00f3]n social:\\s*([^\\n]+)/i) || txt.match(/Bienvenido,\\s*([^\\n]+?)\\s*(?:Domicilio|Salir|$)/i) || [])[1] || "";
   var ruc = (txt.match(/RUC:?\\s*(\\d{11})/i) || txt.match(/\\b(\\d{11})\\b/) || [])[1] || "";
   return { empresa: emp.trim().slice(0, 120), ruc: ruc };
