@@ -66,6 +66,8 @@ interface Store {
   rttWebhookLog?: { at: string; ruc: string; tienePdf: boolean; tieneXml: boolean; resultado: string; from?: string }[];
   /** Solicitudes del Reporte de Rentas y Retenciones (4ta/5ta) por cliente. */
   rentas?: SolicitudRentas[];
+  /** Visor Tributario: token por usuario + capturas enviadas por la extensión. */
+  visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[] };
 }
 
 async function ensureDirs() {
@@ -1353,4 +1355,80 @@ export async function setDiagnostico(
   cliente.diagnostico = diagnostico;
   await writeStore(store);
   return cliente;
+}
+
+// ---- Visor Tributario (extensión de navegador) -----------------------------
+
+export interface VisorCaptura {
+  id: string;
+  userId: string;
+  at: string;
+  url: string;
+  titulo: string;
+  tipo: string;        // "sire" | "dj-mensual" | "dj-anual" | "otro"
+  resumen?: string;    // línea corta interpretada
+  texto?: string;      // texto crudo capturado (recortado)
+  datos?: any;         // JSON capturado de la respuesta de SUNAT (si hubo)
+}
+
+function crearToken(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+/** Token del Visor para un usuario (lo crea si no existe). */
+export async function getVisorToken(userId: string): Promise<string> {
+  const store = await readStore();
+  if (!store.visor) store.visor = {};
+  if (!store.visor.tokens) store.visor.tokens = {};
+  if (!store.visor.tokens[userId]) { store.visor.tokens[userId] = crearToken(); await writeStore(store); }
+  return store.visor.tokens[userId];
+}
+
+/** Regenera el token (invalida el anterior). */
+export async function rotarVisorToken(userId: string): Promise<string> {
+  const store = await readStore();
+  if (!store.visor) store.visor = {};
+  if (!store.visor.tokens) store.visor.tokens = {};
+  store.visor.tokens[userId] = crearToken();
+  await writeStore(store);
+  return store.visor.tokens[userId];
+}
+
+/** Usuario dueño de un token (para autenticar la extensión). */
+export async function visorUserByToken(token: string): Promise<string | null> {
+  const t = (token || "").trim();
+  if (!t) return null;
+  const store = await readStore();
+  const tokens = store.visor?.tokens ?? {};
+  for (const [uid, tk] of Object.entries(tokens)) if (tk === t) return uid;
+  return null;
+}
+
+/** Guarda una captura (máx. 200 por usuario). */
+export async function addVisorCaptura(c: Omit<VisorCaptura, "id" | "at">): Promise<VisorCaptura> {
+  const store = await readStore();
+  if (!store.visor) store.visor = {};
+  if (!store.visor.capturas) store.visor.capturas = [];
+  const cap: VisorCaptura = { ...c, id: crypto.randomUUID(), at: new Date().toISOString() };
+  store.visor.capturas.unshift(cap);
+  // Poda: conserva las últimas 200 de este usuario.
+  const suyas = store.visor.capturas.filter((x) => x.userId === cap.userId);
+  if (suyas.length > 200) {
+    const sobran = new Set(suyas.slice(200).map((x) => x.id));
+    store.visor.capturas = store.visor.capturas.filter((x) => !sobran.has(x.id));
+  }
+  await writeStore(store);
+  return cap;
+}
+
+export async function listVisorCapturas(userId: string): Promise<VisorCaptura[]> {
+  const store = await readStore();
+  return (store.visor?.capturas ?? []).filter((c) => c.userId === userId);
+}
+
+export async function clearVisorCapturas(userId: string): Promise<void> {
+  const store = await readStore();
+  if (!store.visor?.capturas) return;
+  store.visor.capturas = store.visor.capturas.filter((c) => c.userId !== userId);
+  await writeStore(store);
 }

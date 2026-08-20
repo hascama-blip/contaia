@@ -72,6 +72,13 @@ const UTILITARIOS: Opcion[] = [
       "Sube el Libro Diario y obtén el análisis de la cuenta clase 9 (gastos por función: administración, ventas, financieros), un dashboard de compras/gastos para gerencia y el informe en Excel.",
   },
   {
+    href: "/herramientas/visor",
+    icono: "🧩",
+    titulo: "Visor Tributario",
+    detalle:
+      "Extensión del navegador: mientras navegas SUNAT (SIRE, DJ mensual y anual) captura los datos y los trae a Radar para el reporte — sin bots, captcha ni bloqueo de IP.",
+  },
+  {
     href: "/herramientas/banco-word",
     icono: "📄",
     titulo: "Estado de cuenta (PDF) → Word",
