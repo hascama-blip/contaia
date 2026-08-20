@@ -106,8 +106,10 @@ function empresaInfo() {
 }
 function tipoActual() {
   var t = (location.href + " " + document.title + " " + (document.body ? document.body.innerText : "")).toLowerCase();
-  if (/renta anual|declaraci[o\\u00f3]n.*anual|formulario 710|dj anual/.test(t)) return "dj-anual";
-  if (/declaraciones y pagos|declara f[a\\u00e1]cil|nro orden|igv.?renta mensual|pdt igv|\\b0621\\b/.test(t)) return "dj-mensual";
+  // DJ mensual PRIMERO (su contenido real). Evita confundirlo con el menú lateral
+  // "Declaraciones Anuales".
+  if (/consulta de declaraciones y pagos|declara f[a\\u00e1]cil|nro orden|renta mensual|pdt igv|\\b0621\\b/.test(t)) return "dj-mensual";
+  if (/renta anual|formulario 710|declaraci[o\\u00f3]n jurada anual|pdt.*renta.*anual/.test(t)) return "dj-anual";
   return "sire";
 }
 function anioSel() {
