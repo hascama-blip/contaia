@@ -145,7 +145,16 @@ function celdasDjMensual() {
       if (mp && mo) pres[mp[2] + "-" + mp[1]] = 1;
     }
   } catch (e) {}
-  var rg = txt.match(/Desde:\\s*(\\d{2})\\/(20\\d{2})\\s*Hasta:\\s*(\\d{2})\\/(20\\d{2})/i);
+  // Rango consultado: "Desde: MM/AAAA ... Hasta: MM/AAAA" (detalle de resultados)
+  // o, de respaldo, el formulario "Rango de Periodo tributario" con nombres de mes.
+  var MESNOM = { ENERO:1,FEBRERO:2,MARZO:3,ABRIL:4,MAYO:5,JUNIO:6,JULIO:7,AGOSTO:8,SETIEMBRE:9,SEPTIEMBRE:9,OCTUBRE:10,NOVIEMBRE:11,DICIEMBRE:12 };
+  var rg = txt.match(/Desde:\\s*(\\d{1,2})\\/(20\\d{2})[\\s\\S]*?Hasta:\\s*(\\d{1,2})\\/(20\\d{2})/i);
+  if (!rg) {
+    var fm = txt.match(/Rango de Periodo[\\s\\S]{0,120}?\\b([A-Z]{4,10})\\s+(20\\d{2})[\\s\\S]{0,80}?\\b([A-Z]{4,10})\\s+(20\\d{2})/i);
+    if (fm && MESNOM[fm[1].toUpperCase()] && MESNOM[fm[3].toUpperCase()]) {
+      rg = [fm[0], String(MESNOM[fm[1].toUpperCase()]), fm[2], String(MESNOM[fm[3].toUpperCase()]), fm[4]];
+    }
+  }
   var celdas = {};
   if (rg) {
     var yy = parseInt(rg[2], 10), mm = parseInt(rg[1], 10), y2 = parseInt(rg[4], 10), m2 = parseInt(rg[3], 10), g = 0;
