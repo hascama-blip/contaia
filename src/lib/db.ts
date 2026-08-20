@@ -1454,6 +1454,57 @@ export interface VisorMatriz {
 const claveMatriz = (empresa: string, ruc: string, tipo: string) =>
   `${(empresa || ruc || "?").trim().toLowerCase()}|${tipo}`;
 
+const clonMatriz = (m: VisorMatriz): VisorMatriz =>
+  ({ empresa: m.empresa, ruc: m.ruc, tipo: m.tipo, celdas: { ...m.celdas }, anios: { ...m.anios }, at: m.at });
+
+/** Funde `extra` dentro de `base`. Lo más reciente (por `at`) gana en las celdas en conflicto. */
+function fundirMatriz(base: VisorMatriz, extra: VisorMatriz) {
+  const extraNuevo = (extra.at || "") >= (base.at || "");
+  for (const [k, v] of Object.entries(extra.celdas)) if (!(k in base.celdas) || extraNuevo) base.celdas[k] = v;
+  for (const [k, v] of Object.entries(extra.anios)) if (!(k in base.anios) || extraNuevo) base.anios[k] = v;
+  if (!base.empresa && extra.empresa) base.empresa = extra.empresa;
+  if (!base.ruc && extra.ruc) base.ruc = extra.ruc;
+  if ((extra.at || "") > (base.at || "")) base.at = extra.at;
+}
+
+/**
+ * Normaliza la matriz: una sola entrada por empresa+tipo. Las capturas "sin
+ * identificar" (sin empresa/RUC) se pegan a la entrada identificada más reciente
+ * del mismo tipo — así el SIRE o la DJ mensual nunca quedan partidos en dos filas.
+ * Devuelve las identificadas primero (empresa detectada = al inicio).
+ */
+function coalesceMatriz(lista: VisorMatriz[]): VisorMatriz[] {
+  const porTipo = new Map<string, VisorMatriz[]>();
+  for (const m of lista) (porTipo.get(m.tipo) ?? porTipo.set(m.tipo, []).get(m.tipo)!).push(m);
+
+  const out: VisorMatriz[] = [];
+  for (const [tipo, arr] of porTipo) {
+    const ord = [...arr].sort((a, b) => (a.at || "").localeCompare(b.at || "")); // viejo → nuevo
+    const ident = new Map<string, VisorMatriz>();
+    const sinId: VisorMatriz[] = [];
+    for (const m of ord) {
+      if (m.empresa || m.ruc) {
+        const k = claveMatriz(m.empresa, m.ruc, tipo);
+        const base = ident.get(k);
+        if (base) fundirMatriz(base, m); else ident.set(k, clonMatriz(m));
+      } else sinId.push(m);
+    }
+    const identArr = [...ident.values()];
+    if (sinId.length) {
+      const destino = [...identArr].sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0];
+      if (destino) { for (const s of sinId) fundirMatriz(destino, s); }
+      else { const base = clonMatriz(sinId[0]); for (const s of sinId.slice(1)) fundirMatriz(base, s); out.push(base); }
+    }
+    out.push(...identArr);
+  }
+  // Identificadas primero, luego alfabético por empresa.
+  return out.sort((a, b) => {
+    const ai = a.empresa || a.ruc ? 0 : 1, bi = b.empresa || b.ruc ? 0 : 1;
+    if (ai !== bi) return ai - bi;
+    return (a.empresa || a.ruc).localeCompare(b.empresa || b.ruc) || a.tipo.localeCompare(b.tipo);
+  });
+}
+
 /** Mezcla (upsert) lo que envió la extensión en la matriz del usuario. */
 export async function upsertVisorMatriz(userId: string, d: {
   empresa?: string; ruc?: string; tipo?: string;
@@ -1481,29 +1532,18 @@ export async function upsertVisorMatriz(userId: string, d: {
   Object.assign(m.celdas, d.celdas ?? {});
   Object.assign(m.anios, d.anios ?? {});
   m.at = new Date().toISOString();
-  // Absorbe en `m` las entradas del mismo tipo que sean de la MISMA empresa o que
-  // no tengan empresa (capturas "sin identificar"), y elimina esos duplicados.
-  store.visor.matriz[userId] = lista.filter((x) => {
-    if (x === m || x.tipo !== tipo) return true;
-    const xId = Boolean(x.empresa || x.ruc);
-    const misma = xId && claveMatriz(x.empresa, x.ruc, tipo) === claveMatriz(m!.empresa, m!.ruc, tipo);
-    if (!xId || misma) {
-      Object.assign(m!.celdas, x.celdas); Object.assign(m!.anios, x.anios);
-      if (!m!.empresa && x.empresa) m!.empresa = x.empresa;
-      if (!m!.ruc && x.ruc) m!.ruc = x.ruc;
-      return false;
-    }
-    return true;
-  });
-  const nueva = store.visor.matriz[userId];
-  if (nueva.length > 40) store.visor.matriz[userId] = nueva.slice(-40);
+  // Normaliza: una fila por empresa+tipo; lo "sin identificar" se funde con la
+  // empresa detectada y las identificadas quedan al inicio.
+  const limpia = coalesceMatriz(lista);
+  store.visor.matriz[userId] = limpia.length > 40 ? limpia.slice(-40) : limpia;
   await writeStore(store);
-  return m;
+  const claveM = claveMatriz(m.empresa, m.ruc, tipo);
+  return store.visor.matriz[userId].find((x) => x.tipo === tipo && claveMatriz(x.empresa, x.ruc, tipo) === claveM) || m;
 }
 
 export async function getVisorMatriz(userId: string): Promise<VisorMatriz[]> {
   const store = await readStore();
-  return store.visor?.matriz?.[userId] ?? [];
+  return coalesceMatriz(store.visor?.matriz?.[userId] ?? []);
 }
 
 export async function clearVisorMatriz(userId: string): Promise<void> {
