@@ -1452,7 +1452,7 @@ export interface VisorMatriz {
 }
 
 const claveMatriz = (empresa: string, ruc: string, tipo: string) =>
-  `${(ruc || empresa || "?").trim().toLowerCase()}|${tipo}`;
+  `${(empresa || ruc || "?").trim().toLowerCase()}|${tipo}`;
 
 /** Mezcla (upsert) lo que envió la extensión en la matriz del usuario. */
 export async function upsertVisorMatriz(userId: string, d: {

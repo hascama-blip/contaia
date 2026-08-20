@@ -142,8 +142,28 @@ function celdasSire() {
 // DJ mensual: la tabla lista los PRESENTADOS (Periodo MM/AAAA + Nro Orden). El
 // rango "Desde MM/AAAA Hasta MM/AAAA" define los meses que debían estar → los que
 // faltan = No Presentó.
+var MESNOM = { ENERO:1,FEBRERO:2,MARZO:3,ABRIL:4,MAYO:5,JUNIO:6,JULIO:7,AGOSTO:8,SETIEMBRE:9,SEPTIEMBRE:9,OCTUBRE:10,NOVIEMBRE:11,DICIEMBRE:12 };
+// Lee el rango del FORMULARIO (selectores mes/año), incluso cuando no hay tabla.
+function rangoDjForm() {
+  try {
+    var sels = document.querySelectorAll("select");
+    var meses = [], anios = [];
+    for (var i = 0; i < sels.length; i++) {
+      var s = sels[i];
+      var vraw = String(s.value || "");
+      var vtxt = (s.options && s.selectedIndex >= 0) ? String(s.options[s.selectedIndex].text || "") : vraw;
+      var v = (vtxt || vraw).toUpperCase().trim();
+      if (MESNOM[v]) meses.push(MESNOM[v]);
+      else { var my = (vraw + " " + vtxt).match(/\\b(20\\d{2})\\b/); if (my) anios.push(parseInt(my[1], 10)); }
+    }
+    if (meses.length >= 2 && anios.length >= 2) return { m1: meses[0], y1: anios[0], m2: meses[1], y2: anios[1] };
+  } catch (e) {}
+  return null;
+}
 function celdasDjMensual() {
   var txt = document.body ? document.body.innerText : "";
+  // Solo capturamos DESPUÉS de buscar: hay resultados o el aviso de "no existe".
+  if (!/no existe formulario|Detalle de Declaraci|Nro Orden/i.test(txt)) return null;
   var pres = {};
   try {
     var trs = document.querySelectorAll("tr");
@@ -154,19 +174,14 @@ function celdasDjMensual() {
       if (mp && mo) pres[mp[2] + "-" + mp[1]] = 1;
     }
   } catch (e) {}
-  // Rango consultado: "Desde: MM/AAAA ... Hasta: MM/AAAA" (detalle de resultados)
-  // o, de respaldo, el formulario "Rango de Periodo tributario" con nombres de mes.
-  var MESNOM = { ENERO:1,FEBRERO:2,MARZO:3,ABRIL:4,MAYO:5,JUNIO:6,JULIO:7,AGOSTO:8,SETIEMBRE:9,SEPTIEMBRE:9,OCTUBRE:10,NOVIEMBRE:11,DICIEMBRE:12 };
+  // Rango: "Desde: MM/AAAA ... Hasta: MM/AAAA" (con resultados) o los selectores.
+  var r1, m1, y1, m2, y2;
   var rg = txt.match(/Desde:\\s*(\\d{1,2})\\/(20\\d{2})[\\s\\S]*?Hasta:\\s*(\\d{1,2})\\/(20\\d{2})/i);
-  if (!rg) {
-    var fm = txt.match(/Rango de Periodo[\\s\\S]{0,120}?\\b([A-Z]{4,10})\\s+(20\\d{2})[\\s\\S]{0,80}?\\b([A-Z]{4,10})\\s+(20\\d{2})/i);
-    if (fm && MESNOM[fm[1].toUpperCase()] && MESNOM[fm[3].toUpperCase()]) {
-      rg = [fm[0], String(MESNOM[fm[1].toUpperCase()]), fm[2], String(MESNOM[fm[3].toUpperCase()]), fm[4]];
-    }
-  }
+  if (rg) { m1 = parseInt(rg[1], 10); y1 = parseInt(rg[2], 10); m2 = parseInt(rg[3], 10); y2 = parseInt(rg[4], 10); }
+  else { var f = rangoDjForm(); if (f) { m1 = f.m1; y1 = f.y1; m2 = f.m2; y2 = f.y2; } }
   var celdas = {};
-  if (rg) {
-    var yy = parseInt(rg[2], 10), mm = parseInt(rg[1], 10), y2 = parseInt(rg[4], 10), m2 = parseInt(rg[3], 10), g = 0;
+  if (m1) {
+    var yy = y1, mm = m1, g = 0;
     while ((yy < y2 || (yy === y2 && mm <= m2)) && g < 120) {
       var key = yy + "-" + (mm < 10 ? "0" + mm : "" + mm);
       celdas[key] = pres[key] ? "Presentado" : "No Presentado";
