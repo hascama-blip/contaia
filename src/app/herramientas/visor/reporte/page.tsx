@@ -33,22 +33,20 @@ export default async function Page() {
     porEmpresa.get(k)!.push(m);
   }
 
-  // Observaciones (lo No Presentado) por empresa.
-  const obs = (lista: VisorMatriz[]): string[] => {
+  // Observaciones (lo No Presentado) de UN módulo (SIRE / DJ mensual / DJ anual).
+  const obsDe = (m: VisorMatriz): string[] => {
     const out: string[] = [];
-    for (const m of lista.sort((a, b) => a.tipo.localeCompare(b.tipo))) {
-      // DJ anual: contingencia a nivel de ejercicio (año), no de mes.
-      if (m.tipo === "dj-anual") {
-        const aniosNp = Object.entries(m.anios).filter(([, e]) => e === "NP").map(([y]) => y).sort();
-        if (aniosNp.length) out.push(`${TIPO_LABEL[m.tipo] ?? m.tipo}: NO PRESENTÓ el ejercicio ${aniosNp.join(", ")}.`);
-        continue;
-      }
-      const np = Object.entries(m.celdas).filter(([, e]) => e === "NP").map(([k]) => k).sort();
-      if (np.length) {
-        const porAnio = new Map<string, string[]>();
-        for (const k of np) { const y = k.slice(0, 4); const mm = Number(k.slice(5, 7)); (porAnio.get(y) ?? porAnio.set(y, []).get(y)!).push(NOM_MES[mm]); }
-        for (const [y, meses] of porAnio) out.push(`${TIPO_LABEL[m.tipo] ?? m.tipo}: NO PRESENTÓ ${meses.join(", ")} del ${y}.`);
-      }
+    // DJ anual: contingencia a nivel de ejercicio (año), no de mes.
+    if (m.tipo === "dj-anual") {
+      const aniosNp = Object.entries(m.anios).filter(([, e]) => e === "NP").map(([y]) => y).sort();
+      if (aniosNp.length) out.push(`NO PRESENTÓ el ejercicio ${aniosNp.join(", ")}.`);
+      return out;
+    }
+    const np = Object.entries(m.celdas).filter(([, e]) => e === "NP").map(([k]) => k).sort();
+    if (np.length) {
+      const porAnio = new Map<string, string[]>();
+      for (const k of np) { const y = k.slice(0, 4); const mm = Number(k.slice(5, 7)); (porAnio.get(y) ?? porAnio.set(y, []).get(y)!).push(NOM_MES[mm]); }
+      for (const [y, meses] of porAnio) out.push(`NO PRESENTÓ ${meses.join(", ")} del ${y}.`);
     }
     return out;
   };
@@ -85,75 +83,75 @@ export default async function Page() {
 
           {[...porEmpresa].map(([empresa, lista]) => {
             const ruc = lista.find((m) => m.ruc)?.ruc;
-            const observaciones = obs(lista);
             return (
-              <section key={empresa} className="evitar-corte space-y-4">
+              <section key={empresa} className="evitar-corte space-y-6">
                 <div className="border-b border-slate-200 pb-2">
                   <h2 className="text-lg font-bold text-slate-800">{empresa}</h2>
                   {ruc && <p className="text-xs text-slate-500">RUC {ruc}</p>}
                 </div>
 
+                {/* Cada módulo (SIRE / DJ mensual / DJ anual) con su cuadro y SU propia
+                    sección de observaciones — contingencias debajo. */}
                 {lista.sort((a, b) => a.tipo.localeCompare(b.tipo)).map((m, i) => {
                   const anios = aniosDe(m);
-                  // DJ anual: cuadro SOLO por año (un estado por ejercicio).
-                  if (m.tipo === "dj-anual") {
-                    return (
-                      <div key={i} className="evitar-corte">
-                        <p className="mb-1 text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>
-                        <div className="inline-block overflow-hidden rounded-lg border border-slate-200">
-                          <table className="text-center text-[11px]">
-                            <thead className="bg-slate-100 text-slate-600"><tr>{anios.map((y) => <th key={y} className="px-4 py-1.5">{y}</th>)}</tr></thead>
-                            <tbody><tr>{anios.map((y) => {
-                              const e = m.anios[y];
-                              return <td key={y} className={`px-4 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
-                            })}</tr></tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  }
+                  const observaciones = obsDe(m);
+                  const cuadro = m.tipo === "dj-anual" ? (
+                    // DJ anual: cuadro SOLO por año (un estado por ejercicio).
+                    <div className="inline-block overflow-hidden rounded-lg border border-slate-200">
+                      <table className="text-center text-[11px]">
+                        <thead className="bg-slate-100 text-slate-600"><tr>{anios.map((y) => <th key={y} className="px-4 py-1.5">{y}</th>)}</tr></thead>
+                        <tbody><tr>{anios.map((y) => {
+                          const e = m.anios[y];
+                          return <td key={y} className={`px-4 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
+                        })}</tr></tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full text-center text-[11px]">
+                        <thead className="bg-slate-100 text-slate-600">
+                          <tr><th className="px-2 py-1.5 text-left">Año</th>{MESES.map((mm) => <th key={mm} className="px-2 py-1.5">{mm}</th>)}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {anios.map((y) => (
+                            <tr key={y}>
+                              <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
+                              {Array.from({ length: 12 }, (_, k) => {
+                                const e = m.celdas[`${y}-${String(k + 1).padStart(2, "0")}`];
+                                return (
+                                  <td key={k} className={e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}>
+                                    {e === "NP" ? "No" : e === "P" ? "Sí" : "·"}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
                   return (
-                    <div key={i} className="evitar-corte">
-                      <p className="mb-1 text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>
-                      <div className="overflow-hidden rounded-lg border border-slate-200">
-                        <table className="w-full text-center text-[11px]">
-                          <thead className="bg-slate-100 text-slate-600">
-                            <tr><th className="px-2 py-1.5 text-left">Año</th>{MESES.map((mm) => <th key={mm} className="px-2 py-1.5">{mm}</th>)}</tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {anios.map((y) => (
-                              <tr key={y}>
-                                <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
-                                {Array.from({ length: 12 }, (_, k) => {
-                                  const e = m.celdas[`${y}-${String(k + 1).padStart(2, "0")}`];
-                                  return (
-                                    <td key={k} className={e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}>
-                                      {e === "NP" ? "No" : e === "P" ? "Sí" : "·"}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
+                    <div key={i} className="evitar-corte space-y-2">
+                      <p className="text-sm font-semibold text-brand-700">{TIPO_LABEL[m.tipo] ?? m.tipo}</p>
+                      {cuadro}
+                      <div className="pt-1">
+                        <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Observaciones — contingencias</h4>
+                        {observaciones.length > 0 ? (
+                          <ol className="space-y-2">
+                            {observaciones.map((o, j) => (
+                              <li key={j} className="flex gap-3 rounded-lg border-l-4 border-l-red-500 bg-red-50 p-3 text-sm text-slate-700">
+                                <span className="font-bold text-slate-400">{j + 1}.</span>
+                                <span>{o}<span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">[prioridad alta]</span></span>
+                              </li>
                             ))}
-                          </tbody>
-                        </table>
+                          </ol>
+                        ) : (
+                          <p className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50 p-3 text-sm text-emerald-700">Sin contingencias en los periodos capturados.</p>
+                        )}
                       </div>
                     </div>
                   );
                 })}
-
-                {observaciones.length > 0 && (
-                  <div className="evitar-corte">
-                    <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">Observaciones — contingencias</h3>
-                    <ol className="space-y-2">
-                      {observaciones.map((o, i) => (
-                        <li key={i} className="flex gap-3 rounded-lg border-l-4 border-l-red-500 bg-red-50 p-3 text-sm text-slate-700">
-                          <span className="font-bold text-slate-400">{i + 1}.</span>
-                          <span>{o}<span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">[prioridad alta]</span></span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
               </section>
             );
           })}
