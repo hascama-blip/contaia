@@ -89,8 +89,18 @@ window.addEventListener("message", (ev) => {
 
 // --- Escáner del DOM del SIRE: lee "MES-Presentado / MES-No Presentado" ------
 var MESES = { ENE:"01",FEB:"02",MAR:"03",ABR:"04",MAY:"05",JUN:"06",JUL:"07",AGO:"08",SEP:"09",SET:"09",OCT:"10",NOV:"11",DIC:"12" };
+// Texto de la página INCLUYENDO opciones/listas colapsadas (dropdown cerrado).
+function textoSire() {
+  var partes = [];
+  try { if (document.body) partes.push(document.body.innerText || ""); } catch (e) {}
+  try {
+    var nodos = document.querySelectorAll("option, li, [role='option'], .dijitMenuItem, .ui-menu-item, td, span");
+    for (var i = 0; i < nodos.length; i++) { var s = (nodos[i].textContent || "").trim(); if (s && s.length < 60) partes.push(s); }
+  } catch (e) {}
+  return partes.join("\\n");
+}
 function escanearSire() {
-  var txt = document.body ? document.body.innerText : "";
+  var txt = textoSire();
   if (!/Registro de Ventas|RVIE|SIRE|Presentado/i.test(txt)) return null;
   var re = /\\b(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC|20\\d{2})\\s*[-\\u2013]\\s*(No\\s+Presentado|Presentado)/gi;
   var per = [], seen = {}, m;
