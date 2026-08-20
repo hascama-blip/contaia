@@ -770,12 +770,22 @@ async function snapshotDiario(raw: string): Promise<void> {
   }
 }
 
+// Cola simple: serializa las escrituras del store para evitar entrelazados.
+let writeCola: Promise<void> = Promise.resolve();
 async function writeStore(store: Store): Promise<void> {
-  await ensureDirs();
-  const raw = JSON.stringify(store, null, 2);
-  await fs.writeFile(STORE_PATH, raw, "utf-8");
-  // Copia de seguridad diaria (no bloquea la operación si falla).
-  void snapshotDiario(raw);
+  const tarea = writeCola.then(async () => {
+    await ensureDirs();
+    const raw = JSON.stringify(store, null, 2);
+    // Escritura ATÓMICA: temporal + rename (evita dejar el JSON a medio escribir
+    // si dos escrituras coinciden, lo que corrompía el store).
+    const tmp = `${STORE_PATH}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+    await fs.writeFile(tmp, raw, "utf-8");
+    await fs.rename(tmp, STORE_PATH);
+    void snapshotDiario(raw);
+  });
+  // La cola no debe romperse si una escritura falla.
+  writeCola = tarea.catch(() => {});
+  return tarea;
 }
 
 export function newId(): string {
@@ -1371,37 +1381,34 @@ export interface VisorCaptura {
   datos?: any;         // JSON capturado de la respuesta de SUNAT (si hubo)
 }
 
-function crearToken(): string {
-  return crypto.randomUUID().replace(/-/g, "");
+// Token STATELESS: derivado del userId + AUTH_SECRET (no se guarda en el store,
+// así no hay carrera de escritura que lo pierda). Formato: <userIdB64url>.<hmac>.
+const VISOR_SECRET = process.env.AUTH_SECRET || "radar-visor-secret-fallback";
+function visorTokenFor(userId: string): string {
+  const uid = Buffer.from(userId).toString("base64url");
+  const mac = crypto.createHmac("sha256", VISOR_SECRET).update("visor:" + userId).digest("hex").slice(0, 24);
+  return `${uid}.${mac}`;
 }
 
-/** Token del Visor para un usuario (lo crea si no existe). */
+/** Token del Visor del usuario (estable, no se persiste). */
 export async function getVisorToken(userId: string): Promise<string> {
-  const store = await readStore();
-  if (!store.visor) store.visor = {};
-  if (!store.visor.tokens) store.visor.tokens = {};
-  if (!store.visor.tokens[userId]) { store.visor.tokens[userId] = crearToken(); await writeStore(store); }
-  return store.visor.tokens[userId];
+  return visorTokenFor(userId);
 }
 
-/** Regenera el token (invalida el anterior). */
+/** Stateless: no hay rotación real; devuelve el mismo token. */
 export async function rotarVisorToken(userId: string): Promise<string> {
-  const store = await readStore();
-  if (!store.visor) store.visor = {};
-  if (!store.visor.tokens) store.visor.tokens = {};
-  store.visor.tokens[userId] = crearToken();
-  await writeStore(store);
-  return store.visor.tokens[userId];
+  return visorTokenFor(userId);
 }
 
-/** Usuario dueño de un token (para autenticar la extensión). */
+/** Usuario dueño de un token (verifica el HMAC). */
 export async function visorUserByToken(token: string): Promise<string | null> {
-  const t = (token || "").trim();
-  if (!t) return null;
-  const store = await readStore();
-  const tokens = store.visor?.tokens ?? {};
-  for (const [uid, tk] of Object.entries(tokens)) if (tk === t) return uid;
-  return null;
+  const [uid64, mac] = (token || "").trim().split(".");
+  if (!uid64 || !mac) return null;
+  let userId = "";
+  try { userId = Buffer.from(uid64, "base64url").toString("utf8"); } catch { return null; }
+  if (!userId) return null;
+  const exp = crypto.createHmac("sha256", VISOR_SECRET).update("visor:" + userId).digest("hex").slice(0, 24);
+  return exp === mac ? userId : null;
 }
 
 /** Guarda una captura (máx. 200 por usuario). */
