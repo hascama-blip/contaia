@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Reporte Visor Tributario" };
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
-const TIPO_LABEL: Record<string, string> = { sire: "SIRE — Registro de Ventas / Compras", "dj-mensual": "Declaración Jurada Mensual", "dj-anual": "Declaración Jurada Anual" };
+const TIPO_LABEL: Record<string, string> = { sire: "SIRE — Registro de Ventas / Compras", "sire-compras": "SIRE — Registro de Compras (RCE)", "sire-ventas": "SIRE — Registro de Ventas e Ingresos (RVIE)", "dj-mensual": "Declaración Jurada Mensual", "dj-anual": "Declaración Jurada Anual" };
 const NOM_MES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
 function fmtFecha(iso: string) {

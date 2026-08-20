@@ -7,7 +7,7 @@ interface Matriz {
   celdas: Record<string, "P" | "NP">; anios: Record<string, "P" | "NP">; at: string;
 }
 
-const TIPO_LABEL: Record<string, string> = { sire: "SIRE", "dj-mensual": "DJ mensual", "dj-anual": "DJ anual" };
+const TIPO_LABEL: Record<string, string> = { sire: "SIRE", "sire-compras": "SIRE — Compras", "sire-ventas": "SIRE — Ventas", "dj-mensual": "DJ mensual", "dj-anual": "DJ anual" };
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
 
 export default function VisorPanel() {

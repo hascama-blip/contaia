@@ -88,9 +88,15 @@ try {
   (document.head || document.documentElement).appendChild(s);
   s.onload = () => s.remove();
 } catch (e) {}
+// Recuerda el último SIRE visto por red: codLibro 080000 = Compras (RCE),
+// 140000 = Ventas (RVIE). Sirve para rotular el cuadro cuando el título no basta.
+var ultimoSubSire = "";
 window.addEventListener("message", (ev) => {
   const m = ev.data;
   if (!m || !m.__radarVisor) return;
+  var u = String(m.url || "");
+  if (/\\b140000\\b|rvie(?!rce)/i.test(u)) ultimoSubSire = "ventas";
+  else if (/\\b080000\\b|\\brce\\b/i.test(u)) ultimoSubSire = "compras";
   SEND({ url: m.url, titulo: document.title, datos: m.datos });
 });
 
@@ -124,7 +130,26 @@ function tipoActual() {
   if (/formulario 710\\b|declaraci[o\\u00f3]n jurada anual del ejercicio/.test(t)) return "dj-anual";
   // DJ mensual (su contenido real).
   if (/consulta de declaraciones y pagos|declara f[a\\u00e1]cil|nro orden|renta mensual|pdt igv|\\b0621\\b/.test(t)) return "dj-mensual";
-  return "sire";
+  // SIRE: separar Registro de COMPRAS (RCE) y VENTAS (RVIE). Prioriza el título
+  // de la pantalla; si no, usa el último codLibro visto por red.
+  var sub = subSireDom() || ultimoSubSire;
+  return sub ? "sire-" + sub : "sire";
+}
+// Lee el TÍTULO principal de la pantalla SIRE (no el menú lateral, que lista
+// ambos). "Registro de Compras Electrónico" / "Registro de Ventas e Ingresos".
+function subSireDom() {
+  try {
+    var nodos = document.querySelectorAll("h1,h2,h3,h4,h5,legend,.panel-title,.page-title,.titulo,div,span,strong,b,td,th");
+    for (var i = 0; i < nodos.length; i++) {
+      var el = nodos[i];
+      var s = (el.textContent || "").trim();
+      if (!s || s.length > 55) continue;
+      if (el.closest && el.closest("a")) continue; // salta enlaces del menú
+      if (/^registro de compras/i.test(s)) return "compras";
+      if (/^registro de ventas/i.test(s)) return "ventas";
+    }
+  } catch (e) {}
+  return "";
 }
 // Ejercicio (año) seleccionado en el <select> de la consulta anual.
 function anioEjercicio() {
