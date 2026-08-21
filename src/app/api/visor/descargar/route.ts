@@ -35,19 +35,39 @@ const TOKEN = "__TOKEN__";
 // Identidad compartida entre frames (el frame del SIRE no puede leer el menú
 // superior por ser de otro origen; el frame del menú sí ve la ventana flotante).
 var identidad = { empresa: "", ruc: "" };
-function mejorIdent(a, b) {
-  b = b || {};
-  var emp = a.empresa || "";
-  if (b.empresa && !/\\.\\.\\.$/.test(b.empresa) && (b.empresa.length > emp.length || /\\.\\.\\.$/.test(emp))) emp = b.empresa;
-  else if (!emp && b.empresa) emp = b.empresa;
-  return { empresa: emp, ruc: a.ruc || b.ruc || "" };
+function normEmp(s) { return String(s || "").toUpperCase().replace(/\\.\\.\\.$/, "").replace(/\\s+/g, " ").trim(); }
+function mismaEmpresa(a, b) {
+  a = normEmp(a); b = normEmp(b);
+  if (!a || !b) return false;
+  var k = Math.min(a.length, b.length, 14);
+  return a.slice(0, k) === b.slice(0, k);
+}
+// La empresa ACTUAL manda: al cambiar de empresa se reemplaza (y se descarta el
+// RUC viejo). Un reporte con RUC viene de la ventana flotante y es autoritativo.
+function mejorIdent(prev, inc) {
+  inc = inc || {};
+  var ir = (inc.ruc && String(inc.ruc).length === 11) ? String(inc.ruc) : "";
+  if (ir) {
+    if (prev.ruc && prev.ruc !== ir) return { empresa: inc.empresa || "", ruc: ir }; // cambió de empresa
+    var emp = inc.empresa || "";
+    if (prev.empresa && (!emp || (mismaEmpresa(prev.empresa, emp) && prev.empresa.length > emp.length))) emp = prev.empresa;
+    return { empresa: emp, ruc: ir };
+  }
+  if (inc.empresa) {
+    if (!prev.empresa) return { empresa: inc.empresa, ruc: prev.ruc || "" };
+    if (!mismaEmpresa(prev.empresa, inc.empresa)) return { empresa: inc.empresa, ruc: "" }; // cambió de empresa
+    var mejor = (inc.empresa.length > prev.empresa.length && !/\\.\\.\\.$/.test(inc.empresa)) ? inc.empresa : prev.empresa;
+    return { empresa: mejor, ruc: prev.ruc || "" };
+  }
+  return prev;
 }
 async function enviar(payload) {
   try {
     if (payload && payload.datos && payload.datos.visor) {
       var v = payload.datos.visor;
       if (!v.empresa && identidad.empresa) v.empresa = identidad.empresa;
-      if (!v.ruc && identidad.ruc) v.ruc = identidad.ruc;
+      // El RUC solo se rellena si es de la MISMA empresa (nunca el de otra).
+      if (!v.ruc && identidad.ruc && (!v.empresa || mismaEmpresa(v.empresa, identidad.empresa))) v.ruc = identidad.ruc;
     }
     const r = await fetch(RADAR + "/api/visor/captura", {
       method: "POST", headers: { "Content-Type": "application/json" },
