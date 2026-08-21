@@ -25,6 +25,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // El líder de equipo puede crear hasta 4 trabajadores (el supremo, sin límite).
+  const LIMITE_OPERADORES = 4;
+  if (!esSupremo(user)) {
+    const actuales = await listSubUsuarios(user.id);
+    if (actuales.length >= LIMITE_OPERADORES) {
+      return NextResponse.json(
+        { error: `El Plan de Equipo permite hasta ${LIMITE_OPERADORES} trabajadores. Elimina uno para poder agregar otro.` },
+        { status: 403 }
+      );
+    }
+  }
+
   const body = await req.json().catch(() => ({}));
   const nombre = String(body?.nombre ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();

@@ -13,11 +13,15 @@ interface Sub {
 export default function EquipoManager({
   inicial,
   adminNombre,
+  limite = 4,
 }: {
   inicial: Sub[];
   adminNombre: string;
+  /** Máximo de trabajadores. `null` = sin límite (supremo). */
+  limite?: number | null;
 }) {
   const [subs, setSubs] = useState<Sub[]>(inicial);
+  const lleno = limite != null && subs.length >= limite;
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +32,7 @@ export default function EquipoManager({
   async function crear(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setInfo(null);
+    if (lleno) return setError(`Alcanzaste el máximo de ${limite} trabajadores. Elimina uno para agregar otro.`);
     if (!nombre.trim() || !email.trim() || !password) return setError("Completa nombre, correo y contraseña.");
     setBusy(true);
     try {
@@ -60,24 +65,36 @@ export default function EquipoManager({
     <div className="space-y-6">
       {/* Alta de operador */}
       <section className="card p-5">
-        <h2 className="mb-3 font-semibold text-slate-800">Agregar trabajador (operador)</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800">Agregar trabajador (operador)</h2>
+          {limite != null && (
+            <span className={`badge ${lleno ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+              {subs.length}/{limite} trabajadores
+            </span>
+          )}
+        </div>
         {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
         {info && <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{info}</div>}
+        {lleno && (
+          <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Alcanzaste el máximo de {limite} trabajadores del Plan de Equipo. Elimina uno para poder agregar otro.
+          </div>
+        )}
         <form onSubmit={crear} className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="label">Nombre</label>
-            <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del trabajador" />
+            <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del trabajador" disabled={lleno} />
           </div>
           <div>
             <label className="label">Correo (usuario)</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="trabajador@correo.com" autoComplete="off" />
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="trabajador@correo.com" autoComplete="off" disabled={lleno} />
           </div>
           <div>
             <label className="label">Contraseña</label>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 6 caracteres" autoComplete="new-password" />
+            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 6 caracteres" autoComplete="new-password" disabled={lleno} />
           </div>
           <div className="sm:col-span-3">
-            <button className="btn-primary" disabled={busy}>{busy ? "Creando…" : "Crear cuenta"}</button>
+            <button className="btn-primary" disabled={busy || lleno}>{busy ? "Creando…" : "Crear cuenta"}</button>
           </div>
         </form>
       </section>

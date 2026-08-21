@@ -40,12 +40,12 @@ export default async function EquipoPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Equipo del estudio</h1>
         <p className="text-sm text-slate-500">
-          Crea cuentas para tus trabajadores. Ellos verán las mismas empresas, podrán
+          Crea cuentas para tus trabajadores (hasta <b>4</b>). Ellos verán las mismas empresas, podrán
           extraer de SUNAT, subir declaraciones y poner plazos/comentarios — pero{" "}
           <b>no pueden crear/eliminar empresas ni editar el API</b>.
         </p>
       </div>
-      <EquipoManager inicial={subs} adminNombre={user.nombre} />
+      <EquipoManager inicial={subs} adminNombre={user.nombre} limite={esSupremo(user) ? null : 4} />
     </div>
   );
 }
