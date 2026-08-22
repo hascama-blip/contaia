@@ -90,6 +90,11 @@ function Cuadro({ m }: { m: Matriz }) {
   // (evita filas vacías de años que solo traen la marca de año, ej. 2023/2024).
   const anios = Array.from(new Set([...Object.keys(m.celdas).map((k) => k.slice(0, 4)), ...Object.keys(m.anios)])).sort();
   const aniosMes = Array.from(new Set(Object.keys(m.celdas).map((k) => k.slice(0, 4)))).sort();
+  // Periodos que AÚN NO VENCEN (del mes/año en curso en adelante) no son "No presentó".
+  const hoy = new Date();
+  const aAnio = hoy.getFullYear(), aMes = hoy.getMonth() + 1;
+  const mesNoVence = (y: number, mm: number) => y > aAnio || (y === aAnio && mm >= aMes);
+  const anioNoVence = (y: number) => y >= aAnio;
   const titulo = (
     <p className="mb-1 text-sm font-semibold text-slate-800">
       {TIPO_LABEL[m.tipo] ?? m.tipo} <span className="font-normal text-slate-400">· {m.empresa || m.ruc || "—"}{m.ruc ? ` · RUC ${m.ruc}` : ""}</span>
@@ -106,6 +111,7 @@ function Cuadro({ m }: { m: Matriz }) {
             <thead className="bg-slate-50 text-slate-500"><tr>{anios.map((y) => <th key={y} className="px-3 py-1.5">{y}</th>)}</tr></thead>
             <tbody><tr>{anios.map((y) => {
               const e = m.anios[y];
+              if (e === "NP" && anioNoVence(Number(y))) return <td key={y} className="px-3 py-1.5 text-slate-300" title="Aún no vence">—</td>;
               return <td key={y} className={`px-3 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
             })}</tr></tbody>
           </table>
@@ -127,6 +133,7 @@ function Cuadro({ m }: { m: Matriz }) {
                 <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
                 {Array.from({ length: 12 }, (_, k) => {
                   const e = m.celdas[`${y}-${String(k + 1).padStart(2, "0")}`];
+                  if (e === "NP" && mesNoVence(Number(y), k + 1)) return <td key={k} className="px-2 py-1.5 text-slate-300" title="Aún no vence">—</td>;
                   return (
                     <td key={k} className={`px-2 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>
                       {e === "NP" ? "No" : e === "P" ? "Sí" : "·"}

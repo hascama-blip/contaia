@@ -40,16 +40,30 @@ export default async function Page() {
     }
   }
 
-  // Observaciones (lo No Presentado) de UN módulo (SIRE / DJ mensual / DJ anual).
+  // Fecha del informe: los periodos que AÚN NO VENCEN (del mes en curso en
+  // adelante, del año en curso) NO son contingencia — todavía no toca declarar.
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1; // 1-12
+  // DJ/SIRE mensual del mes M se declara el mes siguiente → M del año en curso
+  // y posteriores aún no vencen.
+  const mesNoVence = (y: number, m: number) => y > anioActual || (y === anioActual && m >= mesActual);
+  // DJ anual del ejercicio Y se declara al año siguiente → el ejercicio en curso
+  // (y posteriores) aún no vence.
+  const anioNoVence = (y: number) => y >= anioActual;
+
+  // Observaciones (lo No Presentado y YA VENCIDO) de UN módulo.
   const obsDe = (m: VisorMatriz): string[] => {
     const out: string[] = [];
     // DJ anual: contingencia a nivel de ejercicio (año), no de mes.
     if (m.tipo === "dj-anual") {
-      const aniosNp = Object.entries(m.anios).filter(([, e]) => e === "NP").map(([y]) => y).sort();
+      const aniosNp = Object.entries(m.anios).filter(([y, e]) => e === "NP" && !anioNoVence(Number(y))).map(([y]) => y).sort();
       if (aniosNp.length) out.push(`NO PRESENTÓ el ejercicio ${aniosNp.join(", ")}.`);
       return out;
     }
-    const np = Object.entries(m.celdas).filter(([, e]) => e === "NP").map(([k]) => k).sort();
+    const np = Object.entries(m.celdas)
+      .filter(([k, e]) => e === "NP" && !mesNoVence(Number(k.slice(0, 4)), Number(k.slice(5, 7))))
+      .map(([k]) => k).sort();
     if (np.length) {
       const porAnio = new Map<string, string[]>();
       for (const k of np) { const y = k.slice(0, 4); const mm = Number(k.slice(5, 7)); (porAnio.get(y) ?? porAnio.set(y, []).get(y)!).push(NOM_MES[mm]); }
@@ -111,6 +125,8 @@ export default async function Page() {
                         <thead className="bg-slate-100 text-slate-600"><tr>{anios.map((y) => <th key={y} className="px-4 py-1.5">{y}</th>)}</tr></thead>
                         <tbody><tr>{anios.map((y) => {
                           const e = m.anios[y];
+                          const noVence = e === "NP" && anioNoVence(Number(y));
+                          if (noVence) return <td key={y} className="px-4 py-1.5 text-slate-300" title="Aún no vence">—</td>;
                           return <td key={y} className={`px-4 py-1.5 ${e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}`}>{e === "NP" ? "No" : e === "P" ? "Sí" : "·"}</td>;
                         })}</tr></tbody>
                       </table>
@@ -127,6 +143,8 @@ export default async function Page() {
                               <td className="px-2 py-1.5 text-left font-medium text-slate-700">{y}</td>
                               {Array.from({ length: 12 }, (_, k) => {
                                 const e = m.celdas[`${y}-${String(k + 1).padStart(2, "0")}`];
+                                const noVence = e === "NP" && mesNoVence(Number(y), k + 1);
+                                if (noVence) return <td key={k} className="text-slate-300" title="Aún no vence">—</td>;
                                 return (
                                   <td key={k} className={e === "NP" ? "bg-red-50 font-semibold text-red-700" : e === "P" ? "bg-emerald-50 text-emerald-700" : "text-slate-300"}>
                                     {e === "NP" ? "No" : e === "P" ? "Sí" : "·"}
@@ -165,10 +183,12 @@ export default async function Page() {
             );
           })}
 
-          <div className="flex items-center gap-4 border-t border-slate-200 pt-3 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3 text-[11px] text-slate-400">
             <span><b className="text-emerald-700">Sí</b> = Presentó</span>
-            <span><b className="text-red-700">No</b> = No presentó</span>
+            <span><b className="text-red-700">No</b> = No presentó (vencido)</span>
+            <span><b>—</b> = aún no vence</span>
             <span>· = sin dato capturado</span>
+            <span className="text-slate-300">· Informe al {fmtFecha(hoy.toISOString())}</span>
           </div>
         </div>
       </article>
