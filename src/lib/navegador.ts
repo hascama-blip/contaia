@@ -178,9 +178,19 @@ async function lanzarLocalConTurno(chromium: any) {
   }
 }
 
-/** Conecta al navegador y dice si fue remoto (Browserless) o local. */
-export async function conectarNavegador(): Promise<ConexionNavegador> {
+/** Conecta al navegador y dice si fue remoto (Browserless) o local.
+ *  opts.preferLocal: para flujos sensibles a captcha/IP (RTT, rentas) usa el
+ *  Chromium LOCAL cuando hay proxy residencial, porque el proxy NO se aplica a
+ *  Browserless (allí la IP sería la de datacenter y SUNAT la bloquea / baja el
+ *  puntaje de reCAPTCHA v3). Sin proxy configurado no hay ventaja → flujo normal. */
+export async function conectarNavegador(opts: { preferLocal?: boolean } = {}): Promise<ConexionNavegador> {
   const { chromium } = await import("playwright-core");
+
+  if (opts.preferLocal) {
+    const proxy = await proxyConfig();
+    if (proxy) return { browser: await lanzarLocalConTurno(chromium), remoto: false };
+    // sin proxy, el local correría con la IP del datacenter → sigue el flujo normal.
+  }
 
   // NAVEGADOR REMOTO (Browserless / Browserbase): si está configurado, los
   // Chromium corren en OTRA máquina (no consumen RAM del servidor web) y ese
@@ -216,8 +226,8 @@ export async function conectarNavegador(): Promise<ConexionNavegador> {
   return { browser: await lanzarLocalConTurno(chromium), remoto: false };
 }
 
-export async function lanzarNavegador() {
-  return (await conectarNavegador()).browser;
+export async function lanzarNavegador(opts: { preferLocal?: boolean } = {}) {
+  return (await conectarNavegador(opts)).browser;
 }
 
 /** Bloquea recursos pesados que NO afectan la extracción (imágenes, fuentes,

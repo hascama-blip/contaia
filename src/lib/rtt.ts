@@ -191,7 +191,9 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
   let browser: any = null;
   const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 180000);
   try {
-    browser = await lanzarNavegador();
+    // RTT: Chromium local + proxy residencial (Browserless usa IP de datacenter
+    // que SUNAT bloquea y baja el puntaje de reCAPTCHA v3).
+    browser = await lanzarNavegador({ preferLocal: true });
     const ctx = await browser.newContext({
       acceptDownloads: true,
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
