@@ -230,6 +230,30 @@ export async function lanzarNavegador(opts: { preferLocal?: boolean } = {}) {
   return (await conectarNavegador(opts)).browser;
 }
 
+/** Prueba el proxy residencial SIN tocar SUNAT: abre Chromium local con el proxy
+ *  (igual que la Opción A del RTT) y consulta la IP de salida. Sirve para validar
+ *  que el proxy autentica desde el servidor antes de enrutar los logins por él. */
+export async function probarProxy(): Promise<{ ok: boolean; ip?: string; ms?: number; error?: string; server?: string }> {
+  const proxy = await proxyConfig();
+  if (!proxy) return { ok: false, error: "No hay proxy configurado (PROXY_SERVER)." };
+  const { chromium } = await import("playwright-core");
+  let browser: any = null;
+  const t0 = Date.now();
+  try {
+    browser = await lanzarLocal(chromium); // lanzarLocal aplica el proxyConfig()
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto("https://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 25000 });
+    const body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+    const ip = (body.match(/(\d{1,3}\.){3}\d{1,3}/) || [])[0] || "";
+    return { ok: !!ip, ip, ms: Date.now() - t0, server: proxy.server };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e).slice(0, 200), ms: Date.now() - t0, server: proxy.server };
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
 /** Bloquea recursos pesados que NO afectan la extracción (imágenes, fuentes,
  *  media y tracking). Se conservan CSS/JS/XHR/documento para no romper nada.
  *  Reduce RAM, CPU y ancho de banda — y suele ACELERAR la navegación. */

@@ -78,6 +78,19 @@ export default function SupremoPanel() {
   const [pxPass, setPxPass] = useState("");
   const [integBusy, setIntegBusy] = useState<string | null>(null);
   const [integMsg, setIntegMsg] = useState<string | null>(null);
+  const [proxyTest, setProxyTest] = useState<string | null>(null);
+
+  async function probarProxyUI() {
+    setProxyTest("Probando… (abre un navegador con el proxy, ~15s)");
+    try {
+      const res = await fetch("/api/supremo/probar-proxy", { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (d.ok) setProxyTest(`✓ Proxy OK — IP de salida: ${d.ip} (${d.ms} ms). Sirve para la Opción A.`);
+      else setProxyTest(`✗ Falló: ${d.error ?? "sin respuesta"}. Revisa que el proxy autentique por usuario/clave desde cualquier IP (no whitelist).`);
+    } catch {
+      setProxyTest("✗ Error de red al probar el proxy.");
+    }
+  }
 
   async function toggleOperadores(s: Solicitud) {
     if (expandido === s.id) { setExpandido(null); return; }
@@ -713,15 +726,24 @@ export default function SupremoPanel() {
               {integBusy === "px" ? "Guardando…" : "💾 Guardar proxy"}
             </button>
           </div>
-          {integ?.proxy?.configurado && integ.proxy.fuente === "app" && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
-              onClick={() => guardarInteg({ proxyServer: "", proxyUser: "", proxyPass: "" }, "px")}
-              disabled={integBusy !== null}
-              className="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+              onClick={probarProxyUI}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              🗑️ Quitar proxy
+              🔌 Probar proxy (IP de salida)
             </button>
-          )}
+            {integ?.proxy?.configurado && integ.proxy.fuente === "app" && (
+              <button
+                onClick={() => guardarInteg({ proxyServer: "", proxyUser: "", proxyPass: "" }, "px")}
+                disabled={integBusy !== null}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                🗑️ Quitar proxy
+              </button>
+            )}
+          </div>
+          {proxyTest && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-600">{proxyTest}</p>}
         </div>
         {integMsg && <p className="mt-2 text-xs text-slate-600">{integMsg}</p>}
       </div>
