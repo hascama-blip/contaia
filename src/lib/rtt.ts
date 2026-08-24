@@ -191,11 +191,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
   let browser: any = null;
   const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 180000);
   try {
-    // RTT por Browserless (login estable). La Opción A (Chromium local + proxy
-    // residencial) queda disponible con preferLocal, pero desactivada hasta
-    // validar que el proxy Webshare autentique desde el servidor (hoy rompe el
-    // login → probablemente exige whitelist de IP).
-    browser = await lanzarNavegador();
+    // RTT por Chromium local + proxy residencial (Opción A): Browserless usa IP
+    // de datacenter que baja el puntaje de reCAPTCHA v3 y SUNAT descarta el envío.
+    // El proxy ya se validó ("Probar proxy" → IP de salida OK). Si SUNAT rechaza
+    // esta IP, el login fallará → habría que usar un residencial peruano/rápido.
+    browser = await lanzarNavegador({ preferLocal: true });
     const ctx = await browser.newContext({
       acceptDownloads: true,
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
