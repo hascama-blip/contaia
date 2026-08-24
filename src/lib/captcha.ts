@@ -37,6 +37,11 @@ export async function detectarTurnstile(ctx: any, page: any): Promise<CaptchaDet
       const r = await fr
         .evaluate(() => {
           const out: { sitekey: string | null; hayWidget: boolean } = { sitekey: null, hayWidget: false };
+          // 0) sitekey capturado al vuelo desde turnstile.render (hookTurnstileSitekey).
+          try {
+            const sk = (window as any).__radarSitekey;
+            if (sk && /^0x/i.test(String(sk))) { out.hayWidget = true; out.sitekey = String(sk); return out; }
+          } catch (e) { /* */ }
           // ¿Hay Turnstile? Señales: input de respuesta, div.cf-turnstile o el iframe.
           const resp = document.querySelector('[name="cf-turnstile-response"], [id^="cf-chl-widget"]');
           const div = document.querySelector(".cf-turnstile, [data-sitekey]") as HTMLElement | null;
@@ -66,6 +71,39 @@ export async function detectarTurnstile(ctx: any, page: any): Promise<CaptchaDet
     }
   }
   return null;
+}
+
+/** Engancha `turnstile.render` ANTES de que SUNAT lo llame, para capturar el
+ *  sitekey (que va como parámetro JS, no como data-sitekey). Debe llamarse justo
+ *  tras crear el contexto (aplica a todos los frames que se creen después). */
+export async function hookTurnstileSitekey(ctx: any): Promise<void> {
+  try {
+    await ctx.addInitScript(() => {
+      try {
+        let _ts: any;
+        const wrap = (ts: any) => {
+          if (!ts || ts.__radarWrapped) return ts;
+          const orig = ts.render;
+          if (typeof orig === "function") {
+            ts.render = function (this: any, ...args: any[]) {
+              try {
+                const p = args[1] || args[0];
+                if (p && p.sitekey) (window as any).__radarSitekey = p.sitekey;
+              } catch (e) { /* */ }
+              return orig.apply(this, args);
+            };
+          }
+          ts.__radarWrapped = true;
+          return ts;
+        };
+        Object.defineProperty(window, "turnstile", {
+          configurable: true,
+          get() { return _ts; },
+          set(v) { _ts = wrap(v); },
+        });
+      } catch (e) { /* */ }
+    });
+  } catch (e) { /* addInitScript no disponible en este runtime */ }
 }
 
 /** ¿Se ve OTRO tipo de captcha (reCAPTCHA/hCaptcha)? Solo para diagnóstico. */
@@ -164,19 +202,25 @@ export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [
       clientKey = (await getIntegraciones()).capsolverKey;
     } catch { /* */ }
   }
-  const info = await detectarTurnstile(ctx, page);
+  const tieneKey = !!clientKey;
+  let info = await detectarTurnstile(ctx, page);
+  // El sitekey se captura al correr turnstile.render; si aún no está, reintenta.
+  for (let i = 0; i < 5 && info && info.sinSitekey; i++) {
+    await page.waitForTimeout(1500).catch(() => {});
+    info = await detectarTurnstile(ctx, page);
+  }
 
   if (!info) {
     // Reporta si hay OTRO captcha (para saber que hay que adaptar el proveedor).
     const otro = await detectarOtroCaptcha(ctx);
     pasos.push(otro
-      ? { paso: "captcha", detectado: otro, resuelto: false, nota: "tipo no soportado aún" }
-      : { paso: "captcha", detectado: "ninguno", resuelto: false, nota: "no se vio widget" });
+      ? { paso: "captcha", detectado: otro, resuelto: false, tieneKey, nota: "tipo no soportado aún" }
+      : { paso: "captcha", detectado: "ninguno", resuelto: false, tieneKey, nota: "no se vio widget" });
     return false;
   }
 
   if (info.sinSitekey) {
-    pasos.push({ paso: "captcha", detectado: "turnstile", resuelto: false, nota: "widget presente pero no se pudo leer el sitekey", url: info.url });
+    pasos.push({ paso: "captcha", detectado: "turnstile", resuelto: false, tieneKey, nota: "widget presente pero no se pudo leer el sitekey", url: info.url });
     return false;
   }
 

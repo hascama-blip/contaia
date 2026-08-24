@@ -12,7 +12,7 @@
 // (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
-import { resolverCaptchaSiHay } from "./captcha";
+import { resolverCaptchaSiHay, hookTurnstileSitekey } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -197,6 +197,7 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     });
     await bloquearRecursos(ctx);
+    await hookTurnstileSitekey(ctx); // captura el sitekey del Turnstile (SUNAT lo pasa por JS)
     autoAceptarDialogos(ctx);
     const page = await ctx.newPage();
 
