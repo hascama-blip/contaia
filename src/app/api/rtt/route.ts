@@ -37,8 +37,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta configurar el dominio del webhook (RTT_DOMINIO). Configúralo en el panel Supremo." }, { status: 400 });
   }
 
-  // Sub-address con el RUC embebido (match determinístico en el webhook).
-  const emailDestino = `reportes+RUC${ruc}@${dominio}`;
+  // Correo destino CORTO (SUNAT trunca la dirección a ~40 caracteres): solo el
+  // RUC como parte local, sin el prefijo "reportes+RUC" ni el sub-address "+".
+  // El webhook extrae el RUC de la corrida de 11 dígitos (catch-all del dominio),
+  // igual que el flujo de rentas. Ej.: 20606054590@dominio
+  const emailDestino = `${ruc}@${dominio}`;
 
   // Modo diagnóstico: NO crea solicitud (no consume ni ensucia la trazabilidad),
   // solo recorre el formulario en SOL y devuelve el volcado crudo.
