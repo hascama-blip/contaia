@@ -283,9 +283,25 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     const estructura = await volcar(ctx);
     pasos.push({ paso: "estructura", emailDestino: params.emailDestino, formCargado: !!frameRTT, hayCorreo: estado.correo, ...estructura });
 
-    // En diagnóstico: probar el captcha (detección + resolución) y mostrarlo en la
-    // traza, SIN llegar a Enviar. Así se valida el Turnstile de punta a punta.
+    // En diagnóstico: verificar el LÍMITE del campo de correo (SUNAT suele
+    // truncar la dirección ~40 chars) y probar el captcha, SIN llegar a Enviar.
     if (params.diagnostico) {
+      if (frameRTT) {
+        const chk = await frameRTT.evaluate((email: string) => {
+          const el = document.querySelector('#txtCorreo, input[name="txtCorreo"], input[type="email"]') as HTMLInputElement | null;
+          if (!el) return null;
+          const max = el.maxLength; // -1 = sin límite
+          try { el.value = email; } catch (e) { /* */ }
+          return { maxLength: max, valorTrasEscribir: (el.value || "").length };
+        }, params.emailDestino).catch(() => null as any);
+        if (chk) pasos.push({
+          paso: "correo-limite",
+          emailDestino: params.emailDestino,
+          longitud: params.emailDestino.length,
+          maxLength: chk.maxLength,
+          truncaria: chk.maxLength != null && chk.maxLength > 0 && params.emailDestino.length > chk.maxLength,
+        });
+      }
       await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
       return { ok: false, diag: { pasos } };
     }
