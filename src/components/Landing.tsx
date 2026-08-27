@@ -7,11 +7,16 @@ import ConejoTikTok from "@/components/ConejoTikTok";
 // El login interno de ESTA web no se enlaza aquí (queda oculto en /login).
 const APP_LOGIN = "https://app.radartributaria.com/login";
 
+interface ClaseRuc {
+  etiqueta: string;
+  genera: string;
+}
 interface Modulo {
   icono: string;
   titulo: string;
   detalle: string;
   captura: string; // /capturas/<archivo>.png (colócalo en public/capturas)
+  clases?: ClaseRuc[]; // solo el primer módulo: qué genera según la clase de RUC
 }
 
 const MODULOS: Modulo[] = [
@@ -19,28 +24,45 @@ const MODULOS: Modulo[] = [
     icono: "📑",
     titulo: "Reporte analítico de auditoría",
     detalle:
-      "Consulta el estado del RUC en SUNAT, extrae SIRE (compras/ventas), buzón, declaraciones y deudas, y arma un informe de gerencia con contingencias y recomendaciones — todo desde una sola ficha del cliente.",
+      "El corazón de la plataforma. Con solo el RUC consulta el estado del contribuyente en SUNAT y ejecuta, desde una sola ficha, todos los procedimientos hasta el informe de gerencia con contingencias y recomendaciones. La información que genera depende de la clase de RUC:",
     captura: "/capturas/reporte.png",
+    clases: [
+      {
+        etiqueta: "RUC 20 · Empresa (persona jurídica)",
+        genera:
+          "SIRE de compras (RCE) y ventas (RVIE), estado presentado/no presentado, buzón electrónico, deudas y fraccionamiento (Art. 36), declaraciones mensuales comparadas contra el SIRE y DJ anual (Formulario 710).",
+      },
+      {
+        etiqueta: "RUC 10 · Persona natural CON negocio (3ª categoría)",
+        genera:
+          "Igual que una empresa: está obligada al SIRE, así que genera compras/ventas, buzón, deudas, declaraciones vs SIRE y DJ anual.",
+      },
+      {
+        etiqueta: "RUC 10 · Persona natural SIN negocio",
+        genera:
+          "No lleva SIRE. En su lugar se habilitan Rentas de 4ta/5ta categoría (por empleador y periodo) e ITF, además del buzón y las deudas.",
+      },
+    ],
   },
   {
     icono: "📨",
     titulo: "Consultas tributarias",
     detalle:
-      "Lee los mensajes del buzón electrónico SUNAT con sus asuntos y descarga el PDF de cada notificación, resaltando lo urgente y lo peligroso (cobranza, fiscalización, valores).",
+      "Extrae el buzón electrónico de SUNAT y las deudas del fraccionamiento (Art. 36) sin revisar el portal a mano. Lee cada notificación con su asunto, descarga su PDF y resalta lo urgente y lo peligroso: cobranza coactiva, fiscalización, valores y procedimientos no contenciosos.",
     captura: "/capturas/consultas.png",
   },
   {
     icono: "📄",
     titulo: "Reporte Tributario para Terceros (RTT)",
     detalle:
-      "Solicita el RTT de SUNAT y recíbelo automáticamente por correo, con trazabilidad de cada estado (creado → en proceso → listo) y descarga del PDF/XML cuando llega.",
+      "Solicita el RTT de SUNAT y lo recibe por ti, sin revisar el correo a mano. El bot inicia sesión, pide el reporte y un webhook captura el PDF/XML apenas SUNAT lo envía, con trazabilidad de cada estado (creado → en proceso → listo) y descarga directa.",
     captura: "/capturas/rtt.png",
   },
   {
     icono: "📊",
     titulo: "Detalle SIRE",
     detalle:
-      "Revisa el detalle de los comprobantes del SIRE por periodo — compras (RCE) y ventas (RVIE) — y el estado presentado / no presentado de cada mes.",
+      "Baja el detalle comprobante por comprobante de la propuesta SUNAT vía la API oficial del SIRE — compras (RCE) y ventas (RVIE) por periodo — con base, IGV y total de cada documento, y el estado presentado / no presentado de cada mes.",
     captura: "/capturas/detalle-sire.png",
   },
 ];
@@ -92,7 +114,7 @@ export default function Landing() {
             Diagnóstico tributario asistido
           </p>
           <h1 className="text-3xl font-bold leading-tight sm:text-5xl" translate="no">RADAR TRIBUTAR·IA</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-white/85 sm:text-lg">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-white/90 sm:text-xl">
             La plataforma que revisa el estado tributario de tus clientes en SUNAT —
             SIRE, buzón, declaraciones, deudas y reportes— y arma el informe de gerencia
             por ti, con trazabilidad de cada paso.
@@ -108,21 +130,33 @@ export default function Landing() {
       {/* Módulos con captura */}
       <section className="mx-auto max-w-6xl px-6 py-14">
         <div className="mb-12 text-center">
-          <h2 className="text-2xl font-bold text-slate-800 sm:text-3xl">¿Qué incluye la plataforma?</h2>
-          <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-500">
+          <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">¿Qué incluye la plataforma?</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600 sm:text-lg">
             Cada módulo automatiza un procedimiento de la auditoría tributaria.
             Toca el <span className="font-semibold text-emerald-600">punto verde</span> (o la ventana) para verlo en grande.
           </p>
         </div>
 
-        <div className="space-y-20">
-          {MODULOS.map((m, i) => (
+        <div className="space-y-24">
+          {MODULOS.map((m) => (
             <div key={m.titulo} className="mx-auto max-w-4xl">
-              <div className="mb-4 text-center">
-                <div className="mb-1 text-4xl">{m.icono}</div>
-                <h3 className="text-xl font-bold text-slate-800 sm:text-2xl">{m.titulo}</h3>
-                <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">{m.detalle}</p>
+              <div className="mb-6 text-center">
+                <div className="mb-2 text-5xl">{m.icono}</div>
+                <h3 className="text-2xl font-bold text-slate-800 sm:text-3xl">{m.titulo}</h3>
+                <p className="mx-auto mt-3 max-w-3xl text-base leading-relaxed text-slate-600 sm:text-lg">{m.detalle}</p>
               </div>
+
+              {m.clases && (
+                <div className="mx-auto mb-6 grid max-w-3xl gap-3 sm:grid-cols-3">
+                  {m.clases.map((c) => (
+                    <div key={c.etiqueta} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm">
+                      <p className="text-sm font-bold text-brand-700">{c.etiqueta}</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{c.genera}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} />
             </div>
           ))}
