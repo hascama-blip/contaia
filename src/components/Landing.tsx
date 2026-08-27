@@ -102,7 +102,9 @@ function RadarPulse() {
 
 export default function Landing() {
   return (
-    <div className="-mx-3 sm:-mx-4">
+    // Full-bleed: rompe el max-width del contenedor de la app para ocupar todo
+    // el ancho de la pantalla (evita los lados vacíos en escritorio).
+    <div className="relative left-1/2 -mt-5 w-screen -translate-x-1/2 overflow-x-hidden bg-slate-50 sm:-mt-6">
       <ConejoTikTok />
       {/* Barra superior pública */}
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -113,8 +115,19 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="hero-gradient text-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
+      <section className="hero-gradient relative overflow-hidden text-white">
+        {/* Decoración radar en los lados (rellena el espacio vacío). */}
+        <div aria-hidden className="pointer-events-none absolute left-0 top-1/2 hidden -translate-x-1/3 -translate-y-1/2 lg:block">
+          <div className="h-[26rem] w-[26rem] rounded-full border border-white/10" />
+          <div className="absolute inset-16 rounded-full border border-white/10" />
+          <div className="absolute inset-32 rounded-full border border-accent-300/15" />
+        </div>
+        <div aria-hidden className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-1/3 lg:block">
+          <div className="h-[26rem] w-[26rem] rounded-full border border-white/10" />
+          <div className="absolute inset-16 rounded-full border border-white/10" />
+          <div className="absolute inset-32 rounded-full border border-accent-300/15" />
+        </div>
+        <div className="relative mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
           <RadarPulse />
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-accent-300">
             Diagnóstico tributario asistido
