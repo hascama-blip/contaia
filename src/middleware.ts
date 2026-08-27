@@ -7,6 +7,7 @@ import { verifySessionToken, SESSION_COOKIE } from "./lib/authToken";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (
+    pathname === "/" ||           // landing pública (la raíz); el resto sí exige sesión
     pathname.startsWith("/login") ||
     pathname.startsWith("/reset") ||
     pathname.startsWith("/api/auth") ||

@@ -1,46 +1,79 @@
 import { LogoAsenco } from "@/components/Logo";
 
-// Landing PÚBLICA (para visitantes sin sesión). Describe la plataforma y sus
-// módulos principales (no utilitarios) y manda a iniciar al app público. El
-// login interno de esta web NO se enlaza aquí (queda oculto en /login).
+// Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
+// módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
+// El login interno de ESTA web no se enlaza aquí (queda oculto en /login).
 const APP_LOGIN = "https://app.radartributaria.com/login";
 
-const MODULOS = [
+interface Modulo {
+  icono: string;
+  titulo: string;
+  detalle: string;
+  captura: string; // /capturas/<archivo>.png (colócalo en public/capturas)
+}
+
+const MODULOS: Modulo[] = [
   {
     icono: "📑",
     titulo: "Reporte analítico de auditoría",
     detalle:
-      "Consulta el estado del RUC en SUNAT, extrae SIRE (compras/ventas), buzón, declaraciones y deudas, y arma un informe de gerencia con contingencias y recomendaciones.",
+      "Consulta el estado del RUC en SUNAT, extrae SIRE (compras/ventas), buzón, declaraciones y deudas, y arma un informe de gerencia con contingencias y recomendaciones — todo desde una sola ficha del cliente.",
+    captura: "/capturas/reporte.png",
   },
   {
     icono: "📨",
     titulo: "Consultas tributarias",
     detalle:
-      "Lee los mensajes del buzón electrónico SUNAT con sus asuntos y descarga el PDF de cada notificación, resaltando lo urgente y lo peligroso.",
+      "Lee los mensajes del buzón electrónico SUNAT con sus asuntos y descarga el PDF de cada notificación, resaltando lo urgente y lo peligroso (cobranza, fiscalización, valores).",
+    captura: "/capturas/consultas.png",
   },
   {
     icono: "📄",
     titulo: "Reporte Tributario para Terceros (RTT)",
     detalle:
-      "Solicita el RTT de SUNAT y recíbelo automáticamente, con trazabilidad de cada estado (creado → en proceso → listo) y descarga del PDF/XML.",
+      "Solicita el RTT de SUNAT y recíbelo automáticamente por correo, con trazabilidad de cada estado (creado → en proceso → listo) y descarga del PDF/XML cuando llega.",
+    captura: "/capturas/rtt.png",
   },
   {
     icono: "📊",
     titulo: "Detalle SIRE",
     detalle:
-      "Revisa el detalle de los comprobantes del SIRE por periodo — compras (RCE) y ventas (RVIE) — y el estado presentado / no presentado.",
+      "Revisa el detalle de los comprobantes del SIRE por periodo — compras (RCE) y ventas (RVIE) — y el estado presentado / no presentado de cada mes.",
+    captura: "/capturas/detalle-sire.png",
   },
 ];
+
+function Captura({ src, icono, titulo }: { src: string; icono: string; titulo: string }) {
+  // Marco tipo ventana de navegador. Muestra la imagen si existe; si no, un
+  // fondo con el ícono como "vista previa" (para que nunca salga rota).
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-3 py-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+        <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+        <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+        <span className="ml-2 truncate text-[11px] text-slate-400">radartributaria — {titulo}</span>
+      </div>
+      <div
+        className="relative flex aspect-[16/10] items-center justify-center bg-gradient-to-br from-brand-50 to-slate-100"
+        style={{ backgroundImage: `url(${src})`, backgroundSize: "cover", backgroundPosition: "top center" }}
+      >
+        {/* Si la imagen no está, se ve este ícono de fondo (vista previa). */}
+        <span className="pointer-events-none text-5xl opacity-25">{icono}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
   return (
     <div className="-mx-3 sm:-mx-4">
-      {/* Barra superior pública (solo logo) */}
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2" translate="no">
-          <LogoAsenco />
+      {/* Barra superior pública */}
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2" translate="no"><LogoAsenco /></div>
+          <a href={APP_LOGIN} className="btn-primary text-sm">Iniciar</a>
         </div>
-        <a href={APP_LOGIN} className="btn-primary text-sm">Iniciar</a>
       </header>
 
       {/* Hero */}
@@ -49,42 +82,43 @@ export default function Landing() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-accent-300">
             Diagnóstico tributario asistido
           </p>
-          <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
-            <span translate="no">RADAR TRIBUTAR·IA</span>
-          </h1>
+          <h1 className="text-3xl font-bold leading-tight sm:text-5xl" translate="no">RADAR TRIBUTAR·IA</h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-white/85 sm:text-lg">
             La plataforma que revisa el estado tributario de tus clientes en SUNAT —
             SIRE, buzón, declaraciones, deudas y reportes— y arma el informe de gerencia
             por ti, con trazabilidad de cada paso.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-8">
             <a href={APP_LOGIN} className="rounded-xl bg-white px-6 py-3 text-sm font-semibold text-brand-800 shadow-sm transition hover:bg-white/90">
               Iniciar →
             </a>
           </div>
-          <p className="mt-4 text-xs text-white/60">Acceso a la plataforma para estudios contables y auditores.</p>
         </div>
       </section>
 
-      {/* Módulos principales */}
+      {/* Módulos con captura */}
       <section className="mx-auto max-w-6xl px-6 py-14">
-        <div className="mb-8 text-center">
-          <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">¿Qué hace la plataforma?</h2>
+        <div className="mb-10 text-center">
+          <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">¿Qué incluye la plataforma?</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-500">
-            Reúne en un solo lugar los procedimientos clave de una auditoría tributaria.
+            Cada módulo automatiza un procedimiento de la auditoría tributaria.
           </p>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          {MODULOS.map((m) => (
-            <div key={m.titulo} className="card p-6">
-              <div className="mb-2 text-2xl">{m.icono}</div>
-              <h3 className="font-semibold text-slate-800">{m.titulo}</h3>
-              <p className="mt-1.5 text-sm text-slate-500">{m.detalle}</p>
+
+        <div className="space-y-14">
+          {MODULOS.map((m, i) => (
+            <div key={m.titulo} className={`grid items-center gap-8 sm:grid-cols-2 ${i % 2 ? "sm:[&>div:first-child]:order-2" : ""}`}>
+              <div>
+                <div className="mb-2 text-3xl">{m.icono}</div>
+                <h3 className="text-lg font-bold text-slate-800">{m.titulo}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{m.detalle}</p>
+              </div>
+              <Captura src={m.captura} icono={m.icono} titulo={m.titulo} />
             </div>
           ))}
         </div>
 
-        <div className="mt-12 rounded-2xl border border-brand-100 bg-brand-50 p-8 text-center">
+        <div className="mt-16 rounded-2xl border border-brand-100 bg-brand-50 p-8 text-center">
           <h3 className="text-lg font-bold text-slate-800">Empieza ahora</h3>
           <p className="mx-auto mt-1 max-w-xl text-sm text-slate-500">
             Ingresa a la plataforma para consultar a tus clientes y generar sus informes.
