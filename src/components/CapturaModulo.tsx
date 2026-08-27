@@ -48,7 +48,7 @@ export default function CapturaModulo({
 
   return (
     <div className="relative">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.03] hover:shadow-2xl">
         {/* Barra de la ventana. El punto verde amplía. */}
         <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
           <span className="h-3.5 w-3.5 rounded-full bg-red-300" />
