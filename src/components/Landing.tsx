@@ -54,7 +54,6 @@ const MODULOS: Modulo[] = [
     detalle:
       "Solicita el RTT de SUNAT y lo recibe por ti: el bot inicia sesión, pide el reporte y un webhook captura el archivo apenas SUNAT lo envía.",
     captura: "/capturas/rtt.png",
-    pos: "center",
     genera: [
       "El Reporte Tributario para Terceros en PDF y XML, tal como lo emite SUNAT.",
       "Trazabilidad de cada estado: creado → en proceso → listo.",
