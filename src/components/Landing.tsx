@@ -81,12 +81,37 @@ function Captura({ src, icono, titulo }: { src: string; icono: string; titulo: s
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
         <span className="ml-2 truncate text-[11px] text-slate-400">radartributaria — {titulo}</span>
       </div>
-      <div
-        className="relative flex aspect-[16/10] items-center justify-center bg-gradient-to-br from-brand-50 to-slate-100"
-        style={{ backgroundImage: `url(${src})`, backgroundSize: "cover", backgroundPosition: "top center" }}
-      >
-        {/* Si la imagen no está, se ve este ícono de fondo (vista previa). */}
-        <span className="pointer-events-none text-5xl opacity-25">{icono}</span>
+      <div className="relative aspect-[16/10]">
+        {/* Mockup base (se ve mientras no haya captura real). */}
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-50 to-slate-100 p-3">
+          <div className="flex h-full gap-2">
+            <div className="hidden w-1/5 flex-col gap-1.5 sm:flex">
+              <div className="h-2.5 rounded bg-white/70" />
+              <div className="h-2.5 w-4/5 rounded bg-white/60" />
+              <div className="h-2.5 w-3/5 rounded bg-white/50" />
+              <div className="mt-auto h-8 rounded-lg bg-brand-200/60" />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg opacity-40">{icono}</span>
+                <div className="h-3 w-1/3 rounded bg-slate-300/60" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-10 rounded-lg bg-white/70" />
+                <div className="h-10 rounded-lg bg-white/70" />
+                <div className="h-10 rounded-lg bg-white/70" />
+              </div>
+              <div className="flex-1 rounded-lg bg-white/60 p-2">
+                <div className="mb-1.5 h-2 w-2/3 rounded bg-slate-300/50" />
+                <div className="mb-1.5 h-2 w-1/2 rounded bg-slate-300/40" />
+                <div className="h-2 w-3/4 rounded bg-slate-300/40" />
+              </div>
+              <div className="h-6 w-24 rounded-lg bg-brand-300/60" />
+            </div>
+          </div>
+        </div>
+        {/* Captura real (si el archivo existe, tapa el mockup). */}
+        <div className="absolute inset-0 bg-cover bg-top" style={{ backgroundImage: `url(${src})` }} />
       </div>
     </div>
   );
