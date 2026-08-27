@@ -117,18 +117,21 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="hero-gradient relative overflow-hidden text-white">
-        {/* Decoración radar en los lados (rellena el espacio vacío). */}
-        <div aria-hidden className="pointer-events-none absolute left-0 top-1/2 hidden -translate-x-1/3 -translate-y-1/2 lg:block">
-          <div className="h-[26rem] w-[26rem] rounded-full border border-white/10" />
-          <div className="absolute inset-16 rounded-full border border-white/10" />
-          <div className="absolute inset-32 rounded-full border border-accent-300/15" />
+        {/* Fondo tipo radar: anillos concéntricos + cruz + barrido giratorio. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
+          <div className="relative aspect-square h-[150%]">
+            {[100, 80, 60, 40, 22].map((s) => (
+              <div key={s} className="absolute rounded-full border border-cyan-300/10" style={{ inset: `${(100 - s) / 2}%` }} />
+            ))}
+            <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-cyan-300/10" />
+            <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-cyan-300/10" />
+            <div
+              className="absolute inset-0 rounded-full animate-spin [animation-duration:6s]"
+              style={{ background: "conic-gradient(from 0deg, rgba(56,189,248,0.20), rgba(56,189,248,0.02) 24%, transparent 44%)" }}
+            />
+          </div>
         </div>
-        <div aria-hidden className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-1/3 lg:block">
-          <div className="h-[26rem] w-[26rem] rounded-full border border-white/10" />
-          <div className="absolute inset-16 rounded-full border border-white/10" />
-          <div className="absolute inset-32 rounded-full border border-accent-300/15" />
-        </div>
-        {/* Palabras de fondo que aparecen y desaparecen. */}
+        {/* Palabras/blips que aparecen y desaparecen en posiciones al azar. */}
         <HeroWords />
         <div className="relative z-10 mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
           <RadarPulse />
