@@ -1,5 +1,6 @@
 import { LogoAsenco } from "@/components/Logo";
 import CapturaModulo from "@/components/CapturaModulo";
+import ConejoTikTok from "@/components/ConejoTikTok";
 
 // Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
 // módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
@@ -74,6 +75,7 @@ function RadarPulse() {
 export default function Landing() {
   return (
     <div className="-mx-3 sm:-mx-4">
+      <ConejoTikTok />
       {/* Barra superior pública */}
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">

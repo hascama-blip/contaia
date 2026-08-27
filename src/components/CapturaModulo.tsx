@@ -68,9 +68,6 @@ export default function CapturaModulo({
 
           {/* Botón ampliar */}
           <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-700 shadow ring-1 ring-slate-200 transition group-hover:scale-110">⤢</span>
-
-          {/* 🐰 Conejo que sube y toca el botón */}
-          <span className="conejo" aria-hidden>🐰</span>
         </button>
       </div>
 
@@ -91,34 +88,11 @@ export default function CapturaModulo({
       )}
 
       <style jsx>{`
-        .conejo {
-          position: absolute;
-          left: 14px;
-          bottom: 8px;
-          font-size: 30px;
-          line-height: 1;
-          filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
-          animation: conejo-sube 5.5s ease-in-out infinite;
-          pointer-events: none;
-        }
-        @keyframes conejo-sube {
-          0%   { bottom: 8px;  transform: translateY(0) scale(1);      opacity: 0; }
-          8%   { opacity: 1; }
-          16%  { bottom: 22%;  transform: translateY(0) scale(1); }
-          20%  { bottom: 16%; }
-          34%  { bottom: 48%; }
-          38%  { bottom: 42%; }
-          52%  { bottom: 78%; transform: translateY(0) scale(1); }
-          58%  { bottom: 84%; transform: translateY(0) scale(0.82) rotate(-6deg); }  /* toca el botón */
-          64%  { bottom: 78%; transform: translateY(0) scale(1) rotate(0); }
-          88%  { bottom: 78%; opacity: 1; }
-          100% { bottom: 78%; opacity: 0; }
-        }
-        .dot-verde { animation: dot-latido 5.5s ease-in-out infinite; }
+        .dot-verde { animation: dot-latido 2.6s ease-in-out infinite; }
         @keyframes dot-latido {
-          0%, 56% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
-          60%     { transform: scale(1.5); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
-          66%,100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+          0%, 70%  { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
+          85%      { transform: scale(1.4); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+          100%     { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
         }
       `}</style>
     </div>
