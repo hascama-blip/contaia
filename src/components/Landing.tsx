@@ -2,7 +2,6 @@ import { LogoAsenco } from "@/components/Logo";
 import CapturaModulo from "@/components/CapturaModulo";
 import ConejoTikTok from "@/components/ConejoTikTok";
 import HeroWords from "@/components/HeroWords";
-import Reveal from "@/components/Reveal";
 
 // Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
 // módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
@@ -16,7 +15,6 @@ interface Modulo {
   captura: string; // /capturas/<archivo>.png (colócalo en public/capturas)
   genera: string[]; // qué información genera este módulo
   pos?: string; // posición del recorte de la captura (ej. "center", "top")
-  estados?: boolean; // anima Creado → En proceso → Listo (RTT)
 }
 
 const MODULOS: Modulo[] = [
@@ -57,7 +55,6 @@ const MODULOS: Modulo[] = [
       "Solicita el RTT de SUNAT y lo recibe por ti: el bot inicia sesión, pide el reporte y un webhook captura el archivo apenas SUNAT lo envía.",
     captura: "/capturas/rtt.png",
     pos: "center",
-    estados: true,
     genera: [
       "El Reporte Tributario para Terceros en PDF y XML, tal como lo emite SUNAT.",
       "Trazabilidad de cada estado: creado → en proceso → listo.",
@@ -171,7 +168,7 @@ export default function Landing() {
 
         <div className="space-y-24">
           {MODULOS.map((m) => (
-            <Reveal key={m.titulo} className="mx-auto max-w-4xl">
+            <div key={m.titulo} className="mx-auto max-w-4xl">
               <div className="mb-6 text-center">
                 <div className="mb-2 text-5xl">{m.icono}</div>
                 <h3 className="text-2xl font-bold text-slate-800 sm:text-3xl">{m.titulo}</h3>
@@ -190,8 +187,8 @@ export default function Landing() {
                 </ul>
               </div>
 
-              <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} pos={m.pos} estados={m.estados} />
-            </Reveal>
+              <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} pos={m.pos} />
+            </div>
           ))}
         </div>
 

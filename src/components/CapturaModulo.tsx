@@ -10,13 +10,11 @@ export default function CapturaModulo({
   icono,
   titulo,
   pos = "top center",
-  estados = false,
 }: {
   src: string;
   icono: string;
   titulo: string;
   pos?: string;
-  estados?: boolean; // muestra la animación Creado → En proceso → Listo (RTT)
 }) {
   const [open, setOpen] = useState(false);
 
@@ -80,17 +78,6 @@ export default function CapturaModulo({
           {Mockup}
           <div className="absolute inset-0 bg-cover" style={{ backgroundImage: `url(${src})`, backgroundPosition: pos }} />
 
-          {/* Estados animados del RTT: Creado → En proceso → Listo */}
-          {estados && (
-            <span className="pointer-events-none absolute inset-x-4 bottom-4 z-10 flex items-center justify-center gap-2 rounded-xl bg-slate-900/85 px-3 py-2 text-xs font-medium text-white shadow-lg backdrop-blur sm:text-sm">
-              <span className="est est-0">● Creado</span>
-              <span className="flecha">→</span>
-              <span className="est est-1">● En proceso</span>
-              <span className="flecha">→</span>
-              <span className="est est-2">✓ Listo</span>
-            </span>
-          )}
-
           {/* Botón ampliar */}
           <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-700 shadow ring-1 ring-slate-200 transition group-hover:scale-110">⤢</span>
         </button>
@@ -118,19 +105,6 @@ export default function CapturaModulo({
           0%, 70%  { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
           85%      { transform: scale(1.4); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
           100%     { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
-        }
-        .flecha { opacity: 0.5; }
-        .est { opacity: 0.4; transition: opacity 0.3s; white-space: nowrap; }
-        .est-0 { animation: paso 4.5s ease-in-out infinite; }
-        .est-1 { animation: paso 4.5s ease-in-out infinite; animation-delay: 1.4s; }
-        .est-2 { animation: pasoOk 4.5s ease-in-out infinite; animation-delay: 2.8s; }
-        @keyframes paso {
-          0%, 100% { opacity: 0.4; }
-          6%, 26%  { opacity: 1; color: #7dd3fc; }
-        }
-        @keyframes pasoOk {
-          0%, 100% { opacity: 0.4; }
-          6%, 40%  { opacity: 1; color: #6ee7b7; }
         }
       `}</style>
     </div>
