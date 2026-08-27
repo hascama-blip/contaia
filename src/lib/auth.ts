@@ -34,7 +34,9 @@ export function publicUser(u: Usuario): UsuarioPublico {
 // sobreescribir por entorno; si no, usa los valores iniciales acordados.
 const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "supremo@radartributaria.com").trim().toLowerCase();
 const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "Supremo2026@";
-const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador supremo";
+// Nombre que se muestra en el perfil. Configurable por SUPREMO_NOMBRE; por
+// defecto uno neutral (sin la palabra "supremo").
+const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador";
 
 /** Garantiza la cuenta supremo (idempotente y AUTO-REPARADORA). Se llama al
  *  entrar a /login, /register y al panel del supremo. Si la cuenta no existe la
@@ -56,6 +58,8 @@ export async function ensureSupremo(): Promise<void> {
   if (existente.rol !== "supremo") patch.rol = "supremo";
   if (existente.estado !== "aprobado") patch.estado = "aprobado";
   if (existente.parentId) patch.parentId = undefined;
+  // Nombre visible del perfil: se ajusta al configurado (SUPREMO_NOMBRE).
+  if (existente.nombre !== SUPREMO_NOMBRE) patch.nombre = SUPREMO_NOMBRE;
   // Si la contraseña configurada no abre la cuenta, la reponemos.
   if (!verifyPassword(SUPREMO_PASSWORD, existente.passHash)) {
     patch.passHash = hashPassword(SUPREMO_PASSWORD);
