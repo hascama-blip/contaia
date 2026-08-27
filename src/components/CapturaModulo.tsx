@@ -9,10 +9,12 @@ export default function CapturaModulo({
   src,
   icono,
   titulo,
+  pos = "top center",
 }: {
   src: string;
   icono: string;
   titulo: string;
+  pos?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -74,7 +76,7 @@ export default function CapturaModulo({
         {/* Contenido (grande). */}
         <button onClick={() => setOpen(true)} className="group relative block aspect-[16/10] w-full cursor-zoom-in text-left">
           {Mockup}
-          <div className="absolute inset-0 bg-cover bg-top" style={{ backgroundImage: `url(${src})` }} />
+          <div className="absolute inset-0 bg-cover" style={{ backgroundImage: `url(${src})`, backgroundPosition: pos }} />
 
           {/* Botón ampliar */}
           <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-700 shadow ring-1 ring-slate-200 transition group-hover:scale-110">⤢</span>

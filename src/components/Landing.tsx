@@ -14,6 +14,7 @@ interface Modulo {
   detalle: string;
   captura: string; // /capturas/<archivo>.png (colócalo en public/capturas)
   genera: string[]; // qué información genera este módulo
+  pos?: string; // posición del recorte de la captura (ej. "center", "top")
 }
 
 const MODULOS: Modulo[] = [
@@ -53,6 +54,7 @@ const MODULOS: Modulo[] = [
     detalle:
       "Solicita el RTT de SUNAT y lo recibe por ti: el bot inicia sesión, pide el reporte y un webhook captura el archivo apenas SUNAT lo envía.",
     captura: "/capturas/rtt.png",
+    pos: "center",
     genera: [
       "El Reporte Tributario para Terceros en PDF y XML, tal como lo emite SUNAT.",
       "Trazabilidad de cada estado: creado → en proceso → listo.",
@@ -185,7 +187,7 @@ export default function Landing() {
                 </ul>
               </div>
 
-              <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} />
+              <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} pos={m.pos} />
             </div>
           ))}
         </div>
