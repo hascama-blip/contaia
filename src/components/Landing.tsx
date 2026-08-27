@@ -105,7 +105,7 @@ export default function Landing() {
   return (
     // Full-bleed: rompe el max-width del contenedor de la app para ocupar todo
     // el ancho de la pantalla (evita los lados vacíos en escritorio).
-    <div className="relative left-1/2 -mt-5 w-screen -translate-x-1/2 overflow-x-hidden bg-slate-50 sm:-mt-6">
+    <div className="relative left-1/2 -ml-[50vw] -mt-5 w-screen overflow-x-hidden bg-slate-50 sm:-mt-6">
       <ConejoTikTok />
       {/* Barra superior pública */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">

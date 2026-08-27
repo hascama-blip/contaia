@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Marco tipo ventana con mockup + captura real (si existe). Un conejo sube por
 // la ventana y "toca" el círculo verde; al hacer clic se abre una ventana grande
@@ -15,6 +15,16 @@ export default function CapturaModulo({
   titulo: string;
 }) {
   const [open, setOpen] = useState(false);
+
+  // Al abrir: bloquea el scroll del fondo y cierra con Escape.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
 
   const Mockup = (
     <div className="absolute inset-0 bg-gradient-to-br from-brand-50 to-slate-100 p-4">
