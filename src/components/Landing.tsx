@@ -108,10 +108,12 @@ export default function Landing() {
     <div className="relative left-1/2 -mt-5 w-screen -translate-x-1/2 overflow-x-hidden bg-slate-50 sm:-mt-6">
       <ConejoTikTok />
       {/* Barra superior pública */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2" translate="no"><LogoAsenco /></div>
-          <a href={APP_LOGIN} className="btn-primary text-sm">Iniciar</a>
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 sm:py-4">
+          <div className="flex origin-left scale-110 items-center gap-2 sm:scale-[1.35]" translate="no"><LogoAsenco /></div>
+          <a href={APP_LOGIN} className="btn-primary rounded-xl px-6 py-2.5 text-base font-semibold shadow-md sm:px-8 sm:py-3 sm:text-lg">
+            Iniciar →
+          </a>
         </div>
       </header>
 
