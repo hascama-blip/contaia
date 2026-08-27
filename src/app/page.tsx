@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId, modulosDelEstudio, esSupremo } from "@/lib/auth";
+import { getCurrentUser, studioId, modulosDelEstudio, esSupremo } from "@/lib/auth";
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 import UtilitariosSeccion from "@/components/UtilitariosSeccion";
+import Landing from "@/components/Landing";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +139,10 @@ function Tarjeta({ o, bloqueado }: { o: Opcion; bloqueado: boolean }) {
 }
 
 export default async function MenuPage() {
-  const user = await requireUser();
+  // Visitante sin sesión → landing pública (el login interno queda en /login,
+  // sin enlazar, para que no entre gente que no debe).
+  const user = await getCurrentUser();
+  if (!user) return <Landing />;
   const clientes = await listClientes(studioId(user));
   const mods = await modulosDelEstudio(user);
 
