@@ -1,6 +1,7 @@
 import { LogoAsenco } from "@/components/Logo";
 import CapturaModulo from "@/components/CapturaModulo";
 import ConejoTikTok from "@/components/ConejoTikTok";
+import HeroWords from "@/components/HeroWords";
 
 // Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
 // módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
@@ -127,7 +128,9 @@ export default function Landing() {
           <div className="absolute inset-16 rounded-full border border-white/10" />
           <div className="absolute inset-32 rounded-full border border-accent-300/15" />
         </div>
-        <div className="relative mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
+        {/* Palabras de fondo que aparecen y desaparecen. */}
+        <HeroWords />
+        <div className="relative z-10 mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
           <RadarPulse />
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-accent-300">
             Diagnóstico tributario asistido

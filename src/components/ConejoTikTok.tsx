@@ -1,7 +1,8 @@
 "use client";
 
-// Conejo de cuerpo completo (🐇) que salta cruzando toda la página. Al hacer
-// clic lleva al TikTok de Radar. Se pausa al pasar el mouse para poder clicarlo.
+// Conejo de cuerpo completo (🐇) que recorre el MARCO de la ventana (perímetro
+// del viewport: abajo → derecha → arriba → izquierda, en bucle). Al hacer clic
+// lleva al TikTok de Radar. Se pausa al pasar el mouse para poder clicarlo.
 const TIKTOK = "https://www.tiktok.com/@radartributaria";
 
 export default function ConejoTikTok() {
@@ -12,36 +13,46 @@ export default function ConejoTikTok() {
       rel="noopener noreferrer"
       aria-label="Síguenos en TikTok"
       title="🐇 ¡Síguenos en TikTok!"
-      className="conejo-pagina"
+      className="conejo-marco"
     >
-      🐇
+      <span className="conejo-inner">🐇</span>
       <style jsx>{`
-        .conejo-pagina {
+        .conejo-marco {
           position: fixed;
-          bottom: 14px;
-          left: 0;
+          top: 90%;
+          left: 1%;
           z-index: 45;
-          font-size: 42px;
-          line-height: 1;
           text-decoration: none;
           cursor: pointer;
-          filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3));
-          will-change: left, transform;
-          animation: cruza 16s linear infinite, brinca 0.85s ease-in-out infinite;
+          will-change: top, left;
+          animation: marco 24s linear infinite;
         }
-        .conejo-pagina:hover {
+        .conejo-inner {
+          display: inline-block;
+          font-size: 40px;
+          line-height: 1;
+          filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3));
+          animation: bob 0.8s ease-in-out infinite;
+        }
+        .conejo-marco:hover,
+        .conejo-marco:hover .conejo-inner {
           animation-play-state: paused;
         }
-        @keyframes cruza {
-          0%   { left: -8%; }
-          100% { left: 106%; }
+        /* Recorre el perímetro de la ventana. */
+        @keyframes marco {
+          0%   { top: 90%; left: 1%; }
+          25%  { top: 90%; left: 95%; }
+          50%  { top: 3%;  left: 95%; }
+          75%  { top: 3%;  left: 1%; }
+          100% { top: 90%; left: 1%; }
         }
-        @keyframes brinca {
+        @keyframes bob {
           0%, 100% { transform: translateY(0) scaleX(-1); }
-          50%      { transform: translateY(-26px) scaleX(-1); }
+          50%      { transform: translateY(-8px) scaleX(-1); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .conejo-pagina { animation: none; left: 16px; }
+          .conejo-marco { animation: none; top: auto; bottom: 14px; left: 16px; }
+          .conejo-inner { animation: none; }
         }
       `}</style>
     </a>
