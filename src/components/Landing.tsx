@@ -43,6 +43,33 @@ const MODULOS: Modulo[] = [
   },
 ];
 
+// Radar animado: ícono central + aros de pulso que se expanden y desvanecen
+// (como un radar) + un barrido giratorio. Da vida al hero.
+function RadarPulse() {
+  return (
+    <div className="relative mx-auto mb-6 h-28 w-28">
+      {/* Aros de pulso (se expanden y se desvanecen, escalonados) */}
+      <span className="absolute inset-0 rounded-full border-2 border-accent-300/50 animate-ping [animation-duration:2.4s]" />
+      <span className="absolute inset-0 rounded-full border-2 border-accent-300/40 animate-ping [animation-duration:2.4s] [animation-delay:0.8s]" />
+      <span className="absolute inset-0 rounded-full border-2 border-accent-300/30 animate-ping [animation-duration:2.4s] [animation-delay:1.6s]" />
+      {/* Barrido giratorio del radar */}
+      <span
+        className="absolute inset-1 rounded-full animate-spin [animation-duration:3.5s]"
+        style={{ background: "conic-gradient(from 0deg, rgba(253,224,71,0.45), rgba(253,224,71,0.05) 22%, transparent 40%)" }}
+      />
+      {/* Disco base + ícono central del radar */}
+      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-white/5 ring-1 ring-white/15">
+        <svg viewBox="0 0 24 24" className="h-14 w-14" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9.5" className="stroke-white" strokeWidth="1.2" opacity="0.35" />
+          <circle cx="12" cy="12" r="5.5" className="stroke-white" strokeWidth="1.2" opacity="0.6" />
+          <line x1="12" y1="12" x2="20.5" y2="5.5" className="stroke-accent-300" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="2" className="fill-accent-300" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function Captura({ src, icono, titulo }: { src: string; icono: string; titulo: string }) {
   // Marco tipo ventana de navegador. Muestra la imagen si existe; si no, un
   // fondo con el ícono como "vista previa" (para que nunca salga rota).
@@ -79,6 +106,7 @@ export default function Landing() {
       {/* Hero */}
       <section className="hero-gradient text-white">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center sm:py-24">
+          <RadarPulse />
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-accent-300">
             Diagnóstico tributario asistido
           </p>
