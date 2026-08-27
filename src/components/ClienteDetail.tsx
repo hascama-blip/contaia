@@ -11,8 +11,6 @@ import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
 import RentasPanel from "./RentasPanel";
 import ItfPanel from "./ItfPanel";
-import ExtraerTodoPN from "./ExtraerTodoPN";
-import ExtraerTodoAPI from "./ExtraerTodoAPI";
 import DeudasF36Panel from "./DeudasF36Panel";
 import {
   CondicionBadge,
@@ -341,15 +339,7 @@ export default function ClienteDetail({
             )}
           </section>
 
-          {/* Extraer todo con un solo login SOL (buzón + fraccionamiento; y, en
-              persona natural, además rentas 4ta/5ta + ITF). */}
-          <ExtraerTodoPN
-            clienteId={cliente.id}
-            solUserGuardado={cliente.credSire?.solUser ?? ""}
-            personaNatural={esPersonaNatural(cliente.ruc)}
-          />
-
-          {/* ═════════ MÓDULOS DE SCRAPING (login SOL) ═════════ */}
+          {/* ═════════ MÓDULOS DE SCRAPING (login SOL) — cada uno con su botón ═════════ */}
 
           {/* 1 · Buzón electrónico */}
           <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL (scraping)." />
@@ -357,7 +347,6 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             yaConsultado={Boolean(cliente.buzon)}
-            sinConsultar
           />
 
           {/* 2 · Deudas (Fraccionamiento F36) */}
@@ -366,27 +355,21 @@ export default function ClienteDetail({
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
             inicial={cliente.deudasF36 ?? null}
-            sinGenerar
           />
 
           {/* 3 y 4 · Rentas 4ta/5ta e ITF — solo persona natural (scraping) */}
           {esPersonaNatural(cliente.ruc) && (
             <>
               <FaseHeader n="3" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
-              <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} sinGenerar />
+              <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
               <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
-              <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={cliente.itf ?? null} sinConsultar />
+              <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={cliente.itf ?? null} />
             </>
           )}
 
           {/* ═════════ MÓDULOS API (SIRE — client_id/secret, no login SOL) ═════════ */}
           {llevaSire(cliente) && (
             <>
-              <ExtraerTodoAPI
-                clienteId={cliente.id}
-                solUserGuardado={cliente.credSire?.solUser ?? ""}
-                inicialCred={cliente.credSire ?? null}
-              />
               <FaseHeader n="5" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (API)." />
               <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
               <FaseHeader n="6" titulo="Extracción SIRE (montos)" detalle="Compras/ventas por periodo. Coloca y bloquea la API (client_id/secret)." />
