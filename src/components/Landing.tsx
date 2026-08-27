@@ -1,4 +1,5 @@
 import { LogoAsenco } from "@/components/Logo";
+import CapturaModulo from "@/components/CapturaModulo";
 
 // Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
 // módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
@@ -70,53 +71,6 @@ function RadarPulse() {
   );
 }
 
-function Captura({ src, icono, titulo }: { src: string; icono: string; titulo: string }) {
-  // Marco tipo ventana de navegador. Muestra la imagen si existe; si no, un
-  // fondo con el ícono como "vista previa" (para que nunca salga rota).
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-3 py-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
-        <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-        <span className="ml-2 truncate text-[11px] text-slate-400">radartributaria — {titulo}</span>
-      </div>
-      <div className="relative aspect-[16/10]">
-        {/* Mockup base (se ve mientras no haya captura real). */}
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-50 to-slate-100 p-3">
-          <div className="flex h-full gap-2">
-            <div className="hidden w-1/5 flex-col gap-1.5 sm:flex">
-              <div className="h-2.5 rounded bg-white/70" />
-              <div className="h-2.5 w-4/5 rounded bg-white/60" />
-              <div className="h-2.5 w-3/5 rounded bg-white/50" />
-              <div className="mt-auto h-8 rounded-lg bg-brand-200/60" />
-            </div>
-            <div className="flex flex-1 flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg opacity-40">{icono}</span>
-                <div className="h-3 w-1/3 rounded bg-slate-300/60" />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="h-10 rounded-lg bg-white/70" />
-                <div className="h-10 rounded-lg bg-white/70" />
-                <div className="h-10 rounded-lg bg-white/70" />
-              </div>
-              <div className="flex-1 rounded-lg bg-white/60 p-2">
-                <div className="mb-1.5 h-2 w-2/3 rounded bg-slate-300/50" />
-                <div className="mb-1.5 h-2 w-1/2 rounded bg-slate-300/40" />
-                <div className="h-2 w-3/4 rounded bg-slate-300/40" />
-              </div>
-              <div className="h-6 w-24 rounded-lg bg-brand-300/60" />
-            </div>
-          </div>
-        </div>
-        {/* Captura real (si el archivo existe, tapa el mockup). */}
-        <div className="absolute inset-0 bg-cover bg-top" style={{ backgroundImage: `url(${src})` }} />
-      </div>
-    </div>
-  );
-}
-
 export default function Landing() {
   return (
     <div className="-mx-3 sm:-mx-4">
@@ -151,22 +105,23 @@ export default function Landing() {
 
       {/* Módulos con captura */}
       <section className="mx-auto max-w-6xl px-6 py-14">
-        <div className="mb-10 text-center">
-          <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">¿Qué incluye la plataforma?</h2>
+        <div className="mb-12 text-center">
+          <h2 className="text-2xl font-bold text-slate-800 sm:text-3xl">¿Qué incluye la plataforma?</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-500">
             Cada módulo automatiza un procedimiento de la auditoría tributaria.
+            Toca el <span className="font-semibold text-emerald-600">punto verde</span> (o la ventana) para verlo en grande.
           </p>
         </div>
 
-        <div className="space-y-14">
+        <div className="space-y-20">
           {MODULOS.map((m, i) => (
-            <div key={m.titulo} className={`grid items-center gap-8 sm:grid-cols-2 ${i % 2 ? "sm:[&>div:first-child]:order-2" : ""}`}>
-              <div>
-                <div className="mb-2 text-3xl">{m.icono}</div>
-                <h3 className="text-lg font-bold text-slate-800">{m.titulo}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">{m.detalle}</p>
+            <div key={m.titulo} className="mx-auto max-w-4xl">
+              <div className="mb-4 text-center">
+                <div className="mb-1 text-4xl">{m.icono}</div>
+                <h3 className="text-xl font-bold text-slate-800 sm:text-2xl">{m.titulo}</h3>
+                <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">{m.detalle}</p>
               </div>
-              <Captura src={m.captura} icono={m.icono} titulo={m.titulo} />
+              <CapturaModulo src={m.captura} icono={m.icono} titulo={m.titulo} />
             </div>
           ))}
         </div>
