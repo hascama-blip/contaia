@@ -230,31 +230,45 @@ export async function lanzarNavegador(opts: { preferLocal?: boolean } = {}) {
   return (await conectarNavegador(opts)).browser;
 }
 
-/** Prueba el proxy residencial SIN tocar SUNAT: abre Chromium local con el proxy
- *  (igual que la Opción A del RTT) y consulta la IP de salida. Sirve para validar
- *  que el proxy autentica desde el servidor antes de enrutar los logins por él. */
-export async function probarProxy(): Promise<{ ok: boolean; ip?: string; ms?: number; error?: string; server?: string }> {
+/** Prueba el proxy residencial abriendo Chromium local con el proxy (igual que la
+ *  Opción A del RTT). Prueba por separado HTTP, HTTPS y el HOST REAL de SUNAT: si
+ *  el proxy tuneliza HTTP pero falla el CONNECT de HTTPS, la IP sale bien pero
+ *  SUNAT (solo HTTPS) da chrome-error. Así vemos DÓNDE se rompe, no solo la IP. */
+export async function probarProxy(): Promise<{
+  ok: boolean; ip?: string; ms?: number; error?: string; server?: string;
+  http?: string; https?: string; sunat?: string;
+}> {
   const proxy = await proxyConfig();
   if (!proxy) return { ok: false, error: "No hay proxy configurado (PROXY_SERVER)." };
   const { chromium } = await import("playwright-core");
   let browser: any = null;
   const t0 = Date.now();
+  // Navega una URL y devuelve "ok" o el mensaje de error (net error de Chromium).
+  const intento = async (page: any, url: string, timeout = 40000): Promise<string> => {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout });
+      const u = String(page.url());
+      if (/chrome-error/i.test(u)) return "chrome-error (navegación falló)";
+      return "ok";
+    } catch (e: any) {
+      return String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 120);
+    }
+  };
   try {
     browser = await lanzarLocal(chromium); // lanzarLocal aplica el proxyConfig()
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    // Los residenciales son más lentos: damos más tiempo y probamos por HTTP
-    // (menos handshake) — si falla, reintenta por HTTPS.
-    let body = "";
-    try {
-      await page.goto("http://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 45000 });
-      body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
-    } catch {
-      await page.goto("https://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 45000 });
-      body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
-    }
-    const ip = (body.match(/(\d{1,3}\.){3}\d{1,3}/) || [])[0] || "";
-    return { ok: !!ip, ip, ms: Date.now() - t0, server: proxy.server };
+    // 1) IP por HTTP (handshake mínimo).
+    const http = await intento(page, "http://api.ipify.org?format=json");
+    let ip = "";
+    if (http === "ok") ip = ((await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string).match(/(\d{1,3}\.){3}\d{1,3}/)?.[0] || "";
+    // 2) HTTPS (mismo servicio por TLS → prueba el CONNECT del proxy).
+    const https = await intento(page, "https://api.ipify.org?format=json");
+    if (!ip && https === "ok") ip = ((await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string).match(/(\d{1,3}\.){3}\d{1,3}/)?.[0] || "";
+    // 3) HOST REAL de SUNAT (lo que de verdad usa el RTT/buzón).
+    const sunat = await intento(page, "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm", 55000);
+    // "ok" global = se pudo llegar a SUNAT por HTTPS (lo único que importa para el bot).
+    return { ok: sunat === "ok", ip, ms: Date.now() - t0, server: proxy.server, http, https, sunat };
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e).slice(0, 200), ms: Date.now() - t0, server: proxy.server };
   } finally {

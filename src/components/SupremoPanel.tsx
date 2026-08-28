@@ -81,12 +81,26 @@ export default function SupremoPanel() {
   const [proxyTest, setProxyTest] = useState<string | null>(null);
 
   async function probarProxyUI() {
-    setProxyTest("Probando… (abre un navegador con el proxy, ~15s)");
+    setProxyTest("Probando… (abre un navegador con el proxy y toca SUNAT, ~30–50s)");
     try {
       const res = await fetch("/api/supremo/probar-proxy", { method: "POST" });
       const d = await res.json().catch(() => ({}));
-      if (d.ok) setProxyTest(`✓ Proxy OK — IP de salida: ${d.ip} (${d.ms} ms). Sirve para la Opción A.`);
-      else setProxyTest(`✗ Falló: ${d.error ?? "sin respuesta"}. Revisa que el proxy autentique por usuario/clave desde cualquier IP (no whitelist).`);
+      // Desglose por paso: si HTTP/IP sale bien pero HTTPS o SUNAT fallan, el
+      // proxy no tuneliza HTTPS (CONNECT) → el bot da chrome-error en el login.
+      const icono = (v?: string) => (v === "ok" ? "✓" : v ? `✗ ${v}` : "—");
+      const desglose =
+        d.http !== undefined
+          ? `\n  • IP (HTTP): ${d.ip ? `${icono(d.http)} ${d.ip}` : icono(d.http)}` +
+            `\n  • HTTPS (ipify): ${icono(d.https)}` +
+            `\n  • SUNAT (e-menu, HTTPS): ${icono(d.sunat)}`
+          : "";
+      if (d.ok) {
+        setProxyTest(`✓ Proxy OK — llega a SUNAT por HTTPS. IP de salida: ${d.ip ?? "?"} (${d.ms} ms). Sirve para la Opción A (RTT).${desglose}`);
+      } else if (d.ip && (d.https !== "ok" || d.sunat !== "ok")) {
+        setProxyTest(`⚠️ El proxy da IP (${d.ip}) pero NO llega a SUNAT por HTTPS → el bot dará chrome-error en el login. El proxy debe permitir CONNECT/HTTPS.${desglose}`);
+      } else {
+        setProxyTest(`✗ Falló: ${d.error ?? "sin respuesta"}. Revisa que el proxy autentique por usuario/clave desde cualquier IP (no whitelist).${desglose}`);
+      }
     } catch {
       setProxyTest("✗ Error de red al probar el proxy.");
     }
@@ -743,7 +757,7 @@ export default function SupremoPanel() {
               </button>
             )}
           </div>
-          {proxyTest && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-600">{proxyTest}</p>}
+          {proxyTest && <p className="mt-2 whitespace-pre-line rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-600">{proxyTest}</p>}
         </div>
         {integMsg && <p className="mt-2 text-xs text-slate-600">{integMsg}</p>}
       </div>

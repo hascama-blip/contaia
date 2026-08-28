@@ -205,12 +205,18 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     const page = await ctx.newPage();
 
     // 1) Login SOL (secuencia idéntica a fraccionamiento/buzón, con reintento).
+    //    Se GUARDA el net-error de cada intento: si el proxy no tuneliza HTTPS a
+    //    SUNAT, aquí sale ERR_TUNNEL/ERR_TIMED_OUT y la URL queda en chrome-error.
     let navOk = false;
+    let navErr = "";
     for (let i = 0; i < 3 && !navOk; i++) {
       try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 70000 }); navOk = true; }
-      catch { await page.waitForTimeout(2000).catch(() => {}); }
+      catch (e: any) { navErr = String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 160); await page.waitForTimeout(2000).catch(() => {}); }
     }
-    if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 70000 }).catch(() => {});
+    if (!navOk) {
+      try { await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 70000 }); navOk = true; }
+      catch (e: any) { navErr = String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 160); }
+    }
     await page.waitForTimeout(2500).catch(() => {});
     await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
     await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
@@ -229,8 +235,22 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
 
     const url = page.url();
     const texto = (await page.evaluate(() => (document.body?.innerText || "").slice(0, 300)).catch(() => "")) as string;
+    // La navegación misma falló (proxy no llegó a SUNAT): la URL queda en
+    // chrome-error o about:blank. Es distinto de "SUNAT rechazó la clave".
+    const navFallo = /^chrome-error|^about:blank/i.test(url) || !navOk;
     const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url + " " + texto);
-    pasos.push({ paso: "login", url, loginError });
+    pasos.push({ paso: "login", url, navOk, navErr: navErr || undefined, navFallo, loginError });
+    if (navFallo) {
+      return {
+        ok: false,
+        loginError: true,
+        error:
+          "No se pudo abrir la página de SUNAT (la navegación falló: " +
+          (navErr || "chrome-error") +
+          "). Suele ser el proxy residencial: no tuneliza HTTPS a SUNAT o está lento/caído. En el panel del supremo usa 'Probar proxy' y revisa que 'SUNAT (HTTPS)' salga ✓.",
+        diag: { pasos },
+      };
+    }
     if (loginError) {
       return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL, o bloqueo temporal por varios intentos). Espera ~10 min y reintenta.", diag: { pasos } };
     }
