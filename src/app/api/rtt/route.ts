@@ -61,8 +61,11 @@ export async function POST(req: NextRequest) {
     // Sin casilla roja: si había reporte previo se conserva "listo"; si no, se
     // borra la casilla. El error se comunica solo como aviso transitorio.
     await resolverFalloRTT(sol.id);
-    return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte." }, { status: r.loginError ? 401 : 502 });
+    // Se incluye `diag` (la traza, con el paso "enviar" y la respuesta de SUNAT)
+    // para poder ver por qué no salió, sin tener que usar el modo diagnóstico.
+    return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
   }
   // OK → queda "en_proceso" esperando el correo de SUNAT (lo captura el webhook).
-  return NextResponse.json({ solicitud: sol });
+  // Se devuelve también `diag` para ver el paso "enviar" (respuesta de SUNAT).
+  return NextResponse.json({ solicitud: sol, diag: r.diag });
 }
