@@ -306,6 +306,225 @@ export async function resolverRecaptchaV3(ctx: any, frame: any, pasos: any[] = [
   return true;
 }
 
+// ============================================================
+//  reCAPTCHA que APARECE al Enviar (SUNAT RTT): invisible/v2 con desafío
+// ============================================================
+// El RTT muestra el captcha DESPUÉS de dar Enviar (una capa translúcida con el
+// desafío de imágenes). Antes de Enviar no hay sitekey en el DOM. Aquí:
+//  - volcarCaptcha: vuelca la estructura (para diagnóstico: iframes, sitekeys…).
+//  - detectarRecaptchaPost: halla el sitekey (del iframe anchor ?k=, del div
+//    data-sitekey o del render=), y si es v2 (hay anchor/bframe/campo) o v3.
+//  - resolverRecaptchaAparecido: lo resuelve con CapSolver, inyecta el token y
+//    dispara el callback de grecaptcha para que SUNAT continúe el envío.
+
+/** Vuelca todo lo relacionado a captcha en cada frame (solo diagnóstico). */
+export async function volcarCaptcha(ctx: any): Promise<any[]> {
+  const out: any[] = [];
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const info = await fr
+        .evaluate(() => {
+          const srcIframes = (Array.from(document.querySelectorAll("iframe")) as HTMLIFrameElement[])
+            .map((f) => f.src || "")
+            .filter((s) => /recaptcha|challenges\.cloudflare/i.test(s))
+            .map((s) => s.slice(0, 160));
+          const divs = (Array.from(document.querySelectorAll("[data-sitekey]")) as HTMLElement[])
+            .map((d) => d.getAttribute("data-sitekey") || "");
+          const scripts = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[])
+            .map((s) => s.src || "")
+            .filter((u) => /recaptcha\/(api|enterprise)\.js/i.test(u))
+            .map((s) => s.slice(0, 160));
+          const hayCampoV3 = !!document.querySelector('#tokenCaptchaV3, [name="tokenCaptchaV3"]');
+          const hayCampoV2 = !!document.querySelector('[name="g-recaptcha-response"], #g-recaptcha-response');
+          const cfg = !!(window as any).___grecaptcha_cfg;
+          if (!srcIframes.length && !divs.length && !scripts.length && !hayCampoV3 && !hayCampoV2) return null;
+          return { iframes: srcIframes, divs, scripts, hayCampoV3, hayCampoV2, cfg };
+        })
+        .catch(() => null);
+      if (info) {
+        let url = "";
+        try { url = fr.url(); } catch { /* */ }
+        out.push({ url: (url || "").slice(0, 90), ...info });
+      }
+    }
+  }
+  return out;
+}
+
+export interface RecaptchaPost { sitekey: string; url: string; tipo: "v2" | "v3"; invisible: boolean; enterprise: boolean; hayBframe: boolean }
+
+/** Halla el reCAPTCHA presente (tras Enviar): sitekey exacto y si es v2/v3. */
+export async function detectarRecaptchaPost(ctx: any): Promise<RecaptchaPost | null> {
+  let fallback: RecaptchaPost | null = null;
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const r = await fr
+        .evaluate(() => {
+          const w = window as any;
+          const ifr = (Array.from(document.querySelectorAll("iframe")) as HTMLIFrameElement[]).map((f) => f.src || "");
+          const anchor = ifr.find((s) => /recaptcha\/(api2|enterprise)\/anchor/i.test(s)) || "";
+          const bframe = ifr.find((s) => /recaptcha\/(api2|enterprise)\/bframe/i.test(s)) || "";
+          const div = document.querySelector(".g-recaptcha[data-sitekey], [data-sitekey]") as HTMLElement | null;
+          const scriptEnt = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[])
+            .map((s) => s.src || "").find((u) => /recaptcha\/enterprise\.js/i.test(u));
+          let sitekey: string | null = null;
+          let enterprise = !!scriptEnt || /enterprise/i.test(anchor + bframe);
+          let invisible = true;
+          let tipo: "v2" | "v3" = "v3";
+          const from = anchor || bframe;
+          if (from) { const m = /[?&]k=(6L[0-9A-Za-z_-]{38})(?![0-9A-Za-z_-])/.exec(from); if (m) { sitekey = m[1]; tipo = "v2"; } }
+          if (!sitekey && div) {
+            const dk = div.getAttribute("data-sitekey") || "";
+            if (/^6L[0-9A-Za-z_-]{38}$/.test(dk)) {
+              sitekey = dk; tipo = "v2";
+              try { const rc = div.getBoundingClientRect(); if (div.offsetParent !== null && rc.width > 10 && rc.height > 10) invisible = false; } catch (e) { /* */ }
+            }
+          }
+          if (!sitekey) {
+            const sc = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[])
+              .map((s) => s.src || "").find((u) => /recaptcha\/(api|enterprise)\.js/i.test(u)) || "";
+            const m = /[?&]render=(6L[0-9A-Za-z_-]{38})(?![0-9A-Za-z_-])/.exec(sc);
+            if (m && m[1] !== "explicit") { sitekey = m[1]; tipo = (anchor || bframe || div) ? "v2" : "v3"; }
+          }
+          if (!sitekey && w.__radarRc && /^6L[0-9A-Za-z_-]{38}$/.test(w.__radarRc.sitekey || "")) sitekey = w.__radarRc.sitekey;
+          const hayCampoV2 = !!document.querySelector('[name="g-recaptcha-response"], #g-recaptcha-response');
+          const hayCampoV3 = !!document.querySelector('#tokenCaptchaV3, [name="tokenCaptchaV3"]');
+          if (sitekey && (anchor || bframe || hayCampoV2)) tipo = "v2";
+          return sitekey ? { sitekey, tipo, invisible, enterprise, hayBframe: !!bframe, hayCampoV2, hayCampoV3 } : null;
+        })
+        .catch(() => null as any);
+      if (r?.sitekey) {
+        let url = "";
+        try { url = fr.url(); } catch { /* */ }
+        if (!url || url === "about:blank") url = pg.url();
+        const info: RecaptchaPost = { sitekey: r.sitekey, url, tipo: r.tipo, invisible: r.invisible, enterprise: r.enterprise, hayBframe: r.hayBframe };
+        if (r.hayCampoV2 || r.hayCampoV3 || r.hayBframe || /reportetri|itreportetri/i.test(url)) return info;
+        if (!fallback) fallback = info;
+      }
+    }
+  }
+  return fallback;
+}
+
+/** Pide a CapSolver un token de reCAPTCHA v2 (checkbox o invisible). */
+async function capsolverRecaptchaV2(
+  clientKey: string, sitekey: string, url: string, invisible: boolean, enterprise: boolean
+): Promise<{ token: string | null; error?: string; tipo?: string }> {
+  let ultimoError = "";
+  const pedir = async (type: string): Promise<string | null> => {
+    const crear = await fetch(`${API_URL}/createTask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientKey,
+        task: { type, websiteURL: url, websiteKey: sitekey, isInvisible: !!invisible },
+      }),
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (!crear || crear.errorId || !crear.taskId) {
+      ultimoError = crear ? `${crear.errorCode || ""} ${crear.errorDescription || ""}`.trim() || "createTask sin taskId" : "createTask sin respuesta";
+      return null;
+    }
+    const hasta = Date.now() + MAX_MS;
+    while (Date.now() < hasta) {
+      await sleep(3000);
+      const res = await fetch(`${API_URL}/getTaskResult`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientKey, taskId: crear.taskId }),
+      })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!res) continue;
+      if (res.errorId) { ultimoError = `${res.errorCode || ""} ${res.errorDescription || ""}`.trim() || "getTaskResult errorId"; return null; }
+      if (res.status === "ready") return res.solution?.gRecaptchaResponse ?? res.solution?.token ?? null;
+    }
+    ultimoError = "timeout esperando el token";
+    return null;
+  };
+  const tipos = enterprise
+    ? ["ReCaptchaV2EnterpriseTaskProxyLess", "ReCaptchaV2TaskProxyLess"]
+    : ["ReCaptchaV2TaskProxyLess", "ReCaptchaV2EnterpriseTaskProxyLess"];
+  for (const t of tipos) {
+    const token = await pedir(t);
+    if (token) return { token, tipo: t };
+  }
+  return { token: null, error: ultimoError.slice(0, 140) };
+}
+
+/** Inyecta un token de reCAPTCHA v2 en g-recaptcha-response de todos los frames y
+ *  dispara el callback registrado en ___grecaptcha_cfg (así SUNAT continúa). */
+async function inyectarV2YDisparar(ctx: any, token: string): Promise<number> {
+  let total = 0;
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const n = await fr
+        .evaluate((tok: string) => {
+          let puestos = 0;
+          document.querySelectorAll('textarea[name="g-recaptcha-response"], #g-recaptcha-response, [name="g-recaptcha-response"]').forEach((el) => {
+            (el as HTMLInputElement).value = tok;
+            try { (el as HTMLElement).innerHTML = tok; } catch (e) { /* */ }
+            puestos++;
+          });
+          // Disparar el callback de grecaptcha (invisible: es quien envía el form).
+          try {
+            const cfg = (window as any).___grecaptcha_cfg;
+            if (cfg && cfg.clients) {
+              const seen = new Set<any>();
+              const visit = (o: any, d: number) => {
+                if (!o || d > 7 || typeof o !== "object" || seen.has(o)) return;
+                seen.add(o);
+                for (const k of Object.keys(o)) {
+                  let v: any;
+                  try { v = o[k]; } catch (e) { continue; }
+                  if (typeof v === "function" && (k === "callback" || k.toLowerCase().includes("callback"))) {
+                    try { v(tok); puestos++; } catch (e) { /* */ }
+                  } else if (v && typeof v === "object") visit(v, d + 1);
+                }
+              };
+              Object.values(cfg.clients).forEach((c: any) => visit(c, 0));
+            }
+          } catch (e) { /* */ }
+          return puestos;
+        }, token)
+        .catch(() => 0);
+      total += Number(n) || 0;
+    }
+  }
+  return total;
+}
+
+/** Resuelve el reCAPTCHA que APARECIÓ tras Enviar (v2 invisible/checkbox, o v3).
+ *  Devuelve true si inyectó un token. Reporta pasos de diagnóstico. */
+export async function resolverRecaptchaAparecido(ctx: any, pasos: any[] = []): Promise<boolean> {
+  let clientKey = (process.env.CAPSOLVER_KEY || "").trim();
+  if (!clientKey) {
+    try { const { getIntegraciones } = await import("./db"); clientKey = (await getIntegraciones()).capsolverKey; } catch { /* */ }
+  }
+  const info = await detectarRecaptchaPost(ctx);
+  if (!info) { pasos.push({ paso: "recaptcha-post", detectado: false, nota: "no apareció reCAPTCHA tras Enviar" }); return false; }
+  if (!clientKey) {
+    pasos.push({ paso: "recaptcha-post", detectado: true, tipo: info.tipo, sitekey: info.sitekey, resuelto: false, nota: "falta CAPSOLVER_KEY" });
+    return false;
+  }
+  if (info.tipo === "v2" || info.hayBframe) {
+    const sol = await capsolverRecaptchaV2(clientKey, info.sitekey, info.url, info.invisible, info.enterprise);
+    if (!sol.token) {
+      pasos.push({ paso: "recaptcha-post", detectado: true, tipo: "v2", sitekey: info.sitekey, url: info.url, invisible: info.invisible, enterprise: info.enterprise, resuelto: false, nota: "CapSolver no resolvió v2", capsolverError: sol.error });
+      return false;
+    }
+    const inyecciones = await inyectarV2YDisparar(ctx, sol.token);
+    pasos.push({ paso: "recaptcha-post", detectado: true, tipo: "v2", sitekey: info.sitekey, invisible: info.invisible, enterprise: info.enterprise, resuelto: true, proveedor: "capsolver", tarea: sol.tipo, inyecciones });
+    return true;
+  }
+  // v3 puro (sin desafío visible): igual que resolverRecaptchaV3 pero con el
+  // sitekey ya presente en el frame.
+  const dest = ctx.pages()[0] && ctx.pages()[0].mainFrame();
+  const okV3 = await resolverRecaptchaV3(ctx, dest, pasos).catch(() => false);
+  return okV3;
+}
+
 /** ¿Se ve OTRO tipo de captcha (reCAPTCHA/hCaptcha)? Solo para diagnóstico. */
 export async function detectarOtroCaptcha(ctx: any): Promise<string | null> {
   for (const pg of ctx.pages()) {

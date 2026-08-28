@@ -12,7 +12,7 @@
 // (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
-import { resolverCaptchaSiHay, hookTurnstileSitekey, hookRecaptchaV3, detectarRecaptchaV3, resolverRecaptchaV3 } from "./captcha";
+import { resolverCaptchaSiHay, hookTurnstileSitekey, hookRecaptchaV3, detectarRecaptchaV3, resolverRecaptchaV3, volcarCaptcha, detectarRecaptchaPost, resolverRecaptchaAparecido } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -324,11 +324,30 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         });
       }
       await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
-      // reCAPTCHA v3: reportar sitekey/action detectados y probar que CapSolver
-      // devuelve token (esto es lo que de verdad destraba el envío del RTT).
-      const v3 = await detectarRecaptchaV3(ctx).catch(() => null);
-      pasos.push({ paso: "recaptchaV3-detect", ...(v3 || { detectado: false }) });
-      if (frameRTT) await resolverRecaptchaV3(ctx, frameRTT, pasos).catch(() => false);
+      // El reCAPTCHA del RTT APARECE al Enviar (capa translúcida con el desafío).
+      // Antes de Enviar no hay sitekey. Así que en diagnóstico: escribimos el
+      // correo, damos Enviar (NO envía sin resolver el captcha) y volcamos qué
+      // captcha apareció + intentamos resolverlo con CapSolver.
+      const v3pre = await detectarRecaptchaV3(ctx).catch(() => null);
+      pasos.push({ paso: "recaptchaV3-detect", ...(v3pre || { detectado: false }), nota: "antes de Enviar (suele venir vacío: el captcha aparece al Enviar)" });
+      if (frameRTT) {
+        await frameRTT.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').first().fill(params.emailDestino).catch(() => {});
+        let clico = false;
+        for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
+          const el = frameRTT.locator(sel).first();
+          if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clico = true; break; }
+        }
+        pasos.push({ paso: "enviar-diag", clico });
+        // Esperar a que aparezca el captcha (iframe recaptcha / bframe).
+        let post: any = null;
+        for (let i = 0; i < 12 && !post; i++) {
+          await page.waitForTimeout(1200).catch(() => {});
+          post = await detectarRecaptchaPost(ctx).catch(() => null);
+        }
+        const volcado = await volcarCaptcha(ctx).catch(() => []);
+        pasos.push({ paso: "captcha-tras-enviar", detectado: post || false, frames: volcado });
+        await resolverRecaptchaAparecido(ctx, pasos).catch(() => false);
+      }
       return { ok: false, diag: { pasos } };
     }
 
@@ -358,26 +377,38 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
     }
 
-    // El formulario RTT trae Cloudflare Turnstile (campo cf-turnstile-response).
-    // Resolverlo ANTES de "Enviar" (no-op si no hay widget o no hay CAPSOLVER_KEY).
+    // Turnstile (por si el login/forma lo trae). No-op si no hay widget/clave.
     const captchaOk = await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
     if (captchaOk) await page.waitForTimeout(1200).catch(() => {});
 
-    // reCAPTCHA v3 (el que rechazaba al bot por reputación de IP): generamos el
-    // token con CapSolver e inyectamos, para que el POST salga con buen puntaje
-    // aunque la IP sea de datacenter. Se hace JUSTO antes de Enviar.
-    await resolverRecaptchaV3(ctx, frameRTT, pasos).catch(() => false);
+    // Helper: pulsar Enviar dentro del frame del RTT.
+    const pulsarEnviar = async (): Promise<boolean> => {
+      for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
+        const el = frameRTT.locator(sel).first();
+        if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); return true; }
+      }
+      return !!(await clickEnFrame(frameRTT, ["Enviar"]));
+    };
 
-    // Enviar dentro del frame del RTT. El botón corre la reCAPTCHA v3 (rellena
-    // tokenCaptchaV3) y hace el POST; por eso se hace CLIC (no POST directo) y el
-    // confirm lo acepta autoAceptarDialogos.
-    let enviado = false;
-    for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
-      const el = frameRTT.locator(sel).first();
-      if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); enviado = true; break; }
+    // El reCAPTCHA del RTT APARECE al Enviar. Secuencia correcta:
+    //  1) Enviar (dispara el captcha) → 2) esperar a que aparezca →
+    //  3) resolverlo con CapSolver (inyecta token + dispara callback) →
+    //  4) por si el callback no envía solo, volver a Enviar.
+    let enviado = await pulsarEnviar();
+    // Esperar a que el captcha se materialice (iframe recaptcha / bframe).
+    let post: any = null;
+    for (let i = 0; i < 12 && !post; i++) {
+      await page.waitForTimeout(1200).catch(() => {});
+      post = await detectarRecaptchaPost(ctx).catch(() => null);
     }
-    if (!enviado) enviado = !!(await clickEnFrame(frameRTT, ["Enviar"]));
-    // reCAPTCHA v3 + POST son asíncronos: dar tiempo.
+    const captchaResuelto = await resolverRecaptchaAparecido(ctx, pasos).catch(() => false);
+    if (captchaResuelto) {
+      await page.waitForTimeout(2500).catch(() => {});
+      // Si tras resolver el captcha no se envió solo (callback), reintentar Enviar.
+      const yaEnviado = await frameRTT.evaluate(() => /se ha enviado|se enviar|de manera exitosa|exitos|correo/i.test(document.body?.innerText || "")).catch(() => false);
+      if (!yaEnviado) { await pulsarEnviar(); enviado = true; }
+    }
+    // POST asíncrono: dar tiempo.
     await page.waitForTimeout(4500).catch(() => {});
     const trasEnviar = (await frameRTT.evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
     const exito = /se ha enviado|se enviar[aá]|se generar[aá]|enviado a su correo|correo.*registrad|de manera exitosa|exitos|env[ií]o.*correo/i.test(trasEnviar);
