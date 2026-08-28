@@ -37,7 +37,10 @@ export interface HonorariosResultado {
   diag?: { pasos: any[]; requests?: any[]; rango?: { fi: string; ff: string } };
 }
 
-/** Rango de fechas (dd/mm/aaaa) para MES(ES) COMPLETO(S) a partir de YYYYMM. */
+/** Rango de fechas (dd/mm/aaaa) para MES(ES) COMPLETO(S) a partir de YYYYMM.
+ *  La fecha FIN se topa a HOY: si el mes final está en curso, sus días futuros
+ *  aún no existen en SUNAT y la consulta no devolvería nada. Por eso fecha fin =
+ *  mínimo(último día del mes, hoy). */
 export function rangoMeses(desde?: string, hasta?: string): { fi: string; ff: string } {
   const norm = (s?: string) => String(s || "").replace(/\D/g, "");
   const hoy = new Date();
@@ -46,8 +49,10 @@ export function rangoMeses(desde?: string, hasta?: string): { fi: string; ff: st
   const y1 = +d.slice(0, 4), m1 = +d.slice(4, 6) || 1;
   const y2 = +h.slice(0, 4), m2 = +h.slice(4, 6) || 12;
   const p2 = (n: number) => String(n).padStart(2, "0");
-  const ultimo = new Date(y2, m2, 0).getDate(); // último día del mes final
-  return { fi: `01/${p2(m1)}/${y1}`, ff: `${p2(ultimo)}/${p2(m2)}/${y2}` };
+  const fmt = (dt: Date) => `${p2(dt.getDate())}/${p2(dt.getMonth() + 1)}/${dt.getFullYear()}`;
+  const finMes = new Date(y2, m2, 0); // último día del mes final
+  const ffDate = finMes.getTime() > hoy.getTime() ? hoy : finMes; // topar a hoy
+  return { fi: `01/${p2(m1)}/${y1}`, ff: fmt(ffDate) };
 }
 
 // ---- Helpers (copiados del flujo probado del RTT/buzón) ----
@@ -224,19 +229,29 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     pasos.push({ paso: "login", url, loginError });
     if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL o bloqueo temporal).", diag: { pasos, requests, rango } };
 
-    // 2) Entrar por el menú a "Consulta Receptor".
+    // 2) Abrir "Consulta Receptor". La opción está muy anidada y duplicada, así
+    //    que navegamos DIRECTO por su CÓDIGO de menú (capturado: 11.5.1.1.14),
+    //    igual que hace ejecuta(): action=execute redirige al app cpelec001Alias.
     await cerrarPantallas(ctx, page);
-    const menu = await clicMenu(ctx, ["Consulta Receptor", "Consulta del Receptor"]);
-    pasos.push({ paso: "menu-consulta-receptor", clico: !!menu.clico, onclick: menu.clico, candidatos: menu.candidatos });
+    const MENU_CODE = process.env.HONORARIOS_MENU_CODE || "11.5.1.1.14";
+    const EJECUTA_URL = `https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=${MENU_CODE}&s=ww1`;
+    let via = "code";
+    try { await page.goto(EJECUTA_URL, { waitUntil: "domcontentloaded", timeout: 60000 }); }
+    catch { via = "code-err"; }
+    await page.waitForTimeout(2500).catch(() => {});
+    pasos.push({ paso: "menu-consulta-receptor", via, code: MENU_CODE, url: page.url().slice(0, 160) });
 
-    // 3) Esperar el formulario "Consulta SEE - Receptor" (detección por contenido).
+    // 3) Esperar el formulario "Consulta SEE - Receptor" (por contenido o URL).
     let appFrame: any = null;
     for (let i = 0; i < 15 && !appFrame; i++) {
       await page.waitForTimeout(1200).catch(() => {});
       await cerrarPantallas(ctx, page);
       for (const fr of todosLosFrames(ctx)) {
-        if (await esFrameReceptor(fr)) { appFrame = fr; break; }
+        const u = fr.url();
+        if (/itreciboelectronico|cpelec001Alias/i.test(u) || await esFrameReceptor(fr)) { appFrame = fr; break; }
       }
+      // Respaldo: si a mitad de camino no cargó, intentar por el menú (texto).
+      if (!appFrame && i === 6) { await clicMenu(ctx, ["Consulta Receptor"]).catch(() => {}); }
     }
     pasos.push({ paso: "app-cargada", encontrada: !!appFrame, url: appFrame ? appFrame.url().slice(0, 160) : null });
 
