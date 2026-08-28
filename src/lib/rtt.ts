@@ -159,21 +159,38 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
 async function irAlFormularioCorreo(fr: any): Promise<string> {
   let via = "acepto:?";
   try {
-    // 1) Marcar la casilla Acepto de verdad (queda tildada y habilita el botón).
+    // 1) Marcar la casilla (SIN ella el botón "Acepto" queda deshabilitado) y
+    //    VERIFICAR que quedó tildada; si no, reintentar con clic + eventos.
     const chk = fr.locator('#chkAceptar, input[type="checkbox"]').first();
     if (await chk.count().catch(() => 0)) {
-      await chk.check({ force: true, timeout: 4000 }).catch(async () => {
-        await chk.click({ force: true, timeout: 4000 }).catch(() => {});
-      });
+      for (let t = 0; t < 3; t++) {
+        await chk.check({ force: true, timeout: 4000 }).catch(() => {});
+        if (await chk.isChecked().catch(() => false)) break;
+        // Forzar por JS + disparar change (habilita el botón).
+        await fr.evaluate(() => {
+          const c = (document.querySelector("#chkAceptar") || document.querySelector('input[type="checkbox"]')) as HTMLInputElement | null;
+          if (c) { c.checked = true; c.dispatchEvent(new Event("change", { bubbles: true })); }
+        }).catch(() => {});
+        await fr.page().waitForTimeout(300).catch(() => {});
+      }
     }
     await fr.page().waitForTimeout(400).catch(() => {});
-    // 2) Pulsar "Acepto" (botón o enlace).
+    // 2) Pulsar "Acepto" (botón o enlace), ya habilitado por la casilla.
     const btn = fr.locator('#btnAceptar, button:has-text("Acepto"), a:has-text("Acepto"), input[value*="Acepto" i]').first();
     if (await btn.count().catch(() => 0)) { await btn.click({ force: true, timeout: 5000 }).catch(() => {}); via = "acepto:click"; }
     else via = "acepto:sin-boton";
   } catch { via = "acepto:err"; }
   await fr.page().waitForTimeout(2500).catch(() => {});
   return via;
+}
+
+// RESPALDO: navegar el frame DIRECTO al formulario del correo. La sesión viaja
+// por cookies (ya entramos por el menú), así que este GET carga el form con todo
+// el Turnstile aunque el clic en "Acepto" no haya avanzado.
+const FORM_CORREO_URL = "https://ww1.sunat.gob.pe/ol-ti-itreportetri/reportetri.htm?action=cargarFormulario";
+async function saltarPorGet(fr: any): Promise<void> {
+  await fr.evaluate((u: string) => { try { window.location.href = u; } catch (e) { /* */ } }, FORM_CORREO_URL).catch(() => {});
+  await fr.page().waitForTimeout(2200).catch(() => {});
 }
 
 /** Vuelca la estructura visible (para calibrar la navegación del RTT). */
@@ -302,7 +319,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     let via = "no-frame";
     if (frameRTT && !estado.correo) {
       for (let intento = 0; intento < 3 && !estado.correo; intento++) {
-        via = await irAlFormularioCorreo(frameRTT);
+        // Intento 0: "Acepto" real (mimetiza al usuario). Intentos 1-2: RESPALDO
+        // por GET a ?action=cargarFormulario, que SIEMPRE carga el formulario del
+        // correo con el Turnstile (turnstileSitekey/getTokenTurnstile/enviarCorreo).
+        if (intento === 0) via = await irAlFormularioCorreo(frameRTT);
+        else { via = "get-jump"; await saltarPorGet(frameRTT); }
         for (let i = 0; i < 10 && !estado.correo; i++) {
           await page.waitForTimeout(1000).catch(() => {});
           await cerrarPantallas(ctx, page);
