@@ -466,43 +466,22 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
     }
 
-    // Helper: pulsar Enviar (#btnCorreo) dentro del frame del RTT.
-    const pulsarEnviar = async (): Promise<boolean> => {
-      for (const sel of ["#btnCorreo", "#btnEnviar", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
-        const el = frameRTT.locator(sel).first();
-        if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); return true; }
-      }
-      return !!(await clickEnFrame(frameRTT, ["Enviar"]));
-    };
-    // Buscar el frame del RTT fresco (tras Enviar la pantalla se re-renderiza).
+    // Buscar el frame del RTT fresco (tras enviar la pantalla se re-renderiza).
     const frameActual = () => todosLosFrames(ctx).find((f: any) => /reportetri|itreportetri/i.test(f.url())) || frameRTT;
     const leerTexto = async () => (await (frameActual()).evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
     const yaExito = (t: string) => /se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa|exitos/i.test(t);
 
-    // TURNSTILE del RTT: SUNAT expone getTokenTurnstile() (lo lee enviarCorreo()).
-    // Leemos turnstileSitekey, lo resolvemos con CapSolver y SOBRESCRIBIMOS
-    // getTokenTurnstile() para devolver NUESTRO token. Luego Enviar → enviarCorreo
-    // manda el token válido → cuadro verde. (No hace falta renderizar el widget.)
-    await resolverTurnstileSunat(ctx, frameRTT, pasos).catch(() => false);
-
-    let enviado = await pulsarEnviar();
-    await page.waitForTimeout(4000).catch(() => {});
-    let trasEnviar = await leerTexto();
-    // Si el clic al botón no disparó el envío, llamar a la función de SUNAT.
-    if (!yaExito(trasEnviar)) {
-      await frameActual().evaluate(() => {
-        try { if (typeof (window as any).enviarCorreo === "function") (window as any).enviarCorreo(); } catch (e) { /* */ }
-      }).catch(() => {});
-      enviado = true;
-      await page.waitForTimeout(4000).catch(() => {});
-      trasEnviar = await leerTexto();
-    }
-    // Reintento final: re-resolver Turnstile (token nuevo) + Enviar, por si el
-    // primero caducó o el widget aún no estaba listo.
-    if (!yaExito(trasEnviar)) {
-      await resolverTurnstileSunat(ctx, frameActual(), pasos).catch(() => false);
-      await pulsarEnviar();
-      await page.waitForTimeout(4500).catch(() => {});
+    // ENVÍO: replicamos EXACTAMENTE el callback del Turnstile de SUNAT →
+    // resolvemos el Turnstile con CapSolver, ponemos el token en #token y hacemos
+    // form01.submit(). (enviar=true). Reintentamos con token nuevo si no sale el
+    // cuadro verde (el token de Turnstile es de un solo uso y caduca).
+    let enviado = false;
+    let trasEnviar = "";
+    for (let intento = 0; intento < 2 && !yaExito(trasEnviar); intento++) {
+      const fr = frameActual();
+      const ok = await resolverTurnstileSunat(ctx, fr, pasos, true).catch(() => false);
+      if (ok) enviado = true;
+      await page.waitForTimeout(5000).catch(() => {});
       trasEnviar = await leerTexto();
     }
     // Éxito real de SUNAT: "El reporte solicitado se está procesando. Terminada

@@ -724,7 +724,13 @@ async function leerTurnstileSitekey(frame: any): Promise<string> {
 
 /** Resuelve el Turnstile del RTT y sobrescribe getTokenTurnstile() de SUNAT con
  *  el token de CapSolver. Devuelve true si lo aplicó. */
-export async function resolverTurnstileSunat(ctx: any, frame: any, pasos: any[] = []): Promise<boolean> {
+// El callback del Turnstile de SUNAT hace EXACTAMENTE:
+//   document.getElementById('token').value = token;
+//   document.getElementById('form01').submit();
+// Así que replicamos eso: ponemos el token de CapSolver en #token y (si enviar)
+// hacemos form01.submit(). NO se toca getTokenTurnstile (hacerlo rompía el envío:
+// enviarCorreo→getTokenTurnstile ya no ejecutaba el challenge ni enviaba).
+export async function resolverTurnstileSunat(ctx: any, frame: any, pasos: any[] = [], enviar = false): Promise<boolean> {
   let clientKey = (process.env.CAPSOLVER_KEY || "").trim();
   if (!clientKey) {
     try { const { getIntegraciones } = await import("./db"); clientKey = (await getIntegraciones()).capsolverKey; } catch { /* */ }
@@ -737,17 +743,22 @@ export async function resolverTurnstileSunat(ctx: any, frame: any, pasos: any[] 
   const token = await capsolverTurnstile(clientKey, sitekey, url);
   if (!token) { pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: false, nota: "CapSolver no devolvió token" }); return false; }
   const aplicado = await frame
-    .evaluate((tok: string) => {
+    .evaluate(({ tok, env }: { tok: string; env: boolean }) => {
       try {
         (window as any).__radarTsToken = tok;
-        // Sobrescribir el accesor de SUNAT: enviarCorreo() lee getTokenTurnstile().
-        (window as any).getTokenTurnstile = function () { return tok; };
-        // Y rellenar cualquier campo de respuesta de Turnstile por si acaso.
-        document.querySelectorAll('[name="cf-turnstile-response"], textarea[name="cf-turnstile-response"], #tokenCaptchaTurnstile').forEach((el) => { (el as HTMLInputElement).value = tok; });
-        return { ok: true, tipoGetToken: typeof (window as any).getTokenTurnstile };
+        // Poner el token donde lo pone el callback de SUNAT: el hidden #token.
+        const t = document.getElementById("token") as HTMLInputElement | null;
+        if (t) t.value = tok;
+        document.querySelectorAll('[name="cf-turnstile-response"], textarea[name="cf-turnstile-response"]').forEach((el) => { (el as HTMLInputElement).value = tok; });
+        let enviado = false;
+        if (env) {
+          const f = document.getElementById("form01") as HTMLFormElement | null;
+          if (f && typeof f.submit === "function") { f.submit(); enviado = true; }
+        }
+        return { ok: true, setToken: !!t, enviado };
       } catch (e: any) { return { ok: false, err: String(e).slice(0, 80) }; }
-    }, token)
+    }, { tok: token, env: enviar })
     .catch(() => ({ ok: false }));
-  pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: true, proveedor: "capsolver", ...aplicado });
+  pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: true, proveedor: "capsolver", enviar, ...aplicado });
   return true;
 }
