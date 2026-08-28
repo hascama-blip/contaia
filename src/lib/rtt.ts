@@ -220,7 +220,7 @@ async function volcar(ctx: any): Promise<any> {
 export async function generarRTT(params: RttParams): Promise<RttResultado> {
   const pasos: any[] = [];
   let browser: any = null;
-  const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 220000);
+  const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 285000);
   try {
     // Se corre IGUAL que el buzón (lanzarNavegador() sin proxy): ese camino YA
     // llega a SUNAT y hace login. El reCAPTCHA v3 NO se resuelve con la IP: lo
@@ -468,30 +468,52 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
 
     // Buscar el frame del RTT fresco (tras enviar la pantalla se re-renderiza).
     const frameActual = () => todosLosFrames(ctx).find((f: any) => /reportetri|itreportetri/i.test(f.url())) || frameRTT;
-    const leerTexto = async () => (await (frameActual()).evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
-    const yaExito = (t: string) => /se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa|exitos/i.test(t);
+    const leerTexto = async () => (await (frameActual()).evaluate(() => (document.body?.innerText || "").slice(0, 600)).catch(() => "")) as string;
+    const yaExito = (t: string) => /se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa|exitos|env[ií]o.*exitos|generar.*reporte.*correo/i.test(t);
+    // Error VISIBLE de SUNAT (cuadro rojo #msgCorreoErr / alertas): correo
+    // inválido, límite de 3/día, o rechazo de la validación de seguridad.
+    const leerError = async (): Promise<string> => (await (frameActual()).evaluate(() => {
+      const cajas = ["#msgCorreoErr", "#msgNidiErr", "#msgErrorCorreo", ".alert-danger", ".has-error .help-block", ".text-danger"];
+      for (const s of cajas) {
+        const el = document.querySelector(s) as HTMLElement | null;
+        const vis = el && (el.offsetParent !== null || !el.classList.contains("hidden"));
+        const t = (el?.innerText || "").replace(/\s+/g, " ").trim();
+        if (vis && t) return t.slice(0, 180);
+      }
+      const body = document.body?.innerText || "";
+      const m = /(no es v[aá]lid[oa][^.]*|solo.*\d+ reporte[^.]*d[ií]a[^.]*|excedi[óo][^.]*|error en la validaci[oó]n[^.]*|no se ha[^.]*generar[^.]*)/i.exec(body);
+      return m ? m[1].replace(/\s+/g, " ").trim().slice(0, 180) : "";
+    }).catch(() => "")) as string;
 
-    // ENVÍO: replicamos EXACTAMENTE el callback del Turnstile de SUNAT →
-    // resolvemos el Turnstile con CapSolver, ponemos el token en #token y hacemos
-    // form01.submit(). (enviar=true). Reintentamos con token nuevo si no sale el
-    // cuadro verde (el token de Turnstile es de un solo uso y caduca).
+    // ENVÍO reforzado: replicamos el callback del Turnstile (poner token en #token
+    // + form01.submit). Hasta 3 intentos con token NUEVO (el de Turnstile es de un
+    // solo uso y caduca). Tras cada intento se SONDEA hasta ~18s el cuadro verde o
+    // un error visible de SUNAT (para no esperar de más ni de menos).
     let enviado = false;
     let trasEnviar = "";
-    for (let intento = 0; intento < 2 && !yaExito(trasEnviar); intento++) {
-      const fr = frameActual();
-      const ok = await resolverTurnstileSunat(ctx, fr, pasos, true).catch(() => false);
+    let errorSunat = "";
+    for (let intento = 0; intento < 3 && !yaExito(trasEnviar); intento++) {
+      const ok = await resolverTurnstileSunat(ctx, frameActual(), pasos, true).catch(() => false);
       if (ok) enviado = true;
-      await page.waitForTimeout(5000).catch(() => {});
-      trasEnviar = await leerTexto();
+      for (let i = 0; i < 12 && !yaExito(trasEnviar); i++) {
+        await page.waitForTimeout(1500).catch(() => {});
+        trasEnviar = await leerTexto();
+        if (yaExito(trasEnviar)) break;
+        errorSunat = await leerError();
+        if (errorSunat) break; // SUNAT mostró un error concreto → no reintentar a ciegas
+      }
+      // Correo inválido o límite: reintentar no ayuda → cortar.
+      if (/no es v[aá]lid|reporte.*d[ií]a|excedi/i.test(errorSunat)) break;
     }
-    // Éxito real de SUNAT: "El reporte solicitado se está procesando. Terminada
-    // dicha acción el mismo estará en la bandeja de correo ingresada."
-    const exito = /se est[aá] procesando|bandeja de correo|se ha enviado|se enviar[aá]|se generar[aá]|enviado a su correo|de manera exitosa|exitos/i.test(trasEnviar);
-    const fallo = !exito && /no es v[aá]lid|inv[aá]lid|no se pudo|vuelva a intentar|captcha|verificaci[oó]n/i.test(trasEnviar);
-    pasos.push({ paso: "enviar", clico: enviado, exito, fallo, respuesta: trasEnviar.slice(0, 300) });
+    const exito = yaExito(trasEnviar);
+    const fallo = !exito && (!!errorSunat || /no es v[aá]lid|inv[aá]lid|no se pudo|vuelva a intentar|captcha|verificaci[oó]n/i.test(trasEnviar));
+    pasos.push({ paso: "enviar", enviado, exito, fallo, errorSunat: errorSunat || undefined, respuesta: trasEnviar.slice(0, 300) });
 
-    if (!enviado) return { ok: false, error: "No se pudo pulsar Enviar en el formulario del RTT.", diag: { pasos } };
-    if (fallo && !exito) return { ok: false, error: "SUNAT no aceptó el envío: " + trasEnviar.replace(/\s+/g, " ").slice(0, 160), diag: { pasos } };
+    if (exito) return { ok: true, diag: { pasos } };
+    if (errorSunat) return { ok: false, error: "SUNAT no aceptó el envío: " + errorSunat, diag: { pasos } };
+    if (!enviado) return { ok: false, error: "No se pudo resolver la verificación de seguridad (Turnstile). Reintenta en unos minutos.", diag: { pasos } };
+    // Se envió el form pero SUNAT no confirmó a tiempo: puede que el correo llegue
+    // igual; se deja en proceso (el webhook lo capturará) en vez de marcar error.
     return { ok: true, diag: { pasos } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error generando el RTT.", diag: { pasos } };

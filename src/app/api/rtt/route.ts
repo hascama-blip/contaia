@@ -4,7 +4,7 @@ import { upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfi
 import { generarRTT } from "@/lib/rtt";
 
 export const runtime = "nodejs";
-export const maxDuration = 240;
+export const maxDuration = 300;
 
 // GET → lista las solicitudes RTT del usuario + bitácora del webhook + config.
 export async function GET() {
