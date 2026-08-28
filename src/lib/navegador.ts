@@ -243,8 +243,16 @@ export async function probarProxy(): Promise<{ ok: boolean; ip?: string; ms?: nu
     browser = await lanzarLocal(chromium); // lanzarLocal aplica el proxyConfig()
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    await page.goto("https://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 25000 });
-    const body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+    // Los residenciales son más lentos: damos más tiempo y probamos por HTTP
+    // (menos handshake) — si falla, reintenta por HTTPS.
+    let body = "";
+    try {
+      await page.goto("http://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 45000 });
+      body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+    } catch {
+      await page.goto("https://api.ipify.org?format=json", { waitUntil: "domcontentloaded", timeout: 45000 });
+      body = (await page.evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+    }
     const ip = (body.match(/(\d{1,3}\.){3}\d{1,3}/) || [])[0] || "";
     return { ok: !!ip, ip, ms: Date.now() - t0, server: proxy.server };
   } catch (e: any) {
