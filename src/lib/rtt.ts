@@ -12,7 +12,7 @@
 // (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
-import { resolverCaptchaSiHay, hookTurnstileSitekey, hookRecaptchaV3, detectarRecaptchaV3, volcarCaptcha } from "./captcha";
+import { resolverCaptchaSiHay, hookTurnstileSitekey, hookRecaptchaV3, detectarRecaptchaV3, resolverTurnstileSunat } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -152,13 +152,28 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
  *  reportetri.htm?action=cargarFormulario, SIN hc/token (la sesión va por
  *  cookies). Como ya entramos por el menú, las cookies están puestas: navegamos
  *  el frame DIRECTO a esa URL y así saltamos el checkbox + "Acepto". */
-const FORM_CORREO_URL = "https://ww1.sunat.gob.pe/ol-ti-itreportetri/reportetri.htm?action=cargarFormulario";
+// El flujo REAL: marcar la casilla "Acepto" y pulsar el botón "Acepto"
+// (#btnAceptar). Esto lo hace SUNAT: arma el hidden `token` y corre initTurnstile.
+// (El salto por GET a ?action=cargarFormulario dejaba el token vacío y el Enviar
+// no disparaba nada.)
 async function irAlFormularioCorreo(fr: any): Promise<string> {
-  const via = (await fr.evaluate((u: string) => {
-    try { window.location.href = u; return "goto"; }
-    catch (e: any) { return "err:" + (e && e.message ? String(e.message).slice(0, 60) : ""); }
-  }, FORM_CORREO_URL).catch(() => "err")) as string;
-  await fr.page().waitForTimeout(1500).catch(() => {});
+  const via = (await fr.evaluate(() => {
+    // 1) Marcar la casilla Acepto (dispara el change que habilita el botón).
+    const chk = (document.querySelector("#chkAceptar") || document.querySelector('input[type="checkbox"]')) as HTMLInputElement | null;
+    if (chk && !chk.checked) {
+      chk.checked = true;
+      chk.dispatchEvent(new Event("click", { bubbles: true }));
+      chk.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    // 2) Pulsar el botón Acepto.
+    const btn = document.querySelector("#btnAceptar") as HTMLElement | null;
+    if (btn) { btn.click(); return "acepto:btnAceptar"; }
+    const cands = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a')) as HTMLElement[];
+    const acepto = cands.find((b) => /acepto/i.test(((b.textContent || "") + ((b as HTMLInputElement).value || "")).trim()));
+    if (acepto) { acepto.click(); return "acepto:texto"; }
+    return chk ? "acepto:solo-check" : "acepto:sin-boton";
+  }).catch(() => "acepto:err")) as string;
+  await fr.page().waitForTimeout(2200).catch(() => {});
   return via;
 }
 
@@ -382,28 +397,10 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         pasos.push({ paso: "detalle-form", ...(detalle || { error: "no se pudo leer" }) });
 
         await frameRTT.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').first().fill(params.emailDestino).catch(() => {});
-        let clico = false;
-        for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
-          const el = frameRTT.locator(sel).first();
-          if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clico = true; break; }
-        }
-        pasos.push({ paso: "enviar-diag", clico });
-        // Esperar a que aparezca el TURNSTILE ("Verificando…") y RESOLVERLO con
-        // CapSolver, pero SIN disparar el callback (disparar=false) → no envía.
-        // Se usa un array temporal para no repetir 12 veces el paso "captcha".
-        let resuelto = false;
-        let ultimoCaptcha: any = null;
-        for (let i = 0; i < 12 && !resuelto; i++) {
-          await page.waitForTimeout(1500).catch(() => {});
-          const tmp: any[] = [];
-          resuelto = await resolverCaptchaSiHay(ctx, page, tmp, false).catch(() => false);
-          if (tmp.length) ultimoCaptcha = tmp[tmp.length - 1];
-        }
-        if (ultimoCaptcha) pasos.push(ultimoCaptcha);
-        const frTs = todosLosFrames(ctx).find((f: any) => /reportetri|itreportetri/i.test(f.url())) || frameRTT;
-        pasos.push({ paso: "sonda-despues", ...(await sonda(frTs)) });
-        const volcado = await volcarCaptcha(ctx).catch(() => []);
-        pasos.push({ paso: "captcha-tras-enviar", frames: volcado });
+        // TURNSTILE del RTT vía funciones de SUNAT: leer turnstileSitekey y
+        // resolverlo con CapSolver (sobrescribe getTokenTurnstile). NO se pulsa
+        // Enviar en diagnóstico → no se manda el reporte, solo se valida.
+        await resolverTurnstileSunat(ctx, frameRTT, pasos).catch(() => false);
       }
       return { ok: false, diag: { pasos } };
     }
@@ -445,27 +442,32 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     // Buscar el frame del RTT fresco (tras Enviar la pantalla se re-renderiza).
     const frameActual = () => todosLosFrames(ctx).find((f: any) => /reportetri|itreportetri/i.test(f.url())) || frameRTT;
     const leerTexto = async () => (await (frameActual()).evaluate(() => (document.body?.innerText || "").slice(0, 500)).catch(() => "")) as string;
+    const yaExito = (t: string) => /se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa|exitos/i.test(t);
 
-    // El captcha (Cloudflare TURNSTILE, "Verificando…") APARECE al Enviar.
-    // Secuencia: Enviar → esperar el widget → resolver con CapSolver e inyectar
-    // el token + DISPARAR el callback de Turnstile (SUNAT continúa el POST) →
-    // sale el cuadro verde "El reporte se está procesando…".
+    // TURNSTILE del RTT: SUNAT expone getTokenTurnstile() (lo lee enviarCorreo()).
+    // Leemos turnstileSitekey, lo resolvemos con CapSolver y SOBRESCRIBIMOS
+    // getTokenTurnstile() para devolver NUESTRO token. Luego Enviar → enviarCorreo
+    // manda el token válido → cuadro verde. (No hace falta renderizar el widget.)
+    await resolverTurnstileSunat(ctx, frameRTT, pasos).catch(() => false);
+
     let enviado = await pulsarEnviar();
-    let captchaResuelto = false;
-    for (let i = 0; i < 8 && !captchaResuelto; i++) {
-      await page.waitForTimeout(1500).catch(() => {});
-      // Al Enviar SUNAT corre turnstile.render → el hook captura sitekey+callback.
-      captchaResuelto = await resolverCaptchaSiHay(ctx, page, pasos, true).catch(() => false);
-      // Si ya salió el mensaje de éxito, no seguir.
-      if (/se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa/i.test(await leerTexto())) break;
-    }
-    // Dar tiempo al POST tras disparar el callback.
     await page.waitForTimeout(4000).catch(() => {});
     let trasEnviar = await leerTexto();
-    // Si el callback no disparó el envío, reintentar Enviar una vez.
-    if (captchaResuelto && !/se est[aá] procesando|bandeja de correo|se ha enviado|de manera exitosa|exitos/i.test(trasEnviar)) {
-      await pulsarEnviar();
+    // Si el clic al botón no disparó el envío, llamar a la función de SUNAT.
+    if (!yaExito(trasEnviar)) {
+      await frameActual().evaluate(() => {
+        try { if (typeof (window as any).enviarCorreo === "function") (window as any).enviarCorreo(); } catch (e) { /* */ }
+      }).catch(() => {});
+      enviado = true;
       await page.waitForTimeout(4000).catch(() => {});
+      trasEnviar = await leerTexto();
+    }
+    // Reintento final: re-resolver Turnstile (token nuevo) + Enviar, por si el
+    // primero caducó o el widget aún no estaba listo.
+    if (!yaExito(trasEnviar)) {
+      await resolverTurnstileSunat(ctx, frameActual(), pasos).catch(() => false);
+      await pulsarEnviar();
+      await page.waitForTimeout(4500).catch(() => {});
       trasEnviar = await leerTexto();
     }
     // Éxito real de SUNAT: "El reporte solicitado se está procesando. Terminada

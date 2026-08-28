@@ -695,3 +695,59 @@ export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [
   pasos.push({ paso: "captcha", detectado: "turnstile", sitekey: info.sitekey, resuelto: true, proveedor: "capsolver", inyecciones, callbacks, disparado: disparar });
   return true;
 }
+
+// ============================================================
+//  Turnstile del RTT — usando las funciones PROPIAS de SUNAT
+// ============================================================
+// El RTT (sunatturnstile.js) expone globales: `turnstileSitekey` (la clave),
+// `getTokenTurnstile()` (lo que enviarCorreo() lee para el POST) e `initTurnstile`.
+// En vez de renderizar el widget (que un bot no pasa), leemos el sitekey, lo
+// resolvemos con CapSolver y SOBRESCRIBIMOS getTokenTurnstile() para devolver
+// NUESTRO token. Así enviarCorreo() manda el token válido y sale el cuadro verde.
+
+/** Lee el sitekey de Turnstile del RTT (global de SUNAT o del HTML). "" si no. */
+async function leerTurnstileSitekey(frame: any): Promise<string> {
+  return (await frame
+    .evaluate(() => {
+      const w = window as any;
+      const cand = [w.turnstileSitekey, w.__radarSitekey, w.sitekey].filter((s: any) => typeof s === "string");
+      for (const s of cand) if (/^0x[A-Za-z0-9_-]{8,}$/.test(s)) return s;
+      // Buscar en el JS inline / HTML: turnstileSitekey = '0x...' o data-sitekey.
+      const html = document.documentElement.outerHTML;
+      const m = /turnstileSitekey\s*[=:]\s*['"](0x[A-Za-z0-9_-]{8,})['"]/.exec(html)
+        || /data-sitekey=['"](0x[A-Za-z0-9_-]{8,})['"]/.exec(html)
+        || /(0x4[A-Za-z0-9_-]{8,})/.exec(html);
+      return m ? m[1] : "";
+    })
+    .catch(() => "")) as string;
+}
+
+/** Resuelve el Turnstile del RTT y sobrescribe getTokenTurnstile() de SUNAT con
+ *  el token de CapSolver. Devuelve true si lo aplicó. */
+export async function resolverTurnstileSunat(ctx: any, frame: any, pasos: any[] = []): Promise<boolean> {
+  let clientKey = (process.env.CAPSOLVER_KEY || "").trim();
+  if (!clientKey) {
+    try { const { getIntegraciones } = await import("./db"); clientKey = (await getIntegraciones()).capsolverKey; } catch { /* */ }
+  }
+  const sitekey = await leerTurnstileSitekey(frame);
+  if (!sitekey) { pasos.push({ paso: "turnstile-sunat", detectado: false, nota: "no se halló turnstileSitekey" }); return false; }
+  if (!clientKey) { pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: false, nota: "falta CAPSOLVER_KEY" }); return false; }
+  let url = "";
+  try { url = frame.url(); } catch { /* */ }
+  const token = await capsolverTurnstile(clientKey, sitekey, url);
+  if (!token) { pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: false, nota: "CapSolver no devolvió token" }); return false; }
+  const aplicado = await frame
+    .evaluate((tok: string) => {
+      try {
+        (window as any).__radarTsToken = tok;
+        // Sobrescribir el accesor de SUNAT: enviarCorreo() lee getTokenTurnstile().
+        (window as any).getTokenTurnstile = function () { return tok; };
+        // Y rellenar cualquier campo de respuesta de Turnstile por si acaso.
+        document.querySelectorAll('[name="cf-turnstile-response"], textarea[name="cf-turnstile-response"], #tokenCaptchaTurnstile').forEach((el) => { (el as HTMLInputElement).value = tok; });
+        return { ok: true, tipoGetToken: typeof (window as any).getTokenTurnstile };
+      } catch (e: any) { return { ok: false, err: String(e).slice(0, 80) }; }
+    }, token)
+    .catch(() => ({ ok: false }));
+  pasos.push({ paso: "turnstile-sunat", detectado: true, sitekey, resuelto: true, proveedor: "capsolver", ...aplicado });
+  return true;
+}
