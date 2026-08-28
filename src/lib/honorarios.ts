@@ -369,12 +369,29 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     await clickEnFrame(appFrame, ["Buscar", "Consultar"]).catch(() => {});
     await page.waitForTimeout(4000).catch(() => {});
 
-    // 5) Leer la tabla y PAGINAR (Siguiente) hasta traer todos los recibos.
+    // 5) Leer la tabla y PAGINAR (Siguiente / número) hasta traer TODOS los
+    //    recibos. Clave: tras pasar de página se ESPERA a que cambie el rango
+    //    "X a Y de N" antes de leer (si no, se leía la página vieja/vacía).
     const frApp = () => todosLosFrames(ctx).find((f: any) => /itreciboelectronico|cpelec001Alias/i.test(f.url())) || appFrame;
+    const rangoTxt = async (fr: any) => (await fr.evaluate(() => {
+      const m = /(\d+)\s*a\s*(\d+)\s*de\s*(\d+)/i.exec(document.body?.innerText || "");
+      return m ? m[0] : "";
+    }).catch(() => "")) as string;
+    // Clic EXACTO en el enlace de página siguiente ("Siguiente" o el número).
+    const irSiguiente = async (fr: any, next: number): Promise<boolean> => (await fr.evaluate((next: number) => {
+      const as = Array.from(document.querySelectorAll('a, input[type="button"], input[type="submit"]')) as HTMLElement[];
+      const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      let el = as.find((a) => /siguiente|>>|›|»/.test(norm(a.textContent) + " " + ((a as HTMLInputElement).value || "")));
+      if (!el) el = as.find((a) => norm(a.textContent) === String(next));
+      if (el) { el.click(); return true; }
+      return false;
+    }, next).catch(() => false)) as boolean;
+
     const recibos: Recibo[] = [];
     const vistos = new Set<string>();
     let total = 0;
-    for (let g = 0; g < 30; g++) {
+    let pagina = 1;
+    for (let g = 0; g < 40; g++) {
       const fr = frApp();
       const { rows, hasta, total: t } = await parsearPagina(fr);
       if (t) total = t;
@@ -382,12 +399,22 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
         const k = `${r.td}|${r.nro}|${r.nroDocEmisor}|${r.fecha}`;
         if (!vistos.has(k)) { vistos.add(k); recibos.push(r); }
       }
-      if (!total || hasta >= total || rows.length === 0) break;
-      const sig = await clickEnFrame(fr, ["Siguiente"]);
-      if (!sig) break;
-      await page.waitForTimeout(2600).catch(() => {});
+      if (total && hasta >= total) break;           // ya se leyó todo
+      if (rows.length === 0 && g > 0) break;         // sin datos (no cortar en la 1ª)
+      const antes = await rangoTxt(fr);
+      const fue = await irSiguiente(fr, pagina + 1);
+      if (!fue) break;
+      // Esperar a que el rango cambie (la página nueva cargó) — hasta ~16s.
+      let cambio = false;
+      for (let i = 0; i < 16; i++) {
+        await page.waitForTimeout(1000).catch(() => {});
+        const ahora = await rangoTxt(frApp());
+        if (ahora && ahora !== antes) { cambio = true; break; }
+      }
+      if (!cambio) break;
+      pagina++;
     }
-    pasos.push({ paso: "extraccion", total, leidos: recibos.length, muestra: recibos.slice(0, 3) });
+    pasos.push({ paso: "extraccion", total, leidos: recibos.length, paginas: pagina, muestra: recibos.slice(0, 3) });
 
     // 6) Diagnóstico: volcar estructura + muestra (no genera archivo).
     if (params.diagnostico) {
