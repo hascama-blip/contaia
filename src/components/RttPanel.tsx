@@ -72,7 +72,8 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         body: JSON.stringify({ ruc, rucLogin: sel.ruc, solUser, solPass, razonSocial: sel.razonSocial, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      // La traza cruda (cuadro negro) solo se muestra en Modo diagnóstico.
+      setDiag(diagModo && data.diag ? JSON.stringify(data.diag, null, 2) : null);
       if (!res.ok) { setError(data.error ?? "No se pudo generar el reporte."); await cargar(); return; }
       setInfo(diagModo ? "Diagnóstico listo (revisa la traza cruda abajo)." : "Generación enviada. SUNAT procesa y envía el reporte por correo; aquí lo verás listo para descargar en cuanto llegue.");
       await cargar();
@@ -116,13 +117,16 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         )}
         {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-        {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
+        {diag && diagModo && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
       </div>
 
       {/* Generación de Reporte Tributario: info + descarga */}
       <div className="card p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Generación de Reporte Tributario</h2>
+          <div>
+            <h2 className="font-semibold text-slate-800">Generación de Reporte Tributario</h2>
+            <p className="text-[11px] text-slate-400">Los reportes se guardan 7 días y luego se borran automáticamente.</p>
+          </div>
           <button className="btn-ghost text-sm" onClick={cargar} disabled={refrescando}>
             {refrescando ? "Actualizando…" : "↻ Actualizar"}
           </button>
@@ -130,7 +134,7 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         {solicitudes.filter((s) => s.estado !== "error").length === 0 ? (
           <p className="text-sm text-slate-400">Aún no has generado ningún reporte. Elige una empresa y pulsa “Generar Reporte Tributario”.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="max-w-2xl space-y-3">
             {solicitudes.filter((s) => s.estado !== "error").map((s) => {
               const listo = s.estado === "listo";
               const enCurso = ["creado", "pendiente", "en_proceso", "recibido"].includes(s.estado);
@@ -157,10 +161,15 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
                     <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-600">⚠ {s.error ?? "Error en la generación"}</div>
                   )}
                   {listo && (
-                    <div className="mt-2 flex gap-2">
-                      <a className="btn-primary text-sm" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ Descargar PDF</a>
-                      {s.rutaXml && <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ Descargar XML</a>}
-                    </div>
+                    <details className="mt-2 group">
+                      <summary className="btn-primary inline-flex cursor-pointer list-none items-center gap-1 text-sm">
+                        📄 Formatos <span className="text-[10px] transition group-open:rotate-180">▾</span>
+                      </summary>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ PDF</a>
+                        {s.rutaXml && <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ XML</a>}
+                      </div>
+                    </details>
                   )}
                   {enCurso && (
                     <p className="mt-2 text-[11px] text-slate-400">⏳ SUNAT está procesando el reporte; llega por correo y aquí queda listo para descargar. Esta vista se actualiza sola.</p>

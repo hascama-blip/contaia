@@ -681,13 +681,24 @@ export async function resolverFalloRTT(id: string): Promise<boolean> {
 /** Limpia la lista de RTT: quita casillas en "error" y resuelve las atascadas
  *  (>N min): con archivo → "listo"; sin archivo → se borran. Nunca deja casillas
  *  rojas ni colgadas. Devuelve nº de casillas afectadas. */
+// Retención de los reportes RTT: se guardan 7 días y luego se borran (con sus
+// archivos PDF/XML). Configurable por RTT_RETENCION_DIAS.
+const RTT_RETENCION_DIAS = Math.max(1, Number(process.env.RTT_RETENCION_DIAS ?? "7") || 7);
+
 export async function limpiarRTT(minutos = 30): Promise<number> {
   const store = await readStore();
   if (!Array.isArray(store.rtt)) return 0;
   const limite = Date.now() - minutos * 60_000;
+  const limiteRetencion = Date.now() - RTT_RETENCION_DIAS * 24 * 60 * 60_000;
   const now = new Date().toISOString();
   let dirty = false;
+  const borrarArchivos = (s: SolicitudRTT) => {
+    for (const r of [s.rutaPdf, s.rutaXml]) if (r) fs.unlink(r).catch(() => {});
+  };
   store.rtt = store.rtt.filter((s) => {
+    // Retención: cualquier reporte con más de N días fuera (borra sus archivos).
+    const nacido = new Date(s.creadoEn).getTime();
+    if (Number.isFinite(nacido) && nacido < limiteRetencion) { borrarArchivos(s); dirty = true; return false; }
     const conArchivo = !!(s.rutaPdf || s.rutaXml);
     if (s.estado === "error") {
       if (conArchivo) { s.estado = "listo"; s.error = undefined; s.actualizadoEn = now; dirty = true; return true; }
