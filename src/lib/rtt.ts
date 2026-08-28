@@ -418,6 +418,20 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         pasos.push({ paso: "detalle-form", ...(detalle || { error: "no se pudo leer" }) });
 
         await frameRTT.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').first().fill(params.emailDestino).catch(() => {});
+        // FUENTES: el código EXACTO de las funciones de SUNAT (para saber cómo
+        // dispara el envío: si enviarCorreo es el callback del Turnstile, si usa
+        // turnstile.execute, qué valida, etc.) y así conducir bien el POST.
+        const fuentes = await frameRTT.evaluate(() => {
+          const src = (n: string) => { try { const f = (window as any)[n]; return typeof f === "function" ? f.toString().replace(/\s+/g, " ").slice(0, 1600) : "typeof:" + typeof f; } catch (e) { return "err"; } };
+          return {
+            initTurnstile: src("initTurnstile"),
+            enviarCorreo: src("enviarCorreo"),
+            getTokenTurnstile: src("getTokenTurnstile"),
+            validaCorreo: src("validaCorreo"),
+            turnstileWidgetId: String((window as any).turnstileWidgetId),
+          };
+        }).catch(() => null);
+        pasos.push({ paso: "fuentes-sunat", ...(fuentes || { error: "no se pudo leer" }) });
         // TURNSTILE del RTT vía funciones de SUNAT: leer turnstileSitekey y
         // resolverlo con CapSolver (sobrescribe getTokenTurnstile). NO se pulsa
         // Enviar en diagnóstico → no se manda el reporte, solo se valida.
