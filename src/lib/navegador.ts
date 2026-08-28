@@ -126,8 +126,9 @@ async function proxyConfig(): Promise<{ server: string; username?: string; passw
 }
 
 // Lanza el Chromium local (@sparticuz en Render; el instalado en local).
-async function lanzarLocal(chromium: any) {
-  const proxy = await proxyConfig();
+// proxyOverride: para el "Probar proxy" con otra sesión sin tocar el entorno.
+async function lanzarLocal(chromium: any, proxyOverride?: { server: string; username?: string; password?: string }) {
+  const proxy = proxyOverride ?? (await proxyConfig());
   try {
     const sparticuz = (await import("@sparticuz/chromium")).default as any;
     const executablePath = await sparticuz.executablePath();
@@ -234,12 +235,22 @@ export async function lanzarNavegador(opts: { preferLocal?: boolean } = {}) {
  *  Opción A del RTT). Prueba por separado HTTP, HTTPS y el HOST REAL de SUNAT: si
  *  el proxy tuneliza HTTP pero falla el CONNECT de HTTPS, la IP sale bien pero
  *  SUNAT (solo HTTPS) da chrome-error. Así vemos DÓNDE se rompe, no solo la IP. */
-export async function probarProxy(): Promise<{
+export async function probarProxy(sesionOverride?: string): Promise<{
   ok: boolean; ip?: string; ms?: number; error?: string; server?: string;
-  http?: string; https?: string; sunat?: string;
+  http?: string; https?: string; sunat?: string; usuario?: string;
 }> {
-  const proxy = await proxyConfig();
-  if (!proxy) return { ok: false, error: "No hay proxy configurado (PROXY_SERVER)." };
+  const base = await proxyConfig();
+  if (!base) return { ok: false, error: "No hay proxy configurado (PROXY_SERVER)." };
+  // Override de sesión: reemplaza los dígitos finales del usuario (la "sticky
+  // session") por la sesión pedida, para probar OTRO peer sin redesplegar.
+  let proxy = base;
+  const ses = (sesionOverride || "").trim();
+  if (ses && base.username) {
+    const nuevoUser = /\d+$/.test(base.username)
+      ? base.username.replace(/\d+$/, ses)
+      : `${base.username}-${ses}`;
+    proxy = { ...base, username: nuevoUser };
+  }
   const { chromium } = await import("playwright-core");
   let browser: any = null;
   const t0 = Date.now();
@@ -254,8 +265,10 @@ export async function probarProxy(): Promise<{
       return String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 120);
     }
   };
+  // Enmascara el usuario para no filtrar la credencial completa en el panel.
+  const usuarioMasc = proxy.username ? proxy.username.replace(/(.{6}).*?(\d+)?$/, (_m, a, d) => `${a}…${d || ""}`) : undefined;
   try {
-    browser = await lanzarLocal(chromium); // lanzarLocal aplica el proxyConfig()
+    browser = await lanzarLocal(chromium, proxy); // usa el proxy (con override si lo hay)
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     // 1) IP por HTTP (handshake mínimo).
@@ -268,9 +281,9 @@ export async function probarProxy(): Promise<{
     // 3) HOST REAL de SUNAT (lo que de verdad usa el RTT/buzón).
     const sunat = await intento(page, "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm", 55000);
     // "ok" global = se pudo llegar a SUNAT por HTTPS (lo único que importa para el bot).
-    return { ok: sunat === "ok", ip, ms: Date.now() - t0, server: proxy.server, http, https, sunat };
+    return { ok: sunat === "ok", ip, ms: Date.now() - t0, server: proxy.server, http, https, sunat, usuario: usuarioMasc };
   } catch (e: any) {
-    return { ok: false, error: String(e?.message ?? e).slice(0, 200), ms: Date.now() - t0, server: proxy.server };
+    return { ok: false, error: String(e?.message ?? e).slice(0, 200), ms: Date.now() - t0, server: proxy.server, usuario: usuarioMasc };
   } finally {
     if (browser) await browser.close().catch(() => {});
   }

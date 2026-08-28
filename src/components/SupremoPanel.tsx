@@ -79,11 +79,19 @@ export default function SupremoPanel() {
   const [integBusy, setIntegBusy] = useState<string | null>(null);
   const [integMsg, setIntegMsg] = useState<string | null>(null);
   const [proxyTest, setProxyTest] = useState<string | null>(null);
+  const [proxyBusy, setProxyBusy] = useState(false);
+  const [proxySesion, setProxySesion] = useState("");
 
   async function probarProxyUI() {
-    setProxyTest("Probando… (abre un navegador con el proxy y toca SUNAT, ~30–50s)");
+    setProxyBusy(true);
+    const conSes = proxySesion.trim() ? ` (sesión ${proxySesion.trim()})` : "";
+    setProxyTest(`Probando${conSes}… (abre un navegador con el proxy y toca SUNAT, ~30–50s)`);
     try {
-      const res = await fetch("/api/supremo/probar-proxy", { method: "POST" });
+      const res = await fetch("/api/supremo/probar-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sesion: proxySesion.trim() || undefined }),
+      });
       const d = await res.json().catch(() => ({}));
       // Desglose por paso: si HTTP/IP sale bien pero HTTPS o SUNAT fallan, el
       // proxy no tuneliza HTTPS (CONNECT) → el bot da chrome-error en el login.
@@ -92,7 +100,8 @@ export default function SupremoPanel() {
         d.http !== undefined
           ? `\n  • IP (HTTP): ${d.ip ? `${icono(d.http)} ${d.ip}` : icono(d.http)}` +
             `\n  • HTTPS (ipify): ${icono(d.https)}` +
-            `\n  • SUNAT (e-menu, HTTPS): ${icono(d.sunat)}`
+            `\n  • SUNAT (e-menu, HTTPS): ${icono(d.sunat)}` +
+            (d.usuario ? `\n  • Peer: ${d.usuario}` : "")
           : "";
       if (d.ok) {
         setProxyTest(`✓ Proxy OK — llega a SUNAT por HTTPS. IP de salida: ${d.ip ?? "?"} (${d.ms} ms). Sirve para la Opción A (RTT).${desglose}`);
@@ -103,6 +112,8 @@ export default function SupremoPanel() {
       }
     } catch {
       setProxyTest("✗ Error de red al probar el proxy.");
+    } finally {
+      setProxyBusy(false);
     }
   }
 
@@ -743,10 +754,18 @@ export default function SupremoPanel() {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               onClick={probarProxyUI}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              disabled={proxyBusy}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              🔌 Probar proxy (IP de salida)
+              {proxyBusy ? "Probando…" : "🔌 Probar proxy (HTTP/HTTPS/SUNAT)"}
             </button>
+            <input
+              value={proxySesion}
+              onChange={(e) => setProxySesion(e.target.value)}
+              placeholder="sesión (ej. 55001) — opcional"
+              className="w-44 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-brand-500"
+              title="Prueba OTRO peer sticky sin redesplegar: reemplaza los dígitos finales del usuario del proxy por esta sesión."
+            />
             {integ?.proxy?.configurado && integ.proxy.fuente === "app" && (
               <button
                 onClick={() => guardarInteg({ proxyServer: "", proxyUser: "", proxyPass: "" }, "px")}
