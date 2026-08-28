@@ -106,6 +106,180 @@ export async function hookTurnstileSitekey(ctx: any): Promise<void> {
   } catch (e) { /* addInitScript no disponible en este runtime */ }
 }
 
+// ============================================================
+//  reCAPTCHA v3 (invisible, por PUNTAJE) — el que bloquea el RTT
+// ============================================================
+// SUNAT corre reCAPTCHA v3 al Enviar: su JS llama grecaptcha.execute(sitekey,
+// {action}) DESDE EL NAVEGADOR → el token se puntúa por la reputación de NUESTRA
+// IP. Con IP de datacenter/proxy el puntaje es bajo y SUNAT no manda el reporte.
+// SOLUCIÓN: que el token lo GENERE CapSolver (desde SU infraestructura de buena
+// reputación) y lo INYECTAMOS. El puntaje queda alto sin depender de nuestra IP,
+// así corremos el RTT como el buzón (sin proxy).
+
+export interface RecaptchaV3Info { sitekey: string; action: string | null; url: string; hayCampo: boolean }
+
+/** Engancha grecaptcha.execute para (a) capturar sitekey+action que usa SUNAT y
+ *  (b) devolver NUESTRO token (window.__radarV3Token) cuando esté listo, en vez
+ *  del que Google generaría con nuestra IP. No-op si algo falla. */
+export async function hookRecaptchaV3(ctx: any): Promise<void> {
+  try {
+    await ctx.addInitScript(() => {
+      try {
+        const record = (args: any[]) => {
+          try {
+            const w = window as any;
+            w.__radarRc = w.__radarRc || {};
+            const sk = args && args[0];
+            const opt = args && args[1];
+            if (typeof sk === "string" && /^6L/i.test(sk)) w.__radarRc.sitekey = sk;
+            if (opt && opt.action) w.__radarRc.action = String(opt.action);
+          } catch (e) { /* */ }
+        };
+        const wrapExec = (orig: any) =>
+          function (this: any, ...args: any[]) {
+            record(args);
+            const w = window as any;
+            if (w.__radarV3Token) return Promise.resolve(w.__radarV3Token);
+            return orig.apply(this, args);
+          };
+        const wrapGre = (g: any) => {
+          if (!g || g.__radarV3) return g;
+          try {
+            if (typeof g.execute === "function") g.execute = wrapExec(g.execute);
+            if (g.enterprise && typeof g.enterprise.execute === "function") g.enterprise.execute = wrapExec(g.enterprise.execute);
+            g.__radarV3 = true;
+          } catch (e) { /* */ }
+          return g;
+        };
+        let _g: any;
+        Object.defineProperty(window, "grecaptcha", {
+          configurable: true,
+          get() { return _g; },
+          set(v) { _g = wrapGre(v); },
+        });
+      } catch (e) { /* */ }
+    });
+  } catch (e) { /* addInitScript no disponible */ }
+}
+
+/** Detecta reCAPTCHA v3 en cualquier frame: sitekey (del hook o del src del
+ *  script api.js/enterprise.js con ?render=) + action capturado + si hay campo
+ *  tokenCaptchaV3/g-recaptcha-response. */
+export async function detectarRecaptchaV3(ctx: any): Promise<RecaptchaV3Info | null> {
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const r = await fr
+        .evaluate(() => {
+          const w = window as any;
+          const cap = w.__radarRc || {};
+          let sitekey: string | null = cap.sitekey || null;
+          const action: string | null = cap.action || null;
+          if (!sitekey) {
+            const srcs = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[])
+              .map((s) => s.src || "");
+            const s = srcs.find((u) => /recaptcha\/(api|enterprise)\.js/i.test(u)) || "";
+            const m = /[?&]render=([^&]+)/.exec(s);
+            if (m && m[1] && m[1] !== "explicit") sitekey = decodeURIComponent(m[1]);
+          }
+          if (!sitekey) {
+            const html = document.documentElement.outerHTML;
+            const m2 = /(6L[A-Za-z0-9_-]{20,})/.exec(html);
+            if (m2) sitekey = m2[1];
+          }
+          const hayCampo = !!document.querySelector('input[name="tokenCaptchaV3"], #tokenCaptchaV3, textarea[name="g-recaptcha-response"], [name="g-recaptcha-response"]');
+          return sitekey ? { sitekey, action, hayCampo } : null;
+        })
+        .catch(() => null as any);
+      if (r?.sitekey) {
+        let url = "";
+        try { url = fr.url(); } catch { /* */ }
+        if (!url || url === "about:blank") url = pg.url();
+        return { sitekey: r.sitekey, action: r.action, url, hayCampo: !!r.hayCampo };
+      }
+    }
+  }
+  return null;
+}
+
+/** Pide a CapSolver un token de reCAPTCHA v3 (sin proxy: usa la IP de CapSolver,
+ *  que tiene buena reputación → buen puntaje). null si falla. */
+async function capsolverRecaptchaV3(clientKey: string, sitekey: string, url: string, action: string | null): Promise<string | null> {
+  const pedir = async (type: string) => {
+    const crear = await fetch(`${API_URL}/createTask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientKey,
+        task: { type, websiteURL: url, websiteKey: sitekey, pageAction: action || "submit" },
+      }),
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (!crear || crear.errorId || !crear.taskId) return null;
+    const hasta = Date.now() + MAX_MS;
+    while (Date.now() < hasta) {
+      await sleep(3000);
+      const res = await fetch(`${API_URL}/getTaskResult`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientKey, taskId: crear.taskId }),
+      })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!res) continue;
+      if (res.errorId) return null;
+      if (res.status === "ready") return res.solution?.gRecaptchaResponse ?? res.solution?.token ?? null;
+    }
+    return null;
+  };
+  // Primero v3 normal; si SUNAT usa Enterprise, reintenta con esa tarea.
+  return (await pedir("ReCaptchaV3TaskProxyLess")) || (await pedir("ReCaptchaV3EnterpriseTaskProxyLess"));
+}
+
+/** Resuelve el reCAPTCHA v3 (si lo hay y hay clave) e inyecta el token en el
+ *  frame indicado: fija window.__radarV3Token (para que el hook lo devuelva) y
+ *  los campos ocultos. Devuelve true si inyectó un token. No-op seguro. */
+export async function resolverRecaptchaV3(ctx: any, frame: any, pasos: any[] = []): Promise<boolean> {
+  let clientKey = (process.env.CAPSOLVER_KEY || "").trim();
+  if (!clientKey) {
+    try {
+      const { getIntegraciones } = await import("./db");
+      clientKey = (await getIntegraciones()).capsolverKey;
+    } catch { /* */ }
+  }
+  const info = await detectarRecaptchaV3(ctx);
+  if (!info) { pasos.push({ paso: "recaptchaV3", detectado: false, nota: "no se vio reCAPTCHA v3" }); return false; }
+  if (!clientKey) {
+    pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: false, nota: "falta CAPSOLVER_KEY" });
+    return false;
+  }
+  const token = await capsolverRecaptchaV3(clientKey, info.sitekey, info.url, info.action);
+  if (!token) {
+    pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: false, nota: "CapSolver no devolvió token v3" });
+    return false;
+  }
+  const destino = frame || (ctx.pages()[0] && ctx.pages()[0].mainFrame());
+  const inyecciones = await destino
+    .evaluate((tok: string) => {
+      const w = window as any;
+      w.__radarV3Token = tok; // el hook de grecaptcha.execute lo devolverá
+      let puestos = 0;
+      const sel = ['input[name="tokenCaptchaV3"]', "#tokenCaptchaV3", 'textarea[name="g-recaptcha-response"]', 'input[name="g-recaptcha-response"]', "#g-recaptcha-response"];
+      for (const s of sel) document.querySelectorAll(s).forEach((el) => { (el as HTMLInputElement).value = tok; puestos++; });
+      // Envuelve execute AHORA (ya existe con seguridad) para devolver nuestro token.
+      try {
+        const g = (window as any).grecaptcha;
+        const wrap = () => () => Promise.resolve(tok);
+        if (g && typeof g.execute === "function") g.execute = wrap();
+        if (g && g.enterprise && typeof g.enterprise.execute === "function") g.enterprise.execute = wrap();
+      } catch (e) { /* */ }
+      return puestos;
+    }, token)
+    .catch(() => 0);
+  pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: true, proveedor: "capsolver", inyecciones });
+  return true;
+}
+
 /** ¿Se ve OTRO tipo de captcha (reCAPTCHA/hCaptcha)? Solo para diagnóstico. */
 export async function detectarOtroCaptcha(ctx: any): Promise<string | null> {
   for (const pg of ctx.pages()) {

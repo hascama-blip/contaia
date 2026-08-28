@@ -12,7 +12,7 @@
 // (mismos helpers), para no reintroducir problemas ya resueltos allí.
 
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
-import { resolverCaptchaSiHay, hookTurnstileSitekey } from "./captcha";
+import { resolverCaptchaSiHay, hookTurnstileSitekey, hookRecaptchaV3, detectarRecaptchaV3, resolverRecaptchaV3 } from "./captcha";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -191,16 +191,18 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
   let browser: any = null;
   const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 220000);
   try {
-    // Opción A: Chromium local + proxy residencial PERUANO (validado con "Probar
-    // proxy"). SUNAT ve una IP de Perú → el login pasa y el reCAPTCHA v3 puntúa
-    // alto. Requiere sesión STICKY (misma IP en todo el flujo).
-    browser = await lanzarNavegador({ preferLocal: true });
+    // Se corre IGUAL que el buzón (lanzarNavegador() sin proxy): ese camino YA
+    // llega a SUNAT y hace login. El reCAPTCHA v3 NO se resuelve con la IP: lo
+    // GENERA CapSolver (buena reputación) y lo inyectamos antes de Enviar
+    // (hookRecaptchaV3 + resolverRecaptchaV3). Así el proxy deja de ser necesario.
+    browser = await lanzarNavegador();
     const ctx = await browser.newContext({
       acceptDownloads: true,
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     });
     await bloquearRecursos(ctx);
     await hookTurnstileSitekey(ctx); // captura el sitekey del Turnstile (SUNAT lo pasa por JS)
+    await hookRecaptchaV3(ctx);      // captura sitekey/action del v3 y permite devolver nuestro token
     autoAceptarDialogos(ctx);
     const page = await ctx.newPage();
 
@@ -322,6 +324,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         });
       }
       await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
+      // reCAPTCHA v3: reportar sitekey/action detectados y probar que CapSolver
+      // devuelve token (esto es lo que de verdad destraba el envío del RTT).
+      const v3 = await detectarRecaptchaV3(ctx).catch(() => null);
+      pasos.push({ paso: "recaptchaV3-detect", ...(v3 || { detectado: false }) });
+      if (frameRTT) await resolverRecaptchaV3(ctx, frameRTT, pasos).catch(() => false);
       return { ok: false, diag: { pasos } };
     }
 
@@ -355,6 +362,11 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     // Resolverlo ANTES de "Enviar" (no-op si no hay widget o no hay CAPSOLVER_KEY).
     const captchaOk = await resolverCaptchaSiHay(ctx, page, pasos).catch(() => false);
     if (captchaOk) await page.waitForTimeout(1200).catch(() => {});
+
+    // reCAPTCHA v3 (el que rechazaba al bot por reputación de IP): generamos el
+    // token con CapSolver e inyectamos, para que el POST salga con buen puntaje
+    // aunque la IP sea de datacenter. Se hace JUSTO antes de Enviar.
+    await resolverRecaptchaV3(ctx, frameRTT, pasos).catch(() => false);
 
     // Enviar dentro del frame del RTT. El botón corre la reCAPTCHA v3 (rellena
     // tokenCaptchaV3) y hace el POST; por eso se hace CLIC (no POST directo) y el
