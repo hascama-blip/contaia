@@ -154,7 +154,6 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
                   {listo && (
                     <div className="flex shrink-0 items-center gap-2">
                       <a className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ PDF</a>
-                      {s.rutaXml && <a className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ XML</a>}
                     </div>
                   )}
                 </div>
