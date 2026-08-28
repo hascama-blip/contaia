@@ -191,11 +191,10 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
   let browser: any = null;
   const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 180000);
   try {
-    // RTT por Browserless (login estable). La Opción A (Chromium local + proxy)
-    // queda lista con preferLocal, pero el proxy actual (IP no peruana / lenta)
-    // hace que SUNAT rechace el login. Reactivar cuando haya un residencial
-    // PERUANO que SUNAT acepte (validar con "Probar proxy").
-    browser = await lanzarNavegador();
+    // Opción A: Chromium local + proxy residencial PERUANO (validado con "Probar
+    // proxy"). SUNAT ve una IP de Perú → el login pasa y el reCAPTCHA v3 puntúa
+    // alto. Requiere sesión STICKY (misma IP en todo el flujo).
+    browser = await lanzarNavegador({ preferLocal: true });
     const ctx = await browser.newContext({
       acceptDownloads: true,
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
