@@ -189,7 +189,7 @@ async function volcar(ctx: any): Promise<any> {
 export async function generarRTT(params: RttParams): Promise<RttResultado> {
   const pasos: any[] = [];
   let browser: any = null;
-  const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 180000);
+  const tope = setTimeout(() => { if (browser) browser.close().catch(() => {}); }, 220000);
   try {
     // Opción A: Chromium local + proxy residencial PERUANO (validado con "Probar
     // proxy"). SUNAT ve una IP de Perú → el login pasa y el reCAPTCHA v3 puntúa
@@ -207,10 +207,10 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     // 1) Login SOL (secuencia idéntica a fraccionamiento/buzón, con reintento).
     let navOk = false;
     for (let i = 0; i < 3 && !navOk; i++) {
-      try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45000 }); navOk = true; }
+      try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 70000 }); navOk = true; }
       catch { await page.waitForTimeout(2000).catch(() => {}); }
     }
-    if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 45000 }).catch(() => {});
+    if (!navOk) await page.goto(LOGIN_URL, { waitUntil: "commit", timeout: 70000 }).catch(() => {});
     await page.waitForTimeout(2500).catch(() => {});
     await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
     await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
