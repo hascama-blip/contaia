@@ -83,14 +83,26 @@ export async function hookTurnstileSitekey(ctx: any): Promise<void> {
         let _ts: any;
         const wrap = (ts: any) => {
           if (!ts || ts.__radarWrapped) return ts;
-          const orig = ts.render;
-          if (typeof orig === "function") {
+          const origRender = ts.render;
+          if (typeof origRender === "function") {
             ts.render = function (this: any, ...args: any[]) {
               try {
                 const p = args[1] || args[0];
                 if (p && p.sitekey) (window as any).__radarSitekey = p.sitekey;
+                // Capturar el callback: SUNAT lo usa para continuar el envío tras
+                // verificar. Lo dispararemos con el token que resuelva CapSolver.
+                if (p && typeof p.callback === "function") (window as any).__radarTsCallback = p.callback;
+                if (p && (p.action || p.cData)) (window as any).__radarTsExtra = { action: p.action, cData: p.cData };
               } catch (e) { /* */ }
-              return orig.apply(this, args);
+              return origRender.apply(this, args);
+            };
+          }
+          // getResponse: si SUNAT lee el token por aquí, devolver el nuestro.
+          const origGet = ts.getResponse;
+          if (typeof origGet === "function") {
+            ts.getResponse = function (this: any, ...args: any[]) {
+              try { if ((window as any).__radarTsToken) return (window as any).__radarTsToken; } catch (e) { /* */ }
+              return origGet.apply(this, args);
             };
           }
           ts.__radarWrapped = true;
@@ -104,6 +116,27 @@ export async function hookTurnstileSitekey(ctx: any): Promise<void> {
       } catch (e) { /* */ }
     });
   } catch (e) { /* addInitScript no disponible en este runtime */ }
+}
+
+/** Fija el token de Turnstile y dispara el callback capturado en TODOS los frames
+ *  (así SUNAT, que espera la verificación, continúa el POST del reporte). */
+async function dispararTurnstileCallback(ctx: any, token: string): Promise<number> {
+  let n = 0;
+  for (const pg of ctx.pages()) {
+    for (const fr of pg.frames()) {
+      const hit = await fr
+        .evaluate((tok: string) => {
+          try {
+            (window as any).__radarTsToken = tok;
+            if (typeof (window as any).__radarTsCallback === "function") { (window as any).__radarTsCallback(tok); return 1; }
+          } catch (e) { /* */ }
+          return 0;
+        }, token)
+        .catch(() => 0);
+      n += Number(hit) || 0;
+    }
+  }
+  return n;
 }
 
 // ============================================================
@@ -612,7 +645,7 @@ async function inyectarToken(ctx: any, token: string): Promise<number> {
  * Resuelve el captcha si hay uno (y hay clave). No-op en caso contrario.
  * Empuja un paso al array de diagnóstico. Devuelve true si inyectó un token.
  */
-export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = []): Promise<boolean> {
+export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [], disparar = true): Promise<boolean> {
   // Key: variable de entorno o la guardada por el supremo en la app.
   let clientKey = (process.env.CAPSOLVER_KEY || "").trim();
   if (!clientKey) {
@@ -655,6 +688,10 @@ export async function resolverCaptchaSiHay(ctx: any, page: any, pasos: any[] = [
   }
 
   const inyecciones = await inyectarToken(ctx, token);
-  pasos.push({ paso: "captcha", detectado: "turnstile", sitekey: info.sitekey, resuelto: true, proveedor: "capsolver", inyecciones });
+  // Disparar el callback de Turnstile (SUNAT espera la verificación para hacer el
+  // POST del reporte). En diagnóstico (disparar=false) NO se dispara, para no enviar.
+  let callbacks = 0;
+  if (disparar) callbacks = await dispararTurnstileCallback(ctx, token);
+  pasos.push({ paso: "captcha", detectado: "turnstile", sitekey: info.sitekey, resuelto: true, proveedor: "capsolver", inyecciones, callbacks, disparado: disparar });
   return true;
 }
