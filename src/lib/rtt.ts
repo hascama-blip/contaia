@@ -359,6 +359,28 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
 
         pasos.push({ paso: "sonda-antes", ...(await sonda(frameRTT)) });
 
+        // DETALLE del form: ¿el token viene vacío (por GET-saltar Acepto)?, ¿el
+        // botón está deshabilitado?, ¿qué hace el handler inline de Enviar?
+        const detalle = await frameRTT.evaluate(() => {
+          const val = (id: string) => ((document.getElementById(id) as HTMLInputElement | null)?.value || "");
+          const btn = document.getElementById("btnCorreo") as HTMLButtonElement | null;
+          const inlines = (Array.from(document.querySelectorAll("script:not([src])")) as HTMLScriptElement[]).map((s) => s.textContent || "");
+          const relevantes = inlines
+            .filter((t) => /btnCorreo|turnstile|enviarCorreo|grecaptcha|sunatTurnstile|sunatRecaptcha|onSubmit|submit|Acepto|cargarFormulario/i.test(t))
+            .map((t) => t.replace(/\s+/g, " ").trim().slice(0, 900));
+          const fns = Object.keys(window as any).filter((k) => /turnstile|recaptcha|enviar|correo|sunat|acepto|reporte/i.test(k)).slice(0, 40);
+          return {
+            tokenVal: val("token").slice(0, 40),
+            tokenLen: val("token").length,
+            tokenV3Len: val("tokenCaptchaV3").length,
+            btnDisabled: btn ? btn.disabled : null,
+            btnHtml: btn ? btn.outerHTML.slice(0, 220) : null,
+            windowFns: fns,
+            inlineRelevantes: relevantes.slice(0, 8),
+          };
+        }).catch(() => null);
+        pasos.push({ paso: "detalle-form", ...(detalle || { error: "no se pudo leer" }) });
+
         await frameRTT.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').first().fill(params.emailDestino).catch(() => {});
         let clico = false;
         for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
@@ -368,12 +390,16 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
         pasos.push({ paso: "enviar-diag", clico });
         // Esperar a que aparezca el TURNSTILE ("Verificando…") y RESOLVERLO con
         // CapSolver, pero SIN disparar el callback (disparar=false) → no envía.
-        // Así confirmamos sitekey + que CapSolver da token, sin mandar el reporte.
+        // Se usa un array temporal para no repetir 12 veces el paso "captcha".
         let resuelto = false;
+        let ultimoCaptcha: any = null;
         for (let i = 0; i < 12 && !resuelto; i++) {
           await page.waitForTimeout(1500).catch(() => {});
-          resuelto = await resolverCaptchaSiHay(ctx, page, pasos, false).catch(() => false);
+          const tmp: any[] = [];
+          resuelto = await resolverCaptchaSiHay(ctx, page, tmp, false).catch(() => false);
+          if (tmp.length) ultimoCaptcha = tmp[tmp.length - 1];
         }
+        if (ultimoCaptcha) pasos.push(ultimoCaptcha);
         const frTs = todosLosFrames(ctx).find((f: any) => /reportetri|itreportetri/i.test(f.url())) || frameRTT;
         pasos.push({ paso: "sonda-despues", ...(await sonda(frTs)) });
         const volcado = await volcarCaptcha(ctx).catch(() => []);
