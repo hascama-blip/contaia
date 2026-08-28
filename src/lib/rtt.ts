@@ -154,26 +154,25 @@ async function esFrameRTT(fr: any): Promise<{ app: boolean; correo: boolean; ace
  *  el frame DIRECTO a esa URL y así saltamos el checkbox + "Acepto". */
 // El flujo REAL: marcar la casilla "Acepto" y pulsar el botón "Acepto"
 // (#btnAceptar). Esto lo hace SUNAT: arma el hidden `token` y corre initTurnstile.
-// (El salto por GET a ?action=cargarFormulario dejaba el token vacío y el Enviar
-// no disparaba nada.)
+// Se usa .check()/.click() de Playwright (clic REAL): con eventos sintéticos la
+// casilla se destildaba y el botón quedaba deshabilitado → Acepto no avanzaba.
 async function irAlFormularioCorreo(fr: any): Promise<string> {
-  const via = (await fr.evaluate(() => {
-    // 1) Marcar la casilla Acepto (dispara el change que habilita el botón).
-    const chk = (document.querySelector("#chkAceptar") || document.querySelector('input[type="checkbox"]')) as HTMLInputElement | null;
-    if (chk && !chk.checked) {
-      chk.checked = true;
-      chk.dispatchEvent(new Event("click", { bubbles: true }));
-      chk.dispatchEvent(new Event("change", { bubbles: true }));
+  let via = "acepto:?";
+  try {
+    // 1) Marcar la casilla Acepto de verdad (queda tildada y habilita el botón).
+    const chk = fr.locator('#chkAceptar, input[type="checkbox"]').first();
+    if (await chk.count().catch(() => 0)) {
+      await chk.check({ force: true, timeout: 4000 }).catch(async () => {
+        await chk.click({ force: true, timeout: 4000 }).catch(() => {});
+      });
     }
-    // 2) Pulsar el botón Acepto.
-    const btn = document.querySelector("#btnAceptar") as HTMLElement | null;
-    if (btn) { btn.click(); return "acepto:btnAceptar"; }
-    const cands = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a')) as HTMLElement[];
-    const acepto = cands.find((b) => /acepto/i.test(((b.textContent || "") + ((b as HTMLInputElement).value || "")).trim()));
-    if (acepto) { acepto.click(); return "acepto:texto"; }
-    return chk ? "acepto:solo-check" : "acepto:sin-boton";
-  }).catch(() => "acepto:err")) as string;
-  await fr.page().waitForTimeout(2200).catch(() => {});
+    await fr.page().waitForTimeout(400).catch(() => {});
+    // 2) Pulsar "Acepto" (botón o enlace).
+    const btn = fr.locator('#btnAceptar, button:has-text("Acepto"), a:has-text("Acepto"), input[value*="Acepto" i]').first();
+    if (await btn.count().catch(() => 0)) { await btn.click({ force: true, timeout: 5000 }).catch(() => {}); via = "acepto:click"; }
+    else via = "acepto:sin-boton";
+  } catch { via = "acepto:err"; }
+  await fr.page().waitForTimeout(2500).catch(() => {});
   return via;
 }
 
@@ -297,21 +296,22 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       }
     }
 
-    // 3) Ir DIRECTO a la pantalla del correo (GET reportetri.htm?action=
-    //    cargarFormulario; la sesión viaja por cookies al haber entrado por el
-    //    menú). Salta el checkbox + "Acepto".
+    // 3) Pasar de la pantalla "Acepto" al formulario del correo, con REINTENTO:
+    //    a veces el Acepto no avanza al primer intento (casilla/boton), así que
+    //    se reintenta hasta 3 veces esperando que aparezca el campo de correo.
     let via = "no-frame";
     if (frameRTT && !estado.correo) {
-      via = await irAlFormularioCorreo(frameRTT);
-      for (let i = 0; i < 12; i++) {
-        await page.waitForTimeout(1000).catch(() => {});
-        await cerrarPantallas(ctx, page);
-        let encontrado = false;
-        for (const fr of todosLosFrames(ctx)) {
-          const st = await esFrameRTT(fr);
-          if (st.correo) { frameRTT = fr; estado = st; encontrado = true; break; }
+      for (let intento = 0; intento < 3 && !estado.correo; intento++) {
+        via = await irAlFormularioCorreo(frameRTT);
+        for (let i = 0; i < 10 && !estado.correo; i++) {
+          await page.waitForTimeout(1000).catch(() => {});
+          await cerrarPantallas(ctx, page);
+          for (const fr of todosLosFrames(ctx)) {
+            const st = await esFrameRTT(fr);
+            if (st.correo) { frameRTT = fr; estado = st; break; }
+            if (st.app && st.acepto) frameRTT = fr; // seguir en la pantalla Acepto
+          }
         }
-        if (encontrado) break;
       }
     }
     pasos.push({ paso: "cargar-formulario", via, hayCorreo: estado.correo });
