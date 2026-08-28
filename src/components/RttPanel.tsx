@@ -134,101 +134,34 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         {solicitudes.filter((s) => s.estado !== "error").length === 0 ? (
           <p className="text-sm text-slate-400">Aún no has generado ningún reporte. Elige una empresa y pulsa “Generar Reporte Tributario”.</p>
         ) : (
-          <div className="max-w-2xl space-y-3">
+          <div className="space-y-2">
             {solicitudes.filter((s) => s.estado !== "error").map((s) => {
               const listo = s.estado === "listo";
               const enCurso = ["creado", "pendiente", "en_proceso", "recibido"].includes(s.estado);
               return (
-                <div key={s.id} className={`rounded-lg border p-3 ${listo ? "border-emerald-200 bg-emerald-50/40" : s.estado === "error" ? "border-red-200 bg-red-50/40" : "border-slate-200"}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span className="font-semibold text-slate-700">{s.razonSocial || `RUC ${s.ruc}`}</span>
-                      <span className="ml-2 text-xs text-slate-400">RUC {s.ruc}</span>
-                    </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${COLOR[s.estado] ?? "bg-slate-100"}`}>
-                      {LABEL[s.estado] ?? s.estado}
-                    </span>
+                // Barra horizontal delgada: nombre a la izquierda, estado + PDF/XML al final.
+                <div key={s.id} className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${listo ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200"}`}>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-semibold text-slate-700" title={s.razonSocial || `RUC ${s.ruc}`}>{s.razonSocial || `RUC ${s.ruc}`}</span>
+                    <span className="ml-2 whitespace-nowrap text-xs text-slate-400">RUC {s.ruc}</span>
+                    <span className="ml-2 whitespace-nowrap text-[11px] text-slate-400" title={s.emailDestino}>· {new Date(s.creadoEn).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" })}</span>
                   </div>
-
-                  {/* Información de la generación */}
-                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-500 sm:grid-cols-3">
-                    <div><dt className="inline text-slate-400">Solicitado: </dt><dd className="inline">{new Date(s.creadoEn).toLocaleString("es-PE")}</dd></div>
-                    {s.actualizadoEn && <div><dt className="inline text-slate-400">Actualizado: </dt><dd className="inline">{new Date(s.actualizadoEn).toLocaleString("es-PE")}</dd></div>}
-                    <div><dt className="inline text-slate-400">Correo: </dt><dd className="inline break-all">{s.emailDestino}</dd></div>
-                  </dl>
-
-                  {s.estado === "error" && (
-                    <div className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-600">⚠ {s.error ?? "Error en la generación"}</div>
+                  {enCurso && (
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${COLOR[s.estado] ?? "bg-slate-100"}`}>
+                      ⏳ {LABEL[s.estado] ?? s.estado}
+                    </span>
                   )}
                   {listo && (
-                    <details className="mt-2 group">
-                      <summary className="btn-primary inline-flex cursor-pointer list-none items-center gap-1 text-sm">
-                        📄 Formatos <span className="text-[10px] transition group-open:rotate-180">▾</span>
-                      </summary>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ PDF</a>
-                        {s.rutaXml && <a className="btn-ghost text-sm" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ XML</a>}
-                      </div>
-                    </details>
-                  )}
-                  {enCurso && (
-                    <p className="mt-2 text-[11px] text-slate-400">⏳ SUNAT está procesando el reporte; llega por correo y aquí queda listo para descargar. Esta vista se actualiza sola.</p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <a className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700" href={`/api/rtt/${s.id}/archivo?tipo=pdf`}>⬇ PDF</a>
+                      {s.rutaXml && <a className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/api/rtt/${s.id}/archivo?tipo=xml`}>⬇ XML</a>}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
         )}
-      </div>
-
-      {/* Verificación del webhook: últimos correos recibidos */}
-      <div className="card p-5">
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Webhook de correo — verificación</h2>
-          <span className={`badge ${dominio ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
-            {dominio ? `Dominio: ${dominio}` : "Falta configurar RTT_DOMINIO"}
-          </span>
-        </div>
-        <p className="mb-3 text-xs text-slate-400">
-          Aquí aparece <strong>cada correo que llega al webhook</strong> (el PDF/XML de SUNAT). Sirve para verificar
-          que la cadena MX → SendGrid → webhook está funcionando.
-        </p>
-        {webhookLog.length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-            Aún no ha llegado ningún correo al webhook.
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-[10px] uppercase text-slate-400">
-                  <th className="px-2 py-1">Hora</th><th className="px-2 py-1">RUC</th><th className="px-2 py-1">PDF</th><th className="px-2 py-1">XML</th><th className="px-2 py-1">Resultado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {webhookLog.map((e: any, i: number) => (
-                  <tr key={i} className="border-t border-slate-100">
-                    <td className="px-2 py-1 text-slate-500">{new Date(e.at).toLocaleString("es-PE")}</td>
-                    <td className="px-2 py-1 font-medium text-slate-700">{e.ruc || "—"}</td>
-                    <td className="px-2 py-1">{e.tienePdf ? "✓" : "—"}</td>
-                    <td className="px-2 py-1">{e.tieneXml ? "✓" : "—"}</td>
-                    <td className={`px-2 py-1 ${/OK/.test(e.resultado) ? "text-emerald-700" : "text-amber-700"}`}>{e.resultado}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button className="btn-ghost text-sm" onClick={cargar} disabled={refrescando}>
-            {refrescando ? "Revisando…" : "↻ Actualizar"}
-          </button>
-          {revisadoAt && (
-            <span className="text-[11px] text-slate-400">
-              Revisado {revisadoAt} · {webhookLog.length} evento(s)
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );
