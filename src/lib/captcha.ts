@@ -162,49 +162,66 @@ export async function hookRecaptchaV3(ctx: any): Promise<void> {
   } catch (e) { /* addInitScript no disponible */ }
 }
 
-/** Detecta reCAPTCHA v3 en cualquier frame: sitekey (del hook o del src del
- *  script api.js/enterprise.js con ?render=) + action capturado + si hay campo
- *  tokenCaptchaV3/g-recaptcha-response. */
+/** Detecta reCAPTCHA v3 en el frame CORRECTO (el del RTT, que tiene el campo
+ *  tokenCaptchaV3). El sitekey de reCAPTCHA es EXACTO de 40 chars (6L+38): se
+ *  extrae del ?render= del script o de una coincidencia acotada — un regex
+ *  codicioso agarra base64 de otros frames (p. ej. el JWT de la campaña). */
 export async function detectarRecaptchaV3(ctx: any): Promise<RecaptchaV3Info | null> {
+  let fallback: RecaptchaV3Info | null = null;
   for (const pg of ctx.pages()) {
     for (const fr of pg.frames()) {
       const r = await fr
         .evaluate(() => {
           const w = window as any;
           const cap = w.__radarRc || {};
-          let sitekey: string | null = cap.sitekey || null;
-          const action: string | null = cap.action || null;
-          if (!sitekey) {
-            const srcs = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[])
-              .map((s) => s.src || "");
-            const s = srcs.find((u) => /recaptcha\/(api|enterprise)\.js/i.test(u)) || "";
-            const m = /[?&]render=([^&]+)/.exec(s);
-            if (m && m[1] && m[1] !== "explicit") sitekey = decodeURIComponent(m[1]);
-          }
-          if (!sitekey) {
-            const html = document.documentElement.outerHTML;
-            const m2 = /(6L[A-Za-z0-9_-]{20,})/.exec(html);
-            if (m2) sitekey = m2[1];
-          }
           const hayCampo = !!document.querySelector('input[name="tokenCaptchaV3"], #tokenCaptchaV3, textarea[name="g-recaptcha-response"], [name="g-recaptcha-response"]');
-          return sitekey ? { sitekey, action, hayCampo } : null;
+          const esRtt = /reportetri|itreportetri/i.test(location.href);
+          // Sitekey EXACTO (40 chars). 1) render= del script (lo más fiable).
+          let sitekey: string | null = cap.sitekey && /^6L[0-9A-Za-z_-]{38}$/.test(cap.sitekey) ? cap.sitekey : null;
+          const scripts = Array.from(document.querySelectorAll("script")) as HTMLScriptElement[];
+          if (!sitekey) {
+            const src = scripts.map((s) => s.src || "").find((u) => /recaptcha\/(api|enterprise)\.js/i.test(u)) || "";
+            const m = /[?&]render=(6L[0-9A-Za-z_-]{38})(?![0-9A-Za-z_-])/.exec(src);
+            if (m) sitekey = m[1];
+          }
+          const inline = scripts.map((s) => s.textContent || "").join("\n");
+          if (!sitekey) {
+            const m2 = /6L[0-9A-Za-z_-]{38}(?![0-9A-Za-z_-])/.exec(inline)
+              || /6L[0-9A-Za-z_-]{38}(?![0-9A-Za-z_-])/.exec(document.documentElement.outerHTML);
+            if (m2) sitekey = m2[0];
+          }
+          // Action: del hook, o rascada del JS inline (grecaptcha.execute(k,{action:'x'})).
+          let action: string | null = cap.action || null;
+          if (!action) {
+            const ma = /execute\s*\([^,]+,\s*\{[^}]*action\s*:\s*['"]([A-Za-z0-9_\/-]+)['"]/.exec(inline)
+              || /['"]action['"]\s*:\s*['"]([A-Za-z0-9_\/-]+)['"]/.exec(inline);
+            if (ma) action = ma[1];
+          }
+          return sitekey ? { sitekey, action, hayCampo, esRtt } : null;
         })
         .catch(() => null as any);
       if (r?.sitekey) {
         let url = "";
         try { url = fr.url(); } catch { /* */ }
         if (!url || url === "about:blank") url = pg.url();
-        return { sitekey: r.sitekey, action: r.action, url, hayCampo: !!r.hayCampo };
+        const info: RecaptchaV3Info = { sitekey: r.sitekey, action: r.action, url, hayCampo: !!r.hayCampo };
+        // El frame del RTT (con el campo o URL reportetri) es el bueno → devuélvelo.
+        if (r.hayCampo || r.esRtt) return info;
+        if (!fallback) fallback = info; // otro frame: solo si no aparece el del RTT
       }
     }
   }
-  return null;
+  return fallback;
 }
 
 /** Pide a CapSolver un token de reCAPTCHA v3 (sin proxy: usa la IP de CapSolver,
- *  que tiene buena reputación → buen puntaje). null si falla. */
-async function capsolverRecaptchaV3(clientKey: string, sitekey: string, url: string, action: string | null): Promise<string | null> {
-  const pedir = async (type: string) => {
+ *  que tiene buena reputación → buen puntaje). Devuelve el token y, si falla, el
+ *  motivo de CapSolver (sitekey inválido, saldo, key, etc.) para diagnóstico. */
+async function capsolverRecaptchaV3(
+  clientKey: string, sitekey: string, url: string, action: string | null
+): Promise<{ token: string | null; error?: string; tipo?: string }> {
+  let ultimoError = "";
+  const pedir = async (type: string): Promise<string | null> => {
     const crear = await fetch(`${API_URL}/createTask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -215,7 +232,10 @@ async function capsolverRecaptchaV3(clientKey: string, sitekey: string, url: str
     })
       .then((r) => r.json())
       .catch(() => null);
-    if (!crear || crear.errorId || !crear.taskId) return null;
+    if (!crear || crear.errorId || !crear.taskId) {
+      ultimoError = crear ? `${crear.errorCode || ""} ${crear.errorDescription || ""}`.trim() || "createTask sin taskId" : "createTask sin respuesta";
+      return null;
+    }
     const hasta = Date.now() + MAX_MS;
     while (Date.now() < hasta) {
       await sleep(3000);
@@ -227,13 +247,18 @@ async function capsolverRecaptchaV3(clientKey: string, sitekey: string, url: str
         .then((r) => r.json())
         .catch(() => null);
       if (!res) continue;
-      if (res.errorId) return null;
+      if (res.errorId) { ultimoError = `${res.errorCode || ""} ${res.errorDescription || ""}`.trim() || "getTaskResult errorId"; return null; }
       if (res.status === "ready") return res.solution?.gRecaptchaResponse ?? res.solution?.token ?? null;
     }
+    ultimoError = "timeout esperando el token";
     return null;
   };
   // Primero v3 normal; si SUNAT usa Enterprise, reintenta con esa tarea.
-  return (await pedir("ReCaptchaV3TaskProxyLess")) || (await pedir("ReCaptchaV3EnterpriseTaskProxyLess"));
+  let token = await pedir("ReCaptchaV3TaskProxyLess");
+  if (token) return { token, tipo: "v3" };
+  token = await pedir("ReCaptchaV3EnterpriseTaskProxyLess");
+  if (token) return { token, tipo: "v3-enterprise" };
+  return { token: null, error: ultimoError.slice(0, 140) };
 }
 
 /** Resuelve el reCAPTCHA v3 (si lo hay y hay clave) e inyecta el token en el
@@ -253,9 +278,10 @@ export async function resolverRecaptchaV3(ctx: any, frame: any, pasos: any[] = [
     pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: false, nota: "falta CAPSOLVER_KEY" });
     return false;
   }
-  const token = await capsolverRecaptchaV3(clientKey, info.sitekey, info.url, info.action);
+  const sol = await capsolverRecaptchaV3(clientKey, info.sitekey, info.url, info.action);
+  const token = sol.token;
   if (!token) {
-    pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: false, nota: "CapSolver no devolvió token v3" });
+    pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, url: info.url, resuelto: false, nota: "CapSolver no devolvió token v3", capsolverError: sol.error });
     return false;
   }
   const destino = frame || (ctx.pages()[0] && ctx.pages()[0].mainFrame());
@@ -276,7 +302,7 @@ export async function resolverRecaptchaV3(ctx: any, frame: any, pasos: any[] = [
       return puestos;
     }, token)
     .catch(() => 0);
-  pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: true, proveedor: "capsolver", inyecciones });
+  pasos.push({ paso: "recaptchaV3", detectado: true, sitekey: info.sitekey, action: info.action, resuelto: true, proveedor: "capsolver", tipo: sol.tipo, inyecciones });
   return true;
 }
 
