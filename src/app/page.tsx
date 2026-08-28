@@ -93,6 +93,13 @@ const UTILITARIOS: Opcion[] = [
     detalle:
       "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
   },
+  {
+    href: "/herramientas/honorarios",
+    icono: "🧾",
+    titulo: "Subida masiva de honorarios (RxH)",
+    detalle:
+      "El bot entra a SUNAT (Recibo por Honorarios → Consulta Receptor) y extrae los recibos recibidos por mes(es) completo(s), para armar la plantilla de importación a Contasis.",
+  },
 ];
 
 function Tarjeta({ o, bloqueado }: { o: Opcion; bloqueado: boolean }) {

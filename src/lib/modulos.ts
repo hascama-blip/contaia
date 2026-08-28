@@ -42,6 +42,7 @@ export const MODULOS: ModuloDef[] = [
   { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
   { key: "comprobantes-xml", nombre: "Comprobante XML SUNAT", href: "/herramientas/comprobantes-xml", soloSupremo: true },
+  { key: "honorarios", nombre: "Subida masiva de honorarios (RxH)", href: "/herramientas/honorarios", soloSupremo: true },
   // Legacy (no están en el menú; se conservan como solo-supremo)
   { key: "cruce-sire", nombre: "Comparativo SIRE vs sistema contable", href: "/herramientas/cruce-sire", soloSupremo: true },
   { key: "procesar-compras", nombre: "Masivo SIRE → Contabilidad (Contasis)", href: "/herramientas/procesar-compras", soloSupremo: true },

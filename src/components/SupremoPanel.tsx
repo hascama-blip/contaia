@@ -30,6 +30,7 @@ const UTILITARIOS_OPC: { key: string; label: string }[] = [
   { key: "visor", label: "Visor Tributario" },
   { key: "analisis-rtp", label: "Análisis para RTP" },
   { key: "comprobantes-xml", label: "Comprobante XML SUNAT" },
+  { key: "honorarios", label: "Subida masiva de honorarios (RxH)" },
 ];
 
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";
