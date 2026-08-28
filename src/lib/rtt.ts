@@ -331,6 +331,34 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       const v3pre = await detectarRecaptchaV3(ctx).catch(() => null);
       pasos.push({ paso: "recaptchaV3-detect", ...(v3pre || { detectado: false }), nota: "antes de Enviar (suele venir vacío: el captcha aparece al Enviar)" });
       if (frameRTT) {
+        // SONDA: qué es el botón Enviar y qué JS/recaptcha hay en el form ANTES
+        // de tocarlo (para entender por qué el captcha no aparece).
+        const sonda = (fr: any) => fr.evaluate(() => {
+          const g: any = (window as any).grecaptcha;
+          const scriptSrcs = (Array.from(document.querySelectorAll("script[src]")) as HTMLScriptElement[]).map((s) => s.src || "").slice(0, 40);
+          const inline = (Array.from(document.querySelectorAll("script:not([src])")) as HTMLScriptElement[]).map((s) => s.textContent || "").join("\n");
+          const iframeSrcs = (Array.from(document.querySelectorAll("iframe")) as HTMLIFrameElement[]).map((f) => f.src || "");
+          const html = document.documentElement.outerHTML;
+          const site = (/6L[0-9A-Za-z_-]{38}(?![0-9A-Za-z_-])/.exec(html) || [])[0] || null;
+          const render = (/render=(6L[0-9A-Za-z_-]{38})/.exec(html) || [])[1] || null;
+          const btn = (document.querySelector('#btnEnviar, #btnCorreo, [name="btnCorreo"]')
+            || (Array.from(document.querySelectorAll("a,button,input")) as HTMLElement[]).find((e) => /enviar/i.test((e.textContent || "") + ((e as HTMLInputElement).value || "")))) as HTMLElement | null;
+          return {
+            typeofGrecaptcha: typeof g,
+            grecaptchaExecute: !!(g && typeof g.execute === "function"),
+            scriptSrcs,
+            recaptchaEnScripts: /recaptcha/i.test(scriptSrcs.join(" ")),
+            recaptchaEnInline: /grecaptcha|g-recaptcha|recaptcha|execute\s*\(/i.test(inline),
+            iframeSrcs,
+            siteEnHtml: site,
+            renderEnHtml: render,
+            enviarBtn: btn ? { tag: btn.tagName, id: (btn as any).id || "", onclick: (btn.getAttribute("onclick") || "").slice(0, 220), href: (btn.getAttribute("href") || "").slice(0, 160), texto: (btn.textContent || "").trim().slice(0, 40) } : null,
+            texto: (document.body?.innerText || "").replace(/\s+/g, " ").slice(0, 500),
+          };
+        }).catch(() => null);
+
+        pasos.push({ paso: "sonda-antes", ...(await sonda(frameRTT)) });
+
         await frameRTT.locator('#txtCorreo, input[name="txtCorreo"], input[type="email"]').first().fill(params.emailDestino).catch(() => {});
         let clico = false;
         for (const sel of ["#btnEnviar", "#btnCorreo", 'button[name="btnCorreo"]', 'button:has-text("Enviar")', 'input[value*="Enviar" i]', 'a:has-text("Enviar")']) {
@@ -338,12 +366,13 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
           if (await el.count().catch(() => 0)) { await el.click({ force: true, timeout: 4000 }).catch(() => {}); clico = true; break; }
         }
         pasos.push({ paso: "enviar-diag", clico });
-        // Esperar a que aparezca el captcha (iframe recaptcha / bframe).
+        // Esperar a que aparezca el captcha (iframe recaptcha / bframe), hasta ~24s.
         let post: any = null;
-        for (let i = 0; i < 12 && !post; i++) {
+        for (let i = 0; i < 20 && !post; i++) {
           await page.waitForTimeout(1200).catch(() => {});
           post = await detectarRecaptchaPost(ctx).catch(() => null);
         }
+        pasos.push({ paso: "sonda-despues", ...(await sonda(frameRTT)) });
         const volcado = await volcarCaptcha(ctx).catch(() => []);
         pasos.push({ paso: "captcha-tras-enviar", detectado: post || false, frames: volcado });
         await resolverRecaptchaAparecido(ctx, pasos).catch(() => false);
