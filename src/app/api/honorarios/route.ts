@@ -21,5 +21,11 @@ export async function POST(req: NextRequest) {
 
   const r = await extraerHonorarios({ ruc: rucLogin, solUser, solPass, desde, hasta, diagnostico });
   if (!r.ok) return NextResponse.json({ error: r.error, diag: r.diag }, { status: r.loginError ? 401 : 502 });
-  return NextResponse.json({ recibos: r.recibos ?? [], diag: r.diag });
+  return NextResponse.json({
+    total: r.total ?? (r.recibos ?? []).length,
+    recibos: r.recibos ?? [],
+    archivo: r.archivoBase64,
+    nombre: r.nombreArchivo,
+    diag: r.diag,
+  });
 }

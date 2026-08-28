@@ -43,7 +43,20 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
       const data = await res.json().catch(() => ({}));
       if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (!res.ok) { setError(data.error ?? "No se pudo extraer los honorarios."); return; }
-      setInfo(diagModo ? "Diagnóstico listo (revisa la traza abajo)." : `Extracción lista: ${(data.recibos ?? []).length} recibo(s).`);
+      // Descargar el Excel generado (plantilla Contasis) si vino en la respuesta.
+      if (!diagModo && data.archivo) {
+        const bin = atob(data.archivo);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = data.nombre || "Honorarios.xlsx";
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      }
+      const n = data.total ?? (data.recibos ?? []).length;
+      setInfo(diagModo ? `Diagnóstico: ${n} recibo(s) leído(s) (revisa la traza abajo).` : `✅ ${n} recibo(s) extraído(s). Se descargó el Excel (plantilla Contasis).`);
     } catch {
       setError("Error de red al extraer.");
     } finally {

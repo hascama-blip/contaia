@@ -12,6 +12,7 @@
 // mes inicial al último día del mes final. Trae un REGISTRADOR de peticiones para
 // capturar el endpoint de datos (sin DevTools).
 
+import ExcelJS from "exceljs";
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
 
 const LOGIN_URL =
@@ -29,11 +30,31 @@ export interface HonorariosParams {
   diagnostico?: boolean;
 }
 
+export interface Recibo {
+  fecha: string;        // fecha de emisión (dd/mm/aaaa)
+  td: string;           // tipo doc (RH, NC, …)
+  nro: string;          // serie-número (E001-72)
+  estado: string;       // NO ANULADO / ANULADO / …
+  tipoDocEmisor: string; // RUC / DNI
+  nroDocEmisor: string;  // 10407428540
+  nombre: string;        // apellidos y nombres / denominación
+  tipoRenta: string;     // A / …
+  gratuito: string;      // SI / NO
+  moneda: string;        // SOLES / DÓLARES
+  rentaBruta: string;
+  impRenta: string;
+  rentaNeta: string;
+  pendiente: string;
+}
+
 export interface HonorariosResultado {
   ok: boolean;
   loginError?: boolean;
   error?: string;
-  recibos?: any[];
+  recibos?: Recibo[];
+  total?: number;
+  archivoBase64?: string;
+  nombreArchivo?: string;
   diag?: { pasos: any[]; requests?: any[]; rango?: { fi: string; ff: string } };
 }
 
@@ -179,6 +200,89 @@ async function volcar(ctx: any): Promise<any> {
   return { frames };
 }
 
+/** Parsea las filas de recibos de la página actual (tabla HTML) + el rango
+ *  "X a Y de N" para saber cuándo terminar la paginación. */
+async function parsearPagina(frame: any): Promise<{ rows: Recibo[]; hasta: number; total: number }> {
+  return frame.evaluate(() => {
+    const norm = (s: any) => String(s || "").replace(/\s+/g, " ").trim();
+    const esFecha = (s: string) => /^\d{2}\/\d{2}\/\d{4}$/.test(s);
+    const rows: any[] = [];
+    for (const tr of Array.from(document.querySelectorAll("tr"))) {
+      const tds = Array.from(tr.querySelectorAll("td")).map((td) => norm(td.textContent));
+      const di = tds.findIndex(esFecha);
+      if (di < 0) continue;
+      const c = tds.slice(di);
+      // Fila de recibo: fecha + tipo doc (RH/NC/…) + serie-número + estado + …
+      if (c.length >= 16 && /^(RH|NC|NR|OI)/i.test(c[1] || "") && /\d/.test(c[2] || "")) {
+        rows.push({
+          fecha: c[0], td: c[1], nro: c[2], estado: c[3],
+          tipoDocEmisor: c[4], nroDocEmisor: c[5], nombre: c[6],
+          tipoRenta: c[7], gratuito: c[8], moneda: c[9],
+          rentaBruta: c[10], impRenta: c[11], rentaNeta: c[16] || c[10], pendiente: c[17] || "",
+        });
+      }
+    }
+    const m = /(\d+)\s*a\s*(\d+)\s*de\s*(\d+)/i.exec(norm(document.body?.innerText || ""));
+    return { rows, hasta: m ? +m[2] : rows.length, total: m ? +m[3] : rows.length };
+  }).catch(() => ({ rows: [], hasta: 0, total: 0 }));
+}
+
+const num = (s: string) => Number(String(s || "").replace(/[^\d.-]/g, "")) || 0;
+const yyyymm = (fechaDMY: string) => {
+  const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(fechaDMY || "");
+  return m ? `${m[3]}${m[2]}` : "";
+};
+
+/** Construye el Excel con la MISMA plantilla de Contasis (20 columnas). Los
+ *  campos del recibo se mapean; los campos puramente contables (CTA CONTABLE,
+ *  SUBDIARIO, DESTINO, CENTRO DE COSTOS, DEBE/HABER…) quedan con el valor por
+ *  defecto configurable (o vacío) para que el estudio los ajuste/confirme. */
+export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string }): Promise<Buffer> {
+  const D = (k: string, def = "") => (process.env[k] || def); // defaults por entorno
+  const CTA = D("HONORARIOS_CTA");
+  const SUBDIARIO = D("HONORARIOS_SUBDIARIO");
+  const DESTINO = D("HONORARIOS_DESTINO");
+  const CENTRO = D("HONORARIOS_CENTRO");
+  const DEBEHABER = D("HONORARIOS_DEBEHABER", "D");
+
+  const HEADERS = [
+    "CTA CONTABLE", "AÑO Y MES PROCESO", "SUBDIARIO", "COMPROBANTE", "FECHA DOCUMENTO",
+    "TIPO ANEXO", "CODIGO PROVEEDOR", "TIPO DOCUMENTO", "NRO DOCUMENTO", "FECHA VENCIMIENTO",
+    "IMPORTE", "CONV", "FECHA REGISTRO", "TIPO CAMBIO", "GLOSA", "DESTINO",
+    "CENTRO DE COSTOS", "GLOSA MOVIMIENTO", "DOCUMENTO ANULADO", "DEBE / HABER",
+  ];
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Hoja1");
+  ws.addRow(HEADERS);
+  ws.getRow(1).font = { bold: true };
+  for (const r of recibos) {
+    const anulado = /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado);
+    ws.addRow([
+      CTA,                       // CTA CONTABLE
+      yyyymm(r.fecha),           // AÑO Y MES PROCESO
+      SUBDIARIO,                 // SUBDIARIO
+      r.nro,                     // COMPROBANTE (serie-número)
+      r.fecha,                   // FECHA DOCUMENTO
+      r.tipoDocEmisor === "DNI" ? "1" : "6", // TIPO ANEXO (6=RUC, 1=DNI) — ajustable
+      r.nroDocEmisor,            // CODIGO PROVEEDOR (RUC/DNI del emisor)
+      r.td,                      // TIPO DOCUMENTO (RH…)
+      r.nro,                     // NRO DOCUMENTO
+      r.fecha,                   // FECHA VENCIMIENTO
+      num(r.rentaBruta),         // IMPORTE (renta bruta del recibo)
+      "",                        // CONV
+      r.fecha,                   // FECHA REGISTRO
+      /d[oó]lar/i.test(r.moneda) ? "" : "1", // TIPO CAMBIO (soles=1)
+      `HONORARIOS ${r.nombre}`.trim(), // GLOSA
+      DESTINO,                   // DESTINO
+      CENTRO,                    // CENTRO DE COSTOS
+      r.nombre,                  // GLOSA MOVIMIENTO
+      anulado ? "SI" : "NO",     // DOCUMENTO ANULADO
+      DEBEHABER,                 // DEBE / HABER
+    ]);
+  }
+  return (await wb.xlsx.writeBuffer()) as Buffer;
+}
+
 // ============================================================
 //  Bot
 // ============================================================
@@ -255,24 +359,50 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     }
     pasos.push({ paso: "app-cargada", encontrada: !!appFrame, url: appFrame ? appFrame.url().slice(0, 160) : null });
 
-    // 4) Llenar el RANGO de fechas (meses completos) y Buscar.
-    let fechas: any = null;
-    if (appFrame) {
-      fechas = await llenarFechas(appFrame, rango.fi, rango.ff);
-      pasos.push({ paso: "fechas", fi: rango.fi, ff: rango.ff, campos: fechas });
-      await clickEnFrame(appFrame, ["Buscar", "Consultar"]).catch(() => {});
-      await page.waitForTimeout(4000).catch(() => {});
+    if (!appFrame) {
+      return { ok: false, error: "No se abrió la Consulta Receptor. Revisa el acceso SOL / permisos del RUC.", diag: { pasos, requests, rango } };
     }
 
-    // 5) En diagnóstico: volcar estructura + resultado + peticiones capturadas.
+    // 4) Llenar el RANGO de fechas (meses completos, fin topada a hoy) y Buscar.
+    const fechas = await llenarFechas(appFrame, rango.fi, rango.ff);
+    pasos.push({ paso: "fechas", fi: rango.fi, ff: rango.ff, campos: fechas });
+    await clickEnFrame(appFrame, ["Buscar", "Consultar"]).catch(() => {});
+    await page.waitForTimeout(4000).catch(() => {});
+
+    // 5) Leer la tabla y PAGINAR (Siguiente) hasta traer todos los recibos.
+    const frApp = () => todosLosFrames(ctx).find((f: any) => /itreciboelectronico|cpelec001Alias/i.test(f.url())) || appFrame;
+    const recibos: Recibo[] = [];
+    const vistos = new Set<string>();
+    let total = 0;
+    for (let g = 0; g < 30; g++) {
+      const fr = frApp();
+      const { rows, hasta, total: t } = await parsearPagina(fr);
+      if (t) total = t;
+      for (const r of rows) {
+        const k = `${r.td}|${r.nro}|${r.nroDocEmisor}|${r.fecha}`;
+        if (!vistos.has(k)) { vistos.add(k); recibos.push(r); }
+      }
+      if (!total || hasta >= total || rows.length === 0) break;
+      const sig = await clickEnFrame(fr, ["Siguiente"]);
+      if (!sig) break;
+      await page.waitForTimeout(2600).catch(() => {});
+    }
+    pasos.push({ paso: "extraccion", total, leidos: recibos.length, muestra: recibos.slice(0, 3) });
+
+    // 6) Diagnóstico: volcar estructura + muestra (no genera archivo).
     if (params.diagnostico) {
       const estructura = await volcar(ctx);
       pasos.push({ paso: "estructura", ...estructura });
-      return { ok: false, diag: { pasos, requests, rango } };
+      return { ok: recibos.length > 0, recibos, total, diag: { pasos, requests, rango } };
     }
 
-    // 6) Extracción real: pendiente de calibrar con el endpoint del diagnóstico.
-    return { ok: false, error: "Extracción aún no calibrada. Corre el Modo diagnóstico y comparte el endpoint capturado.", diag: { pasos, requests, rango } };
+    // 7) Real: construir el Excel con la plantilla de Contasis.
+    if (recibos.length === 0) {
+      return { ok: false, error: "No se encontraron recibos en ese rango (recuerda que la fecha fin se topa a hoy).", diag: { pasos, requests, rango } };
+    }
+    const buf = await construirExcelHonorarios(recibos, { ruc: params.ruc });
+    const nombreArchivo = `Honorarios-${params.ruc}-${(params.desde || "").replace(/\D/g, "")}${params.hasta && params.hasta !== params.desde ? "_" + params.hasta.replace(/\D/g, "") : ""}.xlsx`;
+    return { ok: true, recibos, total, archivoBase64: buf.toString("base64"), nombreArchivo, diag: { pasos, requests, rango } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error extrayendo honorarios.", diag: { pasos, requests, rango } };
   } finally {
