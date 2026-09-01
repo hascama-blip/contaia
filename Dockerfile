@@ -36,7 +36,6 @@ ENV MAX_NAVEGADORES=2
 ENV PORT=3000
 EXPOSE 3000
 
-# Crea el volumen de datos por si el host no lo monta explícitamente.
-VOLUME ["/var/data"]
-
+# La persistencia de /var/data la da el host (Railway Volumes / -v en el VPS).
+# (Railway NO admite la instrucción VOLUME en el Dockerfile.)
 CMD ["npm", "start"]
