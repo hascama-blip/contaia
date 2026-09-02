@@ -12,7 +12,7 @@ export default function BancoPdfWordPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resumen, setResumen] = useState<Resumen | null>(null);
-  const [res, setRes] = useState<{ nombre: string; word: string; excel: string } | null>(null);
+  const [res, setRes] = useState<{ nombre: string; excel: string } | null>(null);
 
   async function procesar() {
     setError(null); setResumen(null); setRes(null);
@@ -24,25 +24,22 @@ export default function BancoPdfWordPanel() {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setError(data.error ?? "No se pudo convertir."); return; }
       setResumen(data.resumen);
-      setRes({ nombre: data.nombre ?? "estado_cuenta", word: data.word, excel: data.excel });
+      setRes({ nombre: data.nombre ?? "estado_cuenta", excel: data.excel });
+      // Descarga automática del Excel al terminar.
+      if (data.excel) descargarExcel(data.nombre ?? "estado_cuenta", data.excel);
     } catch { setError("Error de red al procesar."); }
     finally { setBusy(false); }
   }
 
-  function bajar(tipo: "word" | "excel") {
-    if (!res) return;
-    const b64 = tipo === "word" ? res.word : res.excel;
+  function descargarExcel(nombre: string, b64: string) {
     if (!b64) return;
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const mime = tipo === "word"
-      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const blob = new Blob([bytes], { type: mime });
+    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${res.nombre}.${tipo === "word" ? "docx" : "xlsx"}`;
+    a.href = url; a.download = `${nombre}.xlsx`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }
@@ -51,12 +48,11 @@ export default function BancoPdfWordPanel() {
 
   return (
     <section className="card p-5">
-      <h3 className="font-semibold text-slate-800">📄 Estado de cuenta (PDF) → Word</h3>
+      <h3 className="font-semibold text-slate-800">📊 Estado de cuenta (PDF) → Excel</h3>
       <p className="mt-1 text-xs text-slate-500">
         Sube el <b>PDF del estado de cuenta del banco</b> (BCP, con capa de texto) y descarga en
-        <b> Excel</b> o <b>Word</b> la tabla de conciliación: FECHA · DESCRIPCIÓN · NUM OP · HORA ·
-        CARGO/ABONO · SALDO CONTABLE · CONCILIACIÓN (esta última en blanco para llenar). El saldo se
-        calcula corrido.
+        <b> Excel</b> la tabla de conciliación: FECHA · DESCRIPCIÓN · NUM OP · HORA · CARGO/ABONO ·
+        SALDO CONTABLE · CONCILIACIÓN (esta última en blanco para llenar). El saldo se calcula corrido.
       </p>
 
       <div className="mt-4 rounded-xl border-2 border-dashed border-slate-300 p-4">
@@ -69,9 +65,8 @@ export default function BancoPdfWordPanel() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button className="btn-primary" onClick={procesar} disabled={busy}>{busy ? "Convirtiendo…" : "Convertir"}</button>
-        {res && <button className="btn-accent" onClick={() => bajar("excel")}>⬇ Descargar Excel</button>}
-        {res && <button className="btn-ghost" onClick={() => bajar("word")}>⬇ Descargar Word</button>}
+        <button className="btn-primary" onClick={procesar} disabled={busy}>{busy ? "Convirtiendo…" : "Convertir a Excel"}</button>
+        {res && <button className="btn-accent" onClick={() => descargarExcel(res.nombre, res.excel)}>⬇ Descargar Excel</button>}
       </div>
 
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}

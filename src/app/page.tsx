@@ -81,10 +81,10 @@ const UTILITARIOS: Opcion[] = [
   },
   {
     href: "/herramientas/banco-word",
-    icono: "📄",
-    titulo: "Estado de cuenta (PDF) → Word",
+    icono: "📊",
+    titulo: "Estado de cuenta (PDF) → Excel",
     detalle:
-      "Convierte el PDF del estado de cuenta del banco (BCP) en un Word con la tabla de conciliación (fecha, descripción, N° op, hora, cargo/abono, saldo) lista para llenar.",
+      "Convierte el PDF del estado de cuenta del banco (BCP) en un Excel con la tabla de conciliación (fecha, descripción, N° op, hora, cargo/abono, saldo) lista para llenar.",
   },
   {
     href: "/herramientas/comprobantes-xml",

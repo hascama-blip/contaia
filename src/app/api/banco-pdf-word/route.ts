@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { textoDePdf, parseEstadoBcp, wordEstadoBanco, excelEstadoBanco } from "@/lib/bancoPdfWord";
+import { textoDePdf, parseEstadoBcp, excelEstadoBanco } from "@/lib/bancoPdfWord";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -27,12 +27,11 @@ export async function POST(req: NextRequest) {
     if (!est.movimientos.length) {
       return NextResponse.json({ error: "No se detectaron movimientos. Por ahora está calibrado para el estado de cuenta BCP." }, { status: 422 });
     }
-    const [word, excel] = await Promise.all([wordEstadoBanco(est), excelEstadoBanco(est)]);
+    const excel = await excelEstadoBanco(est);
     const base = (f.name.replace(/\.pdf$/i, "") || "estado_cuenta");
     return NextResponse.json({
       ok: true,
       resumen: { empresa: est.empresa, cuenta: est.cuenta, periodo: est.periodo, saldoInicial: est.saldoInicial, movimientos: est.movimientos.length, saldoFinal: est.movimientos.at(-1)?.saldo ?? est.saldoInicial },
-      word: word.toString("base64"),
       excel: excel.toString("base64"),
       nombre: base,
     });

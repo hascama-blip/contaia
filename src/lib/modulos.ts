@@ -38,7 +38,7 @@ export const MODULOS: ModuloDef[] = [
   // Utilitarios — solo supremo
   { key: "conciliacion", nombre: "Conciliación bancaria", href: "/herramientas/conciliacion", soloSupremo: true },
   { key: "ventas-caja", nombre: "Ventas vs Caja Virtual", href: "/herramientas/ventas-caja", soloSupremo: true },
-  { key: "banco-word", nombre: "Estado de cuenta (PDF) → Word", href: "/herramientas/banco-word", soloSupremo: true },
+  { key: "banco-word", nombre: "Estado de cuenta (PDF) → Excel", href: "/herramientas/banco-word", soloSupremo: true },
   { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
   { key: "comprobantes-xml", nombre: "Comprobante XML SUNAT", href: "/herramientas/comprobantes-xml", soloSupremo: true },

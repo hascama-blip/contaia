@@ -20,8 +20,8 @@ const UTILES: Util[] = [
     key: "banco-word",
     href: "/herramientas/banco-word",
     icono: "📄",
-    titulo: "Estado de cuenta (PDF) → Word",
-    detalle: "Convierte el PDF del estado de cuenta del banco en un Word con la tabla de conciliación lista para llenar.",
+    titulo: "Estado de cuenta (PDF) → Excel",
+    detalle: "Convierte el PDF del estado de cuenta del banco en un Excel con la tabla de conciliación lista para llenar.",
   },
   {
     key: "honorarios",
