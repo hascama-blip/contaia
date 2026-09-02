@@ -45,6 +45,8 @@ export interface Recibo {
   impRenta: string;
   rentaNeta: string;
   pendiente: string;
+  /** "Por concepto de …" del detalle del recibo (se usa como GLOSA). */
+  concepto?: string;
 }
 
 export interface HonorariosResultado {
@@ -227,6 +229,44 @@ async function parsearPagina(frame: any): Promise<{ rows: Recibo[]; hasta: numbe
   }).catch(() => ({ rows: [], hasta: 0, total: 0 }));
 }
 
+/** Para cada recibo entra a su DETALLE (clic en el N° azul), lee el texto de
+ *  "Por concepto de …" y vuelve a la lista con "Anterior". Con presupuesto de
+ *  tiempo (deadline) para no exceder el máximo de la petición. */
+async function extraerConceptos(ctx: any, page: any, frApp: () => any, rows: Recibo[], deadline: number) {
+  const esLista = async () => (await frApp().evaluate(() => {
+    const t = document.body?.innerText || "";
+    return /\bde\s+\d+\b/i.test(t) && /FECHA\s+DESDE|Consulta al Sistema/i.test(t);
+  }).catch(() => false)) as boolean;
+  for (const r of rows) {
+    if (Date.now() > deadline) break;
+    // Clic EXACTO en el enlace del número de recibo (E001-…).
+    const clico = await frApp().evaluate((nro: string) => {
+      const as = Array.from(document.querySelectorAll("a")) as HTMLElement[];
+      const el = as.find((a) => (a.textContent || "").replace(/\s+/g, " ").trim() === nro);
+      if (el) { el.click(); return true; }
+      return false;
+    }, r.nro).catch(() => false);
+    if (!clico) continue;
+    // Esperar el detalle y leer el concepto.
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(700).catch(() => {});
+      const txt = (await frApp().evaluate(() => document.body?.innerText || "").catch(() => "")) as string;
+      if (/Por concepto de/i.test(txt)) {
+        const m = /Por concepto de\s*[:\-]?\s*(.+?)\s*(Observaci[oó]n\b|Inciso\b|Fecha de emisi|Total por honorarios|Lista de Pagos)/is.exec(txt);
+        r.concepto = m ? m[1].replace(/\s+/g, " ").trim().slice(0, 300) : "";
+        break;
+      }
+    }
+    // Volver a la lista con "Anterior".
+    await frApp().evaluate(() => {
+      const els = Array.from(document.querySelectorAll('a,button,input[type="button"],input[type="submit"]')) as HTMLElement[];
+      const b = els.find((e) => /anterior/i.test((e.textContent || "") + " " + ((e as HTMLInputElement).value || "")));
+      if (b) b.click();
+    }).catch(() => {});
+    for (let i = 0; i < 12; i++) { await page.waitForTimeout(700).catch(() => {}); if (await esLista()) break; }
+  }
+}
+
 const num = (s: string) => Number(String(s || "").replace(/[^\d.-]/g, "")) || 0;
 const yyyymm = (fechaDMY: string) => {
   const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(fechaDMY || "");
@@ -272,10 +312,10 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
       "",                        // CONV
       r.fecha,                   // FECHA REGISTRO
       /d[oó]lar/i.test(r.moneda) ? "" : "1", // TIPO CAMBIO (soles=1)
-      `HONORARIOS ${r.nombre}`.trim(), // GLOSA
+      (r.concepto || `HONORARIOS ${r.nombre}`).trim(), // GLOSA = "Por concepto de …"
       DESTINO,                   // DESTINO
       CENTRO,                    // CENTRO DE COSTOS
-      r.nombre,                  // GLOSA MOVIMIENTO
+      r.concepto || r.nombre,    // GLOSA MOVIMIENTO
       anulado ? "SI" : "NO",     // DOCUMENTO ANULADO
       DEBEHABER,                 // DEBE / HABER
     ]);
@@ -391,14 +431,18 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     const vistos = new Set<string>();
     let total = 0;
     let pagina = 1;
+    const deadlineConceptos = Date.now() + 235000; // presupuesto para leer conceptos
     for (let g = 0; g < 40; g++) {
       const fr = frApp();
       const { rows, hasta, total: t } = await parsearPagina(fr);
       if (t) total = t;
+      const nuevos: Recibo[] = [];
       for (const r of rows) {
         const k = `${r.td}|${r.nro}|${r.nroDocEmisor}|${r.fecha}`;
-        if (!vistos.has(k)) { vistos.add(k); recibos.push(r); }
+        if (!vistos.has(k)) { vistos.add(k); recibos.push(r); nuevos.push(r); }
       }
+      // Leer el "Por concepto de" de cada recibo de esta página (detalle → volver).
+      await extraerConceptos(ctx, page, frApp, nuevos, deadlineConceptos).catch(() => {});
       if (total && hasta >= total) break;           // ya se leyó todo
       if (rows.length === 0 && g > 0) break;         // sin datos (no cortar en la 1ª)
       const antes = await rangoTxt(fr);
