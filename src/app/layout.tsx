@@ -40,9 +40,11 @@ export default async function RootLayout({
                 <LogoAsenco />
               </Link>
               {soloRtp ? (
-                // Header MÍNIMO para el usuario restringido: sin menús, solo salir.
-                <div className="flex items-center gap-3">
-                  <span className="hidden text-sm text-slate-600 sm:inline">{user.nombre}</span>
+                // Header MÍNIMO para el usuario restringido: solo su hub, sus
+                // empresas (para el acceso SOL de honorarios) y salir.
+                <div className="flex items-center gap-1.5 text-sm sm:gap-3">
+                  <Link href="/rtputilitarios" className="rounded-lg px-2.5 py-2 hover:bg-slate-100 sm:px-3">Utilitarios RTP</Link>
+                  <Link href="/clientes" className="rounded-lg px-2.5 py-2 hover:bg-slate-100 sm:px-3">Empresas</Link>
                   <SalirBtn />
                 </div>
               ) : (
