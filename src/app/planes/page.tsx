@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { requireUser } from "@/lib/auth";
+import { requireUser , bloquearSiSoloRtp} from "@/lib/auth";
 import { PLANES, CONTACTO, waPlan } from "@/lib/planes";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,7 @@ export const metadata = { title: "Adquirir módulos — Radar Tributario" };
 
 export default async function Page() {
   const user = await requireUser();
+  bloquearSiSoloRtp(user);
 
   // Link de "perfil" del solicitante (para que el supremo lo identifique y le dé el acceso).
   const h = headers();

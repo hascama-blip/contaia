@@ -67,6 +67,37 @@ export async function ensureSupremo(): Promise<void> {
   if (Object.keys(patch).length > 0) await updateUserById(existente.id, patch);
 }
 
+// Usuario RESTRINGIDO "solo RTP": se crea/reconcilia desde el entorno
+// (RTP_USER_EMAIL / RTP_USER_PASSWORD / RTP_USER_NOMBRE). Solo ve /rtputilitarios.
+const RTP_USER_EMAIL = (process.env.RTP_USER_EMAIL ?? "").trim().toLowerCase();
+const RTP_USER_PASSWORD = process.env.RTP_USER_PASSWORD ?? "";
+const RTP_USER_NOMBRE = process.env.RTP_USER_NOMBRE ?? "Utilitarios RTP";
+
+/** Garantiza el usuario "solo RTP" si está configurado por entorno (idempotente y
+ *  auto-reparador, igual que ensureSupremo). Sin las variables, no hace nada. */
+export async function ensureRtpUser(): Promise<void> {
+  if (!RTP_USER_EMAIL || !RTP_USER_PASSWORD) return;
+  const existente = await getUserByEmail(RTP_USER_EMAIL);
+  if (!existente) {
+    await createUser({
+      nombre: RTP_USER_NOMBRE,
+      email: RTP_USER_EMAIL,
+      passHash: hashPassword(RTP_USER_PASSWORD),
+      rol: "admin",
+      estado: "aprobado",
+      soloRtp: true,
+    });
+    return;
+  }
+  const patch: Record<string, unknown> = {};
+  if (existente.soloRtp !== true) patch.soloRtp = true;
+  if (existente.estado !== "aprobado") patch.estado = "aprobado";
+  if (existente.rol === "supremo") patch.rol = "admin"; // nunca supremo por accidente
+  if (existente.nombre !== RTP_USER_NOMBRE) patch.nombre = RTP_USER_NOMBRE;
+  if (!verifyPassword(RTP_USER_PASSWORD, existente.passHash)) patch.passHash = hashPassword(RTP_USER_PASSWORD);
+  if (Object.keys(patch).length > 0) await updateUserById(existente.id, patch);
+}
+
 /** Borra TODAS las cuentas y recrea el usuario supremo desde cero. Devuelve
  *  cuántas cuentas se eliminaron. Acción destructiva (solo el supremo). */
 export async function resetUsuarios(): Promise<number> {
@@ -106,6 +137,19 @@ export function esSupremo(u: Usuario | null | undefined): boolean {
   return Boolean(u) && u!.rol === "supremo";
 }
 
+/** ¿Usuario RESTRINGIDO a los Utilitarios RTP? (sin menús, solo /rtputilitarios). */
+export function esSoloRtp(u: Usuario | null | undefined): boolean {
+  return Boolean(u) && u!.soloRtp === true;
+}
+
+/** Los 4 módulos que ve un usuario "solo RTP". */
+export const MODULOS_RTP = ["analisis-rtp", "banco-word", "honorarios", "conciliacion"];
+
+/** Si el usuario es "solo RTP", lo saca de cualquier página que no sea su hub. */
+export function bloquearSiSoloRtp(u: Usuario | null | undefined): void {
+  if (esSoloRtp(u)) redirect("/rtputilitarios");
+}
+
 /** Plan del estudio al que pertenece el usuario. El supremo = "equipo" (todo).
  *  Los operadores heredan el plan de su admin. */
 export async function planDelEstudio(u: Usuario): Promise<import("./modulos").PlanId> {
@@ -118,6 +162,7 @@ export async function planDelEstudio(u: Usuario): Promise<import("./modulos").Pl
  *  tiene TODOS (incluye utilitarios); el resto según el plan del admin. */
 export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
   const { TODOS_MODULO_KEYS, modulosDePlan, UTILITARIO_KEYS } = await import("./modulos");
+  if (esSoloRtp(u)) return new Set(MODULOS_RTP); // usuario restringido: solo sus 4
   if (esSupremo(u)) return new Set(TODOS_MODULO_KEYS);
   const admin = u.parentId ? await getUserById(u.parentId) : u;
   const base = modulosDePlan(admin?.plan as import("./modulos").PlanId | undefined);

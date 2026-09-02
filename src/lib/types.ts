@@ -120,6 +120,9 @@ export interface Usuario {
   /** Plan asignado por el supremo. De aquí se derivan los módulos.
    *  undefined = "basico" (gratis). */
   plan?: "basico" | "regular" | "premium" | "equipo";
+  /** Usuario RESTRINGIDO a los Utilitarios RTP: solo ve /rtputilitarios y sus 4
+   *  herramientas; sin menús (Inicio/Dashboard/Clientes/Planes/Equipo/Supremo). */
+  soloRtp?: boolean;
   /** Recuperación de contraseña: hash del token + expiración (un solo uso). */
   resetTokenHash?: string;
   resetTokenExp?: string;

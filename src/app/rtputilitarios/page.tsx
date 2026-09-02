@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser, modulosDelEstudio, esSupremo } from "@/lib/auth";
+import { getCurrentUser, modulosDelEstudio, esSupremo, esSoloRtp } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Utilitarios RTP — Radar Tributario" };
@@ -69,11 +69,12 @@ export default async function Page() {
   if (!user) redirect("/login?next=/rtputilitarios");
   const mods = await modulosDelEstudio(user);
   const supremo = esSupremo(user);
+  const soloRtp = esSoloRtp(user);
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/" className="text-sm text-brand-600 hover:underline">← Menú</Link>
+        {!soloRtp && <Link href="/" className="text-sm text-brand-600 hover:underline">← Menú</Link>}
         <h1 className="mt-1 text-2xl font-bold text-slate-800">Utilitarios RTP</h1>
         <p className="text-sm text-slate-500">
           Herramientas de apoyo para el trabajo de RTP, agrupadas en un solo lugar.

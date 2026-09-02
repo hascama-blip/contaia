@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId, esAdmin } from "@/lib/auth";
+import { requireUser, studioId, esAdmin , bloquearSiSoloRtp} from "@/lib/auth";
 import { CondicionBadge, EstadoBadge, RiesgoBadge } from "@/components/ui";
 import VerificarSunatBtn from "@/components/VerificarSunatBtn";
 
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
   const user = await requireUser();
+  bloquearSiSoloRtp(user);
   const clientes = await listClientes(studioId(user));
   const admin = esAdmin(user);
   const pendientesVerif = clientes.filter((c) => !c.sunat).length;

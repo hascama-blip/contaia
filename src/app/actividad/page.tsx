@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireUser, esAdmin, esSupremo, studioId, planDelEstudio } from "@/lib/auth";
+import { requireUser, esAdmin, esSupremo, studioId, planDelEstudio , bloquearSiSoloRtp} from "@/lib/auth";
 import { listarAcciones } from "@/lib/db";
 import ActividadView from "@/components/ActividadView";
 
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 // Bitácora del estudio: quién hizo qué, cuándo y en qué sección. Solo el líder.
 export default async function ActividadPage() {
   const user = await requireUser();
+  bloquearSiSoloRtp(user);
   if (!esAdmin(user)) redirect("/");
 
   // La actividad del equipo es exclusiva del Plan de Equipo (como el módulo Equipo).

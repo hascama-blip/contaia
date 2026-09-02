@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireUser, esAdmin, esSupremo, planDelEstudio } from "@/lib/auth";
+import { requireUser, esAdmin, esSupremo, planDelEstudio , bloquearSiSoloRtp} from "@/lib/auth";
 import { listSubUsuarios } from "@/lib/db";
 import { publicUser } from "@/lib/auth";
 import EquipoManager from "@/components/EquipoManager";
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EquipoPage() {
   const user = await requireUser();
+  bloquearSiSoloRtp(user);
   if (!esAdmin(user)) redirect("/");
 
   // El equipo (operarios) es exclusivo del Plan de Equipo.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { getCurrentUser, studioId, modulosDelEstudio, esSupremo } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCurrentUser, studioId, modulosDelEstudio, esSupremo, esSoloRtp } from "@/lib/auth";
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 import UtilitariosSeccion from "@/components/UtilitariosSeccion";
@@ -150,6 +151,8 @@ export default async function MenuPage() {
   // sin enlazar, para que no entre gente que no debe).
   const user = await getCurrentUser();
   if (!user) return <Landing />;
+  // Usuario restringido "solo RTP": va directo a su hub, sin ver el menú.
+  if (esSoloRtp(user)) redirect("/rtputilitarios");
   const clientes = await listClientes(studioId(user));
   const mods = await modulosDelEstudio(user);
 

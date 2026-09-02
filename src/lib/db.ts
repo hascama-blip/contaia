@@ -105,7 +105,7 @@ async function readStore(): Promise<Store> {
 /** Actualiza campos de un usuario por id (parche superficial). */
 export async function updateUserById(
   id: string,
-  patch: Partial<Pick<Usuario, "passHash" | "rol" | "estado" | "nombre" | "parentId" | "decididoAt">>
+  patch: Partial<Pick<Usuario, "passHash" | "rol" | "estado" | "nombre" | "parentId" | "decididoAt" | "soloRtp">>
 ): Promise<Usuario | null> {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === id);
@@ -133,6 +133,7 @@ export async function createUser(data: {
   rol?: "supremo" | "admin" | "operador";
   parentId?: string;
   estado?: "pendiente" | "aprobado" | "rechazado";
+  soloRtp?: boolean;
 }): Promise<Usuario> {
   const store = await readStore();
   if (!store.users) store.users = [];
@@ -145,6 +146,7 @@ export async function createUser(data: {
     rol: data.rol ?? (data.parentId ? "operador" : "admin"),
     parentId: data.parentId,
     estado: data.estado,
+    ...(data.soloRtp ? { soloRtp: true } : {}),
   };
   store.users.push(user);
   await writeStore(store);

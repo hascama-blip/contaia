@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId } from "@/lib/auth";
+import { requireUser, studioId , bloquearSiSoloRtp} from "@/lib/auth";
 import { sunatModo } from "@/lib/sunat";
 import { EstadoBars, RiesgoPie } from "@/components/DashboardCharts";
 import { RiesgoBadge } from "@/components/ui";
@@ -17,6 +17,7 @@ const MODO_LABEL: Record<string, string> = {
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  bloquearSiSoloRtp(user);
   const clientes = await listClientes(studioId(user));
   const modo = sunatModo();
 
