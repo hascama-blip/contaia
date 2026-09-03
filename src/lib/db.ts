@@ -42,6 +42,9 @@ interface Store {
   users?: Usuario[];
   /** Memoria del estudio: RUC del proveedor → cuenta contable. */
   cuentasProveedor?: Record<string, ProveedorCuenta>;
+  /** Memoria de honorarios: emisor+concepto → cuentas del asiento (aprendido de
+   *  la plantilla del mes anterior). Clave = "<emisor>::<CONCEPTO NORMALIZADO>". */
+  cuentasHonorarios?: Record<string, CuentaHonorario>;
   /** Caché de rubro por RUC (para consultar decolecta 1 sola vez por RUC). */
   rubrosProveedor?: Record<string, { razonSocial: string; actividad: string; at: string }>;
   /** Bitácora de auditoría: acciones de todos los usuarios (la ve el líder). */
@@ -740,6 +743,38 @@ export async function mergeRubros(
 export async function getCuentasProveedor(): Promise<Record<string, ProveedorCuenta>> {
   const store = await readStore();
   return store.cuentasProveedor ?? {};
+}
+
+// --- Memoria de cuentas de honorarios (aprendida del mes anterior) ------------
+export interface CuentaHonorario {
+  emisor: string;    // RUC/DNI del emisor
+  concepto: string;  // concepto normalizado (GLOSA MOVIMIENTO)
+  ctaPagar: string;  // cuenta por pagar (fila H)
+  ctaGasto: string;  // cuenta de gasto (fila D)
+  centro: string;    // centro de costos (fila D)
+  destino: string;   // destino de compra
+  at: string;
+}
+
+export async function getCuentasHonorarios(): Promise<Record<string, CuentaHonorario>> {
+  const store = await readStore();
+  return store.cuentasHonorarios ?? {};
+}
+
+/** Aprende/actualiza el mapa de cuentas de honorarios (merge en la memoria). */
+export async function mergeCuentasHonorarios(
+  entradas: Record<string, Omit<CuentaHonorario, "at">>
+): Promise<number> {
+  const store = await readStore();
+  if (!store.cuentasHonorarios) store.cuentasHonorarios = {};
+  let n = 0;
+  const now = new Date().toISOString();
+  for (const [k, v] of Object.entries(entradas)) {
+    store.cuentasHonorarios[k] = { ...v, at: now };
+    n++;
+  }
+  await writeStore(store);
+  return n;
 }
 
 /** Aprende/actualiza cuentas por proveedor (merge en la memoria del estudio). */

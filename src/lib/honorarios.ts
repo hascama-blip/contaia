@@ -28,7 +28,11 @@ export interface HonorariosParams {
   desde?: string;
   hasta?: string;
   diagnostico?: boolean;
+  /** Memoria aprendida del mes anterior (emisor+concepto → cuentas). */
+  mapaCuentas?: Record<string, MapCuenta>;
 }
+
+export interface MapCuenta { emisor: string; concepto: string; ctaPagar: string; ctaGasto: string; centro: string; destino: string }
 
 export interface Recibo {
   fecha: string;        // fecha de emisión (dd/mm/aaaa)
@@ -267,6 +271,45 @@ async function extraerConceptos(ctx: any, page: any, frApp: () => any, rows: Rec
   }
 }
 
+/** Normaliza el concepto (GLOSA MOVIMIENTO) para comparar mes a mes. */
+export function normConcepto(s: string): string {
+  return String(s || "").toUpperCase().replace(/\s+/g, " ").trim();
+}
+
+/** Lee la plantilla YA LLENA del mes anterior (multi-hoja) y arma el mapa
+ *  emisor+concepto → cuentas del asiento (por pagar H, gasto D, centro, destino).
+ *  Sirve para heredar las cuentas cuando el mismo emisor repite el mismo servicio. */
+export async function parseReferenciaHonorarios(buffer: Buffer): Promise<Record<string, MapCuenta>> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as any);
+  const cel = (row: any, c: number): string => {
+    let v = row.getCell(c).value;
+    if (v && typeof v === "object" && (v as any).result !== undefined) v = (v as any).result;
+    if (v && typeof v === "object" && (v as any).text) v = (v as any).text;
+    return v == null ? "" : String(v).trim();
+  };
+  const mapa: Record<string, MapCuenta> = {};
+  wb.eachSheet((ws) => {
+    for (let r = 2; r <= ws.rowCount; r++) {
+      const row = ws.getRow(r);
+      const emisor = cel(row, 7).replace(/\D/g, "");
+      const concepto = normConcepto(cel(row, 18));
+      if (!emisor || !concepto) continue;
+      const cta = cel(row, 1);
+      const dh = cel(row, 20).toUpperCase();
+      const centro = cel(row, 17);
+      const destino = cel(row, 16);
+      const key = `${emisor}::${concepto}`;
+      const e = mapa[key] || { emisor, concepto, ctaPagar: "", ctaGasto: "", centro: "", destino: "" };
+      if (dh === "H") { if (cta) e.ctaPagar = cta; }
+      else if (dh === "D") { if (cta) e.ctaGasto = cta; if (centro) e.centro = centro; }
+      if (destino && !e.destino) e.destino = destino;
+      mapa[key] = e;
+    }
+  });
+  return mapa;
+}
+
 const num = (s: string) => Number(String(s || "").replace(/[^\d.-]/g, "")) || 0;
 const yyyymm = (fechaDMY: string) => {
   const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(fechaDMY || "");
@@ -283,14 +326,24 @@ const ddmmyy = (fechaDMY: string) => {
  *   • DEBE  (D): cuenta de GASTO (la asigna el contador → se deja VACÍA).
  *  El concepto ("Por concepto de …") va en GLOSA MOVIMIENTO. TIPO CAMBIO en
  *  blanco. Incluye recibos con RUC o DNI. Cuentas configurables por entorno. */
-export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string }): Promise<Buffer> {
+export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string; mapaCuentas?: Record<string, MapCuenta> }): Promise<Buffer> {
   const D = (k: string, def = "") => (process.env[k] ?? def);
-  const CTA_PAGAR = D("HONORARIOS_CTA_PAGAR");   // H (por pagar) — vacío por defecto
-  const CTA_GASTO = D("HONORARIOS_CTA_GASTO");   // D (gasto) — vacío (contador)
   const SUBDIARIO = D("HONORARIOS_SUBDIARIO", "11");
   const DESTINO = D("HONORARIOS_DESTINO", "010");
   const CONV = D("HONORARIOS_CONV", "VTA");
-  const CENTRO_D = D("HONORARIOS_CENTRO", "");   // centro de costos (D) — contador
+
+  // Memoria del mes anterior: emisor+concepto → cuentas. Con respaldos por
+  // concepto (mismo servicio) y por emisor (misma persona con una sola cuenta).
+  const mapa = meta.mapaCuentas || {};
+  const entradas = Object.values(mapa);
+  const buscar = (emisor: string, concNorm: string): MapCuenta | null => {
+    if (mapa[`${emisor}::${concNorm}`]) return mapa[`${emisor}::${concNorm}`];
+    const porConc = entradas.filter((e) => e.concepto === concNorm && e.ctaGasto);
+    if (porConc.length) return porConc[0];
+    const porEmi = entradas.filter((e) => e.emisor === emisor && e.ctaGasto);
+    if (porEmi.length && new Set(porEmi.map((e) => e.ctaGasto)).size === 1) return porEmi[0];
+    return null;
+  };
 
   const HEADERS = [
     "CTA CONTABLE", "AÑO Y MES PROCESO", "SUBDIARIO", "COMPROBANTE", "FECHA DOCUMENTO",
@@ -316,13 +369,19 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
     const glosa = `HO  ${r.nro}        /`;
     const glosaMov = (r.concepto || r.nombre || "").trim();
     const anulado = /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado) ? "1" : "0";
+    // Herencia de cuentas del mes anterior (si no hay match → todo vacío).
+    const hit = buscar(doc, normConcepto(glosaMov));
+    const ctaPagar = hit?.ctaPagar || "";
+    const ctaGasto = hit?.ctaGasto || "";
+    const centroD = hit?.centro || "";
+    const destino = hit?.destino || DESTINO;
     // Fila base del asiento (cambia CTA CONTABLE, CENTRO DE COSTOS y DEBE/HABER).
     const fila = (cta: string, centro: string, dh: string) => [
       cta, anioMes, SUBDIARIO, comprobante, fecha, tipoAnexo, r.nroDocEmisor, "HO", nroDoc, "",
-      importe, CONV, fecha, "" /* TIPO CAMBIO en blanco */, glosa, DESTINO, centro, glosaMov, anulado, dh, "",
+      importe, CONV, fecha, "" /* TIPO CAMBIO en blanco */, glosa, destino, centro, glosaMov, anulado, dh, "",
     ];
-    ws.addRow(fila(CTA_PAGAR, "", "H"));       // por pagar (H)
-    ws.addRow(fila(CTA_GASTO, CENTRO_D, "D")); // gasto (D) — cuenta vacía (contador)
+    ws.addRow(fila(ctaPagar, "", "H"));         // por pagar (H) — de la memoria o vacío
+    ws.addRow(fila(ctaGasto, centroD, "D"));    // gasto (D) — de la memoria o vacío (contador)
   }
   return (await wb.xlsx.writeBuffer()) as Buffer;
 }
@@ -475,7 +534,7 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     if (recibos.length === 0) {
       return { ok: false, error: "No se encontraron recibos en ese rango (recuerda que la fecha fin se topa a hoy).", diag: { pasos, requests, rango } };
     }
-    const buf = await construirExcelHonorarios(recibos, { ruc: params.ruc });
+    const buf = await construirExcelHonorarios(recibos, { ruc: params.ruc, mapaCuentas: params.mapaCuentas });
     const nombreArchivo = `Honorarios-${params.ruc}-${(params.desde || "").replace(/\D/g, "")}${params.hasta && params.hasta !== params.desde ? "_" + params.hasta.replace(/\D/g, "") : ""}.xlsx`;
     return { ok: true, recibos, total, archivoBase64: buf.toString("base64"), nombreArchivo, diag: { pasos, requests, rango } };
   } catch (err: any) {

@@ -21,7 +21,24 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
+  const [aprendidas, setAprendidas] = useState<number | null>(null);
+  const [aprendMsg, setAprendMsg] = useState<string | null>(null);
+  const [aprendBusy, setAprendBusy] = useState(false);
   const sel = clientes.find((c) => c.id === id) ?? null;
+
+  // Sube la plantilla YA LLENA del mes anterior para aprender las cuentas.
+  async function aprender(file: File) {
+    setAprendBusy(true); setAprendMsg(null);
+    try {
+      const fd = new FormData(); fd.append("archivo", file);
+      const res = await fetch("/api/honorarios/aprender", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setAprendMsg(data.error ?? "No se pudo aprender."); return; }
+      setAprendidas(data.total ?? null);
+      setAprendMsg(`✅ Aprendidas ${data.aprendidas} combinaciones (memoria total: ${data.total}). Se aplicarán en la próxima extracción.`);
+    } catch { setAprendMsg("Error de red al subir la plantilla."); }
+    finally { setAprendBusy(false); }
+  }
 
   async function extraer() {
     setError(null); setInfo(null); setDiag(null);
@@ -114,6 +131,28 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
         {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
         {diag && diagModo && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
+      </div>
+
+      {/* Aprender cuentas del mes anterior */}
+      <div className="card p-5">
+        <h3 className="font-semibold text-slate-800">🧠 Heredar cuentas del mes anterior</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Sube la <strong>plantilla YA LLENA del mes pasado</strong> (con las cuentas que puso el contador).
+          El sistema aprende, por <strong>emisor + concepto</strong>, qué cuentas usar. En la próxima extracción,
+          si el mismo emisor repite el mismo servicio, las <strong>cuentas se llenan solas</strong>; si no hay
+          antecedente, quedan en blanco para el contador.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className={`btn-ghost cursor-pointer ${aprendBusy ? "pointer-events-none opacity-50" : ""}`}>
+            {aprendBusy ? "Aprendiendo…" : "⬆ Subir plantilla del mes pasado"}
+            <input
+              type="file" accept=".xlsx" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) aprender(f); e.currentTarget.value = ""; }}
+            />
+          </label>
+          {aprendidas != null && <span className="text-xs text-slate-500">Memoria: {aprendidas} combinaciones</span>}
+        </div>
+        {aprendMsg && <p className="mt-2 text-xs text-slate-600">{aprendMsg}</p>}
       </div>
     </div>
   );
