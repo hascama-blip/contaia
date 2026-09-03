@@ -130,9 +130,34 @@ export interface DiaResumen {
 }
 
 // ---- Parsers ---------------------------------------------------------------
-/** Nombres de las hojas (cuentas) del FORMATO BANCO STARSOFT. */
+/** Nombres de las hojas (cuentas) del FORMATO BANCO STARSOFT (sin la Leyenda). */
 export function listarHojasBanco(buf: Buffer): string[] {
-  return Object.keys(leerHojas(buf));
+  return Object.keys(leerHojas(buf)).filter((s) => !/^leyenda$/i.test(s));
+}
+
+export interface EmpresaBanco { empresa: string; cuentas: string[] }
+
+/** Agrupa las hojas (cuentas) por EMPRESA. Cada hoja con el nombre de la empresa
+ *  en A1 abre/define su grupo; las hojas sin prefijo (que arrancan en "FECHA")
+ *  heredan la empresa de la hoja anterior (así se dividen por empresa/color). */
+export function agruparHojasPorEmpresa(buf: Buffer): EmpresaBanco[] {
+  const hojas = leerHojas(buf);
+  const norm = (s: string) => String(s || "").toUpperCase().replace(/\s+/g, " ").trim();
+  const grupos: EmpresaBanco[] = [];
+  let actual: EmpresaBanco | null = null;
+  for (const [sn, filas] of Object.entries(hojas)) {
+    if (/^leyenda$/i.test(sn)) continue;
+    const a1 = String(filas?.[0]?.[0] ?? "").trim();
+    const esNombreEmpresa = !!a1 && !/^(FECHA|REFERENCIA|CARGO|ABONO)$/i.test(a1);
+    if (esNombreEmpresa) {
+      if (!actual || norm(actual.empresa) !== norm(a1)) { actual = { empresa: a1, cuentas: [] }; grupos.push(actual); }
+      actual.cuentas.push(sn);
+    } else {
+      if (!actual) { actual = { empresa: "(Sin empresa)", cuentas: [] }; grupos.push(actual); }
+      actual.cuentas.push(sn);
+    }
+  }
+  return grupos;
 }
 
 /** Lee los movimientos del banco. Si se pasan `sel` (nombres de hoja), SOLO esas. */

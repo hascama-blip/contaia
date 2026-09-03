@@ -19,6 +19,7 @@ export default function ConciliacionStarsoftPanel() {
   const [sistema, setSistema] = useState<File[]>([]);
   const [banco, setBanco] = useState<File | null>(null);
   const [hojas, setHojas] = useState<string[]>([]);
+  const [empresas, setEmpresas] = useState<{ empresa: string; cuentas: string[] }[]>([]);
   const [hojasSel, setHojasSel] = useState<string[]>([]);
   const [cargandoHojas, setCargandoHojas] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,7 +29,7 @@ export default function ConciliacionStarsoftPanel() {
   const [descarga, setDescarga] = useState<{ nombre: string; b64: string } | null>(null);
 
   async function elegirBanco(f: File | null) {
-    setBanco(f); setHojas([]); setHojasSel([]); setError(null);
+    setBanco(f); setHojas([]); setEmpresas([]); setHojasSel([]); setError(null);
     if (!f) return;
     setCargandoHojas(true);
     try {
@@ -37,6 +38,7 @@ export default function ConciliacionStarsoftPanel() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(data.hojas)) {
         setHojas(data.hojas);
+        setEmpresas(Array.isArray(data.empresas) ? data.empresas : []);
         if (data.hojas.length === 1) setHojasSel(data.hojas);
       } else setError(data.error ?? "No se pudieron leer las hojas del banco.");
     } catch { setError("Error leyendo las hojas del banco."); }
@@ -45,6 +47,12 @@ export default function ConciliacionStarsoftPanel() {
 
   const toggleHoja = (h: string) =>
     setHojasSel((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]);
+  // Selecciona/deselecciona TODAS las cuentas de una empresa de golpe.
+  const toggleEmpresa = (cuentas: string[]) =>
+    setHojasSel((prev) => {
+      const todas = cuentas.every((c) => prev.includes(c));
+      return todas ? prev.filter((x) => !cuentas.includes(x)) : Array.from(new Set([...prev, ...cuentas]));
+    });
 
   async function procesar() {
     setError(null); setResumen(null); setDescarga(null); setDetectados(null);
@@ -128,16 +136,35 @@ export default function ConciliacionStarsoftPanel() {
                   <button type="button" className="text-slate-400 hover:underline" onClick={() => setHojasSel([])}>Ninguna</button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 p-2">
-                {hojas.map((h) => {
-                  const on = hojasSel.includes(h);
+              {/* Agrupadas por EMPRESA (según la leyenda). Cada empresa se puede
+                  seleccionar entera; o marcar cuentas sueltas. */}
+              <div className="space-y-2 rounded-lg border border-slate-200 p-2">
+                {(empresas.length ? empresas : [{ empresa: "Cuentas", cuentas: hojas }]).map((g) => {
+                  const todas = g.cuentas.length > 0 && g.cuentas.every((c) => hojasSel.includes(c));
                   return (
-                    <button
-                      key={h} type="button" onClick={() => toggleHoja(h)}
-                      className={`rounded-md px-2 py-1 text-[11px] font-medium ${on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-                    >
-                      {on ? "✓ " : ""}{h}
-                    </button>
+                    <div key={g.empresa} className="rounded-md bg-slate-50 p-2">
+                      <button
+                        type="button" onClick={() => toggleEmpresa(g.cuentas)}
+                        className="mb-1 flex items-center gap-1.5 text-[11px] font-bold text-slate-700 hover:text-brand-700"
+                        title="Seleccionar/quitar todas las cuentas de esta empresa"
+                      >
+                        <span className={`grid h-3.5 w-3.5 place-items-center rounded border ${todas ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"}`}>{todas ? "✓" : ""}</span>
+                        {g.empresa} <span className="font-normal text-slate-400">({g.cuentas.length})</span>
+                      </button>
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.cuentas.map((h) => {
+                          const on = hojasSel.includes(h);
+                          return (
+                            <button
+                              key={h} type="button" onClick={() => toggleHoja(h)}
+                              className={`rounded-md px-2 py-1 text-[11px] font-medium ${on ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}
+                            >
+                              {on ? "✓ " : ""}{h}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>

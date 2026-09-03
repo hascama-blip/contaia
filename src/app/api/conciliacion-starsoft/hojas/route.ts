@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { listarHojasBanco } from "@/lib/conciliacionStarsoft";
+import { listarHojasBanco, agruparHojasPorEmpresa, EmpresaBanco } from "@/lib/conciliacionStarsoft";
 
 export const runtime = "nodejs";
 
@@ -14,15 +14,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Adjunta el/los Excel del banco." }, { status: 400 });
   }
   try {
-    // Unión de las hojas (cuentas) de todos los archivos, preservando el orden.
+    // Unión de las hojas (cuentas) y su AGRUPACIÓN POR EMPRESA (según la leyenda /
+    // el nombre de empresa en cada hoja), preservando el orden.
     const vistas = new Set<string>();
     const hojas: string[] = [];
+    const empresas: EmpresaBanco[] = [];
+    const idxEmpresa: Record<string, number> = {};
     for (const f of files) {
-      for (const h of listarHojasBanco(Buffer.from(await f.arrayBuffer()))) {
+      const buf = Buffer.from(await f.arrayBuffer());
+      for (const h of listarHojasBanco(buf)) {
         if (!vistas.has(h)) { vistas.add(h); hojas.push(h); }
       }
+      for (const g of agruparHojasPorEmpresa(buf)) {
+        const key = g.empresa.toUpperCase().replace(/\s+/g, " ").trim();
+        if (idxEmpresa[key] === undefined) { idxEmpresa[key] = empresas.length; empresas.push({ empresa: g.empresa, cuentas: [] }); }
+        for (const c of g.cuentas) if (!empresas[idxEmpresa[key]].cuentas.includes(c)) empresas[idxEmpresa[key]].cuentas.push(c);
+      }
     }
-    return NextResponse.json({ hojas });
+    return NextResponse.json({ hojas, empresas });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "No se pudo leer el Excel." }, { status: 500 });
   }
