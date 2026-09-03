@@ -272,53 +272,57 @@ const yyyymm = (fechaDMY: string) => {
   const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(fechaDMY || "");
   return m ? `${m[3]}${m[2]}` : "";
 };
+const ddmmyy = (fechaDMY: string) => {
+  const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(fechaDMY || "");
+  return m ? `${m[1]}/${m[2]}/${m[3].slice(2)}` : (fechaDMY || "");
+};
 
-/** Construye el Excel con la MISMA plantilla de Contasis (20 columnas). Los
- *  campos del recibo se mapean; los campos puramente contables (CTA CONTABLE,
- *  SUBDIARIO, DESTINO, CENTRO DE COSTOS, DEBE/HABER…) quedan con el valor por
- *  defecto configurable (o vacío) para que el estudio los ajuste/confirme. */
+/** Construye el Excel de importación a Contasis (21 columnas), replicando la
+ *  plantilla real: CADA RECIBO = un asiento de 2 filas —
+ *   • HABER (H): cuenta por PAGAR (42411001);
+ *   • DEBE  (D): cuenta de GASTO (la asigna el contador → se deja VACÍA).
+ *  El concepto ("Por concepto de …") va en GLOSA MOVIMIENTO. TIPO CAMBIO en
+ *  blanco. Incluye recibos con RUC o DNI. Cuentas configurables por entorno. */
 export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string }): Promise<Buffer> {
-  const D = (k: string, def = "") => (process.env[k] || def); // defaults por entorno
-  const CTA = D("HONORARIOS_CTA");
-  const SUBDIARIO = D("HONORARIOS_SUBDIARIO");
-  const DESTINO = D("HONORARIOS_DESTINO");
-  const CENTRO = D("HONORARIOS_CENTRO");
-  const DEBEHABER = D("HONORARIOS_DEBEHABER", "D");
+  const D = (k: string, def = "") => (process.env[k] ?? def);
+  const CTA_PAGAR = D("HONORARIOS_CTA_PAGAR");   // H (por pagar) — vacío por defecto
+  const CTA_GASTO = D("HONORARIOS_CTA_GASTO");   // D (gasto) — vacío (contador)
+  const SUBDIARIO = D("HONORARIOS_SUBDIARIO", "11");
+  const DESTINO = D("HONORARIOS_DESTINO", "010");
+  const CONV = D("HONORARIOS_CONV", "VTA");
+  const CENTRO_D = D("HONORARIOS_CENTRO", "");   // centro de costos (D) — contador
 
   const HEADERS = [
     "CTA CONTABLE", "AÑO Y MES PROCESO", "SUBDIARIO", "COMPROBANTE", "FECHA DOCUMENTO",
-    "TIPO ANEXO", "CODIGO PROVEEDOR", "TIPO DOCUMENTO", "NRO DOCUMENTO", "FECHA VENCIMIENTO",
-    "IMPORTE", "CONV", "FECHA REGISTRO", "TIPO CAMBIO", "GLOSA", "DESTINO",
-    "CENTRO DE COSTOS", "GLOSA MOVIMIENTO", "DOCUMENTO ANULADO", "DEBE / HABER",
+    "TIPO ANEXO", "CODIGO DE ANEXO", "TIPO DOCUMENTO", "NRO DOCUMENTO", "FECHA VENCIMIENTO",
+    "IMPORTE", "CONV", "FECHA REGISTRO", "TIPO CAMBIO", "GLOSA", "DESTINO DE COMPRA",
+    "CENTRO DE COSTOS", "GLOSA MOVIMIENTO", "DOCUMENTO ANULADO", "DEBE / HABER", "NRO FILE",
   ];
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Hoja1");
+  const ws = wb.addWorksheet("Honorarios");
   ws.addRow(HEADERS);
   ws.getRow(1).font = { bold: true };
+
+  let corr = 0;
   for (const r of recibos) {
-    const anulado = /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado);
-    ws.addRow([
-      CTA,                       // CTA CONTABLE
-      yyyymm(r.fecha),           // AÑO Y MES PROCESO
-      SUBDIARIO,                 // SUBDIARIO
-      r.nro,                     // COMPROBANTE (serie-número)
-      r.fecha,                   // FECHA DOCUMENTO
-      r.tipoDocEmisor === "DNI" ? "1" : "6", // TIPO ANEXO (6=RUC, 1=DNI) — ajustable
-      r.nroDocEmisor,            // CODIGO PROVEEDOR (RUC/DNI del emisor)
-      r.td,                      // TIPO DOCUMENTO (RH…)
-      r.nro,                     // NRO DOCUMENTO
-      r.fecha,                   // FECHA VENCIMIENTO
-      num(r.rentaBruta),         // IMPORTE (renta bruta del recibo)
-      "",                        // CONV
-      r.fecha,                   // FECHA REGISTRO
-      /d[oó]lar/i.test(r.moneda) ? "" : "1", // TIPO CAMBIO (soles=1)
-      (r.concepto || `HONORARIOS ${r.nombre}`).trim(), // GLOSA = "Por concepto de …"
-      DESTINO,                   // DESTINO
-      CENTRO,                    // CENTRO DE COSTOS
-      r.concepto || r.nombre,    // GLOSA MOVIMIENTO
-      anulado ? "SI" : "NO",     // DOCUMENTO ANULADO
-      DEBEHABER,                 // DEBE / HABER
-    ]);
+    corr++;
+    const comprobante = String(corr).padStart(4, "0");
+    const anioMes = yyyymm(r.fecha);
+    const fecha = ddmmyy(r.fecha);
+    const doc = (r.nroDocEmisor || "").replace(/\D/g, "");
+    const tipoAnexo = doc.length === 8 ? "01" : "08"; // DNI=01, RUC=08 (ajustable)
+    const nroDoc = (r.nro || "").replace(/-/g, "");    // E001-72 → E00172
+    const importe = num(r.rentaBruta);
+    const glosa = `HO  ${r.nro}        /`;
+    const glosaMov = (r.concepto || r.nombre || "").trim();
+    const anulado = /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado) ? "1" : "0";
+    // Fila base del asiento (cambia CTA CONTABLE, CENTRO DE COSTOS y DEBE/HABER).
+    const fila = (cta: string, centro: string, dh: string) => [
+      cta, anioMes, SUBDIARIO, comprobante, fecha, tipoAnexo, r.nroDocEmisor, "HO", nroDoc, "",
+      importe, CONV, fecha, "" /* TIPO CAMBIO en blanco */, glosa, DESTINO, centro, glosaMov, anulado, dh, "",
+    ];
+    ws.addRow(fila(CTA_PAGAR, "", "H"));       // por pagar (H)
+    ws.addRow(fila(CTA_GASTO, CENTRO_D, "D")); // gasto (D) — cuenta vacía (contador)
   }
   return (await wb.xlsx.writeBuffer()) as Buffer;
 }
