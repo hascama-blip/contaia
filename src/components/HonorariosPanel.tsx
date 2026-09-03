@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AccesosSol from "./AccesosSol";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
@@ -25,6 +25,14 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
   const [aprendMsg, setAprendMsg] = useState<string | null>(null);
   const [aprendBusy, setAprendBusy] = useState(false);
   const sel = clientes.find((c) => c.id === id) ?? null;
+
+  // Al abrir: consultar cuántas combinaciones ya hay aprendidas (memoria guardada).
+  useEffect(() => {
+    fetch("/api/honorarios/aprender", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.total === "number") setAprendidas(d.total); })
+      .catch(() => {});
+  }, []);
 
   // Sube la plantilla YA LLENA del mes anterior para aprender las cuentas.
   async function aprender(file: File) {
@@ -135,22 +143,27 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
 
       {/* Aprender cuentas del mes anterior */}
       <div className="card p-5">
-        <h3 className="font-semibold text-slate-800">🧠 Heredar cuentas del mes anterior</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-slate-800">🧠 Heredar cuentas del mes anterior</h3>
+          {aprendidas != null && (
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${aprendidas > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+              {aprendidas > 0 ? `✅ Memoria activa: ${aprendidas} combinaciones` : "Sin memoria aún"}
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-xs text-slate-500">
-          Sube la <strong>plantilla YA LLENA del mes pasado</strong> (con las cuentas que puso el contador).
-          El sistema aprende, por <strong>emisor + concepto</strong>, qué cuentas usar. En la próxima extracción,
-          si el mismo emisor repite el mismo servicio, las <strong>cuentas se llenan solas</strong>; si no hay
-          antecedente, quedan en blanco para el contador.
+          {aprendidas && aprendidas > 0
+            ? <>Ya hay cuentas aprendidas guardadas — <strong>no necesitas volver a subir</strong> la plantilla cada vez. Solo sube una nueva si quieres <strong>actualizar o añadir</strong> aprendizajes.</>
+            : <>Sube la <strong>plantilla YA LLENA del mes pasado</strong> (con las cuentas que puso el contador). Se aprende, por <strong>emisor + concepto</strong>, qué cuentas usar; en la próxima extracción se llenan solas. Solo se sube <strong>una vez</strong> (queda guardado).</>}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className={`btn-ghost cursor-pointer ${aprendBusy ? "pointer-events-none opacity-50" : ""}`}>
-            {aprendBusy ? "Aprendiendo…" : "⬆ Subir plantilla del mes pasado"}
+            {aprendBusy ? "Aprendiendo…" : (aprendidas && aprendidas > 0 ? "⬆ Actualizar memoria (opcional)" : "⬆ Subir plantilla del mes pasado")}
             <input
               type="file" accept=".xlsx" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) aprender(f); e.currentTarget.value = ""; }}
             />
           </label>
-          {aprendidas != null && <span className="text-xs text-slate-500">Memoria: {aprendidas} combinaciones</span>}
         </div>
         {aprendMsg && <p className="mt-2 text-xs text-slate-600">{aprendMsg}</p>}
       </div>
