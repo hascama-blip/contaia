@@ -9,6 +9,8 @@
 // prueba real); respaldo por fecha (±2 días) + monto exacto + mismo sentido.
 
 import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
+import { parseBancoStarsoft } from "./conciliacionStarsoft";
 
 export interface MovBanco {
   fecha: string;        // YYYY-MM-DD (fecha proceso)
@@ -104,6 +106,83 @@ export async function parseExtractoBcp(buf: Buffer): Promise<{ desde: string; ha
     }
   }
   return { desde, hasta, movs };
+}
+
+// ---- 1b) Extracto bancario EN EXCEL ------------------------------------------
+// Además del PDF (BCP), aceptamos el extracto en Excel. Soporta dos formas:
+//   a) FORMATO BANCO STARSOFT (hojas con FECHA, REFERENCIA, CARGO, ABONO,
+//      OPERACION-NUMERO) → reusa el parser validado de conciliacionStarsoft.
+//   b) Export genérico del banco: una fila de cabecera con Fecha + columnas de
+//      importe (Abono/Cargo, Ingreso/Egreso, Debe/Haber, o un Monto con signo)
+//      + Descripción/Glosa y N° de operación/Referencia.
+const up = (s: any) => String(s ?? "").toUpperCase().replace(/\s+/g, " ").trim();
+const soloDig6 = (s: any) => { const d = String(s ?? "").replace(/\D/g, ""); return d ? d.slice(-6).padStart(6, "0") : ""; };
+
+/** Convierte una celda de fecha (Date o "dd/mm/aaaa" / "dd-mm-aaaa") a ISO. */
+function celdaFecha(v: any): string {
+  if (v instanceof Date && !isNaN(v.getTime())) return fechaLocal(v);
+  const s = String(v ?? "").trim();
+  const m = /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/.exec(s);
+  if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
+  return "";
+}
+
+export function parseExtractoBancoExcel(buf: Buffer): { desde: string; hasta: string; movs: MovBanco[] } {
+  const wb = XLSX.read(buf, { type: "buffer", cellDates: true });
+  const hojas = wb.SheetNames.map((sn) => XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: false }) as any[][]);
+
+  // ¿Formato BANCO STARSOFT? (alguna hoja con REFERENCIA + CARGO + ABONO)
+  const esStarsoft = hojas.some((rows) =>
+    rows.some((f) => f.some((c) => /REFERENCIA/i.test(String(c))) && f.some((c) => /CARGO/i.test(String(c))) && f.some((c) => /ABONO/i.test(String(c)))
+    ));
+
+  let movs: MovBanco[] = [];
+  if (esStarsoft) {
+    for (const b of parseBancoStarsoft(buf)) {
+      movs.push({ fecha: b.fecha, desc: b.referencia, numOp: soloDig6(b.opRaw), monto: b.monto, tipo: b.tipo === "ABONO" ? "abono" : "cargo" });
+    }
+  } else {
+    // Genérico: primera hoja con cabecera reconocible.
+    for (const rows of hojas) {
+      const hRow = rows.findIndex((f) => {
+        const H = f.map(up);
+        return H.some((h) => /FECHA/.test(h)) && H.some((h) => /ABONO|CARGO|INGRESO|EGRESO|DEP[OÓ]SITO|RETIRO|MONTO|IMPORTE|DEBE|HABER/.test(h));
+      });
+      if (hRow < 0) continue;
+      const H = rows[hRow].map(up);
+      const find = (...pats: RegExp[]) => H.findIndex((h) => pats.some((p) => p.test(h)));
+      const iF = find(/FECHA/);
+      const iDesc = find(/DESCRIP/, /GLOSA/, /CONCEPTO/, /DETALLE/, /REFERENCIA/, /OPERAC/);
+      const iOp = find(/OPERAC/, /N[°º]?\s*OP/, /NRO\.?\s*OP/, /REFERENC/, /DOCUMENTO/);
+      const iAbono = find(/ABONO/, /INGRESO/, /DEP[OÓ]SITO/, /HABER/, /CR[EÉ]DITO/);
+      const iCargo = find(/CARGO/, /EGRESO/, /RETIRO/, /DEBE/, /D[EÉ]BITO/);
+      const iMonto = find(/^MONTO$/, /IMPORTE/, /^MONTO /);
+      for (let i = hRow + 1; i < rows.length; i++) {
+        const f = rows[i]; if (!f) continue;
+        const fecha = celdaFecha(f[iF]); if (!fecha) continue;
+        let monto = 0, tipo: MovBanco["tipo"] = "abono";
+        if (iAbono >= 0 || iCargo >= 0) {
+          const ab = num(f[iAbono]), ca = num(f[iCargo]);
+          if (ab) { monto = Math.abs(ab); tipo = "abono"; }
+          else if (ca) { monto = Math.abs(ca); tipo = "cargo"; }
+          else continue;
+        } else if (iMonto >= 0) {
+          const raw = num(f[iMonto]); if (!raw) continue;
+          monto = Math.abs(raw); tipo = raw < 0 ? "cargo" : "abono";
+        } else continue;
+        movs.push({
+          fecha,
+          desc: String(f[iDesc] ?? "").trim(),
+          numOp: soloDig6(iOp >= 0 ? f[iOp] : ""),
+          monto, tipo,
+        });
+      }
+      if (movs.length) break;
+    }
+  }
+
+  const fechas = movs.map((m) => m.fecha).filter((f) => /^\d{4}-\d{2}-\d{2}$/.test(f)).sort();
+  return { desde: fechas[0] ?? "", hasta: fechas[fechas.length - 1] ?? "", movs };
 }
 
 // ---- 2) Libro banco (Excel del sistema contable) -----------------------------

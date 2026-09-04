@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { parseExtractoBcp, parseLibroBanco, parseCajaVirtual, conciliar, excelConciliacion } from "@/lib/conciliacion";
+import { parseExtractoBcp, parseExtractoBancoExcel, parseLibroBanco, parseCajaVirtual, conciliar, excelConciliacion } from "@/lib/conciliacion";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const fLibro = getFile("libro");
   const fCaja = getFile("caja");
 
-  if (!fExtracto) return NextResponse.json({ error: "Adjunta el extracto bancario (PDF)." }, { status: 400 });
+  if (!fExtracto) return NextResponse.json({ error: "Adjunta el extracto bancario (PDF o Excel)." }, { status: 400 });
   if (!fLibro) return NextResponse.json({ error: "Adjunta el libro banco (Excel)." }, { status: 400 });
   for (const f of [fExtracto, fLibro, fCaja]) {
     if (f && f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 20 MB.` }, { status: 400 });
@@ -33,10 +33,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const bufExtracto = Buffer.from(await fExtracto.arrayBuffer());
-    const { desde, hasta, movs } = await parseExtractoBcp(bufExtracto);
+    // El extracto puede venir en PDF (BCP) o en Excel (FORMATO BANCO STARSOFT o
+    // export genérico del banco). Elegimos el parser por la extensión/tipo.
+    const esExcel = /\.(xlsx|xls)$/i.test(fExtracto.name) ||
+      /spreadsheet|excel|ms-excel/i.test(fExtracto.type || "");
+    const { desde, hasta, movs } = esExcel
+      ? parseExtractoBancoExcel(bufExtracto)
+      : await parseExtractoBcp(bufExtracto);
     if (!movs.length) {
       return NextResponse.json(
-        { error: "No se pudieron leer movimientos del PDF. Debe ser un extracto con capa de texto (no escaneado). Por ahora está calibrado para el formato BCP." },
+        {
+          error: esExcel
+            ? "No se pudieron leer movimientos del Excel. Debe tener una fila de cabecera con Fecha y columnas de importe (Abono/Cargo, Ingreso/Egreso o Monto), o ser el FORMATO BANCO STARSOFT."
+            : "No se pudieron leer movimientos del PDF. Debe ser un extracto con capa de texto (no escaneado). Por ahora está calibrado para el formato BCP.",
+        },
         { status: 422 }
       );
     }

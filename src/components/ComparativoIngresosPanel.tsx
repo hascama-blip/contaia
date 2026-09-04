@@ -71,9 +71,10 @@ export default function ComparativoIngresosPanel() {
     <section className="card p-5">
       <h3 className="font-semibold text-slate-800">📊 Comparativo de ingresos por fuente (EECC · StarSoft · Caja Virtual)</h3>
       <p className="mt-1 text-xs text-slate-500">
-        Sube los Excel de cada fuente (puedes subir <b>varias empresas</b> a la vez). El sistema suma los
-        <b> ingresos por empresa</b> según cada fuente y arma un Excel de 2 hojas: <b>Ingresos por fuente</b> y
-        <b> Conciliación</b> (diferencias EECC − StarSoft, EECC − Caja y StarSoft − Caja).
+        Sube los Excel de cada fuente. El comparativo muestra <b>solo la(s) empresa(s) de los documentos
+        StarSoft/Caja</b> que subes (el extracto del banco puede traer muchas empresas, pero solo se toma la
+        que coincide). Arma un Excel de 2 hojas: <b>Ingresos por fuente</b> (resumen) y <b>Conciliación</b>
+        (detallada: diferencias EECC − StarSoft, EECC − Caja y StarSoft − Caja + cuentas del banco).
         Las empresas se emparejan por nombre (sin S.A.C./S.A.).
       </p>
 

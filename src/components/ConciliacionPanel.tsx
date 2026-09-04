@@ -17,7 +17,7 @@ export default function ConciliacionPanel() {
   const [res, setRes] = useState<any>(null);
 
   async function conciliar() {
-    if (!fExtracto) return setError("Adjunta el extracto bancario (PDF).");
+    if (!fExtracto) return setError("Adjunta el extracto bancario (PDF o Excel).");
     if (!fLibro) return setError("Adjunta el libro banco (Excel).");
     setBusy(true); setError(null); setRes(null);
     try {
@@ -55,8 +55,8 @@ export default function ConciliacionPanel() {
         <div className="grid gap-4 md:grid-cols-3">
           <Uploader
             titulo="1 · Extracto bancario"
-            detalle="PDF del banco (BCP). Con capa de texto, no escaneado."
-            accept=".pdf"
+            detalle="PDF del banco (BCP, con capa de texto) o Excel (FORMATO BANCO STARSOFT o export del banco)."
+            accept=".pdf,.xlsx,.xls"
             file={fExtracto}
             onFile={setFExtracto}
             obligatorio
