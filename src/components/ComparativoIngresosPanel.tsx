@@ -69,7 +69,7 @@ export default function ComparativoIngresosPanel() {
   const zonas: { key: "eecc" | "starsoft" | "caja"; titulo: string; sub: string; files: File[]; set: (f: File[]) => void }[] = [
     { key: "eecc", titulo: "1) Estado de cuenta (EECC / banco)", sub: "FORMATO BANCO STARSOFT. Ingreso = suma de ABONOS por empresa.", files: eecc, set: setEecc },
     { key: "starsoft", titulo: "2) StarSoft (Registro de Ventas)", sub: 'Ingreso = columna "Total". Nombra el archivo "starsoft - empresa - periodo".', files: starsoft, set: setStarsoft },
-    { key: "caja", titulo: "3) Caja Virtual", sub: 'Acepta el export contable "Resultado" o el REPORTE (con Empresa/Comprobante/Total). Ingreso = Total (la comisión NO se suma). Se excluyen notas de crédito.', files: caja, set: setCaja },
+    { key: "caja", titulo: "3) Caja Virtual", sub: 'Acepta el export contable "Resultado" o el REPORTE (con Empresa/Comprobante/Total). Ingreso = Total (la comisión NO se suma). Las notas de crédito se consideran (restan).', files: caja, set: setCaja },
   ];
 
   return (

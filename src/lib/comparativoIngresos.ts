@@ -218,8 +218,8 @@ export function ingresosStarsoft(archivos: FuenteArchivo[], stats?: StatsExcluid
       const f = filas[i]; if (!f) continue;
       const doc = String(f[iDoc] ?? "").trim();
       if (!doc) continue; // pie "Total ..." sin documento
-      // Nota de crédito → no se considera (se excluye del comparativo).
-      if (iTD >= 0 && esNotaCredito(f[iTD])) { if (stats) stats.starsoft++; continue; }
+      // Las notas de crédito SÍ se consideran: en el registro ya vienen en negativo.
+      if (iTD >= 0 && esNotaCredito(f[iTD]) && stats) stats.starsoft++;
       agregarComp(acc, key, label, {
         comprobante: doc.replace(/\s+/g, " ").trim(),
         norm: normComp(doc),
@@ -270,33 +270,37 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
     const label = empresa || "Caja (empresa no identificada)";
 
     // Agrupa por comprobante (NRO DOCUMENTO). Suma el IMPORTE de las líneas D.
-    const porComp = new Map<string, Comprobante>();
-    const ncExcl = new Set<string>();
+    // Las notas de crédito SÍ se consideran: en el asiento contable vienen con el
+    // total en el Haber (las líneas D son la reversión), así que su ingreso es
+    // NEGATIVO → se invierte el signo del comprobante NC.
+    const porComp = new Map<string, Comprobante & { esNC: boolean }>();
+    const ncNorms = new Set<string>();
     for (let i = 1; i < filas.length; i++) {
       const f = filas[i]; if (!f) continue;
-      // Nota de crédito → no se considera (se excluye del comparativo).
-      if (iTD >= 0 && esNotaCredito(f[iTD])) {
-        if (iNro >= 0) { const k = normComp(f[iNro]); if (k) ncExcl.add(k); }
-        continue;
-      }
       if (String(f[iDH] ?? "").trim().toUpperCase() !== "D") continue;
       const imp = num(f[iImp]); if (!imp) continue;
       const doc = iNro >= 0 ? String(f[iNro] ?? "").trim() : "";
       const nk = normComp(doc) || `(sin nro) ${i}`;
+      const esNC = iTD >= 0 && esNotaCredito(f[iTD]);
+      if (esNC && normComp(doc)) ncNorms.add(normComp(doc));
       const prev = porComp.get(nk);
-      if (prev) { prev.total = r2(prev.total + imp); }
+      if (prev) { prev.total = r2(prev.total + imp); prev.esNC = prev.esNC || esNC; }
       else porComp.set(nk, {
         comprobante: doc || "(sin nro)",
         norm: normComp(doc),
         fecha: iFe >= 0 ? String(f[iFe] ?? "").trim() : "",
-        tipoDoc: iTD >= 0 ? String(f[iTD] ?? "").trim() : "",
+        tipoDoc: esNC ? "NC" : (iTD >= 0 ? String(f[iTD] ?? "").trim() : ""),
         ruc: (iRuc >= 0 && String(f[iRuc] ?? "").trim()) || (iCod >= 0 ? String(f[iCod] ?? "").trim() : ""),
         cliente: (iRazon >= 0 && String(f[iRazon] ?? "").trim()) || (iGlosaMov >= 0 ? String(f[iGlosaMov] ?? "").trim() : ""),
-        total: r2(imp),
+        total: r2(imp), esNC,
       });
     }
-    for (const c of porComp.values()) agregarComp(acc, key, label, c);
-    if (stats) stats.caja += ncExcl.size;
+    for (const c of porComp.values()) {
+      const { esNC, ...comp } = c;
+      if (esNC) comp.total = r2(-comp.total); // NC → ingreso negativo
+      agregarComp(acc, key, label, comp);
+    }
+    if (stats) stats.caja += ncNorms.size;
     if (!acc[key]) acc[key] = { key, label, total: 0, comprobantes: [] };
   }
   return acc;
@@ -337,10 +341,11 @@ function parseReporteVentas(
     const f = filas[i]; if (!f) continue;
     const comp = String(f[iComp] ?? "").trim();
     if (!comp) continue; // fila vacía o pie ("Tiene N Facturas" no trae comprobante)
-    // Nota de crédito / devolución → no se considera.
+    // Las notas de crédito / devoluciones SÍ se consideran: en el REPORTE su Total
+    // ya viene en negativo, así que se suman tal cual.
     const tp = String(iTPago >= 0 ? f[iTPago] : "").toUpperCase();
     const tc = iTComp >= 0 ? f[iTComp] : "";
-    if (esNotaCredito(tc) || /NOTA\s*CR[EÉ]DITO|DEVOLUC|^DEV\b|DEV\./.test(tp)) { if (stats) stats[fuente]++; continue; }
+    if ((esNotaCredito(tc) || /NOTA\s*CR[EÉ]DITO|DEVOLUC|^DEV\b|DEV\./.test(tp)) && stats) stats[fuente]++;
 
     const empRaw = iEmp >= 0 ? String(f[iEmp] ?? "").trim() : "";
     // El nombre del archivo manda; la columna Empresa es respaldo (multi-empresa).
@@ -398,7 +403,7 @@ export function armarComparativo(
   const cja = ingresosCaja(caja, stats);
   const avisos: string[] = [];
   if (stats.starsoft || stats.caja) {
-    avisos.push(`Se excluyeron notas de crédito (no se consideran): ${stats.starsoft} en StarSoft, ${stats.caja} en Caja.`);
+    avisos.push(`Se consideraron las notas de crédito (restan del ingreso): ${stats.starsoft} en StarSoft, ${stats.caja} en Caja.`);
   }
 
   // Empresas REALES identificadas en los documentos (StarSoft / Caja).
