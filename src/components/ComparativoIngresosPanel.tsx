@@ -3,8 +3,13 @@
 import { useState } from "react";
 
 interface Fila { empresa: string; eecc: number | null; starsoft: number | null; caja: number | null }
+interface Detalle {
+  empresa: string; comprobante: string; fecha: string; tipoDoc: string; ruc: string; cliente: string;
+  starsoft: number | null; caja: number | null; dif: number | null; estado: string;
+}
 interface Resultado {
   filas: Fila[];
+  detalle: Detalle[];
   fuentes: { eecc: number; starsoft: number; caja: number };
   avisos: string[];
 }
@@ -142,7 +147,60 @@ export default function ComparativoIngresosPanel() {
             </table>
           </div>
           <p className="text-[11px] text-slate-400">
-            Diferencias en <span className="font-semibold text-amber-600">ámbar</span> ≥ S/ 0.50. El Excel trae ambas hojas con el detalle.
+            Diferencias en <span className="font-semibold text-amber-600">ámbar</span> ≥ S/ 0.50.
+          </p>
+
+          {/* Detalle POR COMPROBANTE (StarSoft vs Caja Virtual) */}
+          {res.detalle.length > 0 && (() => {
+            const cuadran = res.detalle.filter((d) => d.estado === "Cuadra").length;
+            const problemas = res.detalle.filter((d) => d.estado !== "Cuadra");
+            return (
+              <div className="mt-2 space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="font-semibold text-slate-600">Detalle por comprobante (StarSoft vs Caja):</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{res.detalle.length} comprob.</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">✔ {cuadran} cuadran</span>
+                  {problemas.length > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">⚠ {problemas.length} con diferencia</span>}
+                </div>
+                {problemas.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-amber-200">
+                    <table className="min-w-full text-[12px]">
+                      <thead className="bg-amber-50 text-[11px] uppercase tracking-wide text-amber-700">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left">Comprobante</th>
+                          <th className="px-2 py-1.5 text-left">Fecha</th>
+                          <th className="px-2 py-1.5 text-left">Cliente</th>
+                          <th className="px-2 py-1.5 text-right">StarSoft</th>
+                          <th className="px-2 py-1.5 text-right">Caja</th>
+                          <th className="px-2 py-1.5 text-right">Dif.</th>
+                          <th className="px-2 py-1.5 text-left">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-amber-100">
+                        {problemas.slice(0, 50).map((d, i) => (
+                          <tr key={i} className="hover:bg-amber-50/50">
+                            <td className="px-2 py-1 font-medium text-slate-700">{d.comprobante}</td>
+                            <td className="px-2 py-1 text-slate-500">{d.fecha}</td>
+                            <td className="px-2 py-1 text-slate-600">{d.cliente}</td>
+                            <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(d.starsoft)}</td>
+                            <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(d.caja)}</td>
+                            <td className="px-2 py-1 text-right tabular-nums font-semibold text-amber-600">{money(d.dif)}</td>
+                            <td className="px-2 py-1 font-semibold text-amber-700">{d.estado}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">✔ Todos los comprobantes cuadran entre StarSoft y Caja Virtual.</p>
+                )}
+                {problemas.length > 50 && <p className="text-[11px] text-slate-400">Se muestran los primeros 50; el detalle completo ({res.detalle.length} comprobantes) está en la hoja <b>“Detalle por comprobante”</b> del Excel.</p>}
+              </div>
+            );
+          })()}
+
+          <p className="text-[11px] text-slate-400">
+            El Excel trae 3 hojas: <b>Ingresos por fuente</b>, <b>Detalle por comprobante</b> y <b>Conciliación (resumen)</b>.
           </p>
         </div>
       )}
