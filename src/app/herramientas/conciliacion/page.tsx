@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser, esSupremo, modulosDelEstudio } from "@/lib/auth";
 import ConciliacionPanel from "@/components/ConciliacionPanel";
 import ConciliacionStarsoftPanel from "@/components/ConciliacionStarsoftPanel";
+import ComparativoIngresosPanel from "@/components/ComparativoIngresosPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conciliación bancaria — Radar Tributario" };
@@ -33,6 +34,14 @@ export default async function Page() {
       </div>
 
       <ConciliacionStarsoftPanel />
+
+      <div className="flex items-center gap-3 pt-2">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">comparativo de ingresos (3 fuentes)</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <ComparativoIngresosPanel />
     </div>
   );
 }
