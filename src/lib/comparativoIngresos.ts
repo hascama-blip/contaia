@@ -435,7 +435,42 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
     sDet.addRow({ empresa: "Sin comprobantes para cruzar (sube StarSoft y/o Caja Virtual con detalle).", cS: "" });
   }
 
-  // ---------- Hoja 3: Conciliación por empresa (resumen entre fuentes) ----------
+  // ---------- Hoja 3: Resumen Ventas (StarSoft) vs Caja ----------
+  // Conteos y montos del cruce comprobante a comprobante (como el módulo
+  // "Ventas vs Caja"): cuántas ventas del libro se cobraron en caja y el faltante.
+  const sVC = wb.addWorksheet("Resumen Ventas vs Caja");
+  sVC.columns = [{ width: 40 }, { width: 18 }];
+  {
+    const D = res.detalle;
+    const ventasTotal = D.filter((d) => d.starsoft != null).length;
+    const cajaTotal = D.filter((d) => d.caja != null).length;
+    const matched = D.filter((d) => d.starsoft != null && d.caja != null);
+    const conciliados = matched.length;
+    const conDiferencia = D.filter((d) => d.estado === "Difiere").length;
+    const faltanEnCaja = D.filter((d) => d.estado === "Solo StarSoft").length;
+    const cajaSinVenta = D.filter((d) => d.estado === "Solo Caja").length;
+    const montoVentas = r2(D.reduce((a, d) => a + (d.starsoft ?? 0), 0));
+    const montoConciliado = r2(matched.reduce((a, d) => a + (d.starsoft ?? 0), 0));
+    const montoFaltante = r2(D.filter((d) => d.estado === "Solo StarSoft").reduce((a, d) => a + (d.starsoft ?? 0), 0));
+    const filasVC: [string, number][] = [
+      ["Ventas (libro)", ventasTotal],
+      ["Pagos en caja", cajaTotal],
+      ["Conciliados", conciliados],
+      ["  · con diferencia de monto", conDiferencia],
+      ["Faltan en caja (ventas sin cobro)", faltanEnCaja],
+      ["En caja sin venta (fact/bol)", cajaSinVenta],
+      ["Monto total ventas (S/)", montoVentas],
+      ["Monto conciliado (S/)", montoConciliado],
+      ["Monto faltante en caja (S/)", montoFaltante],
+    ];
+    for (const [k, v] of filasVC) {
+      const row = sVC.addRow([k, v]);
+      if (/S\//.test(k)) row.getCell(2).numFmt = money;
+      if (/^Faltan|^En caja sin|^Monto faltante/.test(k) && v) { row.getCell(2).font = { color: { argb: AMBER }, bold: true }; }
+    }
+  }
+
+  // ---------- Hoja 4: Conciliación por empresa (resumen entre fuentes) ----------
   const s2 = wb.addWorksheet("Conciliación (resumen)");
   s2.columns = [
     { header: "Empresa", key: "empresa", width: 34 },
@@ -466,6 +501,7 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
     if (flags.length) row.getCell("obs").font = { color: { argb: AMBER }, bold: true };
   }
 
+  // Encabezado azul en las hojas con cabecera de columnas (sVC es lista k/v).
   for (const s of [s1, sDet, s2]) {
     s.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
     s.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };

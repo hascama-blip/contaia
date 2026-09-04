@@ -154,6 +154,9 @@ export default function ComparativoIngresosPanel() {
           {res.detalle.length > 0 && (() => {
             const cuadran = res.detalle.filter((d) => d.estado === "Cuadra").length;
             const problemas = res.detalle.filter((d) => d.estado !== "Cuadra");
+            const soloStar = res.detalle.filter((d) => d.estado === "Solo StarSoft");
+            const soloCaja = res.detalle.filter((d) => d.estado === "Solo Caja").length;
+            const montoFaltante = soloStar.reduce((a, d) => a + (d.starsoft ?? 0), 0);
             return (
               <div className="mt-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -161,6 +164,8 @@ export default function ComparativoIngresosPanel() {
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{res.detalle.length} comprob.</span>
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">✔ {cuadran} cuadran</span>
                   {problemas.length > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">⚠ {problemas.length} con diferencia</span>}
+                  {soloStar.length > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">Faltan en caja: {soloStar.length} ({money(montoFaltante)})</span>}
+                  {soloCaja > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">En caja sin venta: {soloCaja}</span>}
                 </div>
                 {problemas.length > 0 ? (
                   <div className="overflow-x-auto rounded-lg border border-amber-200">
