@@ -221,6 +221,18 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
     const hojas = leerHojas(buffer);
     const filas = hojas["Resultado"] ?? Object.values(hojas)[0] ?? [];
     if (!filas.length) continue;
+
+    // ¿Formato REPORTE de Caja Virtual? (cabecera con Comprobante + Total, y
+    // columnas Empresa/Comisión). Es distinto del export contable "Resultado".
+    const hRepIdx = filas.findIndex((f) => {
+      const hh = (f ?? []).map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
+      return hh.includes("COMPROBANTE") && hh.includes("TOTAL") && hh.some((h) => /EMPRESA|FECHA PAGO|COMISION/.test(h));
+    });
+    if (hRepIdx >= 0) {
+      ingresosCajaReporte(acc, nombre, filas, hRepIdx, stats);
+      continue;
+    }
+
     const H = (filas[0] ?? []).map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
     const iImp = H.indexOf("IMPORTE");
     const iDH = H.findIndex((h) => h.replace(/\s/g, "") === "DEBE/HABER");
@@ -268,6 +280,58 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
     if (!acc[key]) acc[key] = { key, label, total: 0, comprobantes: [] };
   }
   return acc;
+}
+
+/** Caja Virtual formato REPORTE (una fila por comprobante, con Empresa,
+ *  Comprobante, Comisión y Total). El ingreso = columna **Total** (la comisión
+ *  NO se resta). Agrupa por la columna Empresa; salta el pie ("Tiene N
+ *  Facturas") y las notas de crédito / devoluciones. */
+function ingresosCajaReporte(
+  acc: Record<string, IngresoEmpresa>, nombre: string, filas: any[][], hRow: number, stats?: StatsExcluidos,
+) {
+  const H = filas[hRow].map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
+  const iEmp = H.findIndex((h) => /^EMPRESA$/.test(h));
+  const iComp = H.findIndex((h) => /^COMPROBANTE$/.test(h));
+  const iTot = H.findIndex((h) => /^TOTAL$/.test(h));
+  const iCom = H.findIndex((h) => /COMISION/.test(h));       // se ignora en la suma
+  const iTPago = H.findIndex((h) => /^TIPO PAGO$/.test(h));
+  const iTComp = H.findIndex((h) => /^TIPO COMPROBANTE$/.test(h));
+  const iFP = H.findIndex((h) => /^FECHA PAGO$/.test(h));
+  const iNroDoc = H.findIndex((h) => /^NRO\.? DOCUMENTO$/.test(h)); // doc del cliente (DNI/RUC)
+  const iContra = H.findIndex((h) => /^CONTRATANTE$/.test(h));
+  if (iComp < 0 || iTot < 0) return;
+
+  const empresaArch = empresaDeNombre(nombre); // respaldo si no hay col Empresa
+  const seen = new Map<string, Set<string>>(); // empresaKey → comprobantes vistos
+  for (let i = hRow + 1; i < filas.length; i++) {
+    const f = filas[i]; if (!f) continue;
+    const comp = String(f[iComp] ?? "").trim();
+    if (!comp) continue; // fila vacía o pie ("Tiene N Facturas" no trae comprobante)
+    // Nota de crédito / devolución → no se considera.
+    const tp = String(iTPago >= 0 ? f[iTPago] : "").toUpperCase();
+    const tc = iTComp >= 0 ? f[iTComp] : "";
+    if (esNotaCredito(tc) || /NOTA\s*CR[EÉ]DITO|DEVOLUC|^DEV\b|DEV\./.test(tp)) { if (stats) stats.caja++; continue; }
+
+    const empRaw = iEmp >= 0 ? String(f[iEmp] ?? "").trim() : "";
+    const empresa = (empRaw && !esNombreGenerico(empRaw) ? empRaw : "") || empresaArch;
+    const key = empresa ? (normEmpresa(empresa) || empresa.toUpperCase().trim()) : SIN_EMPRESA;
+    const label = empresa || "Caja (empresa no identificada)";
+
+    const nk = normComp(comp);
+    let vistos = seen.get(key); if (!vistos) { vistos = new Set(); seen.set(key, vistos); }
+    if (nk && vistos.has(nk)) continue; // no duplicar el mismo comprobante
+    if (nk) vistos.add(nk);
+
+    agregarComp(acc, key, label, {
+      comprobante: comp,
+      norm: nk,
+      fecha: iFP >= 0 ? String(f[iFP] ?? "").trim() : "",
+      tipoDoc: iTComp >= 0 ? String(f[iTComp] ?? "").trim() : "",
+      ruc: iNroDoc >= 0 ? String(f[iNroDoc] ?? "").trim() : "",
+      cliente: iContra >= 0 ? String(f[iContra] ?? "").trim() : "",
+      total: r2(num(f[iTot])), // Total (bruto). La comisión (col iCom) NO se resta.
+    });
+  }
 }
 
 // ---- Ensamblado ------------------------------------------------------------
