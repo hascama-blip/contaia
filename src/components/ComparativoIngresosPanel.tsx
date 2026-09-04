@@ -4,7 +4,7 @@ import { useState } from "react";
 
 interface Fila { empresa: string; eecc: number | null; starsoft: number | null; caja: number | null }
 interface Detalle {
-  empresa: string; comprobante: string; fecha: string; tipoDoc: string; ruc: string; cliente: string;
+  empresa: string; compStarsoft: string; compCaja: string; fecha: string; tipoDoc: string; ruc: string; cliente: string;
   starsoft: number | null; caja: number | null; dif: number | null; estado: string;
 }
 interface Resultado {
@@ -167,8 +167,8 @@ export default function ComparativoIngresosPanel() {
                     <table className="min-w-full text-[12px]">
                       <thead className="bg-amber-50 text-[11px] uppercase tracking-wide text-amber-700">
                         <tr>
-                          <th className="px-2 py-1.5 text-left">Comprobante</th>
-                          <th className="px-2 py-1.5 text-left">Fecha</th>
+                          <th className="px-2 py-1.5 text-left">Comprob. StarSoft</th>
+                          <th className="px-2 py-1.5 text-left">Comprob. Caja</th>
                           <th className="px-2 py-1.5 text-left">Cliente</th>
                           <th className="px-2 py-1.5 text-right">StarSoft</th>
                           <th className="px-2 py-1.5 text-right">Caja</th>
@@ -179,8 +179,8 @@ export default function ComparativoIngresosPanel() {
                       <tbody className="divide-y divide-amber-100">
                         {problemas.slice(0, 50).map((d, i) => (
                           <tr key={i} className="hover:bg-amber-50/50">
-                            <td className="px-2 py-1 font-medium text-slate-700">{d.comprobante}</td>
-                            <td className="px-2 py-1 text-slate-500">{d.fecha}</td>
+                            <td className="px-2 py-1 font-medium text-slate-700">{d.compStarsoft || "—"}</td>
+                            <td className="px-2 py-1 font-medium text-slate-700">{d.compCaja || "—"}</td>
                             <td className="px-2 py-1 text-slate-600">{d.cliente}</td>
                             <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(d.starsoft)}</td>
                             <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(d.caja)}</td>

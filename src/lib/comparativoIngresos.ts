@@ -101,10 +101,12 @@ export interface FilaComparativo {
   caja: number | null;     // caja virtual (líneas D)
   detalleEecc?: string;    // cuentas del banco que suman el EECC
 }
-/** Fila del detalle POR COMPROBANTE (StarSoft vs Caja Virtual). */
+/** Fila del detalle POR COMPROBANTE (StarSoft vs Caja Virtual). Se ven los DOS
+ *  comprobantes emparejados (el de StarSoft y el de Caja) y su diferencia. */
 export interface DetalleComprobante {
   empresa: string;
-  comprobante: string;
+  compStarsoft: string;    // comprobante en StarSoft ("" si no está)
+  compCaja: string;        // comprobante en Caja ("" si no está)
   fecha: string;
   tipoDoc: string;
   ruc: string;
@@ -336,20 +338,22 @@ export function armarComparativo(
       const d = cajaTot != null ? r2(s.total - cajaTot) : null;
       const estado = cajaTot == null ? "Solo StarSoft" : (Math.abs(d ?? 0) < 0.5 ? "Cuadra" : "Difiere");
       detalle.push({
-        empresa: emp, comprobante: s.comprobante, fecha: s.fecha, tipoDoc: s.tipoDoc,
-        ruc: s.ruc, cliente: s.cliente, starsoft: s.total, caja: cajaTot, dif: d, estado,
+        empresa: emp, compStarsoft: s.comprobante, compCaja: c?.comprobante ?? "",
+        fecha: s.fecha || c?.fecha || "", tipoDoc: s.tipoDoc,
+        ruc: s.ruc || c?.ruc || "", cliente: s.cliente || c?.cliente || "",
+        starsoft: s.total, caja: cajaTot, dif: d, estado,
       });
     }
     // Comprobantes que solo están en Caja.
     for (const c of cComps) {
       if (!c.norm || usadosCaja.has(c.norm)) continue;
       detalle.push({
-        empresa: emp, comprobante: c.comprobante, fecha: c.fecha, tipoDoc: c.tipoDoc,
+        empresa: emp, compStarsoft: "", compCaja: c.comprobante, fecha: c.fecha, tipoDoc: c.tipoDoc,
         ruc: c.ruc, cliente: c.cliente, starsoft: null, caja: c.total, dif: null, estado: "Solo Caja",
       });
     }
   }
-  detalle.sort((a, b) => a.empresa.localeCompare(b.empresa) || a.comprobante.localeCompare(b.comprobante));
+  detalle.sort((a, b) => a.empresa.localeCompare(b.empresa) || (a.compStarsoft || a.compCaja).localeCompare(b.compStarsoft || b.compCaja));
 
   return {
     resultado: { filas, detalle, fuentes: { eecc: banco.length, starsoft: starsoft.length, caja: caja.length }, avisos },
@@ -394,36 +398,41 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
   // ---------- Hoja 2: DETALLE POR COMPROBANTE (StarSoft vs Caja Virtual) ----------
   const sDet = wb.addWorksheet("Detalle por comprobante");
   sDet.columns = [
-    { header: "Empresa", key: "empresa", width: 30 },
-    { header: "Comprobante", key: "comprobante", width: 16 },
+    { header: "Empresa", key: "empresa", width: 28 },
+    { header: "Comprob. StarSoft", key: "cS", width: 18 },
+    { header: "Comprob. Caja", key: "cC", width: 18 },
+    { header: "¿Match?", key: "match", width: 9 },
     { header: "Fecha", key: "fecha", width: 11 },
     { header: "T/D", key: "td", width: 6 },
     { header: "RUC/DNI", key: "ruc", width: 13 },
-    { header: "Cliente", key: "cliente", width: 34 },
-    { header: "StarSoft", key: "starsoft", width: 13 },
-    { header: "Caja Virtual", key: "caja", width: 13 },
+    { header: "Cliente", key: "cliente", width: 32 },
+    { header: "Total StarSoft", key: "starsoft", width: 14 },
+    { header: "Total Caja", key: "caja", width: 13 },
     { header: "Diferencia", key: "dif", width: 13 },
     { header: "Estado", key: "estado", width: 16 },
   ];
   const ESTADO_COLOR: Record<string, string> = { "Difiere": AMBER, "Solo StarSoft": "FFB91C1C", "Solo Caja": "FFB91C1C" };
   let dS = 0, dC = 0;
   for (const d of res.detalle) {
+    const match = d.compStarsoft && d.compCaja ? "✔" : "✗";
     const row = sDet.addRow({
-      empresa: d.empresa, comprobante: d.comprobante, fecha: d.fecha, td: d.tipoDoc,
-      ruc: d.ruc, cliente: d.cliente, starsoft: d.starsoft ?? "", caja: d.caja ?? "",
-      dif: d.dif ?? "", estado: d.estado,
+      empresa: d.empresa, cS: d.compStarsoft || "—", cC: d.compCaja || "—", match,
+      fecha: d.fecha, td: d.tipoDoc, ruc: d.ruc, cliente: d.cliente,
+      starsoft: d.starsoft ?? "", caja: d.caja ?? "", dif: d.dif ?? "", estado: d.estado,
     });
     ["starsoft", "caja", "dif"].forEach((k) => (row.getCell(k).numFmt = money));
+    row.getCell("match").alignment = { horizontal: "center" };
+    row.getCell("match").font = { color: { argb: match === "✔" ? "FF15803D" : "FFB91C1C" }, bold: true };
     const col = ESTADO_COLOR[d.estado];
     if (col) { row.getCell("estado").font = { color: { argb: col }, bold: true }; if (d.dif != null) row.getCell("dif").font = { color: { argb: col }, bold: true }; }
     dS += d.starsoft ?? 0; dC += d.caja ?? 0;
   }
   if (res.detalle.length) {
-    const t = sDet.addRow({ empresa: "TOTAL", comprobante: "", fecha: "", td: "", ruc: "", cliente: `${res.detalle.length} comprobante(s)`, starsoft: r2(dS), caja: r2(dC), dif: r2(dS - dC), estado: "" });
+    const t = sDet.addRow({ empresa: "TOTAL", cS: "", cC: "", match: "", fecha: "", td: "", ruc: "", cliente: `${res.detalle.length} comprobante(s)`, starsoft: r2(dS), caja: r2(dC), dif: r2(dS - dC), estado: "" });
     t.font = { bold: true };
     ["starsoft", "caja", "dif"].forEach((k) => (t.getCell(k).numFmt = money));
   } else {
-    sDet.addRow({ empresa: "Sin comprobantes para cruzar (sube StarSoft y/o Caja Virtual con detalle).", comprobante: "" });
+    sDet.addRow({ empresa: "Sin comprobantes para cruzar (sube StarSoft y/o Caja Virtual con detalle).", cS: "" });
   }
 
   // ---------- Hoja 3: Conciliación por empresa (resumen entre fuentes) ----------
