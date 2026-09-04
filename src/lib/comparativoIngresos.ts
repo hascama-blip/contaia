@@ -58,16 +58,25 @@ function esNombreGenerico(s: string): boolean {
   return !n || GENERICOS.has(n);
 }
 
-/** Saca la empresa del nombre de archivo "prefijo - EMPRESA - periodo".
- *  Devuelve "" si no logra separarlo o si solo trae palabras genéricas. */
+/** ¿El segmento parece un periodo (mes/año/fecha) y no una empresa? */
+function esPeriodo(s: string): boolean {
+  const t = String(s ?? "").toUpperCase().trim();
+  if (/^\d{4}$/.test(t) || /^\d{6}$/.test(t)) return true;                 // 2026, 202608
+  if (/^\d{1,2}[\/.\-]\d{1,2}([\/.\-]\d{2,4})?$/.test(t)) return true;     // 01/08 o 01/08/2026
+  if (/\b(20\d{2})\b/.test(t) && t.replace(/[^A-Z]/g, "").length <= 4) return true; // "ABR 2026"
+  return /^(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC|ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SET?IEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE|PERIODO)/.test(t);
+}
+
+/** Saca la empresa del nombre de archivo. NO asume posición: descarta los
+ *  segmentos genéricos (BANCOS, STARSOFT, CAJA VIRTUAL, EECC…) y los periodos,
+ *  y se queda con el resto. Soporta "EMPRESA - TIPO", "TIPO - EMPRESA - periodo",
+ *  "EMPRESA - TIPO - periodo", etc. Devuelve "" si no queda nada útil. */
 export function empresaDeNombre(nombre: string): string {
   const base = String(nombre ?? "").replace(/\.[a-z0-9]+$/i, ""); // sin extensión
   const partes = base.split(/\s*[-_]\s*/).map((p) => p.trim()).filter(Boolean);
-  let emp = "";
-  if (partes.length >= 3) emp = partes.slice(1, -1).join(" ").trim(); // prefijo | EMPRESA | periodo
-  else if (partes.length === 2) emp = partes[1].trim();
-  else emp = base.trim();
-  return esNombreGenerico(emp) ? "" : emp;
+  const cand = partes.filter((p) => !esNombreGenerico(p) && !esPeriodo(p));
+  if (cand.length) return cand.sort((a, b) => b.length - a.length)[0]; // el más "sustancioso"
+  return "";
 }
 
 function leerHojas(buf: Buffer): Record<string, string[][]> {
@@ -127,17 +136,28 @@ export interface ResultadoComparativo {
 /** EECC / banco: agrupa por empresa (leyenda / A1) y suma ABONOS por empresa. */
 export function ingresosBanco(archivos: FuenteArchivo[]): Record<string, IngresoEmpresa> {
   const acc: Record<string, IngresoEmpresa> = {};
-  for (const { buffer } of archivos) {
+  const add = (key: string, label: string, abono: number, cuentas: string) => {
+    const prev = acc[key];
+    if (prev) { prev.total = r2(prev.total + abono); prev.detalle = [prev.detalle, cuentas].filter(Boolean).join(", "); }
+    else acc[key] = { key, label, total: r2(abono), detalle: cuentas };
+  };
+  for (const { nombre, buffer } of archivos) {
+    const empArch = empresaDeNombre(nombre); // el NOMBRE del archivo manda
     let grupos: { empresa: string; cuentas: string[] }[] = [];
     try { grupos = agruparHojasPorEmpresa(buffer); } catch { grupos = []; }
+    // ¿El archivo trae VARIAS empresas de verdad? (FORMATO BANCO STARSOFT con leyenda)
+    const esReal = (e: string) => e && !esNombreGenerico(e) && !/^\(sin empresa\)$/i.test(e);
+    const distintas = new Set(grupos.map((g) => g.empresa).filter(esReal).map((e) => normEmpresa(e)));
+    const multiEmpresa = distintas.size >= 2;
     for (const g of grupos) {
       const movs = parseBancoStarsoft(buffer, g.cuentas);
       const abono = movs.reduce((a, m) => a + (m.abono || 0), 0);
       if (!abono) continue;
-      const key = normEmpresa(g.empresa) || g.empresa.toUpperCase().trim();
-      const prev = acc[key];
-      if (prev) { prev.total = r2(prev.total + abono); }
-      else acc[key] = { key, label: g.empresa, total: r2(abono), detalle: g.cuentas.join(", ") };
+      // Multi-empresa (un solo Excel con muchas) → empresa de la hoja. Si es de una
+      // sola empresa (o la hoja no la trae) → manda el nombre del archivo.
+      const empresa = multiEmpresa ? g.empresa : (empArch || (esReal(g.empresa) ? g.empresa : "") || g.empresa);
+      const key = normEmpresa(empresa) || empresa.toUpperCase().trim();
+      add(key, empresa, abono, g.cuentas.join(", "));
     }
   }
   return acc;
@@ -174,9 +194,12 @@ export function ingresosStarsoft(archivos: FuenteArchivo[], stats?: StatsExcluid
     const hojas = leerHojas(buffer);
     const filas = Object.values(hojas)[0] ?? [];
     if (!filas.length) continue;
+    // El slot StarSoft también acepta el formato REPORTE (Empresa/Comprobante/Total).
+    const hRep = filaCabeceraReporte(filas);
+    if (hRep >= 0) { parseReporteVentas(acc, nombre, filas, hRep, stats, "starsoft"); continue; }
     const a1 = String(filas[0]?.[0] ?? "").trim();
     const empresaA1 = a1 && !/^fecha$/i.test(a1) && !esNombreGenerico(a1) ? a1 : "";
-    const empresa = empresaA1 || empresaDeNombre(nombre);
+    const empresa = empresaDeNombre(nombre) || empresaA1; // el nombre del archivo manda
     // Cabecera: fila que contiene "Total" y "Documento"/"R.U.C.".
     let hRow = filas.findIndex((f) => f.some((c) => /^total$/i.test(String(c).trim())) && f.some((c) => /documento|r\.?u\.?c/i.test(String(c))));
     if (hRow < 0) hRow = filas.findIndex((f) => f.some((c) => /^total$/i.test(String(c).trim())));
@@ -224,12 +247,9 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
 
     // ¿Formato REPORTE de Caja Virtual? (cabecera con Comprobante + Total, y
     // columnas Empresa/Comisión). Es distinto del export contable "Resultado".
-    const hRepIdx = filas.findIndex((f) => {
-      const hh = (f ?? []).map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
-      return hh.includes("COMPROBANTE") && hh.includes("TOTAL") && hh.some((h) => /EMPRESA|FECHA PAGO|COMISION/.test(h));
-    });
+    const hRepIdx = filaCabeceraReporte(filas);
     if (hRepIdx >= 0) {
-      ingresosCajaReporte(acc, nombre, filas, hRepIdx, stats);
+      parseReporteVentas(acc, nombre, filas, hRepIdx, stats, "caja");
       continue;
     }
 
@@ -282,12 +302,22 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
   return acc;
 }
 
-/** Caja Virtual formato REPORTE (una fila por comprobante, con Empresa,
- *  Comprobante, Comisión y Total). El ingreso = columna **Total** (la comisión
- *  NO se resta). Agrupa por la columna Empresa; salta el pie ("Tiene N
- *  Facturas") y las notas de crédito / devoluciones. */
-function ingresosCajaReporte(
-  acc: Record<string, IngresoEmpresa>, nombre: string, filas: any[][], hRow: number, stats?: StatsExcluidos,
+/** Detecta la fila de cabecera del formato REPORTE (Comprobante + Total +
+ *  Empresa/Comisión/Fecha Pago). Devuelve -1 si no es ese formato. */
+function filaCabeceraReporte(filas: any[][]): number {
+  return filas.findIndex((f) => {
+    const hh = (f ?? []).map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
+    return hh.includes("COMPROBANTE") && hh.includes("TOTAL") && hh.some((h) => /EMPRESA|FECHA PAGO|COMISION/.test(h));
+  });
+}
+
+/** Formato REPORTE (una fila por comprobante, con Empresa, Comprobante, Comisión
+ *  y Total). El ingreso = columna **Total** (la comisión NO se resta). Agrupa por
+ *  la columna Empresa; salta el pie ("Tiene N Facturas") y las notas de crédito /
+ *  devoluciones. Sirve tanto para la Caja Virtual como para el slot StarSoft. */
+function parseReporteVentas(
+  acc: Record<string, IngresoEmpresa>, nombre: string, filas: any[][], hRow: number,
+  stats?: StatsExcluidos, fuente: "starsoft" | "caja" = "caja",
 ) {
   const H = filas[hRow].map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
   const iEmp = H.findIndex((h) => /^EMPRESA$/.test(h));
@@ -310,10 +340,11 @@ function ingresosCajaReporte(
     // Nota de crédito / devolución → no se considera.
     const tp = String(iTPago >= 0 ? f[iTPago] : "").toUpperCase();
     const tc = iTComp >= 0 ? f[iTComp] : "";
-    if (esNotaCredito(tc) || /NOTA\s*CR[EÉ]DITO|DEVOLUC|^DEV\b|DEV\./.test(tp)) { if (stats) stats.caja++; continue; }
+    if (esNotaCredito(tc) || /NOTA\s*CR[EÉ]DITO|DEVOLUC|^DEV\b|DEV\./.test(tp)) { if (stats) stats[fuente]++; continue; }
 
     const empRaw = iEmp >= 0 ? String(f[iEmp] ?? "").trim() : "";
-    const empresa = (empRaw && !esNombreGenerico(empRaw) ? empRaw : "") || empresaArch;
+    // El nombre del archivo manda; la columna Empresa es respaldo (multi-empresa).
+    const empresa = empresaArch || (empRaw && !esNombreGenerico(empRaw) ? empRaw : "");
     const key = empresa ? (normEmpresa(empresa) || empresa.toUpperCase().trim()) : SIN_EMPRESA;
     const label = empresa || "Caja (empresa no identificada)";
 
