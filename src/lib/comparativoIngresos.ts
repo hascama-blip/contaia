@@ -365,6 +365,27 @@ function parseReporteVentas(
   }
 }
 
+// ---- Emparejamiento tolerante de empresas ----------------------------------
+// El extracto del banco puede escribir la empresa distinto al nombre del archivo
+// ("BREVETES APURIMAC" vs "BREVETE APURIMC"). Emparejamos por SIMILITUD (Dice de
+// bigramas) con umbral alto, para no confundir "SAN CRISTOBAL" con "SAN
+// CRISTOBAL VIP" (que difieren en un token completo).
+function similitud(a: string, b: string): number {
+  const bg = (s: string) => { const t = s.replace(/\s+/g, ""); const set = new Set<string>(); for (let i = 0; i < t.length - 1; i++) set.add(t.slice(i, i + 2)); return set; };
+  if (a === b) return 1;
+  const A = bg(a), B = bg(b); if (!A.size || !B.size) return 0;
+  let inter = 0; for (const x of A) if (B.has(x)) inter++;
+  return (2 * inter) / (A.size + B.size);
+}
+/** Mejor candidato para `target` entre `cands` (claves normalizadas). Exacto si
+ *  existe; si no, el más parecido por encima del umbral. */
+function mejorMatch(target: string, cands: string[], min = 0.78): string | null {
+  if (cands.includes(target)) return target;
+  let best: string | null = null, bs = min;
+  for (const c of cands) { const s = similitud(target, c); if (s > bs) { bs = s; best = c; } }
+  return best;
+}
+
 // ---- Ensamblado ------------------------------------------------------------
 export function armarComparativo(
   banco: FuenteArchivo[],
@@ -413,23 +434,30 @@ export function armarComparativo(
   const keys = keysDoc.size ? keysDoc : new Set<string>(Object.keys(eecc));
   const label = (k: string) => std[k]?.label ?? cja[k]?.label ?? eecc[k]?.label ?? k;
 
+  // El banco escribe la empresa a su manera; empareja cada empresa-documento con
+  // la del banco por similitud (exacto o parecido) para que caigan en la misma fila.
+  const eeccKeys = Object.keys(eecc);
+  const eeccMatch: Record<string, string | null> = {};
+  for (const k of keys) eeccMatch[k] = eecc[k] ? k : mejorMatch(k, eeccKeys);
+  const eeccDe = (k: string) => { const m = eeccMatch[k]; return m ? eecc[m] : undefined; };
+
   const filas: FilaComparativo[] = [...keys]
     .map((k) => ({
       empresa: label(k),
-      eecc: eecc[k]?.total ?? null,
+      eecc: eeccDe(k)?.total ?? null,
       starsoft: std[k]?.total ?? null,
       caja: cja[k]?.total ?? null,
-      detalleEecc: eecc[k]?.detalle ?? "",
+      detalleEecc: eeccDe(k)?.detalle ?? "",
     }))
     .sort((a, b) => a.empresa.localeCompare(b.empresa));
 
   if (!Object.keys(std).length && !Object.keys(cja).length && !Object.keys(eecc).length) {
     avisos.push("No se detectaron ingresos en ninguna fuente. Revisa que los Excel sean los correctos.");
   }
-  // Empresas del documento que no se encontraron en el extracto bancario.
+  // Empresas del documento que no se encontraron en el extracto bancario (ni exacto ni parecido).
   for (const k of keysDoc) {
     if (k === SIN_EMPRESA) continue;
-    if (!eecc[k]) avisos.push(`"${label(k)}" no se encontró en el extracto bancario (revisa el nombre de la empresa).`);
+    if (eeccKeys.length && !eeccMatch[k]) avisos.push(`"${label(k)}" no se encontró en el extracto bancario (revisa el nombre de la empresa).`);
   }
   // empresas que solo aparecen en una fuente → no se pueden conciliar
   for (const f of filas) {
