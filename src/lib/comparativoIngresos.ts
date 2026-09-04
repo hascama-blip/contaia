@@ -147,6 +147,17 @@ export function ingresosBanco(archivos: FuenteArchivo[]): Record<string, Ingreso
  *  "B001 0004670" y "B0010004670" → "B0010004670". */
 const normComp = (s: any) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
 
+/** ¿El tipo de documento es una NOTA DE CRÉDITO? Se excluyen del comparativo
+ *  (StarSoft las asienta en negativo y la Caja con el total en el Haber, así que
+ *  distorsionan el cruce). StarSoft usa el código "07"; la Caja el texto "NC". */
+function esNotaCredito(tipoDoc: any): boolean {
+  const t = String(tipoDoc ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+  return t === "07" || t === "NC" || /NOTADECREDITO/.test(t);
+}
+
+/** Contador de comprobantes excluidos por ser notas de crédito. */
+export interface StatsExcluidos { starsoft: number; caja: number }
+
 /** Agrega un comprobante al acumulador de la empresa (crea la entrada si falta). */
 function agregarComp(acc: Record<string, IngresoEmpresa>, key: string, labelFallback: string, c: Comprobante) {
   const e = acc[key] ?? (acc[key] = { key, label: labelFallback, total: 0, comprobantes: [] });
@@ -157,7 +168,7 @@ function agregarComp(acc: Record<string, IngresoEmpresa>, key: string, labelFall
 
 /** StarSoft (Registro de Ventas): un comprobante por fila. Empresa desde A1 o
  *  desde el nombre de archivo. Un archivo = una empresa. */
-export function ingresosStarsoft(archivos: FuenteArchivo[]): Record<string, IngresoEmpresa> {
+export function ingresosStarsoft(archivos: FuenteArchivo[], stats?: StatsExcluidos): Record<string, IngresoEmpresa> {
   const acc: Record<string, IngresoEmpresa> = {};
   for (const { nombre, buffer } of archivos) {
     const hojas = leerHojas(buffer);
@@ -184,6 +195,8 @@ export function ingresosStarsoft(archivos: FuenteArchivo[]): Record<string, Ingr
       const f = filas[i]; if (!f) continue;
       const doc = String(f[iDoc] ?? "").trim();
       if (!doc) continue; // pie "Total ..." sin documento
+      // Nota de crédito → no se considera (se excluye del comparativo).
+      if (iTD >= 0 && esNotaCredito(f[iTD])) { if (stats) stats.starsoft++; continue; }
       agregarComp(acc, key, label, {
         comprobante: doc.replace(/\s+/g, " ").trim(),
         norm: normComp(doc),
@@ -202,7 +215,7 @@ export function ingresosStarsoft(archivos: FuenteArchivo[]): Record<string, Ingr
 /** Caja Virtual (export contable "Resultado"): agrupa las líneas "D" por NRO
  *  DOCUMENTO (cada venta) → un comprobante con su total. Empresa desde el nombre
  *  del archivo. */
-export function ingresosCaja(archivos: FuenteArchivo[]): Record<string, IngresoEmpresa> {
+export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos): Record<string, IngresoEmpresa> {
   const acc: Record<string, IngresoEmpresa> = {};
   for (const { nombre, buffer } of archivos) {
     const hojas = leerHojas(buffer);
@@ -226,8 +239,14 @@ export function ingresosCaja(archivos: FuenteArchivo[]): Record<string, IngresoE
 
     // Agrupa por comprobante (NRO DOCUMENTO). Suma el IMPORTE de las líneas D.
     const porComp = new Map<string, Comprobante>();
+    const ncExcl = new Set<string>();
     for (let i = 1; i < filas.length; i++) {
       const f = filas[i]; if (!f) continue;
+      // Nota de crédito → no se considera (se excluye del comparativo).
+      if (iTD >= 0 && esNotaCredito(f[iTD])) {
+        if (iNro >= 0) { const k = normComp(f[iNro]); if (k) ncExcl.add(k); }
+        continue;
+      }
       if (String(f[iDH] ?? "").trim().toUpperCase() !== "D") continue;
       const imp = num(f[iImp]); if (!imp) continue;
       const doc = iNro >= 0 ? String(f[iNro] ?? "").trim() : "";
@@ -245,6 +264,7 @@ export function ingresosCaja(archivos: FuenteArchivo[]): Record<string, IngresoE
       });
     }
     for (const c of porComp.values()) agregarComp(acc, key, label, c);
+    if (stats) stats.caja += ncExcl.size;
     if (!acc[key]) acc[key] = { key, label, total: 0, comprobantes: [] };
   }
   return acc;
@@ -256,10 +276,14 @@ export function armarComparativo(
   starsoft: FuenteArchivo[],
   caja: FuenteArchivo[],
 ): { resultado: ResultadoComparativo; eecc: Record<string, IngresoEmpresa>; std: Record<string, IngresoEmpresa>; cja: Record<string, IngresoEmpresa> } {
+  const stats: StatsExcluidos = { starsoft: 0, caja: 0 };
   const eecc = ingresosBanco(banco);
-  const std = ingresosStarsoft(starsoft);
-  const cja = ingresosCaja(caja);
+  const std = ingresosStarsoft(starsoft, stats);
+  const cja = ingresosCaja(caja, stats);
   const avisos: string[] = [];
+  if (stats.starsoft || stats.caja) {
+    avisos.push(`Se excluyeron notas de crédito (no se consideran): ${stats.starsoft} en StarSoft, ${stats.caja} en Caja.`);
+  }
 
   // Empresas REALES identificadas en los documentos (StarSoft / Caja).
   const realDoc = new Set<string>([...Object.keys(std), ...Object.keys(cja)].filter((k) => k !== SIN_EMPRESA));
