@@ -14,6 +14,7 @@
 
 import ExcelJS from "exceljs";
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
+import { aISO, tiposCambioSunat } from "./tipoCambio";
 
 const LOGIN_URL =
   process.env.BUZON_LOGIN_URL ??
@@ -356,12 +357,16 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
   ws.addRow(HEADERS);
   ws.getRow(1).font = { bold: true };
 
+  // Tipo de cambio SUNAT por fecha de recibo (best-effort; en blanco si falla).
+  const tcPorFecha = await tiposCambioSunat(recibos.map((r) => aISO(r.fecha)));
+
   let corr = 0;
   for (const r of recibos) {
     corr++;
     const comprobante = String(corr).padStart(4, "0");
     const anioMes = yyyymm(r.fecha);
     const fecha = ddmmyy(r.fecha);
+    const tc = tcPorFecha[aISO(r.fecha)] ?? "";     // TIPO DE CAMBIO SUNAT
     const doc = (r.nroDocEmisor || "").replace(/\D/g, "");
     const tipoAnexo = doc.length === 8 ? "01" : "08"; // DNI=01, RUC=08 (ajustable)
     const nroDoc = (r.nro || "").replace(/-/g, "");    // E001-72 → E00172
@@ -378,13 +383,14 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
     // Fila base del asiento (cambia CTA CONTABLE, CENTRO DE COSTOS y DEBE/HABER).
     const fila = (cta: string, centro: string, dh: string) => [
       cta, anioMes, SUBDIARIO, comprobante, fecha, tipoAnexo, r.nroDocEmisor, "HO", nroDoc, "",
-      importe, CONV, fecha, "" /* TIPO CAMBIO en blanco */, glosa, destino, centro, glosaMov, anulado, dh, "",
+      importe, CONV, fecha, tc /* TIPO DE CAMBIO SUNAT */, glosa, destino, centro, glosaMov, anulado, dh, "",
     ];
     ws.addRow(fila(ctaPagar, "", "H"));         // por pagar (H) — de la memoria o vacío
     ws.addRow(fila(ctaGasto, centroD, "D"));    // gasto (D) — de la memoria o vacío (contador)
   }
-  // IMPORTE (col 11) con 2 decimales, como la plantilla ("350.00").
+  // IMPORTE (col 11) con 2 decimales y TIPO DE CAMBIO (col 14) con 3, como Contasis.
   ws.getColumn(11).numFmt = "0.00";
+  ws.getColumn(14).numFmt = "0.000";
   return (await wb.xlsx.writeBuffer()) as Buffer;
 }
 
