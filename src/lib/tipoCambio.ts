@@ -56,11 +56,32 @@ export async function tipoCambioSunat(fechaISO: string): Promise<number | null> 
   }
 }
 
+/** Resta un día a una fecha ISO (aaaa-mm-dd). */
+function menosUnDia(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** TC de una fecha; si ese día no hay (fin de semana/feriado), usa el ÚLTIMO
+ *  publicado antes de esa fecha (retrocede día a día hasta `maxDias`). */
+export async function tipoCambioConRetroceso(fechaISO: string, maxDias = 8): Promise<number | null> {
+  let f = fechaISO;
+  for (let i = 0; i <= maxDias; i++) {
+    const tc = await tipoCambioSunat(f);
+    if (tc != null) return tc;
+    f = menosUnDia(f);
+  }
+  return null;
+}
+
 /** Obtiene el TC para un conjunto de fechas ISO (en paralelo, best-effort).
- *  Devuelve un mapa fechaISO → TC (o null). */
+ *  Si un día no tiene TC, usa el último publicado antes de ese día. Devuelve un
+ *  mapa fechaISO(original) → TC (o null). */
 export async function tiposCambioSunat(fechasISO: string[]): Promise<Record<string, number | null>> {
   const unicas = Array.from(new Set(fechasISO.filter(Boolean)));
   const out: Record<string, number | null> = {};
-  await Promise.all(unicas.map(async (f) => { out[f] = await tipoCambioSunat(f); }));
+  await Promise.all(unicas.map(async (f) => { out[f] = await tipoCambioConRetroceso(f); }));
   return out;
 }
