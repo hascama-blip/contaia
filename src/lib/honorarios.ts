@@ -383,6 +383,8 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
     ws.addRow(fila(ctaPagar, "", "H"));         // por pagar (H) — de la memoria o vacío
     ws.addRow(fila(ctaGasto, centroD, "D"));    // gasto (D) — de la memoria o vacío (contador)
   }
+  // IMPORTE (col 11) con 2 decimales, como la plantilla ("350.00").
+  ws.getColumn(11).numFmt = "0.00";
   return (await wb.xlsx.writeBuffer()) as Buffer;
 }
 
