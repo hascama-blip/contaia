@@ -80,7 +80,8 @@ export default function ComparativoIngresosPanel() {
         StarSoft/Caja</b> que subes (el extracto del banco puede traer muchas empresas, pero solo se toma la
         que coincide). Arma un Excel de 2 hojas: <b>Ingresos por fuente</b> (resumen) y <b>Conciliación</b>
         (detallada: diferencias EECC − StarSoft, EECC − Caja y StarSoft − Caja + cuentas del banco).
-        Las empresas se emparejan por nombre (sin S.A.C./S.A.).
+        Las empresas se emparejan por nombre (sin S.A.C./S.A.). Si una empresa tiene <b>categorías</b>
+        (p. ej. MI BREVETE SEGURO: Policlínico / Escuela por la Sede), se muestran <b>sub-filas</b> por categoría.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -132,17 +133,20 @@ export default function ComparativoIngresosPanel() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {res.filas.map((f) => (
-                  <tr key={f.empresa} className="hover:bg-slate-50">
-                    <td className="px-2 py-1 font-medium text-slate-700">{f.empresa}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.eecc)}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.starsoft)}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.caja)}</td>
-                    <DifCell v={dif(f.eecc, f.starsoft)} />
-                    <DifCell v={dif(f.eecc, f.caja)} />
-                    <DifCell v={dif(f.starsoft, f.caja)} />
-                  </tr>
-                ))}
+                {res.filas.map((f, i) => {
+                  const sub = f.empresa.includes(" — "); // sub-fila por categoría
+                  return (
+                    <tr key={f.empresa + i} className={sub ? "bg-slate-50/40" : "hover:bg-slate-50"}>
+                      <td className={`px-2 py-1 ${sub ? "pl-6 italic text-slate-500" : "font-medium text-slate-700"}`}>{sub ? f.empresa.replace(/^.*? — /, "↳ ") : f.empresa}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.eecc)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.starsoft)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-slate-600">{money(f.caja)}</td>
+                      <DifCell v={dif(f.eecc, f.starsoft)} />
+                      <DifCell v={dif(f.eecc, f.caja)} />
+                      <DifCell v={dif(f.starsoft, f.caja)} />
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

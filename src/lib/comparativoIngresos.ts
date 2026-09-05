@@ -99,6 +99,7 @@ export interface Comprobante {
   ruc: string;          // RUC/DNI del cliente
   cliente: string;
   total: number;
+  categoria?: string;   // POLICLINICO / ESCUELA (cuando aplica, p.ej. MI BREVETE SEGURO)
 }
 /** Ingreso de una empresa según una fuente. `label` = nombre "bonito" que se muestra. */
 export interface IngresoEmpresa { key: string; label: string; total: number; detalle?: string; comprobantes?: Comprobante[] }
@@ -124,6 +125,7 @@ export interface DetalleComprobante {
   caja: number | null;
   dif: number | null;
   estado: string;          // "Cuadra" | "Difiere" | "Solo StarSoft" | "Solo Caja"
+  categoria?: string;      // POLICLINICO / ESCUELA (cuando aplica)
 }
 export interface ResultadoComparativo {
   filas: FilaComparativo[];
@@ -166,6 +168,12 @@ export function ingresosBanco(archivos: FuenteArchivo[]): Record<string, Ingreso
 /** Normaliza un número de comprobante para emparejar StarSoft ↔ Caja:
  *  "B001 0004670" y "B0010004670" → "B0010004670". */
 const normComp = (s: any) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+/** ¿El nro. documento parece un comprobante electrónico (boleta/factura)?
+ *  Empiezan por letra de serie: B0010015106, F001-12, etc. */
+const pareceComprobante = (s: any) => /^[A-Z]/.test(normComp(s));
+/** Categoría de ingreso a partir de la "Sede" (MI BREVETE SEGURO: policlínico /
+ *  escuela). Devuelve "" si no aplica. */
+const catDeSede = (s: any): string => { const t = String(s ?? "").toUpperCase(); return /POLICLIN/.test(t) ? "POLICLINICO" : (/ESCUELA/.test(t) ? "ESCUELA" : ""); };
 
 /** ¿El tipo de documento es una NOTA DE CRÉDITO? Se excluyen del comparativo
  *  (StarSoft las asienta en negativo y la Caja con el total en el Haber, así que
@@ -256,38 +264,40 @@ export function ingresosCaja(archivos: FuenteArchivo[], stats?: StatsExcluidos):
     const H = (filas[0] ?? []).map((c) => String(c).toUpperCase().replace(/\s+/g, " ").trim());
     const iImp = H.indexOf("IMPORTE");
     const iDH = H.findIndex((h) => h.replace(/\s/g, "") === "DEBE/HABER");
-    if (iImp < 0 || iDH < 0) continue;
+    const iCta = H.findIndex((h) => /CTA CONTABLE|CUENTA CONTABLE/.test(h));
+    if (iImp < 0 || iDH < 0 || iCta < 0) continue;
     const iNro = H.findIndex((h) => /^NRO DOCUMENTO$|NRO\.? DOC/.test(h));
     const iTD = H.findIndex((h) => /^TIPO DOCUMENTO/.test(h));
     const iFe = H.findIndex((h) => /FECHA EMISION|FECHA REGISTRO/.test(h));
     const iRuc = H.findIndex((h) => /RUC CLIENTE/.test(h));
     const iRazon = H.findIndex((h) => /RAZON SOCIAL/.test(h));
-    const iCod = H.findIndex((h) => /CODIGO CLIENTE/.test(h));
+    const iCod = H.findIndex((h) => /CODIGO CLIENTE|CODIGO ANEXO/.test(h));
     const iGlosaMov = H.findIndex((h) => /GLOSA MOVIMIENTO/.test(h));
 
     const empresa = empresaDeNombre(nombre);
     const key = empresa ? (normEmpresa(empresa) || empresa.toUpperCase().trim()) : SIN_EMPRESA;
     const label = empresa || "Caja (empresa no identificada)";
 
-    // Agrupa por comprobante (NRO DOCUMENTO). Suma el IMPORTE de las líneas D.
-    // Las notas de crédito SÍ se consideran: en el asiento contable vienen con el
-    // total en el Haber (las líneas D son la reversión), así que su ingreso es
-    // NEGATIVO → se invierte el signo del comprobante NC.
+    // Cada BOLETA/FACTURA está en una línea de cuenta 12x (cuentas por cobrar del
+    // cliente) con su nro. de comprobante — así funciona tanto si el asiento la
+    // pone en el Debe (ventas) como en el Haber (cobranzas). Se agrupa por
+    // comprobante; el importe es el de la boleta. Las notas de crédito restan.
     const porComp = new Map<string, Comprobante & { esNC: boolean }>();
     const ncNorms = new Set<string>();
     for (let i = 1; i < filas.length; i++) {
       const f = filas[i]; if (!f) continue;
-      if (String(f[iDH] ?? "").trim().toUpperCase() !== "D") continue;
-      const imp = num(f[iImp]); if (!imp) continue;
+      if (!String(f[iCta] ?? "").trim().startsWith("12")) continue; // solo cuentas por cobrar
       const doc = iNro >= 0 ? String(f[iNro] ?? "").trim() : "";
-      const nk = normComp(doc) || `(sin nro) ${i}`;
+      if (!pareceComprobante(doc)) continue; // debe ser una boleta/factura (B001…, F001…)
+      const imp = Math.abs(num(f[iImp])); if (!imp) continue;
+      const nk = normComp(doc);
       const esNC = iTD >= 0 && esNotaCredito(f[iTD]);
-      if (esNC && normComp(doc)) ncNorms.add(normComp(doc));
+      if (esNC) ncNorms.add(nk);
       const prev = porComp.get(nk);
       if (prev) { prev.total = r2(prev.total + imp); prev.esNC = prev.esNC || esNC; }
       else porComp.set(nk, {
-        comprobante: doc || "(sin nro)",
-        norm: normComp(doc),
+        comprobante: doc,
+        norm: nk,
         fecha: iFe >= 0 ? String(f[iFe] ?? "").trim() : "",
         tipoDoc: esNC ? "NC" : (iTD >= 0 ? String(f[iTD] ?? "").trim() : ""),
         ruc: (iRuc >= 0 && String(f[iRuc] ?? "").trim()) || (iCod >= 0 ? String(f[iCod] ?? "").trim() : ""),
@@ -333,6 +343,7 @@ function parseReporteVentas(
   const iFP = H.findIndex((h) => /^FECHA PAGO$/.test(h));
   const iNroDoc = H.findIndex((h) => /^NRO\.? DOCUMENTO$/.test(h)); // doc del cliente (DNI/RUC)
   const iContra = H.findIndex((h) => /^CONTRATANTE$/.test(h));
+  const iSede = H.findIndex((h) => /^SEDE$/.test(h)); // categoría: POLICLINICO / ESCUELA
   if (iComp < 0 || iTot < 0) return;
 
   const empresaArch = empresaDeNombre(nombre); // respaldo si no hay col Empresa
@@ -366,6 +377,7 @@ function parseReporteVentas(
       ruc: iNroDoc >= 0 ? String(f[iNroDoc] ?? "").trim() : "",
       cliente: iContra >= 0 ? String(f[iContra] ?? "").trim() : "",
       total: r2(num(f[iTot])), // Total (bruto). La comisión (col iCom) NO se resta.
+      categoria: iSede >= 0 ? catDeSede(f[iSede]) : "",
     });
   }
 }
@@ -446,15 +458,50 @@ export function armarComparativo(
   for (const k of keys) eeccMatch[k] = eecc[k] ? k : mejorMatch(k, eeccKeys);
   const eeccDe = (k: string) => { const m = eeccMatch[k]; return m ? eecc[m] : undefined; };
 
+  // Sub-filas por CATEGORÍA (p. ej. MI BREVETE SEGURO: Policlínico / Escuela).
+  // La categoría de StarSoft viene de la "Sede"; la de la caja se hereda por
+  // boleta (mismo comprobante) desde StarSoft. El banco no tiene categoría.
+  const catLabel = (c: string) => c === "POLICLINICO" ? "Policlínico" : c === "ESCUELA" ? "Escuela" : c;
+  const subfilasDe = (k: string): FilaComparativo[] => {
+    const s = std[k]?.comprobantes ?? [];
+    const c = cja[k]?.comprobantes ?? [];
+    const stdCatMap = new Map<string, string>();
+    for (const x of s) if (x.categoria && x.norm) stdCatMap.set(x.norm, x.categoria);
+    const catOf = (x: Comprobante) => x.categoria || (x.norm ? stdCatMap.get(x.norm) : "") || "";
+    const cats = new Set<string>();
+    for (const x of s) if (x.categoria) cats.add(x.categoria);
+    for (const x of c) { const cc = catOf(x); if (cc) cats.add(cc); }
+    if (!cats.size) return [];
+    const orden = ["POLICLINICO", "ESCUELA", ...[...cats].filter((x) => x !== "POLICLINICO" && x !== "ESCUELA")];
+    const rows: FilaComparativo[] = [];
+    for (const cat of orden) {
+      if (!cats.has(cat)) continue;
+      const sc = s.filter((x) => (x.categoria || "") === cat);
+      const cc = c.filter((x) => catOf(x) === cat);
+      rows.push({
+        empresa: `${label(k)} — ${catLabel(cat)}`, eecc: null,
+        starsoft: sc.length ? r2(sc.reduce((a, x) => a + x.total, 0)) : null,
+        caja: cc.length ? r2(cc.reduce((a, x) => a + x.total, 0)) : null,
+        detalleEecc: "",
+      });
+    }
+    // Residual sin categoría (p. ej. VISA en bloque de la caja que no cruzó boleta).
+    const scSin = s.filter((x) => !x.categoria);
+    const ccSin = c.filter((x) => !catOf(x));
+    if (scSin.length || ccSin.length) {
+      const st = scSin.reduce((a, x) => a + x.total, 0), ct = ccSin.reduce((a, x) => a + x.total, 0);
+      if (Math.abs(st) >= 0.5 || Math.abs(ct) >= 0.5)
+        rows.push({ empresa: `${label(k)} — Sin categoría`, eecc: null, starsoft: scSin.length ? r2(st) : null, caja: ccSin.length ? r2(ct) : null, detalleEecc: "" });
+    }
+    return rows;
+  };
+
   const filas: FilaComparativo[] = [...keys]
-    .map((k) => ({
-      empresa: label(k),
-      eecc: eeccDe(k)?.total ?? null,
-      starsoft: std[k]?.total ?? null,
-      caja: cja[k]?.total ?? null,
-      detalleEecc: eeccDe(k)?.detalle ?? "",
-    }))
-    .sort((a, b) => a.empresa.localeCompare(b.empresa));
+    .sort((a, b) => label(a).localeCompare(label(b)))
+    .flatMap((k) => [
+      { empresa: label(k), eecc: eeccDe(k)?.total ?? null, starsoft: std[k]?.total ?? null, caja: cja[k]?.total ?? null, detalleEecc: eeccDe(k)?.detalle ?? "" },
+      ...subfilasDe(k),
+    ]);
 
   if (!Object.keys(std).length && !Object.keys(cja).length && !Object.keys(eecc).length) {
     avisos.push("No se detectaron ingresos en ninguna fuente. Revisa que los Excel sean los correctos.");
@@ -464,8 +511,9 @@ export function armarComparativo(
     if (k === SIN_EMPRESA) continue;
     if (eeccKeys.length && !eeccMatch[k]) avisos.push(`"${label(k)}" no se encontró en el extracto bancario (revisa el nombre de la empresa).`);
   }
-  // empresas que solo aparecen en una fuente → no se pueden conciliar
+  // empresas que solo aparecen en una fuente → no se pueden conciliar (sin sub-filas)
   for (const f of filas) {
+    if (f.empresa.includes(" — ")) continue; // sub-fila por categoría
     const presentes = [f.eecc, f.starsoft, f.caja].filter((v) => v != null).length;
     if (presentes === 1) avisos.push(`"${f.empresa}" solo aparece en una fuente (no se puede cruzar).`);
   }
@@ -482,6 +530,8 @@ export function armarComparativo(
     if (!sComps.length && !cComps.length) continue;
     const cMap = new Map<string, Comprobante>();
     for (const c of cComps) if (c.norm) cMap.set(c.norm, cMap.has(c.norm) ? { ...c, total: r2(cMap.get(c.norm)!.total + c.total) } : c);
+    const stdCatMap = new Map<string, string>();
+    for (const x of sComps) if (x.categoria && x.norm) stdCatMap.set(x.norm, x.categoria);
     const usadosCaja = new Set<string>();
     for (const s of sComps) {
       const c = s.norm ? cMap.get(s.norm) : undefined;
@@ -493,7 +543,7 @@ export function armarComparativo(
         empresa: emp, compStarsoft: s.comprobante, compCaja: c?.comprobante ?? "",
         fecha: s.fecha || c?.fecha || "", tipoDoc: s.tipoDoc,
         ruc: s.ruc || c?.ruc || "", cliente: s.cliente || c?.cliente || "",
-        starsoft: s.total, caja: cajaTot, dif: d, estado,
+        starsoft: s.total, caja: cajaTot, dif: d, estado, categoria: s.categoria || c?.categoria || "",
       });
     }
     // Comprobantes que solo están en Caja.
@@ -502,6 +552,7 @@ export function armarComparativo(
       detalle.push({
         empresa: emp, compStarsoft: "", compCaja: c.comprobante, fecha: c.fecha, tipoDoc: c.tipoDoc,
         ruc: c.ruc, cliente: c.cliente, starsoft: null, caja: c.total, dif: null, estado: "Solo Caja",
+        categoria: c.categoria || stdCatMap.get(c.norm) || "",
       });
     }
   }
@@ -532,16 +583,18 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
   ];
   let tE = 0, tS = 0, tC = 0;
   for (const f of res.filas) {
+    const esSub = f.empresa.includes(" — "); // sub-fila por categoría
     const vals = [f.eecc, f.starsoft, f.caja].filter((v): v is number => v != null);
     const spread = vals.length >= 2 ? r2(Math.max(...vals) - Math.min(...vals)) : 0;
     const ok = vals.length >= 2 ? (Math.abs(spread) < 0.5 ? "✔ Sí" : "✗ No") : "—";
-    const row = s1.addRow({ empresa: f.empresa, eecc: f.eecc ?? "", starsoft: f.starsoft ?? "", caja: f.caja ?? "", spread: vals.length >= 2 ? spread : "", ok });
+    const row = s1.addRow({ empresa: esSub ? `    ${f.empresa}` : f.empresa, eecc: f.eecc ?? "", starsoft: f.starsoft ?? "", caja: f.caja ?? "", spread: vals.length >= 2 ? spread : "", ok });
     ["eecc", "starsoft", "caja", "spread"].forEach((k) => (row.getCell(k).numFmt = money));
+    if (esSub) row.getCell("empresa").font = { italic: true, color: { argb: "FF64748B" } };
     if (vals.length >= 2 && Math.abs(spread) >= 0.5) {
       row.getCell("spread").font = { color: { argb: AMBER }, bold: true };
       row.getCell("ok").font = { color: { argb: AMBER }, bold: true };
     }
-    tE += f.eecc ?? 0; tS += f.starsoft ?? 0; tC += f.caja ?? 0;
+    if (!esSub) { tE += f.eecc ?? 0; tS += f.starsoft ?? 0; tC += f.caja ?? 0; } // el TOTAL no cuenta las sub-filas
   }
   const tot = s1.addRow({ empresa: "TOTAL", eecc: r2(tE), starsoft: r2(tS), caja: r2(tC), spread: "", ok: "" });
   tot.font = { bold: true };
@@ -558,6 +611,7 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
     { header: "T/D", key: "td", width: 6 },
     { header: "RUC/DNI", key: "ruc", width: 13 },
     { header: "Cliente", key: "cliente", width: 32 },
+    { header: "Categoría", key: "categoria", width: 13 },
     { header: "Total StarSoft", key: "starsoft", width: 14 },
     { header: "Total Caja", key: "caja", width: 13 },
     { header: "Diferencia", key: "dif", width: 13 },
@@ -569,7 +623,7 @@ export async function excelComparativoIngresos(res: ResultadoComparativo): Promi
     const match = d.compStarsoft && d.compCaja ? "✔" : "✗";
     const row = sDet.addRow({
       empresa: d.empresa, cS: d.compStarsoft || "—", cC: d.compCaja || "—", match,
-      fecha: d.fecha, td: d.tipoDoc, ruc: d.ruc, cliente: d.cliente,
+      fecha: d.fecha, td: d.tipoDoc, ruc: d.ruc, cliente: d.cliente, categoria: d.categoria || "",
       starsoft: d.starsoft ?? "", caja: d.caja ?? "", dif: d.dif ?? "", estado: d.estado,
     });
     ["starsoft", "caja", "dif"].forEach((k) => (row.getCell(k).numFmt = money));
