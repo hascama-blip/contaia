@@ -497,11 +497,24 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
     await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
     await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(3000).catch(() => {});
+    // Tras el login, SUNAT REDIRIGE: j_security_check → AutenticaMenuInternet.htm
+    // → MenuInternet.htm. Hay que ESPERAR a que la cadena termine en MenuInternet
+    // (no quedarse en el paso intermedio "Autentica…", que NO es un error).
+    for (let i = 0; i < 25; i++) {
+      const u = page.url();
+      if (/cl-ti-itmenu\/MenuInternet\.htm/i.test(u) && !/Autentica/i.test(u)) break; // llegó al menú (éxito)
+      if (/oauth2\/error|loginMenuSol/i.test(u)) break;                                // login rechazado
+      await page.waitForTimeout(1000).catch(() => {});
+    }
     await cerrarPantallas(ctx, page);
     const url = page.url();
-    const loginError = /oauth2\/error|autenticamenuinternet|problema en la aplicaci|no podemos atenderlo/i.test(url);
-    pasos.push({ paso: "login", url, loginError });
+    // Login fallido REAL: página de error OAuth, seguimos en el login
+    // (loginMenuSol) o mensajes de la app. "AutenticaMenuInternet" NO cuenta:
+    // es un paso normal del redirect exitoso.
+    const formVisible = await page.$("#txtContrasena").then((el: any) => !!el).catch(() => false);
+    const enMenu = /cl-ti-itmenu\/MenuInternet\.htm/i.test(url) && !/Autentica/i.test(url);
+    const loginError = /oauth2\/error|loginMenuSol|problema en la aplicaci|no podemos atenderlo/i.test(url) || (formVisible && !enMenu);
+    pasos.push({ paso: "login", url, loginError, enMenu, formVisible });
     if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL o bloqueo temporal).", diag: { pasos, requests, rango } };
 
     // 2) Abrir "Consulta Receptor". La opción está muy anidada y duplicada, así
