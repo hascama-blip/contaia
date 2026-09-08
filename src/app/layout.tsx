@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { LogoAsenco } from "@/components/Logo";
 import { HeaderNav } from "@/components/HeaderNav";
@@ -22,6 +23,17 @@ export default async function RootLayout({
   // Garantiza/reconcilia la cuenta supremo en cada carga: si la cuenta del
   // correo supremo ya existía (p. ej. registrada antes), aquí se le asigna el
   // rol supremo aunque la sesión sea anterior al cambio. Nunca rompe el render.
+  // Sitio público de la Asociación Mutualista: se renderiza SIN el chrome de
+  // Radar (sin header/menú/footer), como un sitio independiente.
+  const pathname = headers().get("x-pathname") || "";
+  if (pathname.startsWith("/asociacionmutualista")) {
+    return (
+      <html lang="es">
+        <body>{children}</body>
+      </html>
+    );
+  }
+
   await ensureSupremo().catch(() => {});
   await ensureRtpUser().catch(() => {});
   const user = await getCurrentUser();

@@ -1,6 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
+import type { AsociacionContenido } from "./asociacion";
+import { CONTENIDO_DEFAULT, normalizarContenido } from "./asociacion";
 import type {
   Cliente,
   Documento,
@@ -38,6 +40,8 @@ export const BACKUPS_DIR = path.join(DATA_DIR, "backups");
 
 interface Store {
   clientes: Cliente[];
+  /** Contenido editable del sitio público de la Asociación Mutualista. */
+  asociacion?: AsociacionContenido;
   /** Usuarios que inician sesión (cada uno ve solo sus empresas). */
   users?: Usuario[];
   /** Memoria del estudio: RUC del proveedor → cuenta contable. */
@@ -101,6 +105,20 @@ async function readStore(): Promise<Store> {
   } catch {
     return { clientes: [], users: [], cuentasProveedor: {}, rubrosProveedor: {}, acciones: [] };
   }
+}
+
+// ---- Sitio Asociación Mutualista -------------------------------------------
+/** Contenido del sitio público (o el default si aún no se editó). */
+export async function getAsociacion(): Promise<AsociacionContenido> {
+  const store = await readStore();
+  return store.asociacion ?? CONTENIDO_DEFAULT;
+}
+/** Guarda el contenido editado (normalizado). */
+export async function setAsociacion(contenido: any): Promise<AsociacionContenido> {
+  const store = await readStore();
+  store.asociacion = normalizarContenido(contenido);
+  await writeStore(store);
+  return store.asociacion;
 }
 
 // ---- Usuarios --------------------------------------------------------------
