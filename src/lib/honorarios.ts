@@ -426,7 +426,7 @@ function filasDeAsiento(a: AsientoHonorario): (string | number)[][] {
 /** Excel de importación a Contasis (21 columnas) a partir de los asientos. */
 export async function excelDeAsientos(asientos: AsientoHonorario[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Honorarios");
+  const ws = wb.addWorksheet("Hoja1"); // mismo nombre de hoja que la plantilla StarSoft
   ws.addRow(HEADERS_HON);
   ws.getRow(1).font = { bold: true };
   for (const a of asientos) for (const f of filasDeAsiento(a)) ws.addRow(f);
