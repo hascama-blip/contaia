@@ -434,7 +434,9 @@ export async function excelDeAsientos(asientos: AsientoHonorario[]): Promise<Buf
 
 /** TXT de importación a StarSoft: campos separados por "|", 20 columnas (sin
  *  NRO_FILE cuando PERS_SETOURS = falso), un salto de línea por fila y un enter
- *  final. Importe con punto decimal (sin decimales forzados). */
+ *  final. Importe con punto decimal (sin decimales forzados). El campo 15 (GLOSA)
+ *  va VACÍO: StarSoft la genera solo (así lo muestra el manual). El concepto va
+ *  en el campo 18 (GLOSA_MOV). */
 export function txtDeAsientos(asientos: AsientoHonorario[]): string {
   const incluirFile = /^(1|true|si|s[ií])$/i.test(process.env.HONORARIOS_PERS_SETOURS || "");
   const nCols = incluirFile ? 21 : 20;
@@ -442,7 +444,11 @@ export function txtDeAsientos(asientos: AsientoHonorario[]): string {
   const lineas: string[] = [];
   for (const a of asientos) {
     for (const f of filasDeAsiento(a)) {
-      const campos = f.slice(0, nCols).map((v, i) => (i === 10 ? impTxt(Number(v) || 0) : String(v ?? "")));
+      const campos = f.slice(0, nCols).map((v, i) => {
+        if (i === 10) return impTxt(Number(v) || 0); // IMPORTE
+        if (i === 14) return "";                     // GLOSA vacía (la arma StarSoft)
+        return String(v ?? "");
+      });
       lineas.push(campos.join("|"));
     }
   }
