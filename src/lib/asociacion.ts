@@ -73,6 +73,7 @@ export interface Curso {
 export interface EventoCal { fecha: string; curso: string; modalidad: string }
 export interface Stat { icono: string; valor: string; label: string }
 export interface Testimonio { nombre: string; rol: string; texto: string }
+export interface Aliado { logo: string; nombre: string; link: string }
 
 export interface AsociacionContenido {
   marca: string; logo: string; lema: string;
@@ -82,6 +83,7 @@ export interface AsociacionContenido {
   calendarioTitulo: string; calendario: EventoCal[];
   stats: Stat[];
   testimoniosTitulo: string; testimonios: Testimonio[];
+  aliadosTitulo: string; aliados: Aliado[];
   contactoTitulo: string; contactoTexto: string;
   telefono: string; email: string; direccion: string; facebook: string;
   actualizado?: string;
@@ -122,6 +124,8 @@ export const CONTENIDO_DEFAULT: AsociacionContenido = {
     { nombre: "María Q.", rol: "Enfermera", texto: "Excelente organización y docentes de primer nivel. Muy recomendado." },
     { nombre: "Luis R.", rol: "Técnico en enfermería", texto: "Los cursos me ayudaron a mejorar en mi trabajo. Volveré a inscribirme." },
   ],
+  aliadosTitulo: "Nuestros aliados",
+  aliados: [],
   contactoTitulo: "Contáctanos",
   contactoTexto: "Escríbenos para más información sobre inscripciones y convenios.",
   telefono: "", email: "", direccion: "", facebook: "",
@@ -148,6 +152,8 @@ export function normalizarContenido(c: any): AsociacionContenido {
     stats: arr(c?.stats, (x) => ({ icono: s(x?.icono, "•"), valor: s(x?.valor), label: s(x?.label) }), 8),
     testimoniosTitulo: s(c?.testimoniosTitulo, d.testimoniosTitulo),
     testimonios: arr(c?.testimonios, (x) => ({ nombre: s(x?.nombre), rol: s(x?.rol), texto: s(x?.texto) }), 20),
+    aliadosTitulo: s(c?.aliadosTitulo, d.aliadosTitulo),
+    aliados: arr(c?.aliados, (x) => ({ logo: s(x?.logo), nombre: s(x?.nombre), link: s(x?.link) }), 40),
     contactoTitulo: s(c?.contactoTitulo, d.contactoTitulo), contactoTexto: s(c?.contactoTexto, d.contactoTexto),
     telefono: s(c?.telefono), email: s(c?.email), direccion: s(c?.direccion), facebook: s(c?.facebook),
     actualizado: new Date().toISOString(),

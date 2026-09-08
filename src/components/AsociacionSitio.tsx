@@ -7,6 +7,7 @@ interface Curso { id: string; imagen: string; titulo: string; descripcion: strin
 interface EventoCal { fecha: string; curso: string; modalidad: string }
 interface Stat { icono: string; valor: string; label: string }
 interface Testimonio { nombre: string; rol: string; texto: string }
+interface Aliado { logo: string; nombre: string; link: string }
 interface Contenido {
   marca: string; logo: string; lema: string;
   flyers: Flyer[];
@@ -15,6 +16,7 @@ interface Contenido {
   calendarioTitulo: string; calendario: EventoCal[];
   stats: Stat[];
   testimoniosTitulo: string; testimonios: Testimonio[];
+  aliadosTitulo: string; aliados: Aliado[];
   contactoTitulo: string; contactoTexto: string; telefono: string; email: string; direccion: string; facebook: string;
 }
 type Agg = { sum: number; count: number };
@@ -32,6 +34,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
   const [loginOpen, setLoginOpen] = useState(false);
   const [sugOpen, setSugOpen] = useState(false);
   const [verSug, setVerSug] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [ratings, setRatings] = useState<Record<string, Agg>>({});
 
   useEffect(() => {
@@ -85,12 +88,13 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
 
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <a href="#inicio" className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+          <a href="#inicio" className="flex min-w-0 items-center gap-2 sm:gap-3">
             <ImgEdit url={c.logo} editando={editando} onUpload={async (f) => { const u = await subir(f); if (u) set("logo", u); }}
-              className="h-11 w-11 rounded-full object-contain" fallback={<span className="grid h-11 w-11 place-items-center rounded-full text-lg font-black text-white" style={{ background: NAVY }}>IM</span>} />
-            <Txt v={c.marca} editando={editando} onChange={(v) => set("marca", v)} as="span" className="max-w-[240px] text-sm font-extrabold leading-tight sm:text-base" style={{ color: NAVY }} />
+              className="h-9 w-9 shrink-0 rounded-full object-contain sm:h-11 sm:w-11" fallback={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-black text-white sm:h-11 sm:w-11 sm:text-lg" style={{ background: NAVY }}>IM</span>} />
+            <Txt v={c.marca} editando={editando} onChange={(v) => set("marca", v)} as="span" className="truncate text-[13px] font-extrabold leading-tight sm:max-w-none sm:whitespace-normal sm:text-base" style={{ color: NAVY }} />
           </a>
+          {/* Menú desktop */}
           <nav className="hidden items-center gap-0.5 text-sm font-semibold text-slate-600 md:flex">
             <a href="#cursos" className="rounded-lg px-3 py-2 hover:bg-slate-100">Cursos</a>
             <a href="#proximos" className="rounded-lg px-3 py-2 hover:bg-slate-100">Próximos</a>
@@ -98,7 +102,20 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
             <a href="#contacto" className="rounded-lg px-3 py-2 hover:bg-slate-100">Contacto</a>
             <button onClick={() => setSugOpen(true)} className="ml-1 rounded-lg px-4 py-2 font-bold text-slate-900" style={{ background: GOLD }}>💡 Sugerir curso</button>
           </nav>
+          {/* Botón hamburguesa (móvil) */}
+          <button onClick={() => setMenuOpen((o) => !o)} aria-label="Menú" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-2xl text-slate-700 hover:bg-slate-100 md:hidden">
+            {menuOpen ? "✕" : "☰"}
+          </button>
         </div>
+        {/* Menú desplegable (móvil) */}
+        {menuOpen && (
+          <nav className="border-t border-slate-100 bg-white px-3 pb-3 pt-1 text-sm font-semibold text-slate-700 md:hidden">
+            {[["#cursos", "Cursos"], ["#proximos", "Próximos"], ["#calendario", "Calendario"], ["#contacto", "Contacto"]].map(([h, t]) => (
+              <a key={h} href={h} onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 hover:bg-slate-100">{t}</a>
+            ))}
+            <button onClick={() => { setSugOpen(true); setMenuOpen(false); }} className="mt-1 block w-full rounded-lg px-4 py-2.5 text-left font-bold text-slate-900" style={{ background: GOLD }}>💡 Sugerir curso</button>
+          </nav>
+        )}
       </header>
 
       {/* Carrusel de flyers */}
@@ -154,6 +171,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       <section id="calendario" className="mx-auto max-w-4xl px-4 py-14">
         <Encabezado v={c.calendarioTitulo} editando={editando} onChange={(v) => set("calendarioTitulo", v)} sub="Fechas de inicio" />
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="text-white" style={{ background: NAVY }}>
               <tr><th className="px-4 py-3 text-left">Fecha</th><th className="px-4 py-3 text-left">Curso</th><th className="px-4 py-3 text-left">Modalidad</th>{editando && <th className="w-10" />}</tr>
@@ -169,6 +187,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
               ))}
             </tbody>
           </table>
+          </div>
           {editando && <button onClick={() => set("calendario", [...c.calendario, { fecha: "01/01/2026", curso: "Nuevo curso", modalidad: "Virtual" }])} className="w-full bg-slate-50 py-2 text-sm font-semibold" style={{ color: NAVY }}>+ Agregar fecha</button>}
         </div>
       </section>
@@ -196,6 +215,43 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
           </div>
         </div>
       </section>
+
+      {/* Aliados */}
+      {(c.aliados.length > 0 || editando) && (
+        <section id="aliados" className="mx-auto max-w-6xl px-4 py-14">
+          <Encabezado v={c.aliadosTitulo} editando={editando} onChange={(v) => set("aliadosTitulo", v)} sub="Instituciones y empresas que confían en nosotros" />
+          <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {c.aliados.map((al, i) => {
+              const up = (k: keyof Aliado, v: string) => set("aliados", c.aliados.map((x, j) => j === i ? { ...x, [k]: v } : x));
+              const card = (
+                <div className="flex h-24 items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+                  {al.logo ? <img src={al.logo} alt={al.nombre} className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-slate-400">Logo</span>}
+                </div>
+              );
+              return (
+                <div key={i} className="group relative">
+                  {editando && <button onClick={() => set("aliados", c.aliados.filter((_, j) => j !== i))} className="absolute -right-2 -top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-red-600 text-white shadow">×</button>}
+                  {!editando && al.link
+                    ? <a href={al.link} target="_blank" rel="noreferrer" title={al.nombre}>{card}</a>
+                    : card}
+                  {editando && (
+                    <div className="mt-1 space-y-1">
+                      <label className="block cursor-pointer rounded bg-slate-100 py-1 text-center text-[11px] font-semibold text-slate-600 hover:bg-slate-200">⬆ Logo
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const u = await subir(f); if (u) up("logo", u); } e.currentTarget.value = ""; }} />
+                      </label>
+                      <input value={al.nombre} onChange={(e) => up("nombre", e.target.value)} placeholder="Nombre" className="block w-full rounded border border-slate-200 px-1.5 py-0.5 text-[11px]" />
+                      <input value={al.link} onChange={(e) => up("link", e.target.value)} placeholder="https://web…" className="block w-full rounded border border-slate-200 px-1.5 py-0.5 text-[11px]" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {editando && (
+              <button onClick={() => set("aliados", [...c.aliados, { logo: "", nombre: "", link: "" }])} className="grid h-24 place-items-center rounded-xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500 hover:bg-slate-50">+ Aliado</button>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Contacto */}
       <section id="contacto" className="mx-auto max-w-4xl px-4 py-14 text-center">
@@ -258,9 +314,9 @@ function Carrusel({ c, setC, editando, subir }: { c: Contenido; setC: any; edita
             ? <a href={cur.link} target="_blank" rel="noreferrer"><img src={cur.imagen} alt={cur.titulo} className="h-full w-full object-cover" /></a>
             : <img src={cur.imagen} alt={cur.titulo} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center text-white" style={{ background: `linear-gradient(135deg, ${NAVY}, #133a86)` }}>
-            <h1 className="text-3xl font-extrabold sm:text-4xl">{c.marca}</h1>
-            <p className="mt-2 max-w-2xl text-white/85">{c.lema}</p>
+          <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center text-white sm:px-6" style={{ background: `linear-gradient(135deg, ${NAVY}, #133a86)` }}>
+            <h1 className="text-2xl font-extrabold leading-tight sm:text-4xl">{c.marca}</h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/85 sm:text-base">{c.lema}</p>
           </div>
         )}
         {/* Flechas */}
@@ -367,7 +423,7 @@ function Estrellas({ cursoId, agg, editando, onVote }: { cursoId: string; agg?: 
 function Encabezado({ v, editando, onChange, sub }: { v: string; editando: boolean; onChange: (s: string) => void; sub?: string }) {
   return (
     <div className="text-center">
-      <Txt v={v} editando={editando} onChange={onChange} as="h2" className="text-3xl font-extrabold" style={{ color: NAVY }} />
+      <Txt v={v} editando={editando} onChange={onChange} as="h2" className="text-2xl font-extrabold sm:text-3xl" style={{ color: NAVY }} />
       {sub && <p className="mx-auto mt-2 max-w-2xl text-slate-500">{sub}</p>}
       <div className="mx-auto mt-3 h-1 w-16 rounded-full" style={{ background: GOLD }} />
     </div>
