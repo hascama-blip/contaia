@@ -494,37 +494,44 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     });
     const page = await ctx.newPage();
 
-    // 1) Login SOL.
-    let navOk = false;
-    for (let i = 0; i < 3 && !navOk; i++) {
-      try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 70000 }); navOk = true; }
-      catch { await page.waitForTimeout(2000).catch(() => {}); }
+    // 1) Login SOL — CON REINTENTOS. El primer intento suele fallar por arranque
+    //    en frío del navegador (Railway): el formulario aún no cargó cuando se
+    //    escriben las credenciales y el submit no surte efecto. Se reintenta hasta
+    //    entrar; así no hace falta correr el diagnóstico antes.
+    let enMenu = false, url = "", formVisible = true;
+    for (let intento = 1; intento <= 3 && !enMenu; intento++) {
+      // Navegar al login (reintentos de navegación por si el goto falla).
+      let navOk = false;
+      for (let i = 0; i < 3 && !navOk; i++) {
+        try { await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 70000 }); navOk = true; }
+        catch { await page.waitForTimeout(2000).catch(() => {}); }
+      }
+      // ESPERAR a que el campo de clave EXISTA antes de escribir (clave del fix).
+      await page.waitForSelector('#txtContrasena, input[type="password"]', { timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(800).catch(() => {});
+      await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
+      await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
+      await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
+      await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
+      await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+      // Esperar a que el redirect termine en MenuInternet (o falle claramente).
+      for (let i = 0; i < 25; i++) {
+        const u = page.url();
+        if (/cl-ti-itmenu\/MenuInternet\.htm/i.test(u) && !/Autentica/i.test(u)) break; // menú (éxito)
+        if (/oauth2\/error/i.test(u)) break;                                            // error OAuth
+        await page.waitForTimeout(1000).catch(() => {});
+      }
+      await cerrarPantallas(ctx, page);
+      url = page.url();
+      formVisible = await page.$("#txtContrasena").then((el: any) => !!el).catch(() => false);
+      // Éxito = salió del formulario de login y no hay página de error.
+      const errorPagina = /oauth2\/error|problema en la aplicaci|no podemos atenderlo/i.test(url);
+      enMenu = !formVisible && !errorPagina;
+      pasos.push({ paso: "login", intento, url, enMenu, formVisible });
+      if (enMenu) break;
+      await page.waitForTimeout(1500).catch(() => {}); // pequeña pausa antes de reintentar
     }
-    await page.waitForTimeout(2500).catch(() => {});
-    await rellenar(page, ["#txtRuc", 'input[name="ruc"]', "#ruc"], params.ruc);
-    await rellenar(page, ["#txtUsuario", 'input[name="usuario"]', "#usuario"], params.solUser);
-    await rellenar(page, ["#txtContrasena", 'input[type="password"]', "#password"], params.solPass);
-    await clickAny(page, ["#btnAceptar", 'button[type="submit"]', 'input[type="submit"]']);
-    await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-    // Tras el login, SUNAT REDIRIGE: j_security_check → AutenticaMenuInternet.htm
-    // → MenuInternet.htm. Hay que ESPERAR a que la cadena termine en MenuInternet
-    // (no quedarse en el paso intermedio "Autentica…", que NO es un error).
-    for (let i = 0; i < 25; i++) {
-      const u = page.url();
-      if (/cl-ti-itmenu\/MenuInternet\.htm/i.test(u) && !/Autentica/i.test(u)) break; // llegó al menú (éxito)
-      if (/oauth2\/error|loginMenuSol/i.test(u)) break;                                // login rechazado
-      await page.waitForTimeout(1000).catch(() => {});
-    }
-    await cerrarPantallas(ctx, page);
-    const url = page.url();
-    // Login fallido REAL: página de error OAuth, seguimos en el login
-    // (loginMenuSol) o mensajes de la app. "AutenticaMenuInternet" NO cuenta:
-    // es un paso normal del redirect exitoso.
-    const formVisible = await page.$("#txtContrasena").then((el: any) => !!el).catch(() => false);
-    const enMenu = /cl-ti-itmenu\/MenuInternet\.htm/i.test(url) && !/Autentica/i.test(url);
-    const loginError = /oauth2\/error|loginMenuSol|problema en la aplicaci|no podemos atenderlo/i.test(url) || (formVisible && !enMenu);
-    pasos.push({ paso: "login", url, loginError, enMenu, formVisible });
-    if (loginError) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL o bloqueo temporal).", diag: { pasos, requests, rango } };
+    if (!enMenu) return { ok: false, loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL o bloqueo temporal).", diag: { pasos, requests, rango } };
 
     // 2) Abrir "Consulta Receptor". La opción está muy anidada y duplicada, así
     //    que navegamos DIRECTO por su CÓDIGO de menú (capturado: 11.5.1.1.14),
