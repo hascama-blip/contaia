@@ -59,6 +59,7 @@ export interface HonorariosResultado {
   loginError?: boolean;
   error?: string;
   recibos?: Recibo[];
+  asientos?: AsientoHonorario[];
   total?: number;
   archivoBase64?: string;
   nombreArchivo?: string;
@@ -321,20 +322,43 @@ const ddmmyy = (fechaDMY: string) => {
   return m ? `${m[1]}/${m[2]}/${m[3].slice(2)}` : (fechaDMY || "");
 };
 
-/** Construye el Excel de importación a Contasis (21 columnas), replicando la
- *  plantilla real: CADA RECIBO = un asiento de 2 filas —
- *   • HABER (H): cuenta por PAGAR (42411001);
- *   • DEBE  (D): cuenta de GASTO (la asigna el contador → se deja VACÍA).
- *  El concepto ("Por concepto de …") va en GLOSA MOVIMIENTO. TIPO CAMBIO en
- *  blanco. Incluye recibos con RUC o DNI. Cuentas configurables por entorno. */
-export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string; mapaCuentas?: Record<string, MapCuenta> }): Promise<Buffer> {
+// ---- Asiento de honorarios (modelo para Excel / TXT / tabla editable) --------
+/** Máx. de caracteres de la glosa/glosa mov. según el manual Contasis (60);
+ *  ajustable si StarSoft acepta menos. */
+const GLOSA_MAX = Math.max(10, Math.min(60, Number(process.env.HONORARIOS_GLOSA_MAX || "60") || 60));
+/** Limpia y ACORTA el concepto para StarSoft: sin "|", sin saltos de línea,
+ *  espacios colapsados, mayúsculas y recortado a GLOSA_MAX. */
+export function limpiarGlosa(s: string): string {
+  return String(s || "").replace(/[|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase().slice(0, GLOSA_MAX);
+}
+/** Solo quita lo que rompe el TXT (| y saltos) y recorta; conserva el espaciado
+ *  (para la GLOSA "HO  E001-72        /"). */
+function sanitizarCampo(s: string): string {
+  return String(s || "").replace(/[|\r\n\t]+/g, " ").slice(0, GLOSA_MAX);
+}
+
+export interface AsientoHonorario {
+  comprobante: string; anioMes: string; subdiario: string;
+  fechaDoc: string; fechaReg: string;
+  tipoAnexo: string; codProveedor: string; nroDoc: string;
+  importe: number; conv: string; tc: string;
+  glosa: string; destino: string; glosaMov: string; anulado: string;
+  // Editables por el contador (cuentas que faltan):
+  ctaPagar: string; ctaGasto: string; centro: string;
+  // Solo para mostrar en la tabla:
+  nro: string; nombre: string;
+}
+
+/** Arma los asientos (uno por recibo) aplicando la memoria de cuentas y el tipo
+ *  de cambio SUNAT. El concepto se acorta a GLOSA_MAX. */
+export async function armarAsientos(
+  recibos: Recibo[], meta: { mapaCuentas?: Record<string, MapCuenta> },
+): Promise<AsientoHonorario[]> {
   const D = (k: string, def = "") => (process.env[k] ?? def);
   const SUBDIARIO = D("HONORARIOS_SUBDIARIO", "11");
   const DESTINO = D("HONORARIOS_DESTINO", "010");
   const CONV = D("HONORARIOS_CONV", "VTA");
 
-  // Memoria del mes anterior: emisor+concepto → cuentas. Con respaldos por
-  // concepto (mismo servicio) y por emisor (misma persona con una sola cuenta).
   const mapa = meta.mapaCuentas || {};
   const entradas = Object.values(mapa);
   const buscar = (emisor: string, concNorm: string): MapCuenta | null => {
@@ -346,52 +370,88 @@ export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: s
     return null;
   };
 
-  const HEADERS = [
-    "CTA CONTABLE", "AÑO Y MES PROCESO", "SUBDIARIO", "COMPROBANTE", "FECHA DOCUMENTO",
-    "TIPO ANEXO", "CODIGO DE ANEXO", "TIPO DOCUMENTO", "NRO DOCUMENTO", "FECHA VENCIMIENTO",
-    "IMPORTE", "CONV", "FECHA REGISTRO", "TIPO CAMBIO", "GLOSA", "DESTINO DE COMPRA",
-    "CENTRO DE COSTOS", "GLOSA MOVIMIENTO", "DOCUMENTO ANULADO", "DEBE / HABER", "NRO FILE",
-  ];
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Honorarios");
-  ws.addRow(HEADERS);
-  ws.getRow(1).font = { bold: true };
-
-  // Tipo de cambio SUNAT por fecha de recibo (best-effort; en blanco si falla).
   const tcPorFecha = await tiposCambioSunat(recibos.map((r) => aISO(r.fecha)));
-
+  const asientos: AsientoHonorario[] = [];
   let corr = 0;
   for (const r of recibos) {
     corr++;
-    const comprobante = String(corr).padStart(4, "0");
-    const anioMes = yyyymm(r.fecha);
-    const fecha = ddmmyy(r.fecha);
-    const tc = tcPorFecha[aISO(r.fecha)] ?? "";     // TIPO DE CAMBIO SUNAT
     const doc = (r.nroDocEmisor || "").replace(/\D/g, "");
-    const tipoAnexo = doc.length === 8 ? "01" : "08"; // DNI=01, RUC=08 (ajustable)
-    const nroDoc = (r.nro || "").replace(/-/g, "");    // E001-72 → E00172
-    const importe = num(r.rentaBruta);
-    const glosa = `HO  ${r.nro}        /`;
-    const glosaMov = (r.concepto || r.nombre || "").trim();
-    const anulado = /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado) ? "1" : "0";
-    // Herencia de cuentas del mes anterior (si no hay match → todo vacío).
-    const hit = buscar(doc, normConcepto(glosaMov));
-    const ctaPagar = hit?.ctaPagar || "";
-    const ctaGasto = hit?.ctaGasto || "";
-    const centroD = hit?.centro || "";
-    const destino = hit?.destino || DESTINO;
-    // Fila base del asiento (cambia CTA CONTABLE, CENTRO DE COSTOS y DEBE/HABER).
-    const fila = (cta: string, centro: string, dh: string) => [
-      cta, anioMes, SUBDIARIO, comprobante, fecha, tipoAnexo, r.nroDocEmisor, "HO", nroDoc, "",
-      importe, CONV, fecha, tc /* TIPO DE CAMBIO SUNAT */, glosa, destino, centro, glosaMov, anulado, dh, "",
-    ];
-    ws.addRow(fila(ctaPagar, "", "H"));         // por pagar (H) — de la memoria o vacío
-    ws.addRow(fila(ctaGasto, centroD, "D"));    // gasto (D) — de la memoria o vacío (contador)
+    const glosaMov = limpiarGlosa(r.concepto || r.nombre || "");
+    const hit = buscar(doc, normConcepto(r.concepto || r.nombre || ""));
+    asientos.push({
+      comprobante: String(corr).padStart(4, "0"),
+      anioMes: yyyymm(r.fecha),
+      subdiario: SUBDIARIO,
+      fechaDoc: ddmmyy(r.fecha),
+      fechaReg: ddmmyy(r.fecha),
+      tipoAnexo: doc.length === 8 ? "01" : "08", // DNI=01, RUC=08
+      codProveedor: r.nroDocEmisor,
+      nroDoc: (r.nro || "").replace(/-/g, ""),   // E001-72 → E00172
+      importe: num(r.rentaBruta),
+      conv: CONV,
+      tc: tcPorFecha[aISO(r.fecha)] != null ? String(tcPorFecha[aISO(r.fecha)]) : "",
+      glosa: sanitizarCampo(`HO  ${r.nro}        /`),
+      destino: hit?.destino || DESTINO,
+      glosaMov,
+      anulado: /anulado/i.test(r.estado) && !/no\s*anulado/i.test(r.estado) ? "1" : "0",
+      ctaPagar: hit?.ctaPagar || "",
+      ctaGasto: hit?.ctaGasto || "",
+      centro: hit?.centro || "",
+      nro: r.nro,
+      nombre: r.nombre,
+    });
   }
-  // IMPORTE (col 11) con 2 decimales y TIPO DE CAMBIO (col 14) con 3, como Contasis.
-  ws.getColumn(11).numFmt = "0.00";
-  ws.getColumn(14).numFmt = "0.000";
+  return asientos;
+}
+
+const HEADERS_HON = [
+  "CTA CONTABLE", "AÑO Y MES PROCESO", "SUBDIARIO", "COMPROBANTE", "FECHA DOCUMENTO",
+  "TIPO ANEXO", "CODIGO DE ANEXO", "TIPO DOCUMENTO", "NRO DOCUMENTO", "FECHA VENCIMIENTO",
+  "IMPORTE", "CONV", "FECHA REGISTRO", "TIPO CAMBIO", "GLOSA", "DESTINO DE COMPRA",
+  "CENTRO DE COSTOS", "GLOSA MOVIMIENTO", "DOCUMENTO ANULADO", "DEBE / HABER", "NRO FILE",
+];
+
+/** Las 2 filas (H por pagar / D gasto) de un asiento, en las 21 columnas. */
+function filasDeAsiento(a: AsientoHonorario): (string | number)[][] {
+  const fila = (cta: string, centro: string, dh: string): (string | number)[] => [
+    cta, a.anioMes, a.subdiario, a.comprobante, a.fechaDoc, a.tipoAnexo, a.codProveedor, "HO", a.nroDoc, "",
+    a.importe, a.conv, a.fechaReg, a.tc, a.glosa, a.destino, centro, a.glosaMov, a.anulado, dh, "",
+  ];
+  return [fila(a.ctaPagar, "", "H"), fila(a.ctaGasto, a.centro, "D")];
+}
+
+/** Excel de importación a Contasis (21 columnas) a partir de los asientos. */
+export async function excelDeAsientos(asientos: AsientoHonorario[]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Honorarios");
+  ws.addRow(HEADERS_HON);
+  ws.getRow(1).font = { bold: true };
+  for (const a of asientos) for (const f of filasDeAsiento(a)) ws.addRow(f);
+  ws.getColumn(11).numFmt = "0.00";   // IMPORTE
+  ws.getColumn(14).numFmt = "0.000";  // TIPO DE CAMBIO
   return (await wb.xlsx.writeBuffer()) as Buffer;
+}
+
+/** TXT de importación a StarSoft: campos separados por "|", 20 columnas (sin
+ *  NRO_FILE cuando PERS_SETOURS = falso), un salto de línea por fila y un enter
+ *  final. Importe con punto decimal (sin decimales forzados). */
+export function txtDeAsientos(asientos: AsientoHonorario[]): string {
+  const incluirFile = /^(1|true|si|s[ií])$/i.test(process.env.HONORARIOS_PERS_SETOURS || "");
+  const nCols = incluirFile ? 21 : 20;
+  const impTxt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  const lineas: string[] = [];
+  for (const a of asientos) {
+    for (const f of filasDeAsiento(a)) {
+      const campos = f.slice(0, nCols).map((v, i) => (i === 10 ? impTxt(Number(v) || 0) : String(v ?? "")));
+      lineas.push(campos.join("|"));
+    }
+  }
+  return lineas.join("\n") + "\n"; // enter al final
+}
+
+/** Compat: Excel directo desde recibos (arma asientos internamente). */
+export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string; mapaCuentas?: Record<string, MapCuenta> }): Promise<Buffer> {
+  return excelDeAsientos(await armarAsientos(recibos, meta));
 }
 
 // ============================================================
@@ -542,9 +602,10 @@ export async function extraerHonorarios(params: HonorariosParams): Promise<Honor
     if (recibos.length === 0) {
       return { ok: false, error: "No se encontraron recibos en ese rango (recuerda que la fecha fin se topa a hoy).", diag: { pasos, requests, rango } };
     }
-    const buf = await construirExcelHonorarios(recibos, { ruc: params.ruc, mapaCuentas: params.mapaCuentas });
+    const asientos = await armarAsientos(recibos, { mapaCuentas: params.mapaCuentas });
+    const buf = await excelDeAsientos(asientos);
     const nombreArchivo = `Honorarios-${params.ruc}-${(params.desde || "").replace(/\D/g, "")}${params.hasta && params.hasta !== params.desde ? "_" + params.hasta.replace(/\D/g, "") : ""}.xlsx`;
-    return { ok: true, recibos, total, archivoBase64: buf.toString("base64"), nombreArchivo, diag: { pasos, requests, rango } };
+    return { ok: true, recibos, asientos, total, archivoBase64: buf.toString("base64"), nombreArchivo, diag: { pasos, requests, rango } };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Error extrayendo honorarios.", diag: { pasos, requests, rango } };
   } finally {

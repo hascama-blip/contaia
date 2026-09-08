@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     total: r.total ?? (r.recibos ?? []).length,
     recibos: r.recibos ?? [],
+    asientos: r.asientos ?? [],
     archivo: r.archivoBase64,
     nombre: r.nombreArchivo,
     diag: r.diag,
