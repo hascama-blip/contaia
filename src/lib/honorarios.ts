@@ -326,10 +326,13 @@ const ddmmyy = (fechaDMY: string) => {
 /** Máx. de caracteres de la glosa/glosa mov. según el manual Contasis (60);
  *  ajustable si StarSoft acepta menos. */
 const GLOSA_MAX = Math.max(10, Math.min(60, Number(process.env.HONORARIOS_GLOSA_MAX || "60") || 60));
-/** Limpia y ACORTA el concepto para StarSoft: sin "|", sin saltos de línea,
- *  espacios colapsados, mayúsculas y recortado a GLOSA_MAX. */
+/** Limpia y ACORTA el concepto para StarSoft: SIN TILDES (ASCII, como el
+ *  manual), sin "|", sin saltos de línea, espacios colapsados, mayúsculas y
+ *  recortado a GLOSA_MAX. */
 export function limpiarGlosa(s: string): string {
-  return String(s || "").replace(/[|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase().slice(0, GLOSA_MAX);
+  return String(s || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita tildes (Ó→O, Ñ→N…)
+    .replace(/[|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase().slice(0, GLOSA_MAX);
 }
 /** Solo quita lo que rompe el TXT (| y saltos) y recorta; conserva el espaciado
  *  (para la GLOSA "HO  E001-72        /"). */
@@ -452,7 +455,7 @@ export function txtDeAsientos(asientos: AsientoHonorario[]): string {
       lineas.push(campos.join("|"));
     }
   }
-  return lineas.join("\n") + "\n"; // enter al final
+  return lineas.join("\r\n") + "\r\n"; // CRLF (Windows/StarSoft) + enter al final
 }
 
 /** Compat: Excel directo desde recibos (arma asientos internamente). */
