@@ -124,7 +124,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       </section>
 
       {/* Estadísticas */}
-      <section className="py-10 text-white" style={{ background: NAVY }}>
+      <section className="py-16 text-white" style={{ background: NAVY }}>
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-4 px-4 sm:grid-cols-4">
           {c.stats.map((st, i) => (
             <div key={i} className="relative rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
@@ -138,7 +138,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       </section>
 
       {/* Cursos disponibles */}
-      <section id="cursos" className="mx-auto max-w-6xl px-4 py-14">
+      <section id="cursos" className="mx-auto max-w-6xl px-4 py-20">
         <Encabezado v={c.disponiblesTitulo} editando={editando} onChange={(v) => set("disponiblesTitulo", v)} sub="Inscríbete y certifícate con nosotros" />
         <Grid>
           {c.cursosDisponibles.map((curso, i) => (
@@ -152,7 +152,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       </section>
 
       {/* Próximos cursos */}
-      <section id="proximos" className="bg-slate-50 py-14">
+      <section id="proximos" className="bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-4">
           <Encabezado v={c.proximosTitulo} editando={editando} onChange={(v) => set("proximosTitulo", v)} sub="Prepárate para lo que viene" />
           <Grid>
@@ -167,7 +167,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       </section>
 
       {/* Calendario */}
-      <section id="calendario" className="mx-auto max-w-4xl px-4 py-14">
+      <section id="calendario" className="mx-auto max-w-4xl px-4 py-20">
         <Encabezado v={c.calendarioTitulo} editando={editando} onChange={(v) => set("calendarioTitulo", v)} sub="Fechas de inicio" />
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
           <div className="overflow-x-auto">
@@ -192,12 +192,12 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       </section>
 
       {/* Testimonios */}
-      <section className="bg-slate-50 py-14">
+      <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-4">
           <Encabezado v={c.testimoniosTitulo} editando={editando} onChange={(v) => set("testimoniosTitulo", v)} sub="La voz de quienes ya se capacitaron" />
           <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {c.testimonios.map((t, i) => (
-              <div key={i} className="relative rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <div key={i} className="relative rounded-2xl bg-white p-6 ring-1 ring-slate-100">
                 {editando && <button onClick={() => set("testimonios", c.testimonios.filter((_, j) => j !== i))} className="absolute right-2 top-2 text-red-500">×</button>}
                 <div className="h-1 w-8 rounded-full" style={{ background: GOLD }} />
                 <Txt v={t.texto} editando={editando} onChange={(v) => set("testimonios", c.testimonios.map((x, j) => j === i ? { ...x, texto: v } : x))} multiline className="mt-1 text-slate-600" />
@@ -217,13 +217,13 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
 
       {/* Aliados */}
       {(c.aliados.length > 0 || editando) && (
-        <section id="aliados" className="mx-auto max-w-6xl px-4 py-14">
+        <section id="aliados" className="mx-auto max-w-6xl px-4 py-20">
           <Encabezado v={c.aliadosTitulo} editando={editando} onChange={(v) => set("aliadosTitulo", v)} sub="Instituciones y empresas que confían en nosotros" />
           <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {c.aliados.map((al, i) => {
               const up = (k: keyof Aliado, v: string) => set("aliados", c.aliados.map((x, j) => j === i ? { ...x, [k]: v } : x));
               const card = (
-                <div className="flex h-24 items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+                <div className="flex h-24 items-center justify-center rounded-xl border border-slate-200 bg-white p-4 transition">
                   {al.logo ? <img src={al.logo} alt={al.nombre} className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-slate-400">Logo</span>}
                 </div>
               );
@@ -253,7 +253,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       )}
 
       {/* Contacto */}
-      <section id="contacto" className="mx-auto max-w-4xl px-4 py-14 text-center">
+      <section id="contacto" className="mx-auto max-w-4xl px-4 py-20 text-center">
         <Encabezado v={c.contactoTitulo} editando={editando} onChange={(v) => set("contactoTitulo", v)} />
         <Txt v={c.contactoTexto} editando={editando} onChange={(v) => set("contactoTexto", v)} multiline className="mx-auto mt-3 max-w-2xl text-lg text-slate-600" />
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -360,7 +360,7 @@ function CursoCard({ curso, editando, subir, agg, onVote, onChange, onRemove, pr
 }) {
   const up = (k: keyof Curso, v: any) => onChange({ ...curso, [k]: v });
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:shadow-md">
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100 transition">
       {editando && <button onClick={onRemove} className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-red-600/90 text-white">×</button>}
       <div className="relative aspect-[16/10] bg-slate-100">
         {curso.imagen ? <img src={curso.imagen} alt={curso.titulo} className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-slate-300">Flyer del curso</div>}
@@ -422,9 +422,8 @@ function Estrellas({ cursoId, agg, editando, onVote }: { cursoId: string; agg?: 
 function Encabezado({ v, editando, onChange, sub }: { v: string; editando: boolean; onChange: (s: string) => void; sub?: string }) {
   return (
     <div className="text-center">
-      <Txt v={v} editando={editando} onChange={onChange} as="h2" className="text-2xl font-extrabold sm:text-3xl" style={{ color: NAVY }} />
-      {sub && <p className="mx-auto mt-2 max-w-2xl text-slate-500">{sub}</p>}
-      <div className="mx-auto mt-3 h-1 w-16 rounded-full" style={{ background: GOLD }} />
+      <Txt v={v} editando={editando} onChange={onChange} as="h2" className="text-2xl font-semibold tracking-tight sm:text-[28px]" style={{ color: NAVY }} />
+      {sub && <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-400">{sub}</p>}
     </div>
   );
 }
@@ -458,7 +457,7 @@ function Contacto({ label, v, editando, onChange, href }: {
   label: string; v: string; editando: boolean; onChange: (s: string) => void; href?: string;
 }) {
   const inner = (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
       {editando ? <input value={v} onChange={(e) => onChange(e.target.value)} className={`mt-1 block w-full text-center ${ED}`} /> : <div className="mt-1 font-medium text-slate-700">{v || "—"}</div>}
     </div>
