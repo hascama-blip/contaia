@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { excelDeAsientos, txtDeAsientos, AsientoHonorario } from "@/lib/honorarios";
+import { xlsDeAsientos, txtDeAsientos, AsientoHonorario } from "@/lib/honorarios";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,11 +27,12 @@ export async function POST(req: NextRequest) {
       const nombre = `H_${baseNombre}.txt`.replace(/^H_H_/, "H_");
       return NextResponse.json({ archivo: buf.toString("base64"), nombre, mime: "text/plain" });
     }
-    const buf = await excelDeAsientos(asientos);
+    // Excel en formato .xls (BIFF8) — el que acepta el importador de StarSoft.
+    const buf = xlsDeAsientos(asientos);
     return NextResponse.json({
       archivo: buf.toString("base64"),
-      nombre: `${baseNombre}.xlsx`,
-      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      nombre: `${baseNombre}.xls`,
+      mime: "application/vnd.ms-excel",
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "No se pudo exportar." }, { status: 500 });

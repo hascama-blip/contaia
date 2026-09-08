@@ -13,6 +13,7 @@
 // capturar el endpoint de datos (sin DevTools).
 
 import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
 import { aISO, tiposCambioSunat } from "./tipoCambio";
 
@@ -433,6 +434,29 @@ export async function excelDeAsientos(asientos: AsientoHonorario[]): Promise<Buf
   ws.getColumn(11).numFmt = "0.00";   // IMPORTE
   ws.getColumn(14).numFmt = "0.000";  // TIPO DE CAMBIO
   return (await wb.xlsx.writeBuffer()) as Buffer;
+}
+
+/** Excel FORMATO .xls (BIFF8, Excel 97-2003) — el que pide el importador de
+ *  StarSoft ("Libro de Microsoft Excel (*.xls)"). Mismas 21 columnas. Importe y
+ *  tipo de cambio van numéricos con su formato. */
+export function xlsDeAsientos(asientos: AsientoHonorario[]): Buffer {
+  const aoa: any[][] = [HEADERS_HON.slice()];
+  for (const a of asientos) {
+    for (const f of filasDeAsiento(a)) {
+      const row = f.slice() as any[];
+      row[10] = Number(row[10]) || 0;                                   // IMPORTE numérico
+      row[13] = row[13] === "" || row[13] == null ? "" : (Number(row[13]) || ""); // TC numérico
+      aoa.push(row);
+    }
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  for (let r = 1; r < aoa.length; r++) {
+    const kc = XLSX.utils.encode_cell({ r, c: 10 }); if (ws[kc] && ws[kc].t === "n") ws[kc].z = "0.00";   // IMPORTE
+    const nc = XLSX.utils.encode_cell({ r, c: 13 }); if (ws[nc] && ws[nc].t === "n") ws[nc].z = "0.000";  // TC
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Hoja1");
+  return XLSX.write(wb, { bookType: "biff8", type: "buffer" }) as Buffer;
 }
 
 /** TXT de importación a StarSoft: campos separados por "|", 20 columnas (sin

@@ -180,7 +180,7 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
               {faltan > 0
                 ? <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⚠ {faltan} sin cuenta</span>
                 : <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">✅ Cuentas completas</span>}
-              <button className="btn-accent" onClick={() => exportar("xlsx")} disabled={!!expBusy}>{expBusy === "xlsx" ? "…" : "⬇ Excel"}</button>
+              <button className="btn-accent" onClick={() => exportar("xlsx")} disabled={!!expBusy}>{expBusy === "xlsx" ? "…" : "⬇ Excel (.xls)"}</button>
               <button className="btn-primary" onClick={() => exportar("txt")} disabled={!!expBusy}>{expBusy === "txt" ? "…" : "⬇ TXT (StarSoft)"}</button>
             </div>
           </div>
