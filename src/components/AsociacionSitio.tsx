@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Flyer { imagen: string; titulo: string; link: string }
-interface Curso { id: string; imagen: string; titulo: string; descripcion: string; fecha: string; modalidad: string; precio: string; link: string; destacado?: boolean }
+interface Curso { id: string; imagen: string; titulo: string; descripcion: string; ponente: string; fecha: string; modalidad: string; precio: string; link: string; destacado?: boolean }
 interface EventoCal { fecha: string; curso: string; modalidad: string }
 interface Stat { icono: string; valor: string; label: string }
 interface Testimonio { nombre: string; rol: string; texto: string }
@@ -290,7 +290,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
   );
 }
 
-function nuevoCurso(): Curso { return { id: uid(), imagen: "", titulo: "Nuevo curso", descripcion: "Descripción del curso.", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 0", link: "" }; }
+function nuevoCurso(): Curso { return { id: uid(), imagen: "", titulo: "Nuevo curso", descripcion: "Descripción del curso.", ponente: "", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 0", link: "" }; }
 
 // ---- Carrusel --------------------------------------------------------------
 function Carrusel({ c, setC, editando, subir }: { c: Contenido; setC: any; editando: boolean; subir: (f: File) => Promise<string | null> }) {
@@ -376,6 +376,11 @@ function CursoCard({ curso, editando, subir, agg, onVote, onChange, onRemove, pr
       </div>
       <div className="flex flex-1 flex-col p-4">
         <Txt v={curso.titulo} editando={editando} onChange={(v) => up("titulo", v)} as="h3" className="text-base font-bold" style={{ color: NAVY }} />
+        {(curso.ponente || editando) && (
+          <div className="mt-1 text-xs font-semibold text-slate-500">
+            Ponente: {editando ? <input value={curso.ponente} onChange={(e) => up("ponente", e.target.value)} placeholder="Nombre del ponente" className={`ml-1 ${ED}`} /> : <span className="text-slate-600">{curso.ponente}</span>}
+          </div>
+        )}
         <Txt v={curso.descripcion} editando={editando} onChange={(v) => up("descripcion", v)} multiline className="mt-1 flex-1 text-sm text-slate-500" />
         <div className="mt-3 flex items-center justify-between text-sm">
           <span className="text-slate-500">{editando ? <input value={curso.fecha} onChange={(e) => up("fecha", e.target.value)} className={`w-28 ${ED}`} /> : curso.fecha}</span>

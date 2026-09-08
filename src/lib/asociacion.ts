@@ -67,7 +67,7 @@ export function idMediaValido(id: string): boolean {
 // ---- Contenido -------------------------------------------------------------
 export interface Flyer { imagen: string; titulo: string; link: string }
 export interface Curso {
-  id: string; imagen: string; titulo: string; descripcion: string;
+  id: string; imagen: string; titulo: string; descripcion: string; ponente: string;
   fecha: string; modalidad: string; precio: string; link: string; destacado?: boolean;
 }
 export interface EventoCal { fecha: string; curso: string; modalidad: string }
@@ -98,14 +98,14 @@ export const CONTENIDO_DEFAULT: AsociacionContenido = {
   flyers: [],
   disponiblesTitulo: "Cursos disponibles",
   cursosDisponibles: [
-    { id: nid(), imagen: "", titulo: "Soporte Vital Básico (BLS)", descripcion: "Certificación en reanimación cardiopulmonar y primeros auxilios.", fecha: "Inscripciones abiertas", modalidad: "Presencial", precio: "S/ 250", link: "", destacado: true },
-    { id: nid(), imagen: "", titulo: "Bioseguridad Hospitalaria", descripcion: "Normas y protocolos de bioseguridad en establecimientos de salud.", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 180", link: "" },
-    { id: nid(), imagen: "", titulo: "Gestión de la Calidad en Salud", descripcion: "Herramientas para la mejora continua en servicios de salud.", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 220", link: "" },
+    { id: nid(), imagen: "", titulo: "Soporte Vital Básico (BLS)", descripcion: "Certificación en reanimación cardiopulmonar y primeros auxilios.", ponente: "Dr. Juan Pérez", fecha: "Inscripciones abiertas", modalidad: "Presencial", precio: "S/ 250", link: "", destacado: true },
+    { id: nid(), imagen: "", titulo: "Bioseguridad Hospitalaria", descripcion: "Normas y protocolos de bioseguridad en establecimientos de salud.", ponente: "Lic. Rosa Díaz", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 180", link: "" },
+    { id: nid(), imagen: "", titulo: "Gestión de la Calidad en Salud", descripcion: "Herramientas para la mejora continua en servicios de salud.", ponente: "Mg. Carlos Ruiz", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 220", link: "" },
   ],
   proximosTitulo: "Próximos cursos",
   cursosProximos: [
-    { id: nid(), imagen: "", titulo: "Auditoría Médica", descripcion: "Fundamentos de la auditoría en salud.", fecha: "Marzo 2026", modalidad: "Virtual", precio: "S/ 300", link: "" },
-    { id: nid(), imagen: "", titulo: "Farmacología Clínica", descripcion: "Actualización en farmacología aplicada.", fecha: "Abril 2026", modalidad: "Presencial", precio: "S/ 280", link: "" },
+    { id: nid(), imagen: "", titulo: "Auditoría Médica", descripcion: "Fundamentos de la auditoría en salud.", ponente: "Dr. Luis Torres", fecha: "Marzo 2026", modalidad: "Virtual", precio: "S/ 300", link: "" },
+    { id: nid(), imagen: "", titulo: "Farmacología Clínica", descripcion: "Actualización en farmacología aplicada.", ponente: "Q.F. Ana Salas", fecha: "Abril 2026", modalidad: "Presencial", precio: "S/ 280", link: "" },
   ],
   calendarioTitulo: "Calendario de cursos",
   calendario: [
@@ -134,7 +134,7 @@ export const CONTENIDO_DEFAULT: AsociacionContenido = {
 const s = (v: any, def = "") => (typeof v === "string" ? v : def);
 const arr = <T,>(v: any, map: (x: any) => T, max = 60): T[] => (Array.isArray(v) ? v.slice(0, max).map(map) : []);
 const curso = (x: any): Curso => ({
-  id: s(x?.id) || nid(), imagen: s(x?.imagen), titulo: s(x?.titulo), descripcion: s(x?.descripcion),
+  id: s(x?.id) || nid(), imagen: s(x?.imagen), titulo: s(x?.titulo), descripcion: s(x?.descripcion), ponente: s(x?.ponente),
   fecha: s(x?.fecha), modalidad: s(x?.modalidad), precio: s(x?.precio), link: s(x?.link), destacado: !!x?.destacado,
 });
 
