@@ -1,13 +1,15 @@
 // ============================================================
-//  Sitio editable de la Asociación Mutualista (/asociacionmutualista)
+//  Sitio editable — Instituto Mutualista Sanitaria del Perú (/asociacionmutualista)
 // ============================================================
-// Página PÚBLICA con plantilla fija editable (textos, imágenes, video, galería).
-// La EDICIÓN se protege con un usuario/clave aparte (no los usuarios de Radar):
+// Página PÚBLICA con plantilla fija editable (paleta azul marino + dorado):
+//   carrusel de flyers, cursos disponibles/próximos con VALORACIÓN por estrellas
+//   (los alumnos recomiendan), calendario de cursos, sugerencias de próximos
+//   cursos, estadísticas y testimonios.
+// La EDICIÓN se protege con un usuario/clave aparte:
 //   env  ASOCIACION_EDIT_PASSWORD  (clave; mínimo 4 caracteres para habilitar)
-//   env  ASOCIACION_EDIT_USER      (usuario; opcional, default "asociacion")
-// Los medios (imágenes/videos) se guardan como ARCHIVOS en el volumen (DATA_DIR)
-// y se sirven por /api/asociacion/media/<id>. El contenido (textos + URLs) vive
-// en el store JSON.
+//   env  ASOCIACION_EDIT_USER      (usuario; opcional, default "instituto")
+// Medios (imágenes/videos) → archivos en el volumen (DATA_DIR); contenido +
+// valoraciones + sugerencias → store JSON.
 
 import crypto from "crypto";
 import path from "path";
@@ -18,12 +20,9 @@ export const MEDIA_DIR = path.join(DATA_DIR, "asociacion-media");
 
 export const ASOC_COOKIE = "asoc_edit";
 const PASS = process.env.ASOCIACION_EDIT_PASSWORD || "";
-export const ASOC_USER = process.env.ASOCIACION_EDIT_USER || "asociacion";
+export const ASOC_USER = process.env.ASOCIACION_EDIT_USER || "instituto";
 
-/** La edición está habilitada solo si hay una clave configurada. */
 export function edicionHabilitada(): boolean { return PASS.length >= 4; }
-
-/** Token determinístico derivado de la clave (lo que guarda la cookie de edición). */
 export function tokenEsperado(): string {
   return crypto.createHmac("sha256", PASS || "disabled").update("asoc-edit-v1").digest("hex");
 }
@@ -31,11 +30,9 @@ const igual = (a: string, b: string) => {
   const A = Buffer.from(a || ""), B = Buffer.from(b || "");
   return A.length === B.length && crypto.timingSafeEqual(A, B);
 };
-/** ¿Usuario+clave correctos? */
 export function credencialesOk(user: string, pw: string): boolean {
   return edicionHabilitada() && igual(String(user || "").trim(), ASOC_USER) && igual(pw, PASS);
 }
-/** ¿La cookie de edición es válida? */
 export function cookieValida(valor: string | undefined | null): boolean {
   return edicionHabilitada() && !!valor && igual(valor, tokenEsperado());
 }
@@ -46,9 +43,7 @@ const MIME_EXT: Record<string, string> = {
   "image/gif": "gif", "image/avif": "avif",
   "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
 };
-export const MEDIA_MAX = 60 * 1024 * 1024; // 60 MB (videos)
-
-/** Guarda un archivo de medios y devuelve su URL pública. */
+export const MEDIA_MAX = 60 * 1024 * 1024;
 export async function guardarMedia(buf: Buffer, mime: string): Promise<string> {
   const ext = MIME_EXT[String(mime).toLowerCase()];
   if (!ext) throw new Error("Tipo de archivo no permitido (usa imagen o video).");
@@ -57,7 +52,6 @@ export async function guardarMedia(buf: Buffer, mime: string): Promise<string> {
   await fs.writeFile(path.join(MEDIA_DIR, id), buf);
   return `/api/asociacion/media/${id}`;
 }
-/** Content-Type a partir de la extensión del id de medios. */
 export function contentTypeDe(id: string): string {
   const ext = (id.split(".").pop() || "").toLowerCase();
   const map: Record<string, string> = {
@@ -66,100 +60,100 @@ export function contentTypeDe(id: string): string {
   };
   return map[ext] || "application/octet-stream";
 }
-/** id de medios seguro (solo hex + extensión). */
 export function idMediaValido(id: string): boolean {
   return /^[a-f0-9]{10,}\.[a-z0-9]{2,5}$/i.test(id);
 }
 
-// ---- Contenido (plantilla fija editable) -----------------------------------
-export interface Servicio { titulo: string; texto: string; icono: string }
+// ---- Contenido -------------------------------------------------------------
+export interface Flyer { imagen: string; titulo: string; link: string }
+export interface Curso {
+  id: string; imagen: string; titulo: string; descripcion: string;
+  fecha: string; modalidad: string; precio: string; link: string; destacado?: boolean;
+}
+export interface EventoCal { fecha: string; curso: string; modalidad: string }
+export interface Stat { icono: string; valor: string; label: string }
+export interface Testimonio { nombre: string; rol: string; texto: string }
+
 export interface AsociacionContenido {
-  marca: string;
-  logo: string;
-  // Portada (hero)
-  heroTitulo: string;
-  heroSubtitulo: string;
-  heroBoton: string;
-  heroImagen: string;
-  // Quiénes somos
-  nosotrosTitulo: string;
-  nosotrosTexto: string;
-  nosotrosImagen: string;
-  // Servicios / Beneficios
-  serviciosTitulo: string;
-  servicios: Servicio[];
-  // Galería
-  galeriaTitulo: string;
-  galeria: string[];
-  // Video
-  videoTitulo: string;
-  video: string;
-  // Contacto
-  contactoTitulo: string;
-  contactoTexto: string;
-  telefono: string;
-  email: string;
-  direccion: string;
-  facebook: string;
+  marca: string; logo: string; lema: string;
+  flyers: Flyer[];
+  disponiblesTitulo: string; cursosDisponibles: Curso[];
+  proximosTitulo: string; cursosProximos: Curso[];
+  calendarioTitulo: string; calendario: EventoCal[];
+  stats: Stat[];
+  testimoniosTitulo: string; testimonios: Testimonio[];
+  contactoTitulo: string; contactoTexto: string;
+  telefono: string; email: string; direccion: string; facebook: string;
   actualizado?: string;
 }
 
+const nid = () => crypto.randomBytes(8).toString("hex");
+
 export const CONTENIDO_DEFAULT: AsociacionContenido = {
-  marca: "Asociación Mutualista",
+  marca: "Instituto Mutualista Sanitaria del Perú",
   logo: "",
-  heroTitulo: "Bienvenido a nuestra Asociación Mutualista",
-  heroSubtitulo: "Unidos por el bienestar y la solidaridad de nuestros asociados.",
-  heroBoton: "Conócenos",
-  heroImagen: "",
-  nosotrosTitulo: "Quiénes somos",
-  nosotrosTexto: "Somos una asociación sin fines de lucro dedicada al apoyo mutuo de nuestros miembros. Edita este texto con tu historia, misión y visión.",
-  nosotrosImagen: "",
-  serviciosTitulo: "Nuestros beneficios",
-  servicios: [
-    { titulo: "Apoyo solidario", texto: "Fondo de ayuda para los asociados en momentos difíciles.", icono: "🤝" },
-    { titulo: "Actividades", texto: "Eventos, capacitaciones y encuentros para la comunidad.", icono: "🎉" },
-    { titulo: "Asesoría", texto: "Orientación y acompañamiento para nuestros miembros.", icono: "📋" },
+  lema: "Formación de excelencia para el personal de salud del Perú.",
+  flyers: [],
+  disponiblesTitulo: "Cursos disponibles",
+  cursosDisponibles: [
+    { id: nid(), imagen: "", titulo: "Soporte Vital Básico (BLS)", descripcion: "Certificación en reanimación cardiopulmonar y primeros auxilios.", fecha: "Inscripciones abiertas", modalidad: "Presencial", precio: "S/ 250", link: "", destacado: true },
+    { id: nid(), imagen: "", titulo: "Bioseguridad Hospitalaria", descripcion: "Normas y protocolos de bioseguridad en establecimientos de salud.", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 180", link: "" },
+    { id: nid(), imagen: "", titulo: "Gestión de la Calidad en Salud", descripcion: "Herramientas para la mejora continua en servicios de salud.", fecha: "Inscripciones abiertas", modalidad: "Virtual", precio: "S/ 220", link: "" },
   ],
-  galeriaTitulo: "Galería",
-  galeria: [],
-  videoTitulo: "Video institucional",
-  video: "",
+  proximosTitulo: "Próximos cursos",
+  cursosProximos: [
+    { id: nid(), imagen: "", titulo: "Auditoría Médica", descripcion: "Fundamentos de la auditoría en salud.", fecha: "Marzo 2026", modalidad: "Virtual", precio: "S/ 300", link: "" },
+    { id: nid(), imagen: "", titulo: "Farmacología Clínica", descripcion: "Actualización en farmacología aplicada.", fecha: "Abril 2026", modalidad: "Presencial", precio: "S/ 280", link: "" },
+  ],
+  calendarioTitulo: "Calendario de cursos",
+  calendario: [
+    { fecha: "15/02/2026", curso: "Soporte Vital Básico (BLS)", modalidad: "Presencial" },
+    { fecha: "01/03/2026", curso: "Bioseguridad Hospitalaria", modalidad: "Virtual" },
+    { fecha: "20/03/2026", curso: "Auditoría Médica", modalidad: "Virtual" },
+  ],
+  stats: [
+    { icono: "🎓", valor: "+5,000", label: "Egresados capacitados" },
+    { icono: "📚", valor: "+120", label: "Cursos dictados" },
+    { icono: "👨‍🏫", valor: "+40", label: "Docentes especialistas" },
+    { icono: "⭐", valor: "4.8/5", label: "Satisfacción de alumnos" },
+  ],
+  testimoniosTitulo: "Lo que dicen nuestros alumnos",
+  testimonios: [
+    { nombre: "María Q.", rol: "Enfermera", texto: "Excelente organización y docentes de primer nivel. Muy recomendado." },
+    { nombre: "Luis R.", rol: "Técnico en enfermería", texto: "Los cursos me ayudaron a mejorar en mi trabajo. Volveré a inscribirme." },
+  ],
   contactoTitulo: "Contáctanos",
-  contactoTexto: "Escríbenos o visítanos. Estamos para servirte.",
-  telefono: "",
-  email: "",
-  direccion: "",
-  facebook: "",
+  contactoTexto: "Escríbenos para más información sobre inscripciones y convenios.",
+  telefono: "", email: "", direccion: "", facebook: "",
 };
 
-/** Normaliza un contenido parcial (de la edición) contra el default. */
+const s = (v: any, def = "") => (typeof v === "string" ? v : def);
+const arr = <T,>(v: any, map: (x: any) => T, max = 60): T[] => (Array.isArray(v) ? v.slice(0, max).map(map) : []);
+const curso = (x: any): Curso => ({
+  id: s(x?.id) || nid(), imagen: s(x?.imagen), titulo: s(x?.titulo), descripcion: s(x?.descripcion),
+  fecha: s(x?.fecha), modalidad: s(x?.modalidad), precio: s(x?.precio), link: s(x?.link), destacado: !!x?.destacado,
+});
+
 export function normalizarContenido(c: any): AsociacionContenido {
   const d = CONTENIDO_DEFAULT;
-  const s = (v: any, def: string) => (typeof v === "string" ? v : def);
   return {
-    marca: s(c?.marca, d.marca),
-    logo: s(c?.logo, ""),
-    heroTitulo: s(c?.heroTitulo, d.heroTitulo),
-    heroSubtitulo: s(c?.heroSubtitulo, d.heroSubtitulo),
-    heroBoton: s(c?.heroBoton, d.heroBoton),
-    heroImagen: s(c?.heroImagen, ""),
-    nosotrosTitulo: s(c?.nosotrosTitulo, d.nosotrosTitulo),
-    nosotrosTexto: s(c?.nosotrosTexto, d.nosotrosTexto),
-    nosotrosImagen: s(c?.nosotrosImagen, ""),
-    serviciosTitulo: s(c?.serviciosTitulo, d.serviciosTitulo),
-    servicios: Array.isArray(c?.servicios)
-      ? c.servicios.slice(0, 12).map((x: any) => ({ titulo: s(x?.titulo, ""), texto: s(x?.texto, ""), icono: s(x?.icono, "•") }))
-      : d.servicios,
-    galeriaTitulo: s(c?.galeriaTitulo, d.galeriaTitulo),
-    galeria: Array.isArray(c?.galeria) ? c.galeria.filter((x: any) => typeof x === "string").slice(0, 60) : [],
-    videoTitulo: s(c?.videoTitulo, d.videoTitulo),
-    video: s(c?.video, ""),
-    contactoTitulo: s(c?.contactoTitulo, d.contactoTitulo),
-    contactoTexto: s(c?.contactoTexto, d.contactoTexto),
-    telefono: s(c?.telefono, ""),
-    email: s(c?.email, ""),
-    direccion: s(c?.direccion, ""),
-    facebook: s(c?.facebook, ""),
+    marca: s(c?.marca, d.marca), logo: s(c?.logo), lema: s(c?.lema, d.lema),
+    flyers: arr(c?.flyers, (x) => ({ imagen: s(x?.imagen), titulo: s(x?.titulo), link: s(x?.link) }), 15),
+    disponiblesTitulo: s(c?.disponiblesTitulo, d.disponiblesTitulo),
+    cursosDisponibles: Array.isArray(c?.cursosDisponibles) ? c.cursosDisponibles.slice(0, 40).map(curso) : d.cursosDisponibles,
+    proximosTitulo: s(c?.proximosTitulo, d.proximosTitulo),
+    cursosProximos: Array.isArray(c?.cursosProximos) ? c.cursosProximos.slice(0, 40).map(curso) : d.cursosProximos,
+    calendarioTitulo: s(c?.calendarioTitulo, d.calendarioTitulo),
+    calendario: arr(c?.calendario, (x) => ({ fecha: s(x?.fecha), curso: s(x?.curso), modalidad: s(x?.modalidad) }), 60),
+    stats: arr(c?.stats, (x) => ({ icono: s(x?.icono, "•"), valor: s(x?.valor), label: s(x?.label) }), 8),
+    testimoniosTitulo: s(c?.testimoniosTitulo, d.testimoniosTitulo),
+    testimonios: arr(c?.testimonios, (x) => ({ nombre: s(x?.nombre), rol: s(x?.rol), texto: s(x?.texto) }), 20),
+    contactoTitulo: s(c?.contactoTitulo, d.contactoTitulo), contactoTexto: s(c?.contactoTexto, d.contactoTexto),
+    telefono: s(c?.telefono), email: s(c?.email), direccion: s(c?.direccion), facebook: s(c?.facebook),
     actualizado: new Date().toISOString(),
   };
 }
+
+// ---- Valoraciones (rating por curso) y sugerencias -------------------------
+export interface RatingAgg { sum: number; count: number }
+export interface Sugerencia { nombre: string; tema: string; email: string; at: string }

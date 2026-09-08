@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
-import type { AsociacionContenido } from "./asociacion";
+import type { AsociacionContenido, RatingAgg, Sugerencia } from "./asociacion";
 import { CONTENIDO_DEFAULT, normalizarContenido } from "./asociacion";
 import type {
   Cliente,
@@ -42,6 +42,10 @@ interface Store {
   clientes: Cliente[];
   /** Contenido editable del sitio público de la Asociación Mutualista. */
   asociacion?: AsociacionContenido;
+  /** Valoraciones por curso (id de curso → {suma, conteo}). */
+  asociacionRatings?: Record<string, RatingAgg>;
+  /** Sugerencias de próximos cursos (público → las revisa el editor). */
+  asociacionSugerencias?: Sugerencia[];
   /** Usuarios que inician sesión (cada uno ve solo sus empresas). */
   users?: Usuario[];
   /** Memoria del estudio: RUC del proveedor → cuenta contable. */
@@ -119,6 +123,35 @@ export async function setAsociacion(contenido: any): Promise<AsociacionContenido
   store.asociacion = normalizarContenido(contenido);
   await writeStore(store);
   return store.asociacion;
+}
+
+/** Todas las valoraciones (id curso → {suma, conteo}). */
+export async function getRatings(): Promise<Record<string, RatingAgg>> {
+  const store = await readStore();
+  return store.asociacionRatings ?? {};
+}
+/** Agrega una valoración (1..5) a un curso y devuelve el agregado del curso. */
+export async function addRating(cursoId: string, valor: number): Promise<RatingAgg> {
+  const v = Math.max(1, Math.min(5, Math.round(valor)));
+  const store = await readStore();
+  if (!store.asociacionRatings) store.asociacionRatings = {};
+  const prev = store.asociacionRatings[cursoId] ?? { sum: 0, count: 0 };
+  const next = { sum: prev.sum + v, count: prev.count + 1 };
+  store.asociacionRatings[cursoId] = next;
+  await writeStore(store);
+  return next;
+}
+/** Sugerencias de próximos cursos (más recientes primero). */
+export async function getSugerencias(): Promise<Sugerencia[]> {
+  const store = await readStore();
+  return (store.asociacionSugerencias ?? []).slice().reverse();
+}
+export async function addSugerencia(sug: Sugerencia): Promise<void> {
+  const store = await readStore();
+  if (!Array.isArray(store.asociacionSugerencias)) store.asociacionSugerencias = [];
+  store.asociacionSugerencias.push(sug);
+  if (store.asociacionSugerencias.length > 500) store.asociacionSugerencias = store.asociacionSugerencias.slice(-500);
+  await writeStore(store);
 }
 
 // ---- Usuarios --------------------------------------------------------------
