@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const asientos = Array.isArray(body.asientos) ? (body.asientos as AsientoHonorario[]) : [];
   const formato = body.formato === "txt" ? "txt" : "xlsx";
-  const baseNombre = String(body.nombre || "Honorarios").replace(/[^\w.-]+/g, "_");
+  // Nombre base SIN extensión previa (para no arrastrar .xls/.xlsx/.txt).
+  const baseNombre = String(body.nombre || "Honorarios").replace(/\.(xlsx|xls|txt)$/i, "").replace(/[^\w.-]+/g, "_") || "Honorarios";
   if (!asientos.length) return NextResponse.json({ error: "No hay asientos para exportar." }, { status: 400 });
 
   try {
