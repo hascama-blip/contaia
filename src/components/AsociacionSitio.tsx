@@ -91,7 +91,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <a href="#inicio" className="flex min-w-0 items-center gap-2 sm:gap-3">
             <ImgEdit url={c.logo} editando={editando} onUpload={async (f) => { const u = await subir(f); if (u) set("logo", u); }}
-              className="h-10 w-auto max-w-[190px] shrink-0 rounded-md object-contain sm:h-12 sm:max-w-[320px]"
+              className="h-12 w-auto max-w-[230px] shrink-0 rounded-md object-contain sm:h-[68px] sm:max-w-[440px]"
               fallback={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-black text-white sm:h-11 sm:w-11 sm:text-lg" style={{ background: NAVY }}>IM</span>} />
             {/* Cuando hay logo, el nombre ya está en la imagen → no se repite (salvo en edición). */}
             {(!c.logo || editando) && <Txt v={c.marca} editando={editando} onChange={(v) => set("marca", v)} as="span" className={`truncate text-[13px] font-extrabold leading-tight sm:max-w-none sm:whitespace-normal sm:text-base ${c.logo ? "opacity-60" : ""}`} style={{ color: NAVY }} />}
