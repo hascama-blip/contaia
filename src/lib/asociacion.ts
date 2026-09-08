@@ -114,10 +114,10 @@ export const CONTENIDO_DEFAULT: AsociacionContenido = {
     { fecha: "20/03/2026", curso: "Auditoría Médica", modalidad: "Virtual" },
   ],
   stats: [
-    { icono: "🎓", valor: "+5,000", label: "Egresados capacitados" },
-    { icono: "📚", valor: "+120", label: "Cursos dictados" },
-    { icono: "👨‍🏫", valor: "+40", label: "Docentes especialistas" },
-    { icono: "⭐", valor: "4.8/5", label: "Satisfacción de alumnos" },
+    { icono: "", valor: "+5,000", label: "Egresados capacitados" },
+    { icono: "", valor: "+120", label: "Cursos dictados" },
+    { icono: "", valor: "+40", label: "Docentes especialistas" },
+    { icono: "", valor: "4.8/5", label: "Satisfacción de alumnos" },
   ],
   testimoniosTitulo: "Lo que dicen nuestros alumnos",
   testimonios: [
@@ -149,7 +149,7 @@ export function normalizarContenido(c: any): AsociacionContenido {
     cursosProximos: Array.isArray(c?.cursosProximos) ? c.cursosProximos.slice(0, 40).map(curso) : d.cursosProximos,
     calendarioTitulo: s(c?.calendarioTitulo, d.calendarioTitulo),
     calendario: arr(c?.calendario, (x) => ({ fecha: s(x?.fecha), curso: s(x?.curso), modalidad: s(x?.modalidad) }), 60),
-    stats: arr(c?.stats, (x) => ({ icono: s(x?.icono, "•"), valor: s(x?.valor), label: s(x?.label) }), 8),
+    stats: arr(c?.stats, (x) => ({ icono: s(x?.icono, ""), valor: s(x?.valor), label: s(x?.label) }), 8),
     testimoniosTitulo: s(c?.testimoniosTitulo, d.testimoniosTitulo),
     testimonios: arr(c?.testimonios, (x) => ({ nombre: s(x?.nombre), rol: s(x?.rol), texto: s(x?.texto) }), 20),
     aliadosTitulo: s(c?.aliadosTitulo, d.aliadosTitulo),

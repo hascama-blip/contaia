@@ -58,7 +58,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       const r = await fetch("/api/asociacion", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contenido: c }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setMsg(d.error || "No se pudo guardar."); return; }
-      setMsg("✅ Cambios guardados."); setTimeout(() => setMsg(null), 2500);
+      setMsg("Cambios guardados."); setTimeout(() => setMsg(null), 2500);
     } catch { setMsg("Error de red al guardar."); } finally { setGuardando(false); }
   }
   async function salirEdicion() {
@@ -81,8 +81,8 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
       {/* Top bar */}
       <div className="text-white" style={{ background: NAVY }}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-1.5 text-xs">
-          <span>🏥 <Txt v={c.lema} editando={editando} onChange={(v) => set("lema", v)} as="span" /></span>
-          <button onClick={() => setSugOpen(true)} className="hidden font-semibold sm:inline" style={{ color: GOLD }}>💡 Sugerir curso</button>
+          <span><Txt v={c.lema} editando={editando} onChange={(v) => set("lema", v)} as="span" /></span>
+          <button onClick={() => setSugOpen(true)} className="hidden font-semibold sm:inline" style={{ color: GOLD }}>Sugerir curso</button>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
             <a href="#proximos" className="rounded-lg px-3 py-2 hover:bg-slate-100">Próximos</a>
             <a href="#calendario" className="rounded-lg px-3 py-2 hover:bg-slate-100">Calendario</a>
             <a href="#contacto" className="rounded-lg px-3 py-2 hover:bg-slate-100">Contacto</a>
-            <button onClick={() => setSugOpen(true)} className="ml-1 rounded-lg px-4 py-2 font-bold text-slate-900" style={{ background: GOLD }}>💡 Sugerir curso</button>
+            <button onClick={() => setSugOpen(true)} className="ml-1 rounded-lg px-4 py-2 font-bold text-slate-900" style={{ background: GOLD }}>Sugerir curso</button>
           </nav>
           {/* Botón hamburguesa (móvil) */}
           <button onClick={() => setMenuOpen((o) => !o)} aria-label="Menú" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-2xl text-slate-700 hover:bg-slate-100 md:hidden">
@@ -113,7 +113,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
             {[["#cursos", "Cursos"], ["#proximos", "Próximos"], ["#calendario", "Calendario"], ["#contacto", "Contacto"]].map(([h, t]) => (
               <a key={h} href={h} onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 hover:bg-slate-100">{t}</a>
             ))}
-            <button onClick={() => { setSugOpen(true); setMenuOpen(false); }} className="mt-1 block w-full rounded-lg px-4 py-2.5 text-left font-bold text-slate-900" style={{ background: GOLD }}>💡 Sugerir curso</button>
+            <button onClick={() => { setSugOpen(true); setMenuOpen(false); }} className="mt-1 block w-full rounded-lg px-4 py-2.5 text-left font-bold text-slate-900" style={{ background: GOLD }}>Sugerir curso</button>
           </nav>
         )}
       </header>
@@ -129,12 +129,11 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
           {c.stats.map((st, i) => (
             <div key={i} className="relative rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
               {editando && <button onClick={() => set("stats", c.stats.filter((_, j) => j !== i))} className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-red-500/80 text-white">×</button>}
-              <div className="text-3xl">{st.icono}</div>
-              <Txt v={st.valor} editando={editando} onChange={(v) => set("stats", c.stats.map((x, j) => j === i ? { ...x, valor: v } : x))} as="div" className="mt-1 text-2xl font-extrabold" style={{ color: GOLD }} />
-              <Txt v={st.label} editando={editando} onChange={(v) => set("stats", c.stats.map((x, j) => j === i ? { ...x, label: v } : x))} as="div" className="mt-0.5 text-xs text-white/80" />
+                <Txt v={st.valor} editando={editando} onChange={(v) => set("stats", c.stats.map((x, j) => j === i ? { ...x, valor: v } : x))} as="div" className="text-3xl font-extrabold" style={{ color: GOLD }} />
+              <Txt v={st.label} editando={editando} onChange={(v) => set("stats", c.stats.map((x, j) => j === i ? { ...x, label: v } : x))} as="div" className="mt-1 text-xs uppercase tracking-wide text-white/70" />
             </div>
           ))}
-          {editando && <button onClick={() => set("stats", [...c.stats, { icono: "📊", valor: "+100", label: "Nuevo dato" }])} className="grid min-h-[110px] place-items-center rounded-2xl border-2 border-dashed border-white/30 text-white/70">+ Dato</button>}
+          {editando && <button onClick={() => set("stats", [...c.stats, { icono: "", valor: "+100", label: "Nuevo dato" }])} className="grid min-h-[110px] place-items-center rounded-2xl border-2 border-dashed border-white/30 text-white/70">+ Dato</button>}
         </div>
       </section>
 
@@ -200,7 +199,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
             {c.testimonios.map((t, i) => (
               <div key={i} className="relative rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
                 {editando && <button onClick={() => set("testimonios", c.testimonios.filter((_, j) => j !== i))} className="absolute right-2 top-2 text-red-500">×</button>}
-                <div className="text-3xl" style={{ color: GOLD }}>❝</div>
+                <div className="h-1 w-8 rounded-full" style={{ background: GOLD }} />
                 <Txt v={t.texto} editando={editando} onChange={(v) => set("testimonios", c.testimonios.map((x, j) => j === i ? { ...x, texto: v } : x))} multiline className="mt-1 text-slate-600" />
                 <div className="mt-3 flex items-center gap-2">
                   <span className="grid h-9 w-9 place-items-center rounded-full font-bold text-white" style={{ background: NAVY }}>{(t.nombre || "?").slice(0, 1)}</span>
@@ -236,7 +235,7 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
                     : card}
                   {editando && (
                     <div className="mt-1 space-y-1">
-                      <label className="block cursor-pointer rounded bg-slate-100 py-1 text-center text-[11px] font-semibold text-slate-600 hover:bg-slate-200">⬆ Logo
+                      <label className="block cursor-pointer rounded bg-slate-100 py-1 text-center text-[11px] font-semibold text-slate-600 hover:bg-slate-200">Subir logo
                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const u = await subir(f); if (u) up("logo", u); } e.currentTarget.value = ""; }} />
                       </label>
                       <input value={al.nombre} onChange={(e) => up("nombre", e.target.value)} placeholder="Nombre" className="block w-full rounded border border-slate-200 px-1.5 py-0.5 text-[11px]" />
@@ -258,11 +257,11 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
         <Encabezado v={c.contactoTitulo} editando={editando} onChange={(v) => set("contactoTitulo", v)} />
         <Txt v={c.contactoTexto} editando={editando} onChange={(v) => set("contactoTexto", v)} multiline className="mx-auto mt-3 max-w-2xl text-lg text-slate-600" />
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <Contacto icono="📞" label="Teléfono" v={c.telefono} editando={editando} onChange={(v) => set("telefono", v)} href={`tel:${c.telefono}`} />
-          <Contacto icono="✉️" label="Correo" v={c.email} editando={editando} onChange={(v) => set("email", v)} href={`mailto:${c.email}`} />
-          <Contacto icono="📍" label="Dirección" v={c.direccion} editando={editando} onChange={(v) => set("direccion", v)} />
+          <Contacto label="Teléfono" v={c.telefono} editando={editando} onChange={(v) => set("telefono", v)} href={`tel:${c.telefono}`} />
+          <Contacto label="Correo" v={c.email} editando={editando} onChange={(v) => set("email", v)} href={`mailto:${c.email}`} />
+          <Contacto label="Dirección" v={c.direccion} editando={editando} onChange={(v) => set("direccion", v)} />
         </div>
-        <button onClick={() => setSugOpen(true)} className="mt-8 rounded-full px-7 py-3 font-bold text-slate-900" style={{ background: GOLD }}>💡 Sugiere un curso que te gustaría</button>
+        <button onClick={() => setSugOpen(true)} className="mt-8 rounded-full px-7 py-3 font-bold text-slate-900" style={{ background: GOLD }}>Sugiere un curso que te gustaría</button>
       </section>
 
       <footer className="py-8 text-center text-sm text-white/80" style={{ background: NAVY }}>
@@ -274,13 +273,13 @@ export default function AsociacionSitio({ inicial, habilitada }: { inicial: Cont
         {msg && <span className="rounded-full bg-slate-900/90 px-3 py-2 text-xs text-white shadow-lg">{msg}</span>}
         {editando ? (
           <>
-            <button onClick={() => setVerSug(true)} className="rounded-full bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg ring-1 ring-slate-200 hover:bg-slate-50">📋 Sugerencias</button>
-            <button onClick={guardar} disabled={guardando} className="rounded-full px-5 py-3 text-sm font-bold text-slate-900 shadow-lg disabled:opacity-60" style={{ background: GOLD }}>{guardando ? "Guardando…" : "💾 Guardar"}</button>
-            <button onClick={() => window.location.reload()} className="rounded-full bg-white px-4 py-3 text-sm text-slate-600 shadow-lg ring-1 ring-slate-200">↩ Deshacer</button>
-            <button onClick={salirEdicion} className="rounded-full bg-white px-4 py-3 text-sm text-slate-600 shadow-lg ring-1 ring-slate-200">🚪 Salir</button>
+            <button onClick={() => setVerSug(true)} className="rounded-full bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg ring-1 ring-slate-200 hover:bg-slate-50">Sugerencias</button>
+            <button onClick={guardar} disabled={guardando} className="rounded-full px-5 py-3 text-sm font-bold text-slate-900 shadow-lg disabled:opacity-60" style={{ background: GOLD }}>{guardando ? "Guardando…" : "Guardar"}</button>
+            <button onClick={() => window.location.reload()} className="rounded-full bg-white px-4 py-3 text-sm text-slate-600 shadow-lg ring-1 ring-slate-200">Deshacer</button>
+            <button onClick={salirEdicion} className="rounded-full bg-white px-4 py-3 text-sm text-slate-600 shadow-lg ring-1 ring-slate-200">Salir</button>
           </>
         ) : habilitada ? (
-          <button onClick={() => setLoginOpen(true)} className="rounded-full bg-slate-900/80 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-900">🔒 Editar</button>
+          <button onClick={() => setLoginOpen(true)} className="rounded-full bg-slate-900/80 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-slate-900">Editar</button>
         ) : null}
       </div>
 
@@ -335,13 +334,13 @@ function Carrusel({ c, setC, editando, subir }: { c: Contenido; setC: any; edita
         {/* Controles de edición */}
         {editando && (
           <div className="absolute right-3 top-3 flex flex-col gap-2">
-            <label className="cursor-pointer rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow">⬆ {cur?.imagen ? "Reemplazar" : "Subir flyer"}
+            <label className="cursor-pointer rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow">{cur?.imagen ? "Reemplazar" : "Subir flyer"}
               <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; const u = await subir(f); if (u) { if (flyers.length === 0) setFlyers([{ imagen: u, titulo: "", link: "" }]); else setFlyers(flyers.map((x, k) => k === idx ? { ...x, imagen: u } : x)); } e.currentTarget.value = ""; }} />
             </label>
-            <label className="cursor-pointer rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow">➕ Agregar flyer
+            <label className="cursor-pointer rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow">Agregar flyer
               <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; const u = await subir(f); if (u) { setFlyers([...flyers, { imagen: u, titulo: "", link: "" }]); setI(flyers.length); } e.currentTarget.value = ""; }} />
             </label>
-            {cur && <button onClick={() => { setFlyers(flyers.filter((_, k) => k !== idx)); setI(0); }} className="rounded-full bg-red-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow">🗑 Quitar</button>}
+            {cur && <button onClick={() => { setFlyers(flyers.filter((_, k) => k !== idx)); setI(0); }} className="rounded-full bg-red-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow">Quitar</button>}
           </div>
         )}
         {editando && cur && (
@@ -366,7 +365,7 @@ function CursoCard({ curso, editando, subir, agg, onVote, onChange, onRemove, pr
       <div className="relative aspect-[16/10] bg-slate-100">
         {curso.imagen ? <img src={curso.imagen} alt={curso.titulo} className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-slate-300">Flyer del curso</div>}
         {editando && (
-          <label className="absolute inset-0 grid cursor-pointer place-items-center bg-black/40 text-sm font-medium text-white opacity-0 transition group-hover:opacity-100">⬆ Flyer
+          <label className="absolute inset-0 grid cursor-pointer place-items-center bg-black/40 text-sm font-medium text-white opacity-0 transition group-hover:opacity-100">Cambiar flyer
             <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const u = await subir(f); if (u) up("imagen", u); } e.currentTarget.value = ""; }} />
           </label>
         )}
@@ -379,7 +378,7 @@ function CursoCard({ curso, editando, subir, agg, onVote, onChange, onRemove, pr
         <Txt v={curso.titulo} editando={editando} onChange={(v) => up("titulo", v)} as="h3" className="text-base font-bold" style={{ color: NAVY }} />
         <Txt v={curso.descripcion} editando={editando} onChange={(v) => up("descripcion", v)} multiline className="mt-1 flex-1 text-sm text-slate-500" />
         <div className="mt-3 flex items-center justify-between text-sm">
-          <span className="font-semibold text-slate-600">📅 {editando ? <input value={curso.fecha} onChange={(e) => up("fecha", e.target.value)} className={`w-28 ${ED}`} /> : curso.fecha}</span>
+          <span className="text-slate-500">{editando ? <input value={curso.fecha} onChange={(e) => up("fecha", e.target.value)} className={`w-28 ${ED}`} /> : curso.fecha}</span>
           <span className="font-extrabold" style={{ color: NAVY }}>{editando ? <input value={curso.precio} onChange={(e) => up("precio", e.target.value)} className={`w-20 text-right ${ED}`} /> : curso.precio}</span>
         </div>
         {!proximo && <Estrellas cursoId={curso.id} agg={agg} editando={editando} onVote={onVote} />}
@@ -448,20 +447,19 @@ function ImgEdit({ url, editando, onUpload, className = "", fallback }: {
     <div className="group relative inline-block">
       {url ? <img src={url} alt="" className={className} /> : fallback}
       {editando && (
-        <label className="absolute inset-0 grid cursor-pointer place-items-center rounded-[inherit] bg-black/40 text-[10px] font-medium text-white opacity-0 transition group-hover:opacity-100">⬆
+        <label className="absolute inset-0 grid cursor-pointer place-items-center rounded-[inherit] bg-black/40 text-[10px] font-medium text-white opacity-0 transition group-hover:opacity-100">Cambiar
           <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.currentTarget.value = ""; }} />
         </label>
       )}
     </div>
   );
 }
-function Contacto({ icono, label, v, editando, onChange, href }: {
-  icono: string; label: string; v: string; editando: boolean; onChange: (s: string) => void; href?: string;
+function Contacto({ label, v, editando, onChange, href }: {
+  label: string; v: string; editando: boolean; onChange: (s: string) => void; href?: string;
 }) {
   const inner = (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-2xl">{icono}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
       {editando ? <input value={v} onChange={(e) => onChange(e.target.value)} className={`mt-1 block w-full text-center ${ED}`} /> : <div className="mt-1 font-medium text-slate-700">{v || "—"}</div>}
     </div>
   );
@@ -501,7 +499,7 @@ function SugerirModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} titulo="Sugiere un próximo curso">
       {ok ? (
-        <div className="py-4 text-center"><div className="text-4xl">✅</div><p className="mt-2 font-semibold text-slate-700">¡Gracias por tu sugerencia!</p><button onClick={onClose} className="mt-4 rounded-lg px-5 py-2 text-sm font-bold text-slate-900" style={{ background: GOLD }}>Cerrar</button></div>
+        <div className="py-4 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full text-2xl font-bold text-slate-900" style={{ background: GOLD }}>✓</div><p className="mt-3 font-semibold text-slate-700">¡Gracias por tu sugerencia!</p><button onClick={onClose} className="mt-4 rounded-lg px-5 py-2 text-sm font-bold text-slate-900" style={{ background: GOLD }}>Cerrar</button></div>
       ) : (
         <>
           <p className="text-sm text-slate-500">¿Qué curso te gustaría que dictemos? Tu opinión nos ayuda a planificar.</p>
