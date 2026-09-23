@@ -769,3 +769,262 @@ export async function extraerComprobantesXml(params: ComprobantesParams): Promis
     if (browser) await browser.close().catch(() => {});
   }
 }
+
+// ============================================================
+//  MODO API — descarga del XML por el endpoint interno del portal
+// ============================================================
+// SUNAT NO publica una API REST oficial para bajar el XML de comprobantes
+// RECIBIDOS de terceros: la pantalla "Consulta de comprobantes" (ConsultaCPE) es
+// una app Angular que, por dentro, llama endpoints JSON/REST propios. Este modo:
+//   1) OMITE el PDF (solo XML) → cada comprobante es más rápido.
+//   2) En Modo diagnóstico, CAPTURA todas las llamadas de red internas a SUNAT
+//      (URL, método, payload, status) durante la consulta+descarga → así se
+//      IDENTIFICA el endpoint interno para luego llamarlo directo (calibración).
+//   3) Si se configura el endpoint por entorno (CPE_XML_API_URL), lo llama
+//      DIRECTO por fetch (con las cookies de la sesión), sin clics.
+// Comparte login y navegación con el modo scraping (reutiliza sus helpers).
+
+/** Una llamada de red capturada del portal (para calibrar el endpoint interno). */
+export interface LlamadaApi {
+  url: string;
+  metodo: string;
+  status?: number;
+  tipo?: string;      // content-type
+  postData?: string;  // cuerpo enviado (truncado)
+  muestra?: string;   // fragmento de la respuesta (truncado)
+}
+
+/** Registra en `calls` las llamadas XHR/fetch a hosts de SUNAT de todas las
+ *  páginas (actuales y futuras). Solo para diagnóstico: revela el endpoint que
+ *  la app Angular usa para consultar y para descargar el XML. */
+function grabarRedSunat(ctx: any, calls: LlamadaApi[]) {
+  const esSunat = /sunat\.gob\.pe/i;
+  const relevante = /(api|rest|service|servicio|consulta|comprob|cpe|descarg|download|archivo|xml|zip|cdr)/i;
+  const onResp = async (resp: any) => {
+    try {
+      const url = String(resp.url() || "");
+      if (!esSunat.test(url)) return;
+      const req = resp.request();
+      const metodo = String(req.method() || "GET");
+      const ct = String((resp.headers?.() ?? {})["content-type"] || "");
+      // Nos interesan los XHR/POST y las URLs que parezcan de datos (no assets).
+      if (metodo === "GET" && !relevante.test(url) && !/json|xml|zip|octet/i.test(ct)) return;
+      if (/\.(js|css|png|jpe?g|gif|svg|woff2?|ttf|ico|map)(\?|$)/i.test(url)) return;
+      let postData = "";
+      try { postData = String(req.postData?.() || ""); } catch { /* */ }
+      let muestra = "";
+      if (/json|xml|text|octet/i.test(ct)) {
+        const txt = await resp.text().catch(() => "");
+        muestra = String(txt || "").replace(/\s+/g, " ").slice(0, 300);
+      }
+      calls.push({
+        url: url.slice(0, 240),
+        metodo,
+        status: resp.status?.(),
+        tipo: ct.slice(0, 60),
+        postData: postData.slice(0, 300),
+        muestra,
+      });
+      if (calls.length > 200) calls.splice(0, calls.length - 200);
+    } catch { /* ignora */ }
+  };
+  const enganchar = (pg: any) => { try { pg.on("response", onResp); } catch { /* */ } };
+  ctx.pages().forEach(enganchar);
+  ctx.on("page", enganchar);
+}
+
+/** Descarga DIRECTA del XML por un endpoint interno configurado (CPE_XML_API_URL).
+ *  Corre el fetch DENTRO de la página (usa las cookies de sesión). Devuelve el
+ *  texto (XML) o null. Placeholders admitidos en la URL:
+ *  {ruc} {rucEmisor} {tipo} {serie} {numero} {numeroPad} {periodo} {fecha}. */
+async function fetchXmlDirecto(page: any, plantilla: string, ruc: string, item: ItemRelacion, periodo: string): Promise<string | null> {
+  const repl: Record<string, string> = {
+    ruc,
+    rucEmisor: item.rucEmisor,
+    tipo: item.tipo,
+    serie: item.serie,
+    numero: item.numero,
+    numeroPad: String(item.numero).replace(/^0+/, "").padStart(8, "0"),
+    periodo: periodo || "",
+    fecha: item.fecha || "",
+  };
+  let url = plantilla;
+  for (const [k, v] of Object.entries(repl)) url = url.replaceAll(`{${k}}`, encodeURIComponent(v));
+  const b64 = (await page.evaluate(async (u: string) => {
+    try {
+      const r = await fetch(u, { credentials: "include" });
+      if (!r.ok) return "";
+      const b = await r.arrayBuffer(); const by = new Uint8Array(b);
+      let s = ""; for (let i = 0; i < by.length; i++) s += String.fromCharCode(by[i]);
+      return btoa(s);
+    } catch { return ""; }
+  }, url).catch(() => "")) as string;
+  if (!b64) return null;
+  return Buffer.from(b64, "base64").toString("utf-8");
+}
+
+/**
+ * Extrae los XML (SIN PDF) por el modo API. En diagnóstico captura las llamadas
+ * de red internas de SUNAT para identificar el endpoint. Reutiliza el login y la
+ * navegación del modo scraping; si hay CPE_XML_API_URL, baja el XML por fetch
+ * directo (sin clics).
+ */
+export async function extraerComprobantesXmlApi(params: ComprobantesParams): Promise<ComprobantesResultado & { diag?: { pasos: any[]; apiCalls?: LlamadaApi[] } }> {
+  const pasos: any[] = [];
+  const apiCalls: LlamadaApi[] = [];
+  const endpointDirecto = (process.env.CPE_XML_API_URL || "").trim();
+  let browser: any = null;
+  let cerradoPorTiempo = false;
+  const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
+  try {
+    const s = await loginSol(params, pasos);
+    browser = s.browser;
+    if (s.loginError) {
+      return { loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL incorrectos o bloqueo temporal). Espera ~10 min y reintenta.", diag: { pasos } };
+    }
+    // Captura de red SIEMPRE activa (barata); se devuelve solo en diagnóstico.
+    grabarRedSunat(s.ctx, apiCalls);
+
+    const relacionTotal = params.relacion ?? [];
+    if (!relacionTotal.length) {
+      return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes para descargar.", diag: { pasos } };
+    }
+
+    // --- Camino DIRECTO por endpoint interno (si está configurado) -------------
+    // No necesita abrir el formulario: hace fetch con las cookies de sesión.
+    if (endpointDirecto) {
+      const { esZip, extraerTodo } = await import("./zip");
+      const facturas: FacturaXml[] = [];
+      const fallidos: { item: ItemRelacion; motivo: string }[] = [];
+      const relacion = relacionTotal.slice(0, 60);
+      for (const item of relacion) {
+        try {
+          const texto = await fetchXmlDirecto(s.page, endpointDirecto, params.ruc, item, params.periodo);
+          if (!texto) { fallidos.push({ item, motivo: "el endpoint no devolvió contenido (ver diagnóstico)" }); continue; }
+          const buf = Buffer.from(texto, "utf-8");
+          const xmls: string[] = esZip(buf) ? extraerTodo(buf).map((z) => z.data.toString("utf-8")) : [texto];
+          let ok = false;
+          for (const x of xmls) {
+            const fx = parseFacturaXml(x);
+            if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
+          }
+          if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
+        } catch (e: any) {
+          fallidos.push({ item, motivo: String(e?.message ?? e).slice(0, 120) });
+        }
+        await s.page.waitForTimeout(1500).catch(() => {});
+      }
+      pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length });
+      return {
+        facturas, descargados: facturas.length, fallidos,
+        error: facturas.length ? undefined : "El endpoint directo no devolvió XML. Revisa CPE_XML_API_URL y el diagnóstico.",
+        diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
+      };
+    }
+
+    // --- Camino con el FORMULARIO (mismo que scraping) pero SIN PDF ------------
+    const APP_URL = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?action=execute&code=11.38.1.1.1&s=ww1";
+    await s.page.goto(APP_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+    pasos.push({ paso: "goto-app", url: APP_URL });
+    let formOk = false;
+    for (let i = 0; i < 12 && !formOk; i++) {
+      await s.page.waitForTimeout(1500).catch(() => {});
+      formOk = await Promise.all(
+        s.ctx.pages().flatMap((pg: any) => pg.frames().map((fr: any) => fr.getByText(/RUC\s*Emisor|Filtro de comprobante|Recibido/i).first().count().catch(() => 0)))
+      ).then((cs) => cs.some((c) => c > 0)).catch(() => false);
+    }
+    await cerrarAnuncios(s.ctx);
+
+    const { esZip, extraerTodo } = await import("./zip");
+    const facturas: FacturaXml[] = [];
+    const fallidos: { item: ItemRelacion; motivo: string }[] = [];
+    const errores: any[] = [];
+    const marcarFallo = (item: ItemRelacion, motivo: string, extra?: any) => { errores.push({ item: `${item.serie}-${item.numero}`, motivo, ...(extra || {}) }); fallidos.push({ item, motivo }); };
+    const TIPOS_SOPORTADOS = new Set(["01", "03", "07", "08", "14"]);
+    const relacion = relacionTotal.slice(0, 25);
+    const sobrantes = relacionTotal.length - relacion.length;
+    let sunatCaido: string | null = null;
+    let serverSeguidos = 0;
+
+    for (let i = 0; i < relacion.length; i++) {
+      const item = relacion[i];
+      try {
+        if (!TIPOS_SOPORTADOS.has(item.tipo)) { marcarFallo(item, `Tipo ${item.tipo} no se descarga en la Consulta individual de SUNAT.`); continue; }
+        const fr = frameForm(s.ctx);
+        if (!fr) { for (let j = i; j < relacion.length; j++) marcarFallo(relacion[j], "el navegador se cerró (reintentar)"); break; }
+        let estado: "resultado" | "error" | "nada" = "nada";
+        let llenado: any = null;
+        let ultimoAviso = "";
+        for (let intento = 0; intento < 2; intento++) {
+          if (i > 0 || intento > 0) {
+            await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {});
+            await s.page.waitForTimeout(1200).catch(() => {});
+          }
+          llenado = await llenarYConsultar(fr, s.page, item);
+          const r = await esperarResultado(fr, s.page);
+          estado = r.estado;
+          if (r.aviso) ultimoAviso = r.aviso;
+          if (params.diagnostico && r.aviso && llenado) llenado.aviso = r.aviso;
+          if (estado === "resultado") break;
+          await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+          await s.page.waitForTimeout(ES_SERVIDOR_CAIDO.test(ultimoAviso || "") ? 3000 : 1200).catch(() => {});
+        }
+        if (estado !== "resultado") {
+          if (ES_SERVIDOR_CAIDO.test(ultimoAviso)) {
+            serverSeguidos++;
+            marcarFallo(item, "SUNAT respondió “Error del Servidor”. Reintenta en unos minutos.", { llenado });
+            if (serverSeguidos >= 4) { sunatCaido = "SUNAT respondió “Error del Servidor” varias veces. Reintenta en unos minutos."; for (let j = i + 1; j < relacion.length; j++) marcarFallo(relacion[j], sunatCaido); break; }
+          } else {
+            serverSeguidos = 0;
+            marcarFallo(item, estado === "error" ? "SUNAT no devolvió el comprobante (revisa RUC/tipo/serie/número o no existe)." : "no apareció el resultado (tiempo agotado).", { llenado });
+          }
+          continue;
+        }
+        serverSeguidos = 0;
+        const dxml: any = {};
+        const buf = await descargarXmlResultado(fr, s.page, params.diagnostico ? dxml : undefined);
+        if (!buf) {
+          marcarFallo(item, "salió la factura pero no se pudo bajar el XML.", { iconosModal: dxml.iconos });
+        } else {
+          const xmls: string[] = [];
+          const recolectar = (b: Buffer, depth: number) => {
+            if (!esZip(b)) { xmls.push(b.toString("utf-8")); return; }
+            for (const it of extraerTodo(b)) {
+              if (depth < 3 && (it.name.toLowerCase().endsWith(".zip") || esZip(it.data))) recolectar(it.data, depth + 1);
+              else xmls.push(it.data.toString("utf-8"));
+            }
+          };
+          recolectar(buf, 0);
+          let nuevas = 0;
+          for (const x of xmls) {
+            const fx = parseFacturaXml(x);
+            if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); nuevas++; }
+          }
+          // MODO API: NO se descarga el PDF (solo XML) → cada comprobante es más rápido.
+          if (!nuevas) marcarFallo(item, "el archivo descargado no era un XML de comprobante", { iconosModal: dxml.iconos });
+        }
+        await cerrarModal(fr);
+        await s.page.waitForTimeout(1000).catch(() => {});
+      } catch (e: any) {
+        marcarFallo(item, String(e?.message ?? e).slice(0, 120));
+      }
+    }
+    pasos.push({ paso: "descargas", pedidos: relacion.length, ok: facturas.length, errores });
+
+    const notaSobrantes = sobrantes > 0 ? ` (Se procesaron ${relacion.length} de ${relacionTotal.length}; sube el resto en otra tanda.)` : "";
+    return {
+      facturas,
+      descargados: facturas.length,
+      fallidos,
+      sunatCaido: !!sunatCaido,
+      error: sunatCaido ? sunatCaido : facturas.length ? (sobrantes > 0 ? `Descargados ${facturas.length}.${notaSobrantes}` : undefined) : `No se descargó ningún XML (de ${relacion.length}). Revisa el diagnóstico.`,
+      diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
+    };
+  } catch (err: any) {
+    if (cerradoPorTiempo) return { error: "La consulta tardó demasiado y se canceló. Reintenta.", diag: { pasos } };
+    return { error: err?.message ?? "Error extrayendo los comprobantes.", diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined } };
+  } finally {
+    clearTimeout(tope);
+    if (browser) await browser.close().catch(() => {});
+  }
+}

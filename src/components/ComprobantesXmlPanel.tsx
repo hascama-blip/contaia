@@ -29,6 +29,10 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [filaBusy, setFilaBusy] = useState<number | null>(null);
   const [auto, setAuto] = useState(false); // "extraer todas" en curso
   const [genBusy, setGenBusy] = useState(false);
+  // Modo API: baja el XML por el endpoint interno de SUNAT (sin PDF, más rápido).
+  const [apiMode, setApiMode] = useState(false);
+  const [diagModo, setDiagModo] = useState(false);
+  const [diag, setDiag] = useState<string | null>(null);
 
   const estadoDe = (i: number): EstadoFila => filas[i] ?? { estado: "pendiente" };
   const facturasOk = () =>
@@ -106,11 +110,13 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     try {
       // parte 0 = consume 1 cupo (solo la 1ª vez); el resto no consume.
       const parte = consumido ? 1 : 0;
-      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
+      const endpoint = apiMode ? "comprobantes-xml-api" : "comprobantes-xml";
+      const res = await fetch(`/api/clientes/${clienteId}/${endpoint}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, relacion: [item], parte, periodo: periodoSire }),
+        body: JSON.stringify({ solUser, solPass, relacion: [item], parte, periodo: periodoSire, diagnostico: diagModo }),
       });
       const data = await res.json().catch(() => ({}));
+      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (res.status === 401) { setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: data.error ?? "Login SOL falló" } })); return false; }
       if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas((p) => ({ ...p, [i]: { estado: "pendiente" } })); return false; }
       if (!consumido && res.ok) setConsumido(true);
@@ -241,8 +247,23 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         </div>
       </div>
 
+      {/* Modo de extracción */}
+      <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <label className="flex items-center gap-2" title="Baja el XML por el endpoint interno de SUNAT (sin PDF) — más rápido">
+          <input type="checkbox" checked={apiMode} onChange={(e) => { setApiMode(e.target.checked); setDiag(null); }} />
+          <span>⚡ <strong>Modo API</strong> (XML, sin PDF)</span>
+        </label>
+        {apiMode && (
+          <label className="flex items-center gap-2" title="Captura las llamadas de red internas de SUNAT para identificar el endpoint">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+          </label>
+        )}
+        {apiMode && <span className="text-slate-400">Solo XML — no descarga el PDF.</span>}
+      </div>
+
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
       {error && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+      {diag && <pre className="mb-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
       {hayRel && (
         <>
@@ -291,7 +312,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
                         {e.estado === "ok" ? (
                           <span className="inline-flex gap-1">
                             <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarXml(e.factura)}>XML</button>
-                            <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
+                            {!apiMode && (
+                              <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
+                            )}
                           </span>
                         ) : (
                           <button
