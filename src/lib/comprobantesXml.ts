@@ -796,39 +796,46 @@ export interface LlamadaApi {
 
 /** Registra en `calls` las llamadas XHR/fetch a hosts de SUNAT de todas las
  *  páginas (actuales y futuras). Solo para diagnóstico: revela el endpoint que
- *  la app Angular usa para consultar y para descargar el XML. */
+ *  la app Angular usa para consultar y para descargar el XML. Captura tanto la
+ *  PETICIÓN (método, URL, cuerpo, cabeceras clave) como la RESPUESTA — así se ve
+ *  el endpoint aunque la descarga del XML sea un adjunto (sin cuerpo legible). */
 function grabarRedSunat(ctx: any, calls: LlamadaApi[]) {
   const esSunat = /sunat\.gob\.pe/i;
-  const relevante = /(api|rest|service|servicio|consulta|comprob|cpe|descarg|download|archivo|xml|zip|cdr)/i;
+  const relevante = /(api|rest|service|servicio|consulta|comprob|cpe|descarg|download|archivo|reporte|xml|zip|cdr)/i;
+  const esAsset = (u: string) => /\.(js|css|png|jpe?g|gif|svg|woff2?|ttf|ico|map|html?)(\?|$)/i.test(u);
+  const push = (c: LlamadaApi) => { calls.push(c); if (calls.length > 250) calls.splice(0, calls.length - 250); };
+
+  // 1) Toda PETICIÓN relevante (XHR/fetch/POST) → registra método, URL, cuerpo y
+  //    cabeceras útiles para replicar (content-type, accept, referer, tokens).
+  const onReq = (req: any) => {
+    try {
+      const url = String(req.url() || "");
+      if (!esSunat.test(url) || esAsset(url)) return;
+      const metodo = String(req.method() || "GET");
+      const tipoRec = String(req.resourceType?.() || "");
+      if (metodo === "GET" && tipoRec !== "xhr" && tipoRec !== "fetch" && !relevante.test(url)) return;
+      let postData = "";
+      try { postData = String(req.postData?.() || ""); } catch { /* */ }
+      const h = (req.headers?.() ?? {}) as Record<string, string>;
+      const cabeceras = ["content-type", "accept", "referer", "authorization", "x-csrf-token", "cookie"]
+        .filter((k) => h[k]).map((k) => `${k}: ${k === "cookie" ? "(presente)" : String(h[k]).slice(0, 120)}`).join(" · ");
+      push({ url: url.slice(0, 240), metodo, tipo: `req:${tipoRec}`, postData: postData.slice(0, 400), muestra: cabeceras.slice(0, 300) });
+    } catch { /* */ }
+  };
+  // 2) RESPUESTA de datos → registra status/content-type y una muestra del cuerpo.
   const onResp = async (resp: any) => {
     try {
       const url = String(resp.url() || "");
-      if (!esSunat.test(url)) return;
-      const req = resp.request();
-      const metodo = String(req.method() || "GET");
+      if (!esSunat.test(url) || esAsset(url)) return;
       const ct = String((resp.headers?.() ?? {})["content-type"] || "");
-      // Nos interesan los XHR/POST y las URLs que parezcan de datos (no assets).
-      if (metodo === "GET" && !relevante.test(url) && !/json|xml|zip|octet/i.test(ct)) return;
-      if (/\.(js|css|png|jpe?g|gif|svg|woff2?|ttf|ico|map)(\?|$)/i.test(url)) return;
-      let postData = "";
-      try { postData = String(req.postData?.() || ""); } catch { /* */ }
+      if (!relevante.test(url) && !/json|xml|zip|octet/i.test(ct)) return;
       let muestra = "";
-      if (/json|xml|text|octet/i.test(ct)) {
-        const txt = await resp.text().catch(() => "");
-        muestra = String(txt || "").replace(/\s+/g, " ").slice(0, 300);
-      }
-      calls.push({
-        url: url.slice(0, 240),
-        metodo,
-        status: resp.status?.(),
-        tipo: ct.slice(0, 60),
-        postData: postData.slice(0, 300),
-        muestra,
-      });
-      if (calls.length > 200) calls.splice(0, calls.length - 200);
-    } catch { /* ignora */ }
+      if (/json|xml|text/i.test(ct)) muestra = String(await resp.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
+      else if (/zip|octet/i.test(ct)) muestra = "(binario/adjunto — probable ZIP/XML de descarga)";
+      push({ url: url.slice(0, 240), metodo: String(resp.request?.().method?.() || ""), status: resp.status?.(), tipo: `resp:${ct.slice(0, 50)}`, muestra });
+    } catch { /* */ }
   };
-  const enganchar = (pg: any) => { try { pg.on("response", onResp); } catch { /* */ } };
+  const enganchar = (pg: any) => { try { pg.on("request", onReq); pg.on("response", onResp); } catch { /* */ } };
   ctx.pages().forEach(enganchar);
   ctx.on("page", enganchar);
 }
@@ -851,21 +858,28 @@ function urlComprobante(plantilla: string, ruc: string, item: ItemRelacion, peri
   return url;
 }
 
+/** Una petición lista para disparar (URL + opciones de fetch). */
+interface PeticionXml { url: string; metodo: string; body?: string; headers?: Record<string, string> }
+
 /** Descarga EN PARALELO (en lote) el XML de muchos comprobantes por el endpoint
  *  interno, DENTRO de la página (usa las cookies de sesión). Devuelve, en el
- *  mismo orden, el texto de cada uno (o "" si falló). Esto es lo que hace rápida
- *  la extracción masiva: N descargas concurrentes en una sola llamada, sin abrir
- *  navegador por comprobante ni consultar de a uno. `concurrencia` limita cuántas
- *  van a la vez para no saturar a SUNAT. */
-async function fetchXmlLote(page: any, urls: string[], concurrencia: number): Promise<string[]> {
-  return (await page.evaluate(async ({ urls, concurrencia }: { urls: string[]; concurrencia: number }) => {
-    const out: string[] = new Array(urls.length).fill("");
+ *  mismo orden, el texto (base64) de cada uno (o "" si falló). Esto es lo que
+ *  hace rápida la extracción masiva: N descargas concurrentes en una sola
+ *  llamada, sin abrir navegador por comprobante ni consultar de a uno.
+ *  Soporta GET o POST con cuerpo/cabeceras (según lo que revele la captura). */
+async function fetchXmlLote(page: any, peticiones: PeticionXml[], concurrencia: number): Promise<string[]> {
+  return (await page.evaluate(async ({ peticiones, concurrencia }: { peticiones: PeticionXml[]; concurrencia: number }) => {
+    const out: string[] = new Array(peticiones.length).fill("");
     let i = 0;
     async function worker() {
-      while (i < urls.length) {
+      while (i < peticiones.length) {
         const idx = i++;
+        const p = peticiones[idx];
         try {
-          const r = await fetch(urls[idx], { credentials: "include" });
+          const init: any = { method: p.metodo || "GET", credentials: "include" };
+          if (p.headers) init.headers = p.headers;
+          if (p.body != null && p.metodo !== "GET") init.body = p.body;
+          const r = await fetch(p.url, init);
           if (!r.ok) continue;
           const b = await r.arrayBuffer(); const by = new Uint8Array(b);
           let s = ""; const CH = 0x8000;
@@ -874,9 +888,26 @@ async function fetchXmlLote(page: any, urls: string[], concurrencia: number): Pr
         } catch { /* deja "" */ }
       }
     }
-    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, urls.length)) }, worker));
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, peticiones.length)) }, worker));
     return out;
-  }, { urls, concurrencia }).catch(() => urls.map(() => ""))) as string[];
+  }, { peticiones, concurrencia }).catch(() => peticiones.map(() => ""))) as string[];
+}
+
+/** Rellena una plantilla (URL o body) con los datos del comprobante. */
+function rellenarPlantilla(plantilla: string, ruc: string, item: ItemRelacion, periodo: string): string {
+  const repl: Record<string, string> = {
+    ruc,
+    rucEmisor: item.rucEmisor,
+    tipo: item.tipo,
+    serie: item.serie,
+    numero: item.numero,
+    numeroPad: String(item.numero).replace(/^0+/, "").padStart(8, "0"),
+    periodo: periodo || "",
+    fecha: item.fecha || "",
+  };
+  let out = plantilla;
+  for (const [k, v] of Object.entries(repl)) out = out.replaceAll(`{${k}}`, v);
+  return out;
 }
 
 /**
@@ -915,14 +946,25 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
       // TODA la relación (sin tope): son N fetch concurrentes, no navegación.
       const relacion = relacionTotal;
       const concurrencia = Math.max(1, Math.min(Number(process.env.CPE_XML_CONCURRENCIA || 12), 30));
+      // Método/cuerpo/cabeceras configurables por env (según lo que revele la
+      // captura): GET simple, o POST con body JSON, o cabeceras/token extra.
+      const metodo = (process.env.CPE_XML_API_METHOD || "GET").toUpperCase();
+      const bodyTpl = process.env.CPE_XML_API_BODY || "";
+      let headersEnv: Record<string, string> | undefined;
+      try { headersEnv = process.env.CPE_XML_API_HEADERS ? JSON.parse(process.env.CPE_XML_API_HEADERS) : undefined; } catch { headersEnv = undefined; }
       const t0 = Date.now();
       // Se procesa por bloques para acotar memoria en volúmenes grandes (1000+),
       // pero cada bloque baja en paralelo (concurrencia N).
       const TAM_BLOQUE = 200;
       for (let ini = 0; ini < relacion.length; ini += TAM_BLOQUE) {
         const bloque = relacion.slice(ini, ini + TAM_BLOQUE);
-        const urls = bloque.map((it) => urlComprobante(endpointDirecto, params.ruc, it, params.periodo));
-        const textos = await fetchXmlLote(s.page, urls, concurrencia);
+        const peticiones: PeticionXml[] = bloque.map((it) => ({
+          url: urlComprobante(endpointDirecto, params.ruc, it, params.periodo),
+          metodo,
+          body: bodyTpl ? rellenarPlantilla(bodyTpl, params.ruc, it, params.periodo) : undefined,
+          headers: headersEnv,
+        }));
+        const textos = await fetchXmlLote(s.page, peticiones, concurrencia);
         for (let j = 0; j < bloque.length; j++) {
           const item = bloque[j];
           const b64 = textos[j];
