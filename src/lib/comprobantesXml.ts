@@ -833,11 +833,9 @@ function grabarRedSunat(ctx: any, calls: LlamadaApi[]) {
   ctx.on("page", enganchar);
 }
 
-/** Descarga DIRECTA del XML por un endpoint interno configurado (CPE_XML_API_URL).
- *  Corre el fetch DENTRO de la página (usa las cookies de sesión). Devuelve el
- *  texto (XML) o null. Placeholders admitidos en la URL:
+/** Resuelve la URL del endpoint para un comprobante. Placeholders admitidos:
  *  {ruc} {rucEmisor} {tipo} {serie} {numero} {numeroPad} {periodo} {fecha}. */
-async function fetchXmlDirecto(page: any, plantilla: string, ruc: string, item: ItemRelacion, periodo: string): Promise<string | null> {
+function urlComprobante(plantilla: string, ruc: string, item: ItemRelacion, periodo: string): string {
   const repl: Record<string, string> = {
     ruc,
     rucEmisor: item.rucEmisor,
@@ -850,17 +848,35 @@ async function fetchXmlDirecto(page: any, plantilla: string, ruc: string, item: 
   };
   let url = plantilla;
   for (const [k, v] of Object.entries(repl)) url = url.replaceAll(`{${k}}`, encodeURIComponent(v));
-  const b64 = (await page.evaluate(async (u: string) => {
-    try {
-      const r = await fetch(u, { credentials: "include" });
-      if (!r.ok) return "";
-      const b = await r.arrayBuffer(); const by = new Uint8Array(b);
-      let s = ""; for (let i = 0; i < by.length; i++) s += String.fromCharCode(by[i]);
-      return btoa(s);
-    } catch { return ""; }
-  }, url).catch(() => "")) as string;
-  if (!b64) return null;
-  return Buffer.from(b64, "base64").toString("utf-8");
+  return url;
+}
+
+/** Descarga EN PARALELO (en lote) el XML de muchos comprobantes por el endpoint
+ *  interno, DENTRO de la página (usa las cookies de sesión). Devuelve, en el
+ *  mismo orden, el texto de cada uno (o "" si falló). Esto es lo que hace rápida
+ *  la extracción masiva: N descargas concurrentes en una sola llamada, sin abrir
+ *  navegador por comprobante ni consultar de a uno. `concurrencia` limita cuántas
+ *  van a la vez para no saturar a SUNAT. */
+async function fetchXmlLote(page: any, urls: string[], concurrencia: number): Promise<string[]> {
+  return (await page.evaluate(async ({ urls, concurrencia }: { urls: string[]; concurrencia: number }) => {
+    const out: string[] = new Array(urls.length).fill("");
+    let i = 0;
+    async function worker() {
+      while (i < urls.length) {
+        const idx = i++;
+        try {
+          const r = await fetch(urls[idx], { credentials: "include" });
+          if (!r.ok) continue;
+          const b = await r.arrayBuffer(); const by = new Uint8Array(b);
+          let s = ""; const CH = 0x8000;
+          for (let k = 0; k < by.length; k += CH) s += String.fromCharCode.apply(null, Array.from(by.subarray(k, k + CH)) as any);
+          out[idx] = btoa(s);
+        } catch { /* deja "" */ }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, urls.length)) }, worker));
+    return out;
+  }, { urls, concurrencia }).catch(() => urls.map(() => ""))) as string[];
 }
 
 /**
@@ -896,25 +912,37 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
       const { esZip, extraerTodo } = await import("./zip");
       const facturas: FacturaXml[] = [];
       const fallidos: { item: ItemRelacion; motivo: string }[] = [];
-      const relacion = relacionTotal.slice(0, 60);
-      for (const item of relacion) {
-        try {
-          const texto = await fetchXmlDirecto(s.page, endpointDirecto, params.ruc, item, params.periodo);
-          if (!texto) { fallidos.push({ item, motivo: "el endpoint no devolvió contenido (ver diagnóstico)" }); continue; }
-          const buf = Buffer.from(texto, "utf-8");
-          const xmls: string[] = esZip(buf) ? extraerTodo(buf).map((z) => z.data.toString("utf-8")) : [texto];
-          let ok = false;
-          for (const x of xmls) {
-            const fx = parseFacturaXml(x);
-            if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
+      // TODA la relación (sin tope): son N fetch concurrentes, no navegación.
+      const relacion = relacionTotal;
+      const concurrencia = Math.max(1, Math.min(Number(process.env.CPE_XML_CONCURRENCIA || 12), 30));
+      const t0 = Date.now();
+      // Se procesa por bloques para acotar memoria en volúmenes grandes (1000+),
+      // pero cada bloque baja en paralelo (concurrencia N).
+      const TAM_BLOQUE = 200;
+      for (let ini = 0; ini < relacion.length; ini += TAM_BLOQUE) {
+        const bloque = relacion.slice(ini, ini + TAM_BLOQUE);
+        const urls = bloque.map((it) => urlComprobante(endpointDirecto, params.ruc, it, params.periodo));
+        const textos = await fetchXmlLote(s.page, urls, concurrencia);
+        for (let j = 0; j < bloque.length; j++) {
+          const item = bloque[j];
+          const b64 = textos[j];
+          if (!b64) { fallidos.push({ item, motivo: "el endpoint no devolvió contenido" }); continue; }
+          try {
+            const buf = Buffer.from(b64, "base64");
+            const xmls: string[] = esZip(buf) ? extraerTodo(buf).map((z) => z.data.toString("utf-8")) : [buf.toString("utf-8")];
+            let ok = false;
+            for (const x of xmls) {
+              const fx = parseFacturaXml(x);
+              if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
+            }
+            if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
+          } catch (e: any) {
+            fallidos.push({ item, motivo: String(e?.message ?? e).slice(0, 120) });
           }
-          if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
-        } catch (e: any) {
-          fallidos.push({ item, motivo: String(e?.message ?? e).slice(0, 120) });
         }
-        await s.page.waitForTimeout(1500).catch(() => {});
+        if (cerradoPorTiempo) break;
       }
-      pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length });
+      pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length, concurrencia, segundos: Math.round((Date.now() - t0) / 1000) });
       return {
         facturas, descargados: facturas.length, fallidos,
         error: facturas.length ? undefined : "El endpoint directo no devolvió XML. Revisa CPE_XML_API_URL y el diagnóstico.",

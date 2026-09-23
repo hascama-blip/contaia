@@ -131,6 +131,51 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     } finally { setFilaBusy(null); }
   }
 
+  // MODO API — extrae TODA la relación en UNA sola llamada (el servidor baja los
+  // XML en paralelo, en lote). Es lo rápido para volúmenes grandes (1000+): no va
+  // fila por fila ni abre un navegador por comprobante.
+  async function extraerLoteApi() {
+    const solPass = getSolPass(clienteId);
+    const solUser = getSolUser(clienteId);
+    if (!solPass) { setError("Carga tu Clave SOL (arriba) para extraer."); return; }
+    setError(null); setInfo(null); setDiag(null);
+    setAuto(true);
+    // Marca todas las pendientes como "extrayendo".
+    setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado !== "ok") n[i] = { estado: "extrayendo" }; }); return n; });
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml-api`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solUser, solPass, relacion, periodo: periodoSire, diagnostico: diagModo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      if (res.status === 401) { setError(data.error ?? "Login SOL falló"); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "error", motivo: data.error }; }); return n; }); return; }
+      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas({}); return; }
+      if (!res.ok && !Array.isArray(data.facturas)) { setError(data.error ?? "No se pudo extraer."); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "pendiente" }; }); return n; }); return; }
+      // Mapear las facturas devueltas a sus filas por serie-número.
+      const norm = (s: any, num: any) => `${String(s || "").toUpperCase()}-${String(num || "").replace(/^0+/, "")}`;
+      const mapa = new Map<string, any>();
+      for (const f of (data.facturas ?? [])) {
+        const sn = String(f.serieNumero || `${f.serie}-${f.numero}`);
+        const [s, ...rest] = sn.split("-");
+        mapa.set(norm(s, rest.join("-")), f);
+      }
+      setFilas(() => {
+        const n: Record<number, EstadoFila> = {};
+        relacion.forEach((it, i) => {
+          const f = mapa.get(norm(it.serie, it.numero));
+          if (f) n[i] = { estado: "ok", factura: f };
+          else n[i] = { estado: "error", motivo: "SUNAT no devolvió este comprobante" };
+        });
+        return n;
+      });
+      setConsumido(true);
+      const ok = (data.facturas ?? []).length;
+      setInfo(`Extracción por API: ${ok}/${relacion.length} XML descargados${data.error ? ` · ${data.error}` : ""}.`);
+    } catch { setError("Error de red al extraer por API."); }
+    finally { setAuto(false); }
+  }
+
   // Extrae TODAS las pendientes, una por una con una pausa (ritmo humano).
   async function extraerTodas() {
     setAuto(true); setError(null);
@@ -269,9 +314,15 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         <>
           {/* Acciones globales */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button className="btn-primary text-sm" onClick={extraerTodas} disabled={auto || filaBusy !== null}>
-              {auto ? "Extrayendo todas…" : "▶ Extraer todas (una por una)"}
-            </button>
+            {apiMode ? (
+              <button className="btn-primary text-sm" onClick={extraerLoteApi} disabled={auto || filaBusy !== null}>
+                {auto ? "Extrayendo por API…" : "⚡ Extraer TODO por API (rápido, en paralelo)"}
+              </button>
+            ) : (
+              <button className="btn-primary text-sm" onClick={extraerTodas} disabled={auto || filaBusy !== null}>
+                {auto ? "Extrayendo todas…" : "▶ Extraer todas (una por una)"}
+              </button>
+            )}
             <span className="text-xs text-slate-500">{nOk}/{relacion.length} extraídos</span>
             {nOk > 0 && (
               <>
