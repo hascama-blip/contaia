@@ -77,7 +77,9 @@ export function estaCensado(a) {
   return e === "actualizado" || e === "verificado";
 }
 
-export function avanceCenso(asociados) {
+/** Avance de fichas. Los que vendieron todo (estado "transferido") ya no cuentan: son historial. */
+export function avanceCenso(todos) {
+  const asociados = todos.filter((a) => a.estado !== "transferido");
   const r = { total: asociados.length, actualizados: 0, verificados: 0, pendientes: 0, sinUbicar: 0 };
   for (const a of asociados) {
     const e = estadoCenso(a);

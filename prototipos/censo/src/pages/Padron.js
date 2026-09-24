@@ -57,13 +57,14 @@ export function Padron() {
             <tbody>
               ${lista.map((a) => {
                 const suyos = derivados.mapaStands.get(a.id) || [];
+                const vendidos = derivados.anteriores.get(a.id) || [];
                 const galerias = [...new Set(suyos.map((s) => nombreGaleria(s.galeria)))].join(", ");
                 return html`
                   <tr key=${a.id} className="clic" onClick=${() => ir(`ficha-${a.id}`)}>
                     <td className="num muted">${a.numero}</td>
                     <td className="fuerte"><a href=${`#ficha-${a.id}`} onClick=${(e) => e.stopPropagation()} style=${{ color: "inherit" }}>${nombreCompleto(a)}</a></td>
                     <td className="num">${a.dni}</td>
-                    <td className="num">${suyos.map((s) => s.codigo).join(", ") || "—"}</td>
+                    <td className="num">${suyos.map((s) => s.codigo).join(", ") || (vendidos.length ? html`<span className="muted">Vendió ${vendidos.join(", ")}</span>` : "—")}</td>
                     <td>${galerias || "—"}</td>
                     <td><${BadgeCenso} estado=${a.censo?.estado || "pendiente"} /></td>
                     <td><${BadgeAtraso} meses=${derivados.atraso(a).meses} /></td>

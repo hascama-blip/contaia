@@ -6,8 +6,9 @@ import { GALERIAS } from "../config.js";
 import { ESTADOS_STAND } from "../lib/types.js";
 import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar } from "../lib/padron.js";
 import { editarStand } from "../api/stands.js";
+import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 
-function PanelStand({ stand, onCerrar }) {
+function PanelStand({ stand, onCerrar, onTraspaso }) {
   const { avisar } = useApp();
   const [s, setS] = useState({
     giro: stand.giro || "",
@@ -52,6 +53,13 @@ function PanelStand({ stand, onCerrar }) {
           <${Campo} id="st-inq-dni" etiqueta="DNI del inquilino"><${Entrada} id="st-inq-dni" valor=${s.inquilino.dni} onCambio=${cambiaInq("dni")} inputMode="numeric" maxLength="8" /><//>
           <${Campo} id="st-inq-cel" etiqueta="Celular"><${Entrada} id="st-inq-cel" valor=${s.inquilino.celular} onCambio=${cambiaInq("celular")} tipo="tel" /><//>
         </div>`}
+      <div className="seccion-form">
+        <div className="historial-cab">
+          <h3>Propietarios del stand</h3>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${onTraspaso}>Registrar venta o traspaso</button>
+        </div>
+        <${HistorialPropietarios} stand=${stand} compacto />
+      </div>
     <//>`;
 }
 
@@ -59,6 +67,7 @@ export function Stands() {
   const { datos, derivados, puedeEscribir } = useApp();
   const [filtro, setFiltro] = useState({ texto: "", galeria: "", estado: "" });
   const [editando, setEditando] = useState(null);
+  const [traspaso, setTraspaso] = useState(null);
   const conteo = useMemo(() => {
     const c = { propietario: 0, alquilado: 0, cerrado: 0, litigio: 0 };
     for (const s of datos.stands) c[s.estado] = (c[s.estado] || 0) + 1;
@@ -103,12 +112,16 @@ export function Stands() {
             <tbody>
               ${lista.map((s) => {
                 const dueno = derivados.porId.get(s.propietarioId);
+                const anterior = s.historial?.[s.historial.length - 1];
                 return html`<tr key=${s.codigo} className=${puedeEscribir !== false ? "clic" : ""} onClick=${() => puedeEscribir !== false && setEditando(s)}>
                   <td className="fuerte num">${s.codigo}</td>
                   <td>${nombreGaleria(s.galeria)}</td>
                   <td className="der num">${s.area ? `${s.area} m²` : "—"}</td>
                   <td>${s.giro || "—"}</td>
-                  <td>${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>` : html`<span className="muted">Sin propietario</span>`}</td>
+                  <td>
+                    ${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>` : html`<span className="muted">Sin propietario</span>`}
+                    ${anterior && html`<span className="celda-sub">Antes: ${anterior.nombre}</span>`}
+                  </td>
                   <td>${s.inquilino?.nombre || "—"}</td>
                   <td><${BadgeStand} estado=${s.estado} /></td>
                 </tr>`;
@@ -117,8 +130,10 @@ export function Stands() {
           </table>
           ${!lista.length && html`<${Vacio}>Ningún stand coincide con el filtro.<//>`}
         </div>
-        <div className="tabla-pie"><span>${lista.length} de ${datos.stands.length} stands</span>${puedeEscribir !== false && html`<span>Toca un stand para editar giro, estado o inquilino</span>`}</div>
+        <div className="tabla-pie"><span>${lista.length} de ${datos.stands.length} stands</span>${puedeEscribir !== false && html`<span>Toca un stand para editar giro, inquilino o registrar su venta</span>`}</div>
       </section>
-      ${editando && html`<${PanelStand} stand=${editando} onCerrar=${() => setEditando(null)} />`}
+      ${editando && html`<${PanelStand} stand=${editando} onCerrar=${() => setEditando(null)}
+        onTraspaso=${() => { setTraspaso(editando); setEditando(null); }} />`}
+      ${traspaso && html`<${PanelTraspaso} stand=${traspaso} onCerrar=${() => setTraspaso(null)} />`}
     </div>`;
 }

@@ -40,10 +40,21 @@ El nombre visible sale del archivo (`Contrato_compraventa_A-02.pdf` →
 "Contrato compraventa A-02") y se puede renombrar. Acepta PDF, fotos y texto;
 Word/Excel no (se pide guardarlos como PDF).
 
+## Propietarios (ventas y traspasos)
+
+Un propietario anterior **nunca se borra**. "Registrar venta o traspaso" (en
+Stands o en la ficha) llama a `api/stands.js → transferirStand`: el dueño que
+sale pasa a `stand.historial` (`{asociadoId, nombre, dni, desde, hasta, motivo,
+documento, observacion, por, registradoAt}`, con nombre y DNI copiados) y el
+nuevo queda en `propietarioId` desde `propietarioDesde`. Si el anterior se
+queda sin stands, su ficha pasa a "Transferido" (sigue en el padrón, fuera del
+avance). La línea 1.º → 2.º → actual sale de `lib/propietarios.js`. Quitar un
+stand desde la ficha también deja el tramo en el historial.
+
 ## Datos
 
 Colecciones: `asociados`, `stands` (id = código, p. ej. `A-12`; el dueño está en
-`propietarioId`), `pagos` (id = `A-12_2026`, `registros["mantenimiento-09"]`),
+`propietarioId`, los anteriores en `historial`), `pagos` (id = `A-12_2026`, `registros["mantenimiento-09"]`),
 `incidencias`. Los registros con `ejemplo: true` se vacían desde **Reportes**.
 
 ## Tecnología

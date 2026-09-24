@@ -105,6 +105,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
             </div>
             ${deuda?.monto > 0 && html`<p className="burbuja-dato">Deuda vencida: <strong style=${{ color: "var(--peligro)" }}>${soles(deuda.monto)}</strong></p>`}
             ${stand.inquilino?.nombre && html`<p className="burbuja-dato">Inquilino: ${stand.inquilino.nombre}</p>`}
+            ${stand.historial?.length > 0 && html`<p className="burbuja-dato">${stand.historial.length + 1}.º propietario · antes: ${stand.historial[stand.historial.length - 1].nombre}</p>`}
             <div className="burbuja-acciones">
               <a className="btn btn-primary btn-sm" href=${`#ficha-${asociado.id}`}>Ver detalle</a>
               ${onVerificar && puedeEscribir !== false && html`<button className="btn btn-ghost btn-sm" onClick=${() => { cerrar(); onVerificar(activo.codigo); }}>Verificar aquí</button>`}

@@ -6,6 +6,8 @@ import { validarFicha, soloDigitos } from "../lib/validar.js";
 import { leerCodigos, galeriaDeCodigo } from "../lib/padron.js";
 import { ahoraISO, hoy } from "../lib/formato.js";
 import { subirArchivo } from "../lib/archivos.js";
+import { fichaVacia } from "../lib/types.js";
+import { tramoDeSalida } from "../lib/propietarios.js";
 
 class ErrorValidacion extends Error {
   constructor(errores) {
@@ -47,7 +49,7 @@ function limpiar(f) {
 }
 
 /** Asigna los stands al asociado (crea el stand si no existía) y libera los que dejó. */
-async function sincronizarStands(asociadoId, codigos, anteriores, extra, stands) {
+async function sincronizarStands(asociadoId, codigos, anteriores, extra, stands, { duenoActual = null, por = null } = {}) {
   for (const codigo of codigos) {
     const actual = stands.find((s) => s.codigo === codigo);
     if (actual) {
@@ -66,8 +68,14 @@ async function sincronizarStands(asociadoId, codigos, anteriores, extra, stands)
       });
     }
   }
-  for (const codigo of anteriores.filter((c) => !codigos.includes(c))) {
-    await db.actualizarStand(codigo, { propietarioId: null });
+  // Un stand que se quita de la ficha no pierde a su dueño: queda en el historial.
+  const quitados = anteriores.filter((c) => !codigos.includes(c));
+  if (!quitados.length) return;
+  const ahora = ahoraISO();
+  for (const codigo of quitados) {
+    const s = stands.find((x) => x.codigo === codigo) || {};
+    const tramo = tramoDeSalida(s, { ...duenoActual, id: asociadoId }, { hasta: hoy().iso, motivo: "Retirado de la ficha", por, ahora });
+    await db.actualizarStand(codigo, { propietarioId: null, propietarioDesde: null, historial: [...(s.historial || []), tramo] });
   }
 }
 
@@ -107,7 +115,7 @@ export async function actualizarFicha(id, ficha, { asociados, stands, standsActu
   const limpio = limpiar(ficha);
   await db.actualizarAsociado(id, { ...limpio, actualizadoAt: ahoraISO(), actualizadoPor: por || null });
   const { validos } = leerCodigos(ficha.standsTexto);
-  await sincronizarStands(id, validos, standsActuales.map((s) => s.codigo), null, stands);
+  await sincronizarStands(id, validos, standsActuales.map((s) => s.codigo), null, stands, { duenoActual: { ...asociados.find((a) => a.id === id), ...limpio }, por });
 }
 
 export async function cambiarEstadoCenso(id, estado, { por } = {}) {
@@ -135,4 +143,25 @@ export async function adjuntarArchivo(id, tipo, archivo) {
   const { id: archivoId, url } = await subirArchivo(archivo);
   if (id) await db.actualizarAsociado(id, { archivos: { [tipo]: archivoId }, actualizadoAt: ahoraISO() });
   return { archivoId, url };
+}
+
+/**
+ * Alta rápida (nuevo comprador de un stand): solo identificación y contacto.
+ * La ficha completa se llena después desde el padrón.
+ * @returns {Promise<string>} id del asociado
+ */
+export async function crearAsociadoBasico(datos, { asociados, por, nota }) {
+  const ficha = { ...fichaVacia(), ...datos, standsTexto: undefined };
+  const errores = validarFicha(ficha, { asociados });
+  if (Object.keys(errores).length) throw new ErrorValidacion(errores);
+  const id = await db.nuevoId("asociados");
+  const ahora = ahoraISO();
+  await db.guardarAsociado(id, {
+    ...limpiar(ficha),
+    observaciones: nota || "",
+    censo: { estado: "pendiente", fecha: null, visita: null, por: por || null },
+    creadoAt: ahora,
+    actualizadoAt: ahora,
+  });
+  return id;
 }

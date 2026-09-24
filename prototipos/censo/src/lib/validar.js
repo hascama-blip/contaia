@@ -44,7 +44,7 @@ export function validarFicha(f, { asociados = [], stands = [], idActual = null }
         .find((s) => s && s.propietarioId && s.propietarioId !== idActual);
       if (ocupado) {
         const dueno = asociados.find((a) => a.id === ocupado.propietarioId);
-        e.stands = `El stand ${ocupado.codigo} ya figura a nombre de ${nombreCompleto(dueno)}. Si cambió de dueño, regístralo primero como transferido.`;
+        e.stands = `El stand ${ocupado.codigo} ya figura a nombre de ${nombreCompleto(dueno)}. Si lo vendió, usa «Registrar venta o traspaso» en Stands; el anterior queda en el historial.`;
       }
     }
   }
@@ -70,5 +70,19 @@ export function validarIncidencia(i) {
   if (!i.gravedad) e.gravedad = "Elige la gravedad.";
   if (!i.medida) e.medida = "Indica la medida adoptada.";
   if (i.responsable === "inquilino" && !String(i.involucrado || "").trim()) e.involucrado = "Escribe el nombre del inquilino.";
+  return e;
+}
+
+/** Venta o traspaso de un stand. `nueva` = datos mínimos si el comprador no está en el padrón. */
+export function validarTraspaso(t, { stand, hoyIso }) {
+  const e = {};
+  if (!t.fecha) e.fecha = "Indica la fecha de la venta o traspaso.";
+  else if (hoyIso && t.fecha > hoyIso) e.fecha = "La fecha no puede ser futura.";
+  else if (stand?.propietarioDesde && t.fecha < stand.propietarioDesde) e.fecha = "La fecha es anterior a la del propietario actual.";
+  if (!t.motivo) e.motivo = "Elige el motivo.";
+  if (t.modo === "existente") {
+    if (!t.nuevoId) e.nuevoId = "Busca y elige al nuevo propietario.";
+    else if (t.nuevoId === stand?.propietarioId) e.nuevoId = "Esa persona ya es la propietaria actual.";
+  }
   return e;
 }

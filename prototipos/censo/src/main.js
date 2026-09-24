@@ -19,6 +19,7 @@ import { conectarArchivos } from "./lib/archivos.js";
 import { conectarDescargas } from "./lib/exportar.js";
 import { usuarioActual } from "./lib/usuario.js";
 import { standsPorAsociado } from "./lib/padron.js";
+import { anterioresPorAsociado } from "./lib/propietarios.js";
 import { indicePagos, standsMorosos, atrasoAsociado } from "./lib/pagos.js";
 import { hoy } from "./lib/formato.js";
 import { INSTITUCION } from "./config.js";
@@ -93,6 +94,7 @@ function App() {
     return {
       h,
       mapaStands,
+      anteriores: anterioresPorAsociado(datos.stands),
       porId: new Map(datos.asociados.map((a) => [a.id, a])),
       indicePagos: idx,
       morosos: standsMorosos(datos.stands, idx, h.anio, h),

@@ -52,3 +52,6 @@ export const LISTAS = {
 
 // Regla de estatutos: cuántas llamadas de atención en 12 meses disparan la alerta.
 export const LIMITE_INCIDENCIAS = 3;
+
+// Motivos de cambio de propietario de un stand (el anterior queda en el historial).
+export const MOTIVOS_TRASPASO = ["Compraventa", "Herencia (sucesión)", "Donación o anticipo de legítima", "Adjudicación judicial", "Otro"];

@@ -6,11 +6,13 @@ import { FotoCampo, ArchivoCampo, FirmaCampo } from "../components/Archivos.js";
 import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
 import { PanelIncidencia } from "../components/Incidencias.js";
 import { Documentos } from "../components/Documentos.js";
+import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
 import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
 import { registrosDe, deudaStand } from "../lib/pagos.js";
 import { incidenciasDe } from "../lib/incidencias.js";
+import { standsAnteriores } from "../lib/propietarios.js";
 import { fecha, soles } from "../lib/formato.js";
 import { nombresDe } from "../lib/usuario.js";
 import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo } from "../api/asociados.js";
@@ -19,7 +21,7 @@ import { pdfFicha, descargar } from "../lib/exportar.js";
 const PESTANAS = [
   ["datos", "Datos personales"],
   ["familia", "Familia"],
-  ["stands", "Stands e inquilinos"],
+  ["stands", "Stands e historial"],
   ["pagos", "Pagos"],
   ["incidencias", "Incidencias"],
   ["huella", "Huella y firma"],
@@ -61,6 +63,7 @@ export function Ficha({ id }) {
   }, [a?.censo?.por]);
 
   const incidencias = useMemo(() => incidenciasDe(id, datos.incidencias), [id, datos.incidencias]);
+  const anteriores = useMemo(() => standsAnteriores(id, datos.stands, derivados.porId), [id, datos.stands, derivados.porId]);
 
   if (!a || !ficha) {
     return html`<div className="pagina"><${CabPagina} miga=${{ href: "#padron", texto: "Padrón" }} titulo="Ficha no encontrada"
@@ -115,16 +118,33 @@ export function Ficha({ id }) {
     familia: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false}
       bloqueado=${!editable} secciones=${["conyuge", "hijos", "familiares"]} />`,
     stands: html`
-      ${!stands.length && html`<${Vacio}>Sin stands asignados.<//>`}
+      ${!stands.length && html`<${Vacio}>${anteriores.length ? "Hoy no tiene stands a su nombre." : "Sin stands asignados."}<//>`}
       ${stands.length > 0 && html`
         <div className="tabla-caja"><table className="tabla">
-          <thead><tr><th>Stand</th><th>Galería</th><th>Área</th><th>Giro</th><th>Inquilino actual</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Stand</th><th>Galería</th><th>Área</th><th>Giro</th><th>Inquilino actual</th><th>Estado</th>${editable && html`<th></th>`}</tr></thead>
           <tbody>${stands.map((s) => html`<tr key=${s.codigo}>
             <td className="fuerte num">${s.codigo}</td><td>${nombreGaleria(s.galeria)}</td>
             <td className="num">${s.area ? `${s.area} m²` : "—"}</td><td>${s.giro || "—"}</td>
-            <td>${s.inquilino?.nombre || "—"}</td><td><${BadgeStand} estado=${s.estado} /></td></tr>`)}</tbody>
+            <td>${s.inquilino?.nombre || "—"}</td><td><${BadgeStand} estado=${s.estado} /></td>
+            ${editable && html`<td><button className="btn btn-ghost btn-sm" onClick=${() => setPanel({ tipo: "traspaso", stand: s })}>Registrar venta</button></td>`}</tr>`)}</tbody>
         </table></div>
-        <p className="ayuda" style=${{ marginTop: 10 }}>Para cambiar el giro, el estado o el inquilino, entra a <a href="#stands">Stands</a>. Para asignar o quitar stands, edita el campo "N° de stand" en Datos personales.</p>`}`,
+        <p className="ayuda" style=${{ marginTop: 10 }}>Si vendió o traspasó un stand, usa <strong>Registrar venta</strong>: el nuevo dueño queda como propietario y esta persona pasa al historial (no se borra). Giro e inquilino se cambian en <a href="#stands">Stands</a>.</p>
+        <h3 className="subtitulo-ficha">Propietarios de cada stand</h3>
+        ${stands.map((s) => html`<div key=${s.codigo} className="historial-stand">
+          <div className="historial-cab"><h3>Stand ${s.codigo}</h3></div>
+          <${HistorialPropietarios} stand=${s} compacto />
+        </div>`)}`}
+      ${anteriores.length > 0 && html`
+        <h3 className="subtitulo-ficha">Stands que tuvo antes</h3>
+        <div className="tabla-caja"><table className="tabla">
+          <thead><tr><th>Stand</th><th>Fue propietario</th><th>Motivo</th><th>Pasó a</th></tr></thead>
+          <tbody>${anteriores.map(({ stand: s, tramo, siguiente }) => html`<tr key=${`${s.codigo}-${tramo.hasta}`}>
+            <td className="fuerte num">${s.codigo}</td>
+            <td>${tramo.desde ? `${fecha(tramo.desde)} – ` : "Hasta "}${fecha(tramo.hasta)}</td>
+            <td>${tramo.motivo}${tramo.documento ? html`<span className="celda-sub">${tramo.documento}</span>` : ""}</td>
+            <td>${siguiente?.asociado ? html`<a href=${`#ficha-${siguiente.asociado.id}`}>${siguiente.nombre}</a>` : siguiente?.nombre || html`<span className="muted">Sin propietario</span>`}</td>
+          </tr>`)}</tbody>
+        </table></div>`}`,
     pagos: html`
       <div style=${{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <${Leyenda} />
@@ -198,6 +218,7 @@ export function Ficha({ id }) {
       <${Documentos} asociado=${a} />
 
       ${panel?.tipo === "pago" && html`<${PanelPago} inicial=${{ ...panel, anio: derivados.h.anio }} stands=${stands} onCerrar=${() => setPanel(null)} />`}
+      ${panel?.tipo === "traspaso" && html`<${PanelTraspaso} stand=${panel.stand} onCerrar=${() => setPanel(null)} />`}
       ${panel?.tipo === "incidencia" && html`<${PanelIncidencia} inicial=${{ asociadoId: id, stand: stands[0]?.codigo }} onCerrar=${() => setPanel(null)} />`}
     </div>`;
 }
