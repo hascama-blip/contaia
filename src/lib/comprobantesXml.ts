@@ -868,30 +868,41 @@ interface PeticionXml { url: string; metodo: string; body?: string; headers?: Re
  *  hace rápida la extracción masiva: N descargas concurrentes en una sola
  *  llamada, sin abrir navegador por comprobante ni consultar de a uno.
  *  Soporta GET o POST con cuerpo/cabeceras (según lo que revele la captura). */
-async function fetchXmlLote(runner: any, peticiones: PeticionXml[], concurrencia: number, credentials: string = "include"): Promise<string[]> {
-  return (await runner.evaluate(async ({ peticiones, concurrencia, credentials }: { peticiones: PeticionXml[]; concurrencia: number; credentials: string }) => {
-    const out: string[] = new Array(peticiones.length).fill("");
+interface RespXml { b64: string; status: number }
+async function fetchXmlLote(runner: any, peticiones: PeticionXml[], concurrencia: number, credentials: string = "include", reintentos: number = 2): Promise<RespXml[]> {
+  return (await runner.evaluate(async ({ peticiones, concurrencia, credentials, reintentos }: { peticiones: PeticionXml[]; concurrencia: number; credentials: string; reintentos: number }) => {
+    const out: RespXml[] = peticiones.map(() => ({ b64: "", status: 0 }));
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     let i = 0;
     async function worker() {
       while (i < peticiones.length) {
         const idx = i++;
         const p = peticiones[idx];
-        try {
-          const init: any = { method: p.metodo || "GET", credentials };
-          if (p.headers) init.headers = p.headers;
-          if (p.body != null && p.metodo !== "GET") init.body = p.body;
-          const r = await fetch(p.url, init);
-          if (!r.ok) continue;
-          const b = await r.arrayBuffer(); const by = new Uint8Array(b);
-          let s = ""; const CH = 0x8000;
-          for (let k = 0; k < by.length; k += CH) s += String.fromCharCode.apply(null, Array.from(by.subarray(k, k + CH)) as any);
-          out[idx] = btoa(s);
-        } catch { /* deja "" */ }
+        // Reintenta ante 5xx/429/red (SUNAT se satura con XML grandes en ráfaga);
+        // no reintenta 4xx (404 = no existe). Backoff creciente + jitter.
+        for (let intento = 0; intento <= reintentos; intento++) {
+          try {
+            const init: any = { method: p.metodo || "GET", credentials };
+            if (p.headers) init.headers = p.headers;
+            if (p.body != null && p.metodo !== "GET") init.body = p.body;
+            const r = await fetch(p.url, init);
+            out[idx].status = r.status;
+            if (r.ok) {
+              const b = await r.arrayBuffer(); const by = new Uint8Array(b);
+              let s = ""; const CH = 0x8000;
+              for (let k = 0; k < by.length; k += CH) s += String.fromCharCode.apply(null, Array.from(by.subarray(k, k + CH)) as any);
+              out[idx].b64 = btoa(s);
+              break;
+            }
+            if (r.status < 500 && r.status !== 429) break; // 4xx definitivo
+          } catch { if (!out[idx].status) out[idx].status = -1; }
+          if (intento < reintentos) await sleep(600 * (intento + 1) + Math.floor(Math.random() * 400));
+        }
       }
     }
     await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, peticiones.length)) }, worker));
     return out;
-  }, { peticiones, concurrencia, credentials }).catch(() => peticiones.map(() => ""))) as string[];
+  }, { peticiones, concurrencia, credentials, reintentos }).catch(() => peticiones.map(() => ({ b64: "", status: 0 })))) as RespXml[];
 }
 
 /** Rellena una plantilla (URL o body) con los datos del comprobante. */
@@ -1062,35 +1073,59 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
       const facturas: FacturaXml[] = [];
       const fallidos: { item: ItemRelacion; motivo: string }[] = [];
       const t0 = Date.now();
-      // Se procesa por bloques para acotar memoria en volúmenes grandes (1000+),
-      // pero cada bloque baja en paralelo (concurrencia N).
       const TAM_BLOQUE = 200;
-      for (let ini = 0; ini < relacion.length; ini += TAM_BLOQUE) {
-        const bloque = relacion.slice(ini, ini + TAM_BLOQUE);
-        const peticiones: PeticionXml[] = bloque.map((it) => ({
-          url: urlComprobante(endpointDirecto, params.ruc, it, params.periodo),
-          metodo,
-          body: bodyTpl ? rellenarPlantilla(bodyTpl, params.ruc, it, params.periodo) : undefined,
-          headers: headersBase,
-        }));
-        const textos = await fetchXmlLote(frameRun, peticiones, concurrencia, cred);
-        for (let j = 0; j < bloque.length; j++) {
-          const item = bloque[j];
-          const xmls = xmlsDeRespuesta(textos[j], esZip, extraerTodo);
-          if (!xmls.length) { fallidos.push({ item, motivo: "el endpoint no devolvió XML (revisar clave o token)" }); continue; }
-          let ok = false;
-          for (const x of xmls) {
-            const fx = parseFacturaXml(x);
-            if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
-          }
-          if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
+
+      // Parsea la respuesta y agrega a `facturas` si es un XML de comprobante.
+      const agregar = (b64: string): boolean => {
+        for (const x of xmlsDeRespuesta(b64, esZip, extraerTodo)) {
+          const fx = parseFacturaXml(x);
+          if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); return true; }
         }
-        if (cerradoPorTiempo) break;
+        return false;
+      };
+      // ¿El fallo es reintentable? 5xx/429/red = SUNAT saturado (sí); 4xx = no.
+      const reintentable = (st: number) => st <= 0 || st === 429 || st >= 500;
+      // Una pasada por bloques; devuelve los pendientes por error de servidor.
+      const correrPasada = async (items: ItemRelacion[], conc: number, reint: number): Promise<ItemRelacion[]> => {
+        const pend: ItemRelacion[] = [];
+        for (let ini = 0; ini < items.length && !cerradoPorTiempo; ini += TAM_BLOQUE) {
+          const bloque = items.slice(ini, ini + TAM_BLOQUE);
+          const peticiones: PeticionXml[] = bloque.map((it) => ({
+            url: urlComprobante(endpointDirecto, params.ruc, it, params.periodo),
+            metodo,
+            body: bodyTpl ? rellenarPlantilla(bodyTpl, params.ruc, it, params.periodo) : undefined,
+            headers: headersBase,
+          }));
+          const res = await fetchXmlLote(frameRun, peticiones, conc, cred, reint);
+          for (let j = 0; j < bloque.length; j++) {
+            const item = bloque[j];
+            const { b64, status } = res[j];
+            if (b64) { if (!agregar(b64)) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" }); continue; }
+            if (reintentable(status)) pend.push(item);
+            else fallidos.push({ item, motivo: `SUNAT respondió ${status} (comprobante no disponible por API).` });
+          }
+        }
+        return pend;
+      };
+
+      // 1ª pasada rápida; 2ª pasada SUAVE (poca concurrencia, más reintentos) para
+      // los que SUNAT devolvió 500 por carga → así se recuperan casi todos.
+      const pend1 = await correrPasada(relacion, concurrencia, 2);
+      let recuperados = 0;
+      let pendFinal: ItemRelacion[] = [];
+      if (pend1.length && !cerradoPorTiempo) {
+        const antes = facturas.length;
+        pendFinal = await correrPasada(pend1, Math.min(3, concurrencia), 3);
+        recuperados = facturas.length - antes;
+        for (const item of pendFinal) fallidos.push({ item, motivo: "SUNAT devolvió error 500 varias veces (su plataforma no entregó este XML; reintenta más tarde)." });
       }
-      pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length, concurrencia, segundos: Math.round((Date.now() - t0) / 1000) });
+      pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length, fallidos: fallidos.length, reintentados: pend1.length, recuperados, concurrencia, segundos: Math.round((Date.now() - t0) / 1000) });
+      const faltan = relacion.length - facturas.length;
       return {
         facturas, descargados: facturas.length, fallidos,
-        error: facturas.length ? undefined : "El endpoint directo no devolvió XML. Reintenta o revisa el Modo diagnóstico.",
+        error: facturas.length
+          ? (faltan > 0 ? `Descargados ${facturas.length} de ${relacion.length}. ${faltan} no los entregó SUNAT (error 500 en su plataforma); reintenta esos más tarde.` : undefined)
+          : "SUNAT no entregó ningún XML (respondió error en su plataforma). Reintenta en unos minutos o revisa el Modo diagnóstico.",
         diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
       };
     }
