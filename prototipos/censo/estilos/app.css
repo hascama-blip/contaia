@@ -471,3 +471,16 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .logro-escala span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .logro-escala span:last-child { transform: translateX(-100%); }
 .logro-escala span.hecho { color: var(--ok); font-weight: 700; }
+
+/* Plano en azul marino (como el tema oscuro), aunque la página sea blanca. */
+.plano-azul {
+  --superficie: #0f1d33; --superficie-2: #13243e; --borde: #1f3350; --borde-fuerte: #2c4568;
+  --texto: #e2e8f0; --texto-2: #cbd5e1; --texto-3: #94a3b8; --texto-4: #6b7f99;
+  --primario: #3f6ca8; --primario-hover: #4f7cb8; --enlace: #8fb3e3;
+  --ok: #6ee7b7; --ok-fondo: #0c3a2e; --alerta: #fcd34d; --alerta-fondo: #3d2e0a;
+  --peligro: #fca5a5; --peligro-fondo: #43161a; --info: #8fb3e3; --info-fondo: #13294a;
+  --neutro-fondo: #172a45; --pasillo: #0a1628;
+  color-scheme: dark; color: var(--texto);
+  background: #0b1628; border-radius: var(--radio); padding: 14px;
+}
+.plano-azul .leyenda { color: var(--texto-3); }

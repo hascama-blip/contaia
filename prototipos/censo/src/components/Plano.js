@@ -116,7 +116,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
   })();
 
   return html`
-    <div>
+    <div className="plano-azul">
       <div className="plano-caja">
         <div className="plano-lienzo" ref=${caja}>
           <svg ref=${svg} viewBox=${`0 0 ${PLANO.ancho} ${PLANO.alto}`} className="plano" role="img"
