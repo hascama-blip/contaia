@@ -494,3 +494,8 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .desplegable-flecha { width: 10px; height: 10px; border-right: 2px solid var(--texto-3); border-bottom: 2px solid var(--texto-3); transform: rotate(45deg); transition: transform 0.15s; flex-shrink: 0; margin-right: 4px; }
 .desplegable[open] .desplegable-flecha { transform: rotate(-135deg); }
 .desplegable > summary:hover .card-titulo { color: var(--enlace); }
+.grupo > summary { cursor: pointer; list-style: none; align-items: center; }
+.grupo > summary::-webkit-details-marker { display: none; }
+.grupo > summary:hover { color: var(--texto); }
+.grupo-flecha { display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
+.grupo[open] .grupo-flecha { transform: rotate(45deg); }

@@ -141,15 +141,15 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
         </summary>
         <div className="campo-lista">
           ${grupos.map((g) => html`
-            <div key=${g.id}>
-              <div className="grupo-titulo"><span>${g.nombre}</span><span className="num">${g.filas.length}</span></div>
+            <details key=${g.id + (texto.trim() ? "-busqueda" : "")} className="grupo" open=${Boolean(texto.trim())}>
+              <summary className="grupo-titulo"><span><span className="grupo-flecha" aria-hidden="true"></span>${g.nombre}</span><span className="num">${g.filas.length}</span></summary>
               ${g.filas.map(({ stand, asociado }) => html`
                 <button key=${stand.codigo} className="campo-item" onClick=${() => setAbierto(stand.codigo)}>
                   <span className="campo-stand">${stand.codigo}</span>
                   <span className="campo-nombre">${nombreCompleto(asociado)}<small>${asociado.censo?.visita ? `Visita ${fecha(asociado.censo.visita)}` : `DNI ${asociado.dni}`}</small></span>
                   <${BadgeCenso} estado=${estadoCenso(asociado)} />
                 </button>`)}
-            </div>`)}
+            </details>`)}
           ${!grupos.length && html`<${Vacio}>${soloPendientes ? "No quedan stands pendientes con ese filtro." : "Ningún stand coincide."}<//>`}
         </div>
       </details>
