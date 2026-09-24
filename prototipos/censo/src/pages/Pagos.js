@@ -13,6 +13,7 @@ export function Pagos({ stand: standRuta }) {
   const { h, indicePagos, morosos, porId } = derivados;
   const [anio, setAnio] = useState(h.anio);
   const [panel, setPanel] = useState(null);
+  const [galAbierta, setGalAbierta] = useState(null);
   const ordenados = useMemo(() => [...datos.stands].sort((a, b) => compararCodigos(a.codigo, b.codigo)), [datos.stands]);
   const codigo = standRuta && ordenados.some((s) => s.codigo === standRuta) ? standRuta : morosos[0]?.stand.codigo || ordenados[0]?.codigo;
   const stand = ordenados.find((s) => s.codigo === codigo);
@@ -61,12 +62,31 @@ export function Pagos({ stand: standRuta }) {
       </section>
 
       <div className="rejilla r-2">
-        <${Tarjeta} titulo="Morosidad por galería" sub=${`Cuotas vencidas hasta ${h.mes > 1 ? "el mes pasado" : "hoy"}`} sinCuerpo>
+        <${Tarjeta} titulo="Morosidad por galería" sub=${`Cuotas vencidas hasta ${h.mes > 1 ? "el mes pasado" : "hoy"}. Toca una galería para ver sus morosos.`} sinCuerpo>
           <div className="tabla-caja" style=${{ marginTop: 10 }}>
             <table className="tabla">
               <thead><tr><th>Galería</th><th className="der">Stands morosos</th><th className="der">Deuda</th></tr></thead>
               <tbody>
-                ${moro.filas.map((f) => html`<tr key=${f.id}><td>${f.nombre}</td><td className="der num">${f.morosos}</td><td className="der num">${soles(f.deuda)}</td></tr>`)}
+                ${moro.filas.map((f) => {
+                  const abierta = galAbierta === f.id;
+                  const suyos = morosos.filter((m) => m.stand.galeria === f.id);
+                  return html`
+                    <tr key=${f.id} className=${f.morosos ? "clic" : ""} aria-expanded=${f.morosos ? abierta : undefined}
+                      onClick=${() => f.morosos && setGalAbierta(abierta ? null : f.id)}>
+                      <td><span className=${`grupo-flecha${abierta ? " abierta" : ""}`} style=${{ visibility: f.morosos ? "visible" : "hidden" }} aria-hidden="true"></span>${f.nombre}</td>
+                      <td className="der num">${f.morosos}</td><td className="der num">${soles(f.deuda)}</td>
+                    </tr>
+                    ${abierta && suyos.map((m) => {
+                      const d = porId.get(m.stand.propietarioId);
+                      return html`<tr key=${`${f.id}-${m.stand.codigo}`} className="fila-detalle">
+                        <td><span className="num fuerte">${m.stand.codigo}</span> · ${d ? nombreCompleto(d) : "Sin propietario"}
+                          <br /><span style=${{ display: "inline-flex", gap: 8, alignItems: "center", marginTop: 4 }}><${BadgeAtraso} meses=${m.deuda.meses} />
+                          ${d && html`<a href=${`#ficha-${d.id}`} onClick=${(e) => e.stopPropagation()}>Ver detalle</a>`}
+                          <a href=${`#pagos-${m.stand.codigo}`} onClick=${(e) => e.stopPropagation()}>Ver pagos</a></span></td>
+                        <td></td><td className="der num">${soles(m.deuda.monto)}</td>
+                      </tr>`;
+                    })}`;
+                })}
                 <tr><td className="fuerte">Total por cobrar</td><td className="der num fuerte">${moro.morosos}</td><td className="der num fuerte" style=${{ color: "var(--peligro)" }}>${soles(moro.total)}</td></tr>
               </tbody>
             </table>

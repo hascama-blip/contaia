@@ -16,6 +16,7 @@ p { margin: 0; }
 a { color: var(--enlace); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
+table { color: inherit; font-size: inherit; }
 :focus-visible { outline: 2px solid var(--brand-400); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 .muted { color: var(--texto-3); }
@@ -499,3 +500,6 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .grupo > summary:hover { color: var(--texto); }
 .grupo-flecha { display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
 .grupo[open] .grupo-flecha { transform: rotate(45deg); }
+.grupo-flecha.abierta { transform: rotate(45deg); }
+.tabla .fila-detalle td { background: var(--superficie-2); font-size: var(--t-sm); padding-left: 34px; }
+.tabla .fila-detalle td + td { padding-left: 14px; }

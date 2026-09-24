@@ -37,3 +37,8 @@ export function incidenciasDe(asociadoId, incidencias) {
 export function abiertas(incidencias) {
   return incidencias.filter((i) => i.estado !== "cerrada");
 }
+
+/** "propietario" | "inquilino". Registros antiguos: se deduce del texto del involucrado. */
+export function responsableDe(i) {
+  return i.responsable || (/inquilin/i.test(i.involucrado || "") ? "inquilino" : "propietario");
+}

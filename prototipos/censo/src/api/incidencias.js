@@ -13,6 +13,7 @@ export async function registrarIncidencia(i, { por } = {}) {
     asociadoId: i.asociadoId,
     stand: i.stand || "",
     involucrado: String(i.involucrado || "").trim(),
+    responsable: i.responsable === "inquilino" ? "inquilino" : "propietario",
     tipo: i.tipo,
     gravedad: i.gravedad,
     medida: i.medida,

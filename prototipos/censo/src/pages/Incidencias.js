@@ -1,17 +1,29 @@
 // Llamadas de atención e incidencias: registro formal de hechos.
-import { html, useState, useMemo } from "../components/html.js";
+import { html, useState, useMemo, useEffect } from "../components/html.js";
+import { Badge } from "../components/ui.js";
+import { nombresDe } from "../lib/usuario.js";
 import { CabPagina, Tarjeta, BadgeGravedad, Vacio, mensajeError } from "../components/ui.js";
 import { PanelIncidencia } from "../components/Incidencias.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_INCIDENCIA } from "../lib/types.js";
 import { LIMITE_INCIDENCIAS } from "../config.js";
-import { alertasReincidencia, conteoPorTipo, ordenarRecientes } from "../lib/incidencias.js";
+import { alertasReincidencia, conteoPorTipo, ordenarRecientes, responsableDe } from "../lib/incidencias.js";
 import { nombreCompleto, normalizar } from "../lib/padron.js";
-import { fecha } from "../lib/formato.js";
+import { fecha, fechaHora } from "../lib/formato.js";
 import { cambiarEstadoIncidencia } from "../api/incidencias.js";
 
 export function Incidencias() {
-  const { datos, derivados, puedeEscribir, avisar } = useApp();
+  const { datos, derivados, puedeEscribir, avisar, usuario } = useApp();
+  // Autor de cada incidencia: se guarda el id y el nombre se resuelve al mostrar.
+  const [autores, setAutores] = useState({});
+  const idsAutores = [...new Set(datos.incidencias.map((i) => i.por).filter(Boolean))].sort().join(",");
+  useEffect(() => {
+    if (idsAutores) nombresDe(idsAutores.split(",")).then(setAutores).catch(() => {});
+  }, [idsAutores]);
+  const autor = (i) => {
+    if (!i.por) return i.ejemplo ? "Dato de ejemplo" : "Sin registro";
+    return autores[i.por] || (i.por === usuario?.id && usuario?.nombre) || "Usuario del portal";
+  };
   const { h, porId } = derivados;
   const [panel, setPanel] = useState(false);
   const [filtro, setFiltro] = useState("");
@@ -60,14 +72,17 @@ export function Incidencias() {
           </div>
           <div className="tabla-caja">
             <table className="tabla">
-              <thead><tr><th>Fecha</th><th>Involucrado / stand</th><th>Tipo</th><th>Gravedad</th><th>Medida adoptada</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Involucrado / stand</th><th>Tipo</th><th>Gravedad</th><th>Medida adoptada</th><th>Registrado por</th><th>Estado</th></tr></thead>
               <tbody>
                 ${lista.map((i) => html`<tr key=${i.id}>
                   <td className="num">${fecha(i.fecha)}</td>
-                  <td><a href=${`#ficha-${i.asociadoId}`}>${i.involucrado || nombreCompleto(porId.get(i.asociadoId))}</a><br /><span className="muted num" style=${{ fontSize: "var(--t-xs)" }}>${i.stand}</span></td>
+                  <td><a href=${`#ficha-${i.asociadoId}`}>${i.involucrado || nombreCompleto(porId.get(i.asociadoId))}</a><br /><span style=${{ display: "inline-flex", gap: 6, alignItems: "center", marginTop: 3 }}>
+                    <${Badge} tono=${responsableDe(i) === "inquilino" ? "alerta" : "neutro"}>${responsableDe(i) === "inquilino" ? "Inquilino" : "Propietario"}<//>
+                    <span className="muted num" style=${{ fontSize: "var(--t-xs)" }}>${i.stand}</span></span></td>
                   <td>${i.tipo}${i.detalle && html`<br /><span className="muted" style=${{ fontSize: "var(--t-xs)" }}>${i.detalle}</span>`}</td>
                   <td><${BadgeGravedad} estado=${i.gravedad} /></td>
                   <td>${i.medida}</td>
+                  <td>${autor(i)}${i.creadoAt && html`<br /><span className="muted num" style=${{ fontSize: "var(--t-xs)" }}>${fechaHora(i.creadoAt)}</span>`}</td>
                   <td>${editable
                     ? html`<label className="sr" htmlFor=${`inc-e-${i.id}`}>Estado</label>
                       <select id=${`inc-e-${i.id}`} className="input" style=${{ minHeight: 32, padding: "4px 8px", fontSize: "var(--t-xs)" }} value=${i.estado} onChange=${(e) => estado(i.id, e.target.value)}>

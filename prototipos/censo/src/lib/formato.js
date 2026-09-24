@@ -48,3 +48,10 @@ export function haceCuanto(ms) {
 export function porcentaje(parte, total) {
   return total ? Math.round((parte / total) * 100) : 0;
 }
+
+/** ISO con hora → "24/09/2026 11:05" en la hora local de quien mira. */
+export function fechaHora(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

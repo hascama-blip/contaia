@@ -69,5 +69,6 @@ export function validarIncidencia(i) {
   if (!i.tipo) e.tipo = "Elige el tipo.";
   if (!i.gravedad) e.gravedad = "Elige la gravedad.";
   if (!i.medida) e.medida = "Indica la medida adoptada.";
+  if (i.responsable === "inquilino" && !String(i.involucrado || "").trim()) e.involucrado = "Escribe el nombre del inquilino.";
   return e;
 }
