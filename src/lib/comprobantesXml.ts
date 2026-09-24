@@ -849,6 +849,7 @@ function urlComprobante(plantilla: string, ruc: string, item: ItemRelacion, peri
     tipo: item.tipo,
     serie: item.serie,
     numero: item.numero,
+    numeroSc: String(item.numero).replace(/^0+/, "") || "0",
     numeroPad: String(item.numero).replace(/^0+/, "").padStart(8, "0"),
     periodo: periodo || "",
     fecha: item.fecha || "",
@@ -867,8 +868,8 @@ interface PeticionXml { url: string; metodo: string; body?: string; headers?: Re
  *  hace rápida la extracción masiva: N descargas concurrentes en una sola
  *  llamada, sin abrir navegador por comprobante ni consultar de a uno.
  *  Soporta GET o POST con cuerpo/cabeceras (según lo que revele la captura). */
-async function fetchXmlLote(page: any, peticiones: PeticionXml[], concurrencia: number): Promise<string[]> {
-  return (await page.evaluate(async ({ peticiones, concurrencia }: { peticiones: PeticionXml[]; concurrencia: number }) => {
+async function fetchXmlLote(runner: any, peticiones: PeticionXml[], concurrencia: number, credentials: string = "include"): Promise<string[]> {
+  return (await runner.evaluate(async ({ peticiones, concurrencia, credentials }: { peticiones: PeticionXml[]; concurrencia: number; credentials: string }) => {
     const out: string[] = new Array(peticiones.length).fill("");
     let i = 0;
     async function worker() {
@@ -876,7 +877,7 @@ async function fetchXmlLote(page: any, peticiones: PeticionXml[], concurrencia: 
         const idx = i++;
         const p = peticiones[idx];
         try {
-          const init: any = { method: p.metodo || "GET", credentials: "include" };
+          const init: any = { method: p.metodo || "GET", credentials };
           if (p.headers) init.headers = p.headers;
           if (p.body != null && p.metodo !== "GET") init.body = p.body;
           const r = await fetch(p.url, init);
@@ -890,7 +891,7 @@ async function fetchXmlLote(page: any, peticiones: PeticionXml[], concurrencia: 
     }
     await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, peticiones.length)) }, worker));
     return out;
-  }, { peticiones, concurrencia }).catch(() => peticiones.map(() => ""))) as string[];
+  }, { peticiones, concurrencia, credentials }).catch(() => peticiones.map(() => ""))) as string[];
 }
 
 /** Rellena una plantilla (URL o body) con los datos del comprobante. */
@@ -901,6 +902,7 @@ function rellenarPlantilla(plantilla: string, ruc: string, item: ItemRelacion, p
     tipo: item.tipo,
     serie: item.serie,
     numero: item.numero,
+    numeroSc: String(item.numero).replace(/^0+/, "") || "0",
     numeroPad: String(item.numero).replace(/^0+/, "").padStart(8, "0"),
     periodo: periodo || "",
     fecha: item.fecha || "",
@@ -908,6 +910,84 @@ function rellenarPlantilla(plantilla: string, ruc: string, item: ItemRelacion, p
   let out = plantilla;
   for (const [k, v] of Object.entries(repl)) out = out.replaceAll(`{${k}}`, v);
   return out;
+}
+
+// --- Endpoint interno REAL de SUNAT (ConsultaCPE), hallado por diagnóstico -----
+// La app Angular ConsultaCPE (code 11.38.1.1.1) baja el XML así:
+//   GET https://api-cpe.sunat.gob.pe/v1/contribuyente/consultacpe/comprobantes/
+//       {rucEmisor}-{tipo}-{serie}-{numero}-2/02
+//   → 200 JSON { nomArchivo:"...-XML.zip", valArchivo:"<base64 del ZIP>" }
+// Auth: Authorization: Bearer <JWT> (token que el portal emite tras el login
+// SOL). Origen de las llamadas: e-factura.sunat.gob.pe (por CORS, el fetch debe
+// dispararse DESDE ese frame). El sufijo "-2" y "/02" son constantes del portal.
+const ENDPOINT_CPE_DEFAULT =
+  "https://api-cpe.sunat.gob.pe/v1/contribuyente/consultacpe/comprobantes/{rucEmisor}-{tipo}-{serie}-{numeroSc}-2/02";
+const HOST_CPE = /api-cpe\.sunat\.gob\.pe/i;
+
+/** Frame de la app Angular ConsultaCPE (origen e-factura.sunat.gob.pe). El fetch
+ *  al api-cpe debe correr desde AHÍ para que el CORS y el token coincidan. */
+function frameEFactura(ctx: any): any {
+  for (const pg of ctx.pages()) for (const fr of pg.frames()) {
+    if (/e-factura\.sunat\.gob\.pe|consultacpe|nuevaconsulta/i.test(fr.url())) return fr;
+  }
+  return null;
+}
+
+/** Captura COMPLETO (sin truncar) el Bearer que la app manda al api-cpe. Se
+ *  engancha antes de navegar: la 1ª llamada (/parametros) ya lo lleva. */
+function capturarTokenCpe(ctx: any, ref: { token: string }) {
+  const grab = (req: any) => {
+    try {
+      if (!HOST_CPE.test(String(req.url() || ""))) return;
+      const h = (req.headers?.() ?? {}) as Record<string, string>;
+      const a = h["authorization"] || h["Authorization"] || "";
+      if (/bearer\s+eyJ/i.test(a)) ref.token = a;
+    } catch { /* */ }
+  };
+  const eng = (pg: any) => { try { pg.on("request", grab); } catch { /* */ } };
+  ctx.pages().forEach(eng); ctx.on("page", eng);
+}
+
+/** Respaldo: si no se capturó el token de la red, búscalo en el storage del
+ *  frame de la app (Angular lo guarda tras el login). */
+async function tokenDesdeStorage(fr: any): Promise<string> {
+  if (!fr?.evaluate) return "";
+  return (await fr.evaluate(() => {
+    try {
+      for (const store of [sessionStorage, localStorage]) {
+        for (let i = 0; i < store.length; i++) {
+          const v = store.getItem(store.key(i) as string) || "";
+          const m = v.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/);
+          if (m) return "Bearer " + m[0];
+        }
+      }
+    } catch { /* */ }
+    return "";
+  }).catch(() => "")) as string;
+}
+
+/** De la respuesta cruda (base64) del endpoint saca los XML. El api-cpe devuelve
+ *  JSON { valArchivo } con el ZIP en base64; otros endpoints podrían devolver el
+ *  ZIP/XML directo. Maneja ambos. */
+function xmlsDeRespuesta(
+  b64: string,
+  esZip: (b: Buffer) => boolean,
+  extraerTodo: (b: Buffer) => { name: string; data: Buffer }[],
+): string[] {
+  if (!b64) return [];
+  const buf = Buffer.from(b64, "base64");
+  if (buf[0] === 0x7b /* '{' → JSON { valArchivo } */) {
+    try {
+      const j = JSON.parse(buf.toString("utf-8"));
+      const val = j.valArchivo || j.arch || j.archivo || j.contenido;
+      if (typeof val === "string" && val) {
+        const z = Buffer.from(val, "base64");
+        return esZip(z) ? extraerTodo(z).map((it) => it.data.toString("utf-8")) : [z.toString("utf-8")];
+      }
+    } catch { /* */ }
+    return [];
+  }
+  return esZip(buf) ? extraerTodo(buf).map((it) => it.data.toString("utf-8")) : [buf.toString("utf-8")];
 }
 
 /**
@@ -919,7 +999,7 @@ function rellenarPlantilla(plantilla: string, ruc: string, item: ItemRelacion, p
 export async function extraerComprobantesXmlApi(params: ComprobantesParams): Promise<ComprobantesResultado & { diag?: { pasos: any[]; apiCalls?: LlamadaApi[] } }> {
   const pasos: any[] = [];
   const apiCalls: LlamadaApi[] = [];
-  const endpointDirecto = (process.env.CPE_XML_API_URL || "").trim();
+  const endpointDirecto = (process.env.CPE_XML_API_URL || ENDPOINT_CPE_DEFAULT).trim();
   let browser: any = null;
   let cerradoPorTiempo = false;
   const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
@@ -937,21 +1017,50 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
       return { facturas: [], descargados: 0, error: "Sube una relación de comprobantes para descargar.", diag: { pasos } };
     }
 
-    // --- Camino DIRECTO por endpoint interno (si está configurado) -------------
-    // No necesita abrir el formulario: hace fetch con las cookies de sesión.
+    // --- Camino DIRECTO por endpoint interno (api-cpe) -------------------------
+    // Descubierto por diagnóstico: GET .../comprobantes/{clave}/02 → JSON con el
+    // XML (ZIP en base64). Requiere el Bearer que el portal emite tras el login;
+    // se captura navegando a la app y el fetch se dispara DESDE su frame (origen
+    // e-factura) para que CORS y token coincidan. N descargas EN PARALELO: esto
+    // es lo que hace rápida la extracción masiva (sin abrir navegador por CPE).
     if (endpointDirecto) {
       const { esZip, extraerTodo } = await import("./zip");
-      const facturas: FacturaXml[] = [];
-      const fallidos: { item: ItemRelacion; motivo: string }[] = [];
-      // TODA la relación (sin tope): son N fetch concurrentes, no navegación.
-      const relacion = relacionTotal;
+      const usaBearer = HOST_CPE.test(endpointDirecto);
+      const relacion = relacionTotal; // TODA la relación (son fetch, no clics)
       const concurrencia = Math.max(1, Math.min(Number(process.env.CPE_XML_CONCURRENCIA || 12), 30));
-      // Método/cuerpo/cabeceras configurables por env (según lo que revele la
-      // captura): GET simple, o POST con body JSON, o cabeceras/token extra.
+      // Método/cuerpo/cabeceras configurables por env (por si SUNAT cambia algo).
       const metodo = (process.env.CPE_XML_API_METHOD || "GET").toUpperCase();
       const bodyTpl = process.env.CPE_XML_API_BODY || "";
       let headersEnv: Record<string, string> | undefined;
       try { headersEnv = process.env.CPE_XML_API_HEADERS ? JSON.parse(process.env.CPE_XML_API_HEADERS) : undefined; } catch { headersEnv = undefined; }
+
+      // 1) Navegar a la app para EMITIR/CAPTURAR el token y ubicar su frame.
+      const tokRef = { token: "" };
+      let frameRun: any = s.page;
+      if (usaBearer) {
+        capturarTokenCpe(s.ctx, tokRef);
+        await s.page.goto(APP_URL_CONSULTA, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+        for (let i = 0; i < 20 && !tokRef.token; i++) await s.page.waitForTimeout(1000).catch(() => {});
+        const fApp = frameEFactura(s.ctx);
+        if (fApp) frameRun = fApp;
+        if (!tokRef.token) tokRef.token = await tokenDesdeStorage(fApp || s.page);
+        pasos.push({ paso: "api-token", capturado: !!tokRef.token, frameApp: !!fApp });
+        if (!tokRef.token) {
+          return {
+            facturas: [], descargados: 0,
+            fallidos: relacion.map((item) => ({ item, motivo: "no se pudo obtener el token de sesión de SUNAT" })),
+            error: "No se pudo obtener el token de la sesión SUNAT. Reintenta; si persiste, corre el Modo diagnóstico.",
+            diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
+          };
+        }
+      }
+      const headersBase: Record<string, string> | undefined = usaBearer
+        ? { authorization: tokRef.token, accept: "application/json, text/plain, */*" }
+        : headersEnv;
+      const cred = usaBearer ? "omit" : "include";
+
+      const facturas: FacturaXml[] = [];
+      const fallidos: { item: ItemRelacion; motivo: string }[] = [];
       const t0 = Date.now();
       // Se procesa por bloques para acotar memoria en volúmenes grandes (1000+),
       // pero cada bloque baja en paralelo (concurrencia N).
@@ -962,32 +1071,26 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
           url: urlComprobante(endpointDirecto, params.ruc, it, params.periodo),
           metodo,
           body: bodyTpl ? rellenarPlantilla(bodyTpl, params.ruc, it, params.periodo) : undefined,
-          headers: headersEnv,
+          headers: headersBase,
         }));
-        const textos = await fetchXmlLote(s.page, peticiones, concurrencia);
+        const textos = await fetchXmlLote(frameRun, peticiones, concurrencia, cred);
         for (let j = 0; j < bloque.length; j++) {
           const item = bloque[j];
-          const b64 = textos[j];
-          if (!b64) { fallidos.push({ item, motivo: "el endpoint no devolvió contenido" }); continue; }
-          try {
-            const buf = Buffer.from(b64, "base64");
-            const xmls: string[] = esZip(buf) ? extraerTodo(buf).map((z) => z.data.toString("utf-8")) : [buf.toString("utf-8")];
-            let ok = false;
-            for (const x of xmls) {
-              const fx = parseFacturaXml(x);
-              if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
-            }
-            if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
-          } catch (e: any) {
-            fallidos.push({ item, motivo: String(e?.message ?? e).slice(0, 120) });
+          const xmls = xmlsDeRespuesta(textos[j], esZip, extraerTodo);
+          if (!xmls.length) { fallidos.push({ item, motivo: "el endpoint no devolvió XML (revisar clave o token)" }); continue; }
+          let ok = false;
+          for (const x of xmls) {
+            const fx = parseFacturaXml(x);
+            if (fx && fx.rucEmisor) { fx.xmlBase64 = Buffer.from(x, "utf-8").toString("base64"); facturas.push(fx); ok = true; }
           }
+          if (!ok) fallidos.push({ item, motivo: "el contenido no era un XML de comprobante" });
         }
         if (cerradoPorTiempo) break;
       }
       pasos.push({ paso: "api-directo", endpoint: endpointDirecto.replace(/\{[^}]+\}/g, "•"), pedidos: relacion.length, ok: facturas.length, concurrencia, segundos: Math.round((Date.now() - t0) / 1000) });
       return {
         facturas, descargados: facturas.length, fallidos,
-        error: facturas.length ? undefined : "El endpoint directo no devolvió XML. Revisa CPE_XML_API_URL y el diagnóstico.",
+        error: facturas.length ? undefined : "El endpoint directo no devolvió XML. Reintenta o revisa el Modo diagnóstico.",
         diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
       };
     }
