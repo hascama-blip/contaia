@@ -155,7 +155,7 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
         <${Campo} id="f-giro" etiqueta="Giro comercial">
           <${Entrada} ...${c("giro")} placeholder="Ej. Calzado" />
         <//>
-        <${Campo} id="f-estadoStand" etiqueta="Estado del stand">
+        <${Campo} id="f-estadoStand" etiqueta="Estado del stand" className="ancho-2">
           <${Selector} ...${c("estadoStand")} vacio=${null} opciones=${Object.entries(ESTADOS_STAND).map(([k, v]) => [k, v.label])} />
         <//>
         ${["alquilado", "litigio"].includes(ficha.estadoStand) && html`
