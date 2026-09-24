@@ -25,7 +25,8 @@ export function Leyenda() {
 export function CuadroAnual({ registros, anio, onCelda }) {
   const h = hoy();
   return html`
-    <div className="tabla-caja">
+    <p className="aviso-deslizar">Desliza hacia los lados para ver los 12 meses.</p>
+    <div className="tabla-caja cuadro-caja">
       <table className="cuadro">
         <thead><tr><th>Concepto</th>${MESES.map((m) => html`<th key=${m}>${m}</th>`)}</tr></thead>
         <tbody>

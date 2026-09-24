@@ -97,7 +97,7 @@ table { color: inherit; font-size: inherit; }
 /* ---------- Página ---------- */
 .pagina { max-width: var(--ancho); margin: 0 auto; padding: 22px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
 .pagina.angosta { max-width: 760px; }
-.pagina > * { min-width: 0; }
+.pagina > *, .rejilla > * { min-width: 0; }
 .pag-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .miga { font-size: var(--t-sm); color: var(--enlace); display: inline-block; margin-bottom: 4px; }
 .pag-titulo { font-size: var(--t-xl); font-weight: 800; color: var(--texto); }
@@ -507,3 +507,44 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .tabla .fila-detalle td + td { padding-left: 14px; }
 .plano-azul .leyenda { font-size: var(--t-sm); gap: 18px; }
 .plano-azul .leyenda i { width: 16px; height: 16px; }
+
+/* ---------- Adaptación a celulares y tablets ---------- */
+.aviso-deslizar { display: none; }
+@media (max-width: 760px) {
+  /* Tablas → tarjetas apiladas (etiquetas desde data-label) */
+  .tabla thead { display: none; }
+  .tabla, .tabla tbody, .tabla tr, .tabla td { display: block; width: 100%; }
+  .tabla tr { padding: 10px 0; border-bottom: 1px solid var(--borde-fuerte); }
+  .tabla td { border: 0; position: relative; padding: 7px 16px 7px calc(38% + 20px); text-align: left; overflow-wrap: anywhere; min-height: 2.9rem; }
+  .tabla td::before { content: attr(data-label); position: absolute; left: 16px; top: 9px; width: 38%; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.25; text-transform: uppercase; color: var(--texto-3); }
+  .tabla td[data-label=""], .tabla td:not([data-label]) { padding-left: 16px; }
+  .tabla td[data-label=""]::before, .tabla td:not([data-label])::before { display: none; }
+  .tabla td > * { max-width: 100%; }
+  .tabla .der { text-align: left; }
+  .tabla td select.input { width: 100%; }
+  .tabla td:empty { display: none; }
+  .tabla-caja { overflow-x: visible; }
+  /* Excepción: el cuadro anual de pagos sigue deslizándose (12 meses) */
+  .cuadro-caja { overflow-x: auto; }
+  .aviso-deslizar { display: block; font-size: var(--t-xs); color: var(--texto-3); margin-bottom: 6px; }
+  .pagina { padding: 16px 12px 40px; gap: 16px; }
+  .pag-cab { align-items: stretch; }
+  .pag-cab .acciones, .hero .acciones { width: 100%; }
+  .pag-cab .acciones .btn, .hero .acciones .btn { flex: 1 1 auto; }
+  .card-cab { flex-wrap: wrap; }
+  .card-pad { padding: 14px; }
+  .card-cuerpo { padding: 12px 14px 16px; }
+  .filtros .input, .barra-herr .input { width: 100%; flex: 1 1 100%; }
+  .filtros select.input { flex: 1 1 45%; }
+  .barra-herr .segmentos { flex: 1 1 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
+  .panel { width: 100%; }
+  .burbuja { width: min(320px, calc(100vw - 48px)); }
+  .doc { align-items: flex-start; }
+  .doc-acciones { width: 100%; }
+  .logro-cifra { font-size: 1.5rem; }
+  .hero h1 { font-size: 1.25rem; }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .pagina { padding-inline: 20px; }
+  .r-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

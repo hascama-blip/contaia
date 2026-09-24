@@ -13,6 +13,7 @@
 import { html, useState, useEffect, useMemo, useCallback, useRef } from "./components/html.js";
 import { Contexto } from "./components/contexto.js";
 import { Cabecera } from "./components/Cabecera.js";
+import { activarTablasAdaptables } from "./components/tablasAdaptables.js";
 import { escucharTodo, conectar } from "./lib/db.js";
 import { conectarArchivos } from "./lib/archivos.js";
 import { conectarDescargas } from "./lib/exportar.js";
@@ -126,4 +127,5 @@ function App() {
 }
 
 conectar();
+activarTablasAdaptables();
 window.ReactDOM.createRoot(document.getElementById("app")).render(html`<${App} />`);

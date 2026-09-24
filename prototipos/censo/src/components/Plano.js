@@ -117,6 +117,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
 
   return html`
     <div className="plano-azul">
+      <p className="aviso-deslizar">Desliza hacia los lados para ver todo el plano; toca un stand para ver su resumen.</p>
       <div className="plano-caja">
         <div className="plano-lienzo" ref=${caja}>
           <svg ref=${svg} viewBox=${`0 0 ${PLANO.ancho} ${PLANO.alto}`} className="plano" role="img"
