@@ -1,21 +1,19 @@
 // Panel principal: indicadores, plano del C.C. con la barra de logro del censo,
 // lo que requiere atención y el recorrido en orden de inventario.
 import { html, useMemo } from "../components/html.js";
-import { Kpi, Tarjeta, BadgeGravedad, Vacio } from "../components/ui.js";
+import { Tarjeta, BadgeGravedad, Vacio } from "../components/ui.js";
 import { useApp } from "../components/contexto.js";
 import { Campo } from "./Campo.js";
 import { avanceCenso, nombreCompleto } from "../lib/padron.js";
-import { morosidadPorGaleria } from "../lib/pagos.js";
 import { alertasReincidencia, ordenarRecientes } from "../lib/incidencias.js";
-import { soles, fechaCorta, fecha } from "../lib/formato.js";
+import { fechaCorta, fecha } from "../lib/formato.js";
 import { ESTADOS_INCIDENCIA } from "../lib/types.js";
 
 export function Inicio() {
   const { datos, derivados, puedeEscribir } = useApp();
-  const { h, porId, morosos } = derivados;
+  const { h, porId } = derivados;
 
   const avance = useMemo(() => avanceCenso(datos.asociados), [datos.asociados]);
-  const moro = useMemo(() => morosidadPorGaleria(morosos), [morosos]);
   const alertas = useMemo(() => alertasReincidencia(datos.incidencias, h.iso), [datos.incidencias, h]);
   const visitas = datos.asociados.filter((a) => a.censo?.visita && a.censo.visita >= h.iso).sort((a, b) => a.censo.visita.localeCompare(b.censo.visita));
   const recientes = ordenarRecientes(datos.incidencias).slice(0, 4);
@@ -54,22 +52,14 @@ export function Inicio() {
     <div className="pagina">
       <section className="hero">
         <div>
-          <span className="hero-eti">Censo de asociados ${h.anio}</span>
-          <h1>Estado del censo</h1>
-          <p>${avance.censados} de ${avance.total} fichas actualizadas. Faltan ${avance.pendientes} por visitar${avance.sinUbicar ? ` y ${avance.sinUbicar} sin ubicar` : ""}.</p>
+          <h1>Bienvenido al portal del Centro Comercial Inmaculada Concepción</h1>
+          <p>Comienza a gestionar el padrón, los stands, los pagos y el censo desde aquí.</p>
         </div>
         <div className="acciones">
           ${puedeEscribir !== false && html`<a className="btn btn-accent" href="#nueva">+ Nueva ficha</a>`}
           <a className="btn btn-claro" href="#padron">Ver padrón</a>
         </div>
       </section>
-
-      <div className="rejilla r-4">
-        <${Kpi} etiqueta="Asociados en el padrón" valor=${avance.total} nota=${`${datos.stands.length} stands registrados`} />
-        <${Kpi} etiqueta="Fichas actualizadas" valor=${avance.censados} tono="ok" nota=${`${avance.pct}% del padrón`} />
-        <${Kpi} etiqueta="Verificadas y firmadas" valor=${avance.verificados} nota="Archivadas en el libro físico" />
-        <${Kpi} etiqueta="Stands morosos" valor=${moro.morosos} tono=${moro.morosos ? "peligro" : "ok"} nota=${`${soles(moro.total)} por cobrar`} />
-      </div>
 
       <${Campo} incrustado debajoDelPlano=${html`<${Logro} avance=${avance} />`} antesDeLista=${atencion} />
     </div>`;
