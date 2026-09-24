@@ -535,7 +535,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
   .card-pad { padding: 14px; }
   .card-cuerpo { padding: 12px 14px 16px; }
   .filtros .input, .barra-herr .input { width: 100%; flex: 1 1 100%; }
-  .filtros select.input { flex: 1 1 45%; }
+  .filtros select.input { flex: 1 1 100%; }
   .barra-herr .segmentos { flex: 1 1 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
   .panel { width: 100%; }
   .burbuja { width: min(320px, calc(100vw - 48px)); }
@@ -557,3 +557,30 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
   .form-rejilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-rejilla .ancho-2 { grid-column: 1 / -1; }
 }
+
+/* ---------- Proporciones generales ---------- */
+/* Paneles laterales más anchos y con un campo por fila: nada se corta. */
+.panel { width: min(560px, 100%); }
+.panel .form-rejilla { grid-template-columns: minmax(0, 1fr) !important; }
+.panel-cuerpo { gap: 18px; padding: 20px 24px; }
+.panel-cab, .panel-pie { padding-inline: 24px; }
+/* Selects dentro de tablas (estado de incidencias) */
+.tabla td select.input { min-width: 180px; }
+/* Filtros: los selects tienen un ancho mínimo cómodo */
+.filtros select.input { min-width: 220px; }
+.filtros { gap: 12px; padding: 16px 18px; }
+/* Tarjetas: espacio interior parejo */
+.card-cab { padding: 18px 22px 0; }
+.card-cuerpo { padding: 16px 22px 20px; }
+.card-pad { padding: 20px 22px; }
+.lista li { padding: 12px 0; }
+.acciones { gap: 10px; }
+@media (max-width: 760px) {
+  .filtros select.input { min-width: 0; }
+  .panel-cuerpo { padding: 16px; }
+  .card-cab { padding: 16px 16px 0; }
+  .card-cuerpo { padding: 14px 16px 18px; }
+  .card-pad { padding: 16px; }
+}
+.campo > .segmentos.en-linea { display: grid; grid-template-columns: repeat(2, 1fr); }
+.campo > .segmentos.en-linea button { padding: 12px; font-size: var(--t-sm); }
