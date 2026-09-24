@@ -10,7 +10,6 @@ export const MENU = [
   { ruta: "pagos", texto: "Pagos" },
   { ruta: "incidencias", texto: "Incidencias" },
   { ruta: "reportes", texto: "Reportes" },
-  { ruta: "campo", texto: "Campo" },
 ];
 
 export function Cabecera({ seccion, usuario, hayEjemplos, puedeEscribir }) {

@@ -1,6 +1,6 @@
 // Censo en campo: plano interactivo del C.C. y lista en orden de inventario.
 import { html, useState, useMemo } from "../components/html.js";
-import { CabPagina, BadgeCenso, Panel, Campo as CampoForm, Entrada, Selector, Vacio, mensajeError } from "../components/ui.js";
+import { BadgeCenso, Panel, Campo as CampoForm, Entrada, Selector, Vacio, mensajeError } from "../components/ui.js";
 import { FotoCampo } from "../components/Archivos.js";
 import { Plano } from "../components/Plano.js";
 import { useApp } from "../components/contexto.js";
@@ -76,7 +76,11 @@ function PanelVisita({ asociado, stand, onCerrar }) {
     <//>`;
 }
 
-export function Campo() {
+/**
+ * Plano del C.C. + recorrido en orden de inventario.
+ * Se muestra dentro de Inicio (`incrustado`); `debajoDelPlano` va justo bajo el mapa.
+ */
+export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista = null }) {
   const { datos, derivados } = useApp();
   const [texto, setTexto] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
@@ -106,12 +110,12 @@ export function Campo() {
     asociado: derivados.porId.get(datos.stands.find((s) => s.codigo === abierto)?.propietarioId),
   };
 
-  return html`
-    <div className="pagina">
-      <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Censo en campo"
-        sub="Plano del C.C. (un solo piso). Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha." />
-
+  const contenido = html`
       <section className="card card-pad" style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <h2 className="card-titulo">Plano del C.C.</h2>
+          <p className="card-sub">Un solo piso. Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha.</p>
+        </div>
         <div className="barra-herr">
           <label className="sr" htmlFor="cp-buscar">Buscar</label>
           <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por stand, DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
@@ -124,8 +128,10 @@ export function Campo() {
           </label>
         </div>
         <${Plano} modo=${modo} resaltar=${resaltar} enfocar=${enfocar} onVerificar=${setAbierto} />
+        ${debajoDelPlano}
         <p className="ayuda">Plano de ejemplo para la demostración. Con el plano real del C.C. se reemplaza la distribución y los colores siguen funcionando igual.</p>
       </section>
+      ${antesDeLista}
 
       <section className="card">
         <div className="card-cab" style=${{ paddingBottom: 12 }}>
@@ -147,5 +153,7 @@ export function Campo() {
         </div>
       </section>
       ${actual?.asociado && html`<${PanelVisita} key=${abierto} asociado=${actual.asociado} stand=${actual.stand} onCerrar=${() => setAbierto(null)} />`}
-    </div>`;
+    `;
+  if (incrustado) return contenido;
+  return html`<div className="pagina">${contenido}</div>`;
 }

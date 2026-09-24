@@ -29,15 +29,14 @@ import { Stands } from "./pages/Stands.js";
 import { Pagos } from "./pages/Pagos.js";
 import { Incidencias } from "./pages/Incidencias.js";
 import { Reportes } from "./pages/Reportes.js";
-import { Campo } from "./pages/Campo.js";
 
 function leerRuta() {
   const h = decodeURIComponent(location.hash.replace(/^#/, "")) || "inicio";
   if (h.startsWith("ficha-")) return { seccion: "padron", pagina: "ficha", id: h.slice(6) };
   if (h.startsWith("pagos-")) return { seccion: "pagos", pagina: "pagos", stand: h.slice(6) };
   if (h.startsWith("nueva-")) return { seccion: "padron", pagina: "nueva", stand: h.slice(6) };
-  const conocidas = ["inicio", "padron", "nueva", "stands", "pagos", "incidencias", "reportes", "campo"];
-  const p = conocidas.includes(h) ? h : "inicio";
+  const conocidas = ["inicio", "padron", "nueva", "stands", "pagos", "incidencias", "reportes"];
+  const p = conocidas.includes(h) ? h : "inicio"; // #campo quedó dentro de Inicio
   return { seccion: p === "nueva" ? "padron" : p, pagina: p };
 }
 
@@ -113,7 +112,7 @@ function App() {
   else if (estadoBase === "error") pagina = html`<div className="pagina angosta"><div className="aviso aviso-peligro">
     <span>Se perdió la conexión con la base de datos. Recarga la página para reconectar.</span></div></div>`;
   else {
-    const P = { inicio: Inicio, padron: Padron, ficha: Ficha, nueva: NuevaFicha, stands: Stands, pagos: Pagos, incidencias: Incidencias, reportes: Reportes, campo: Campo }[ruta.pagina] || Inicio;
+    const P = { inicio: Inicio, padron: Padron, ficha: Ficha, nueva: NuevaFicha, stands: Stands, pagos: Pagos, incidencias: Incidencias, reportes: Reportes }[ruta.pagina] || Inicio;
     pagina = html`<${P} key=${ruta.pagina + (ruta.id || "") + (ruta.pagina === "nueva" ? ruta.stand || "" : "")} id=${ruta.id} stand=${ruta.stand} />`;
   }
 
