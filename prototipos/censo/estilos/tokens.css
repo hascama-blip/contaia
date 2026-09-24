@@ -1,20 +1,20 @@
-/* Tokens de diseño — mismos colores de Radar (tailwind.config.ts):
-   azul marino ASENCO (brand) + dorado (accent). Cambia aquí y se aplica en toda la app.
+/* Tokens de diseño — paleta verde del C.C.:
+   #0B8A30 (principal) · #33BE5B · #62DCB9 (menta) · #FFE3B3 (crema, acento). Cambia aquí y se aplica en toda la app.
    Tema claro fijo: el fondo de la página es blanco. */
 :root { color-scheme: light; }
 :root {
-  --brand-50: #eef3fa;
-  --brand-100: #d3e0f0;
-  --brand-400: #3f6ca8;
-  --brand-500: #234d82;
-  --brand-600: #173a66;
-  --brand-700: #102b4d;
-  --brand-800: #0b2140;
-  --brand-900: #081a33;
-  --accent-100: #fbedbf;
-  --accent-400: #edb91e;
-  --accent-500: #dca200;
-  --accent-600: #b98600;
+  --brand-50: #e7f7ec;
+  --brand-100: #c9eed4;
+  --brand-400: #33BE5B;
+  --brand-500: #0B8A30;
+  --brand-600: #0B8A30;
+  --brand-700: #09722a;
+  --brand-800: #075a21;
+  --brand-900: #053f17;
+  --accent-100: #fff4df;
+  --accent-400: #FFE3B3;
+  --accent-500: #ffd58c;
+  --accent-600: #a8650a;
 
   /* Superficies y texto */
   --fondo: #ffffff;
@@ -35,20 +35,20 @@
   --anillo: var(--brand-100);
 
   /* Semánticos (estado, no marca) */
-  --ok: #047857;
-  --ok-fondo: #d1fae5;
+  --ok: #0B8A30;
+  --ok-fondo: #dcf5e3;
   --alerta: #b45309;
   --alerta-fondo: #fef3c7;
   --peligro: #b91c1c;
   --peligro-fondo: #fee2e2;
-  --info: var(--brand-600);
-  --info-fondo: var(--brand-50);
+  --info: #0c7a5f;
+  --info-fondo: #dff8f1;
   --neutro-fondo: #f1f5f9;
-  --pasillo: #e6ecf5;
+  --pasillo: #e3f3e8;
 
   /* Franja principal (hero) */
   --hero-desde: var(--brand-900);
-  --hero-hasta: var(--brand-600);
+  --hero-hasta: var(--brand-500);
 
   /* Tipografía: la misma pila de sistema de Radar */
   --fuente: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;

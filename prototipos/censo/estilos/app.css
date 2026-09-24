@@ -330,7 +330,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .firma-lienzo { width: 100%; height: 160px; border: 1px solid var(--borde-fuerte); border-radius: var(--radio-sm); background: #fff; touch-action: none; display: block; }
 
 /* Panel lateral (registrar pago / incidencia / editar stand) */
-.panel-fondo { position: fixed; inset: 0; background: rgba(8, 26, 51, 0.35); z-index: 40; display: flex; justify-content: flex-end; }
+.panel-fondo { position: fixed; inset: 0; background: rgba(4, 40, 20, 0.4); z-index: 40; display: flex; justify-content: flex-end; }
 .panel {
   width: min(460px, 100%); height: 100%; background: var(--superficie); box-shadow: var(--sombra-2);
   display: flex; flex-direction: column;
@@ -465,7 +465,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .logro-eti { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-3); }
 .logro-cifra { font-size: 1.9rem; font-weight: 800; line-height: 1; color: var(--texto); }
 .logro-meta { font-size: var(--t-sm); color: var(--texto-2); }
-.logro-meta strong { color: var(--accent-600); }
+.logro-meta strong { color: var(--alerta); }
 .logro-pista { position: relative; height: 16px; border-radius: 999px; background: var(--neutro-fondo); display: flex; overflow: hidden; }
 .logro-ver { background: var(--ok); height: 100%; }
 .logro-act { background: var(--info); height: 100%; }
@@ -478,16 +478,16 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 /* Cajas en azul marino (paleta oscura) sobre la página blanca: tarjetas,
    paneles laterales y el plano. Los tokens se heredan a todo lo que contienen. */
 .card, .panel, .plano-azul {
-  --superficie: #0f1d33; --superficie-2: #13243e; --borde: #1f3350; --borde-fuerte: #2c4568;
-  --texto: #e2e8f0; --texto-2: #cbd5e1; --texto-3: #94a3b8; --texto-4: #6b7f99;
-  --primario: #3f6ca8; --primario-hover: #4f7cb8; --enlace: #8fb3e3;
-  --ok: #6ee7b7; --ok-fondo: #0c3a2e; --alerta: #fcd34d; --alerta-fondo: #3d2e0a;
-  --peligro: #fca5a5; --peligro-fondo: #43161a; --info: #8fb3e3; --info-fondo: #13294a;
-  --neutro-fondo: #172a45; --pasillo: #0a1628;
+  --superficie: #0c3a22; --superficie-2: #104a2b; --borde: #1b5c37; --borde-fuerte: #2b744a;
+  --texto: #f1fbf4; --texto-2: #d2ecdc; --texto-3: #a3cdb3; --texto-4: #74a488;
+  --primario: #33BE5B; --primario-hover: #62DCB9; --primario-texto: #05301a; --enlace: #62DCB9;
+  --ok: #7ee39b; --ok-fondo: #0f5a2e; --alerta: #FFE3B3; --alerta-fondo: #4d3b17;
+  --peligro: #ffaaa3; --peligro-fondo: #54221f; --info: #62DCB9; --info-fondo: #0e4c40;
+  --neutro-fondo: #154d2e; --pasillo: #082c18; --anillo: #1d6b43; --brand-400: #62DCB9;
   color-scheme: dark; color: var(--texto);
 }
 .card, .panel { background: var(--superficie); }
-.plano-azul { background: #0b1628; border-radius: var(--radio); padding: 14px; }
+.plano-azul { background: #072a16; border-radius: var(--radio); padding: 14px; }
 .plano-azul .leyenda { color: var(--texto-3); }
 
 /* Tarjeta desplegable (cerrada por defecto) */

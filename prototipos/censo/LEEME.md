@@ -16,7 +16,7 @@ Estilo y organización por capas copiados de Radar Tributar·IA.
 | `src/components/*.js` | Piezas de interfaz (badges, tablas, formularios, paneles) | `src/components/*.tsx` |
 | `src/pages/*.js` | Una pantalla por sección | `src/app/**/page.tsx` |
 | `src/main.js` | Arranque, rutas (`#padron`, `#ficha-…`) y derivados | `src/app/layout.tsx` |
-| `estilos/tokens.css` | Colores de Radar (azul marino + dorado), claro y oscuro | `tailwind.config.ts` |
+| `estilos/tokens.css` | Paleta verde (#0B8A30 · #33BE5B · #62DCB9 · #FFE3B3); cajas en verde profundo | `tailwind.config.ts` |
 | `estilos/app.css` | `.card .btn .input .badge`… | `globals.css` |
 
 Regla: una pantalla lee datos del contexto y, para escribir, llama a `api/`.

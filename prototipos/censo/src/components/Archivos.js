@@ -74,7 +74,7 @@ export function FirmaCampo({ valorId, onArchivo, habilitado = true }) {
     ctx.lineWidth = 2.2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0b2140";
+    ctx.strokeStyle = "#053f17";
   }, [firmando]);
 
   const punto = (e) => {
