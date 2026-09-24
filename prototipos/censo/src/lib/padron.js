@@ -27,10 +27,8 @@ export function galeriaDeCodigo(codigo) {
   return String(codigo || "").split("-")[0];
 }
 
-export function nombreGaleria(id, conPiso = false) {
-  const g = GALERIAS.find((x) => x.id === id);
-  if (!g) return id || "—";
-  return conPiso && g.id !== "S" ? `${g.nombre} · ${g.piso}` : g.nombre;
+export function nombreGaleria(id) {
+  return GALERIAS.find((x) => x.id === id)?.nombre || id || "—";
 }
 
 /** Orden de inventario: galería (A, B, C, S) y número de stand. */

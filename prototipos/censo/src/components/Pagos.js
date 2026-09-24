@@ -1,5 +1,6 @@
 // Cuadro anual de pagos de un stand y panel para registrar un pago.
-import { html, useState } from "./html.js";
+import { html, useState, useMemo } from "./html.js";
+import { Buscador, opcionesStands } from "./Buscador.js";
 import { CONCEPTOS, MESES, MESES_LARGO, MEDIOS_PAGO } from "../config.js";
 import { estadoCuota, claveRegistro } from "../lib/pagos.js";
 import { soles, fecha, hoy } from "../lib/formato.js";
@@ -53,8 +54,9 @@ export function CuadroAnual({ registros, anio, onCelda }) {
 
 /** Panel lateral para registrar un pago. `inicial` trae stand, concepto y mes sugeridos. */
 export function PanelPago({ inicial, stands, onCerrar }) {
-  const { usuario, avisar } = useApp();
+  const { usuario, avisar, derivados } = useApp();
   const h = hoy();
+  const opciones = useMemo(() => opcionesStands(stands, derivados.porId), [stands, derivados.porId]);
   const concepto0 = CONCEPTOS.find((c) => c.id === inicial?.concepto) || CONCEPTOS[0];
   const [p, setP] = useState({
     stand: inicial?.stand || "",
@@ -95,8 +97,8 @@ export function PanelPago({ inicial, stands, onCerrar }) {
         <button className="btn btn-ghost" onClick=${onCerrar}>Cancelar</button>
         <button className="btn btn-primary" disabled=${ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : "Guardar pago"}</button>`}>
       <${Campo} id="p-stand" etiqueta="Stand" req error=${errores.stand}>
-        <${Selector} id="p-stand" valor=${p.stand} onCambio=${cambia("stand")} error=${errores.stand}
-          opciones=${stands.map((s) => [s.codigo, `${s.codigo}${s.giro ? ` · ${s.giro}` : ""}`])} />
+        <${Buscador} id="p-stand" opciones=${opciones} valor=${p.stand} onElegir=${cambia("stand")} error=${errores.stand}
+          placeholder="Buscar por stand, DNI o nombre" />
       <//>
       <div className="form-rejilla" style=${{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         <${Campo} id="p-concepto" etiqueta="Concepto" req error=${errores.concepto}>

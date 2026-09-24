@@ -10,11 +10,19 @@ export const INSTITUCION = {
   logo: "img/logo.jpg",
 };
 
+// Un solo piso. El orden es el del inventario (y el del recorrido del censo).
+// La ubicación de cada stand en el plano está en src/plano.js.
 export const GALERIAS = [
-  { id: "A", nombre: "Galería A", piso: "1er piso" },
-  { id: "B", nombre: "Galería B", piso: "1er piso" },
-  { id: "C", nombre: "Galería C", piso: "2do piso" },
-  { id: "S", nombre: "Pabellón de servicios", piso: "1er piso" },
+  { id: "A", nombre: "Galería A" },
+  { id: "B", nombre: "Galería B" },
+  { id: "C", nombre: "Galería C" },
+  { id: "D", nombre: "Galería D" },
+  { id: "E", nombre: "Galería E" },
+  { id: "F", nombre: "Galería F" },
+  { id: "G", nombre: "Galería G" },
+  { id: "H", nombre: "Galería H" },
+  { id: "P", nombre: "Patio de comidas" },
+  { id: "S", nombre: "Pabellón de servicios" },
 ];
 
 // Cuotas que se cobran por stand. `mensual`: todos los meses; `meses`: solo esos.

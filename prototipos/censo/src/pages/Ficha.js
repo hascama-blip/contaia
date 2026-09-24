@@ -5,6 +5,7 @@ import { FichaForm } from "../components/FichaForm.js";
 import { FotoCampo, ArchivoCampo, FirmaCampo } from "../components/Archivos.js";
 import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
 import { PanelIncidencia } from "../components/Incidencias.js";
+import { Documentos } from "../components/Documentos.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
 import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
@@ -21,7 +22,7 @@ const PESTANAS = [
   ["stands", "Stands e inquilinos"],
   ["pagos", "Pagos"],
   ["incidencias", "Incidencias"],
-  ["documentos", "Documentos"],
+  ["huella", "Huella y firma"],
 ];
 
 function fichaDesde(a, stands) {
@@ -119,7 +120,7 @@ export function Ficha({ id }) {
         <div className="tabla-caja"><table className="tabla">
           <thead><tr><th>Stand</th><th>Galería</th><th>Área</th><th>Giro</th><th>Inquilino actual</th><th>Estado</th></tr></thead>
           <tbody>${stands.map((s) => html`<tr key=${s.codigo}>
-            <td className="fuerte num">${s.codigo}</td><td>${nombreGaleria(s.galeria, true)}</td>
+            <td className="fuerte num">${s.codigo}</td><td>${nombreGaleria(s.galeria)}</td>
             <td className="num">${s.area ? `${s.area} m²` : "—"}</td><td>${s.giro || "—"}</td>
             <td>${s.inquilino?.nombre || "—"}</td><td><${BadgeStand} estado=${s.estado} /></td></tr>`)}</tbody>
         </table></div>
@@ -144,7 +145,7 @@ export function Ficha({ id }) {
         <tbody>${incidencias.map((i) => html`<tr key=${i.id}><td className="num">${fecha(i.fecha)}</td><td>${i.tipo}</td>
           <td><${BadgeGravedad} estado=${i.gravedad} /></td><td>${i.medida}</td><td><${BadgeIncidencia} estado=${i.estado} /></td></tr>`)}</tbody>
       </table></div>`}`,
-    documentos: html`
+    huella: html`
       <div className="rejilla r-3">
         <${ArchivoCampo} id="doc-huella" etiqueta="Huella digital" valorId=${a.archivos?.huella} onArchivo=${subir("huella")} habilitado=${puedeSubir} textoBoton="Subir huella" />
         <${ArchivoCampo} id="doc-dni" etiqueta="Foto del DNI" valorId=${a.archivos?.dni} onArchivo=${subir("dni")} habilitado=${puedeSubir} textoBoton="Subir foto del DNI" />
@@ -193,6 +194,8 @@ export function Ficha({ id }) {
           <//>
         </div>
       </div>
+
+      <${Documentos} asociado=${a} />
 
       ${panel?.tipo === "pago" && html`<${PanelPago} inicial=${{ ...panel, anio: derivados.h.anio }} stands=${stands} onCerrar=${() => setPanel(null)} />`}
       ${panel?.tipo === "incidencia" && html`<${PanelIncidencia} inicial=${{ asociadoId: id, stand: stands[0]?.codigo }} onCerrar=${() => setPanel(null)} />`}

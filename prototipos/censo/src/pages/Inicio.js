@@ -51,7 +51,7 @@ export function Inicio() {
         <${Tarjeta} titulo="Avance del censo por galería" sub="Stands con ficha actualizada sobre el total de la galería">
           ${galerias.map((g) => html`
             <div className="avance-fila" key=${g.id}>
-              <div className="avance-cab"><span>${g.nombre}${g.id !== "S" ? html` <span className="muted">· ${g.piso}</span>` : ""}</span>
+              <div className="avance-cab"><span>${g.nombre}</span>
                 <span className="num muted">${g.censados} / ${g.total}</span></div>
               <${Barra} pct=${g.pct} tono=${g.pct >= 60 ? "ok" : g.pct >= 30 ? "alerta" : "peligro"} />
             </div>`)}

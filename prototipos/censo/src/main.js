@@ -3,6 +3,7 @@
 //
 // Capas (igual que Radar):
 //   config.js          catálogos y cuotas del C.C.
+//   plano.js           distribución del plano (un solo piso)
 //   lib/types.js       forma de los datos y etiquetas de estados
 //   lib/db.js          ÚNICA puerta a la base de datos
 //   lib/*.js           reglas de negocio puras (padrón, pagos, incidencias, validación, exportar)
@@ -34,6 +35,7 @@ function leerRuta() {
   const h = decodeURIComponent(location.hash.replace(/^#/, "")) || "inicio";
   if (h.startsWith("ficha-")) return { seccion: "padron", pagina: "ficha", id: h.slice(6) };
   if (h.startsWith("pagos-")) return { seccion: "pagos", pagina: "pagos", stand: h.slice(6) };
+  if (h.startsWith("nueva-")) return { seccion: "padron", pagina: "nueva", stand: h.slice(6) };
   const conocidas = ["inicio", "padron", "nueva", "stands", "pagos", "incidencias", "reportes", "campo"];
   const p = conocidas.includes(h) ? h : "inicio";
   return { seccion: p === "nueva" ? "padron" : p, pagina: p };
@@ -112,7 +114,7 @@ function App() {
     <span>Se perdió la conexión con la base de datos. Recarga la página para reconectar.</span></div></div>`;
   else {
     const P = { inicio: Inicio, padron: Padron, ficha: Ficha, nueva: NuevaFicha, stands: Stands, pagos: Pagos, incidencias: Incidencias, reportes: Reportes, campo: Campo }[ruta.pagina] || Inicio;
-    pagina = html`<${P} key=${ruta.pagina + (ruta.id || "")} id=${ruta.id} stand=${ruta.stand} />`;
+    pagina = html`<${P} key=${ruta.pagina + (ruta.id || "") + (ruta.pagina === "nueva" ? ruta.stand || "" : "")} id=${ruta.id} stand=${ruta.stand} />`;
   }
 
   return html`

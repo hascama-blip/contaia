@@ -1,10 +1,12 @@
-// Censo en campo: la lista en orden de inventario para el recorrido con el celular.
+// Censo en campo: plano interactivo del C.C. y lista en orden de inventario.
 import { html, useState, useMemo } from "../components/html.js";
 import { CabPagina, BadgeCenso, Panel, Campo as CampoForm, Entrada, Selector, Vacio, mensajeError } from "../components/ui.js";
 import { FotoCampo } from "../components/Archivos.js";
+import { Plano } from "../components/Plano.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS, LISTAS } from "../config.js";
 import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado } from "../lib/padron.js";
+import { MODOS } from "../lib/plano.js";
 import { fecha, hoy } from "../lib/formato.js";
 import { soloDigitos } from "../lib/validar.js";
 import { cambiarEstadoCenso, programarVisita, adjuntarArchivo, actualizarDatosCampo } from "../api/asociados.js";
@@ -77,19 +79,27 @@ function PanelVisita({ asociado, stand, onCerrar }) {
 export function Campo() {
   const { datos, derivados } = useApp();
   const [texto, setTexto] = useState("");
-  const [soloPendientes, setSoloPendientes] = useState(true);
+  const [soloPendientes, setSoloPendientes] = useState(false);
+  const [modo, setModo] = useState("censo");
   const [abierto, setAbierto] = useState(null);
 
-  const grupos = useMemo(() => {
+  // Todas las filas stand + asociado, en orden de inventario.
+  const filas = useMemo(() => [...datos.stands]
+    .sort((a, b) => compararCodigos(a.codigo, b.codigo))
+    .map((s) => ({ stand: s, asociado: derivados.porId.get(s.propietarioId) }))
+    .filter(({ asociado }) => asociado), [datos.stands, derivados.porId]);
+
+  const visibles = useMemo(() => {
     const q = normalizar(texto);
-    const filas = [...datos.stands]
-      .sort((a, b) => compararCodigos(a.codigo, b.codigo))
-      .map((s) => ({ stand: s, asociado: derivados.porId.get(s.propietarioId) }))
-      .filter(({ asociado }) => asociado)
+    return filas
       .filter(({ asociado }) => !soloPendientes || !estaCensado(asociado))
-      .filter(({ stand, asociado }) => !q || normalizar(`${stand.codigo} ${asociado.dni} ${nombreCompleto(asociado)}`).includes(q));
-    return GALERIAS.map((g) => ({ ...g, filas: filas.filter((f) => f.stand.galeria === g.id) })).filter((g) => g.filas.length);
-  }, [datos.stands, derivados.porId, texto, soloPendientes]);
+      .filter(({ stand, asociado }) => !q || normalizar(`${stand.codigo} ${asociado.dni} ${asociado.numero} ${nombreCompleto(asociado)}`).includes(q));
+  }, [filas, texto, soloPendientes]);
+
+  const filtrando = Boolean(texto.trim()) || soloPendientes;
+  const resaltar = filtrando ? new Set(visibles.map((f) => f.stand.codigo)) : null;
+  const enfocar = texto.trim() && visibles.length === 1 ? visibles[0].stand.codigo : null;
+  const grupos = GALERIAS.map((g) => ({ ...g, filas: visibles.filter((f) => f.stand.galeria === g.id) })).filter((g) => g.filas.length);
 
   const actual = abierto && {
     stand: datos.stands.find((s) => s.codigo === abierto),
@@ -97,22 +107,35 @@ export function Campo() {
   };
 
   return html`
-    <div className="pagina angosta">
+    <div className="pagina">
       <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Censo en campo"
-        sub="Sigue el orden del inventario: galería, piso y número de stand. Toca un stand para verificar con el propietario presente." />
-      <section className="card">
-        <div className="filtros">
+        sub="Plano del C.C. (un solo piso). Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha." />
+
+      <section className="card card-pad" style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="barra-herr">
           <label className="sr" htmlFor="cp-buscar">Buscar</label>
-          <input id="cp-buscar" className="input buscar" type="search" placeholder="Stand, DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
+          <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por stand, DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
+          <div className="segmentos en-linea" role="group" aria-label="Colorear el plano por">
+            ${Object.entries(MODOS).map(([k, t]) => html`<button key=${k} aria-pressed=${modo === k} onClick=${() => setModo(k)}>${t}</button>`)}
+          </div>
           <label className="check" style=${{ alignItems: "center" }}>
             <input type="checkbox" id="cp-pend" checked=${soloPendientes} onChange=${(e) => setSoloPendientes(e.target.checked)} />
             <span>Solo pendientes</span>
           </label>
         </div>
+        <${Plano} modo=${modo} resaltar=${resaltar} enfocar=${enfocar} onVerificar=${setAbierto} />
+        <p className="ayuda">Plano de ejemplo para la demostración. Con el plano real del C.C. se reemplaza la distribución y los colores siguen funcionando igual.</p>
+      </section>
+
+      <section className="card">
+        <div className="card-cab" style=${{ paddingBottom: 12 }}>
+          <div><h2 className="card-titulo">Recorrido en orden de inventario</h2>
+            <p className="card-sub">${visibles.length} stands${filtrando ? " con el filtro actual" : ""}. Toca uno para verificar con el propietario presente.</p></div>
+        </div>
         <div className="campo-lista">
           ${grupos.map((g) => html`
             <div key=${g.id}>
-              <div className="grupo-titulo"><span>${g.nombre}${g.id !== "S" ? ` · ${g.piso}` : ""}</span><span className="num">${g.filas.length}</span></div>
+              <div className="grupo-titulo"><span>${g.nombre}</span><span className="num">${g.filas.length}</span></div>
               ${g.filas.map(({ stand, asociado }) => html`
                 <button key=${stand.codigo} className="campo-item" onClick=${() => setAbierto(stand.codigo)}>
                   <span className="campo-stand">${stand.codigo}</span>
@@ -123,9 +146,6 @@ export function Campo() {
           ${!grupos.length && html`<${Vacio}>${soloPendientes ? "No quedan stands pendientes con ese filtro." : "Ningún stand coincide."}<//>`}
         </div>
       </section>
-      <div className="aviso aviso-info">
-        <span><strong>Sin señal en la galería:</strong> en "Nueva ficha" el borrador se guarda en el celular; aquí cada cambio se guarda al tocar el botón, así que espera a tener señal para confirmar.</span>
-      </div>
       ${actual?.asociado && html`<${PanelVisita} key=${abierto} asociado=${actual.asociado} stand=${actual.stand} onCerrar=${() => setAbierto(null)} />`}
     </div>`;
 }

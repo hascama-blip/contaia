@@ -30,10 +30,15 @@ function escribirBorrador(valor) {
   }
 }
 
-export function NuevaFicha() {
+export function NuevaFicha({ stand }) {
   const { datos, usuario, caps, ir, avisar, puedeEscribir } = useApp();
   const inicial = useRef(leerBorrador());
-  const [ficha, setFicha] = useState(() => ({ ...fichaVacia(), ...(inicial.current?.ficha || {}) }));
+  const [ficha, setFicha] = useState(() => {
+    const f = { ...fichaVacia(), ...(inicial.current?.ficha || {}) };
+    // Desde el plano: "Registrar ficha" trae el stand ya escrito.
+    if (stand && !String(f.standsTexto || "").trim()) f.standsTexto = stand;
+    return f;
+  });
   const [guardadoEn, setGuardadoEn] = useState(inicial.current?.en || null);
   const [, setTic] = useState(0);
   const [errores, setErrores] = useState({});

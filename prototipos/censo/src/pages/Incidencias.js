@@ -6,7 +6,7 @@ import { useApp } from "../components/contexto.js";
 import { ESTADOS_INCIDENCIA } from "../lib/types.js";
 import { LIMITE_INCIDENCIAS } from "../config.js";
 import { alertasReincidencia, conteoPorTipo, ordenarRecientes } from "../lib/incidencias.js";
-import { nombreCompleto } from "../lib/padron.js";
+import { nombreCompleto, normalizar } from "../lib/padron.js";
 import { fecha } from "../lib/formato.js";
 import { cambiarEstadoIncidencia } from "../api/incidencias.js";
 
@@ -15,10 +15,18 @@ export function Incidencias() {
   const { h, porId } = derivados;
   const [panel, setPanel] = useState(false);
   const [filtro, setFiltro] = useState("");
-  const lista = useMemo(
-    () => ordenarRecientes(datos.incidencias).filter((i) => !filtro || (filtro === "abiertas" ? i.estado !== "cerrada" : i.estado === filtro)),
-    [datos.incidencias, filtro],
-  );
+  const [texto, setTexto] = useState("");
+  const lista = useMemo(() => {
+    const partes = normalizar(texto).split(/\s+/).filter(Boolean);
+    return ordenarRecientes(datos.incidencias)
+      .filter((i) => !filtro || (filtro === "abiertas" ? i.estado !== "cerrada" : i.estado === filtro))
+      .filter((i) => {
+        if (!partes.length) return true;
+        const a = porId.get(i.asociadoId);
+        const pajar = normalizar(`${i.involucrado} ${i.stand} ${String(i.stand).replace("-", "")} ${i.tipo} ${a ? `${a.dni} ${a.numero} ${nombreCompleto(a)}` : ""}`);
+        return partes.every((p) => pajar.includes(p));
+      });
+  }, [datos.incidencias, filtro, texto, porId]);
   const alertas = useMemo(() => alertasReincidencia(datos.incidencias, h.iso), [datos.incidencias, h]);
   const porTipo = useMemo(() => conteoPorTipo(datos.incidencias, h.anio), [datos.incidencias, h]);
   const editable = puedeEscribir !== false;
@@ -40,6 +48,8 @@ export function Incidencias() {
       <div className="rejilla r-8-4" style=${{ alignItems: "start" }}>
         <section className="card">
           <div className="filtros">
+            <label className="sr" htmlFor="inc-buscar">Buscar</label>
+            <input id="inc-buscar" className="input buscar" type="search" placeholder="Buscar por DNI, nombre o stand" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
             <label className="sr" htmlFor="inc-filtro">Estado</label>
             <select id="inc-filtro" className="input" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
               <option value="">Todas</option>
@@ -67,7 +77,7 @@ export function Incidencias() {
                 </tr>`)}
               </tbody>
             </table>
-            ${!lista.length && html`<${Vacio}>No hay incidencias con ese filtro.<//>`}
+            ${!lista.length && html`<${Vacio}>${texto ? `Ninguna incidencia coincide con "${texto}".` : "No hay incidencias con ese filtro."}<//>`}
           </div>
         </section>
 

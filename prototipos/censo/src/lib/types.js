@@ -39,6 +39,7 @@
  * @property {{estado:EstadoCenso, fecha:string|null, visita:string|null, por?:string}} censo
  * @property {string} observaciones        de la Junta Directiva
  * @property {Partial<Record<TipoArchivo,string>>} archivos   ids de archivos subidos
+ * @property {import("./documentos.js").Documento[]} [documentos]  documentos al pie de la ficha
  * @property {{estatutos:boolean, datos:boolean}} compromiso  Ley N° 29733
  * @property {string} creadoAt
  * @property {string} actualizadoAt

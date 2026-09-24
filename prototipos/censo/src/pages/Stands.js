@@ -1,4 +1,4 @@
-// Stands e inquilinos: inventario por galería y piso.
+// Stands e inquilinos: inventario por galería.
 import { html, useState, useMemo } from "../components/html.js";
 import { CabPagina, Kpi, BadgeStand, Vacio, Panel, Campo, Entrada, Selector, mensajeError } from "../components/ui.js";
 import { useApp } from "../components/contexto.js";
@@ -38,7 +38,7 @@ function PanelStand({ stand, onCerrar }) {
     <${Panel} titulo=${`Stand ${stand.codigo}`} onCerrar=${onCerrar}
       pie=${html`<button className="btn btn-ghost" onClick=${onCerrar}>Cancelar</button>
         <button className="btn btn-primary" disabled=${ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : "Guardar"}</button>`}>
-      <p className="muted">${nombreGaleria(stand.galeria, true)}</p>
+      <p className="muted">${nombreGaleria(stand.galeria)}</p>
       <div className="form-rejilla" style=${{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         <${Campo} id="st-giro" etiqueta="Giro comercial"><${Entrada} id="st-giro" valor=${s.giro} onCambio=${cambia("giro")} /><//>
         <${Campo} id="st-area" etiqueta="Área (m²)" error=${errores.area}><${Entrada} id="st-area" valor=${s.area} onCambio=${cambia("area")} inputMode="decimal" error=${errores.area} /><//>
@@ -75,7 +75,7 @@ export function Stands() {
 
   return html`
     <div className="pagina">
-      <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Stands e inquilinos" sub="Inventario por galería y piso" />
+      <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Stands e inquilinos" sub="Inventario por galería" />
       <div className="rejilla r-4">
         <${Kpi} etiqueta="Total de stands" valor=${datos.stands.length} />
         <${Kpi} etiqueta="Ocupados por el propietario" valor=${conteo.propietario} />
@@ -99,13 +99,13 @@ export function Stands() {
         </div>
         <div className="tabla-caja">
           <table className="tabla">
-            <thead><tr><th>Stand</th><th>Galería / piso</th><th className="der">Área</th><th>Giro comercial</th><th>Propietario</th><th>Inquilino actual</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Stand</th><th>Galería</th><th className="der">Área</th><th>Giro comercial</th><th>Propietario</th><th>Inquilino actual</th><th>Estado</th></tr></thead>
             <tbody>
               ${lista.map((s) => {
                 const dueno = derivados.porId.get(s.propietarioId);
                 return html`<tr key=${s.codigo} className=${puedeEscribir !== false ? "clic" : ""} onClick=${() => puedeEscribir !== false && setEditando(s)}>
                   <td className="fuerte num">${s.codigo}</td>
-                  <td>${nombreGaleria(s.galeria, true)}</td>
+                  <td>${nombreGaleria(s.galeria)}</td>
                   <td className="der num">${s.area ? `${s.area} m²` : "—"}</td>
                   <td>${s.giro || "—"}</td>
                   <td>${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>` : html`<span className="muted">Sin propietario</span>`}</td>

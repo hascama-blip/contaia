@@ -32,17 +32,51 @@ async function reducirImagen(archivo, max = 1400) {
   }
 }
 
-const TIPOS = { "image/jpeg": 1, "image/png": 1, "image/webp": 1, "application/pdf": 1 };
+// Tipos que acepta el almacén, por extensión (el navegador a veces no informa el tipo).
+const POR_EXTENSION = {
+  pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
+  txt: "text/plain", csv: "text/csv", md: "text/markdown", json: "application/json",
+};
 
-/** Sube una imagen o PDF y devuelve { id, url }. */
-export async function subirArchivo(archivo) {
+export function tipoDeArchivo(archivo) {
+  const ext = String(archivo.name || "").split(".").pop().toLowerCase();
+  return POR_EXTENSION[ext] || (Object.values(POR_EXTENSION).includes(archivo.type) ? archivo.type : null);
+}
+
+/**
+ * Sube un archivo y devuelve { id, url, tipo, tamano }.
+ * @param {File|Blob} archivo
+ * @param {{ maxLado?: number }} [op]  fotos: lado mayor en px (las del celular pesan mucho)
+ */
+export async function subirArchivo(archivo, { maxLado = 1400 } = {}) {
   const almacen = await conectarArchivos();
   if (!almacen) throw { code: "sin_archivos", message: "Tu acceso a esta página no permite subir archivos." };
-  if (!TIPOS[archivo.type]) throw { code: "unsupported_type", message: "Sube una foto (JPG o PNG) o un PDF." };
-  const listo = await reducirImagen(archivo);
-  const tipo = listo.type || archivo.type;
-  const r = await almacen.upload(listo, { type: tipo });
-  return { id: r.id, url: r.url };
+  const tipo = tipoDeArchivo(archivo);
+  if (!tipo) {
+    throw {
+      code: "unsupported_type",
+      message: /\.(docx?|xlsx?|pptx?)$/i.test(archivo.name || "")
+        ? `${archivo.name}: Word, Excel y PowerPoint no se pueden guardar aquí. Guárdalo como PDF y súbelo.`
+        : `${archivo.name || "El archivo"}: sube un PDF, una foto (JPG o PNG) o un texto.`,
+    };
+  }
+  const listo = tipo.startsWith("image/") && tipo !== "image/gif" ? await reducirImagen(archivo, maxLado) : archivo;
+  const r = await almacen.upload(listo, { type: listo.type && listo !== archivo ? listo.type : tipo });
+  return { id: r.id, url: r.url, tipo: r.contentType || tipo, tamano: r.sizeBytes ?? listo.size };
+}
+
+/** Borra un archivo del almacén (irreversible; solo por acción del usuario). */
+export async function borrarArchivo(id) {
+  const almacen = await conectarArchivos();
+  if (!almacen) throw { code: "sin_archivos", message: "Tu acceso a esta página no permite borrar archivos." };
+  await almacen.delete(id);
+}
+
+/** Lee un archivo subido como Blob (para descargarlo). */
+export async function archivoComoBlob(id) {
+  const r = await fetch(urlArchivo(id));
+  if (!r.ok) throw new Error("No se pudo leer el archivo.");
+  return r.blob();
 }
 
 /** Lee un archivo subido como data URL (para ponerlo en el PDF). */

@@ -42,6 +42,7 @@
   --info: var(--brand-600);
   --info-fondo: var(--brand-50);
   --neutro-fondo: #f1f5f9;
+  --pasillo: #e6ecf5;
 
   /* Franja principal (hero) */
   --hero-desde: var(--brand-900);
@@ -88,6 +89,7 @@
     --info: #8fb3e3;
     --info-fondo: #13294a;
     --neutro-fondo: #172a45;
+    --pasillo: #0a1628;
     --hero-desde: #0b2140;
     --hero-hasta: #1c4476;
     --sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -119,6 +121,7 @@
   --info: #8fb3e3;
   --info-fondo: #13294a;
   --neutro-fondo: #172a45;
+  --pasillo: #0a1628;
   --hero-desde: #0b2140;
   --hero-hasta: #1c4476;
   --sombra: 0 1px 2px rgba(0, 0, 0, 0.3);

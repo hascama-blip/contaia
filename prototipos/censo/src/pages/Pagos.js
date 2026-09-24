@@ -2,6 +2,7 @@
 import { html, useState, useMemo } from "../components/html.js";
 import { CabPagina, Tarjeta, BadgeAtraso, Vacio } from "../components/ui.js";
 import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
+import { Buscador, opcionesStands } from "../components/Buscador.js";
 import { useApp } from "../components/contexto.js";
 import { compararCodigos, nombreCompleto, nombreGaleria } from "../lib/padron.js";
 import { registrosDe, deudaStand, morosidadPorGaleria } from "../lib/pagos.js";
@@ -19,6 +20,7 @@ export function Pagos({ stand: standRuta }) {
   const registros = stand ? registrosDe(indicePagos, stand.codigo, anio) : {};
   const deuda = stand ? deudaStand(registros, anio, h) : { monto: 0, meses: 0 };
   const moro = useMemo(() => morosidadPorGaleria(morosos), [morosos]);
+  const opciones = useMemo(() => opcionesStands(ordenados, porId), [ordenados, porId]);
   const editable = puedeEscribir !== false;
 
   return html`
@@ -29,12 +31,10 @@ export function Pagos({ stand: standRuta }) {
       <section className="card">
         <div className="filtros">
           <label className="label" htmlFor="pg-stand" style=${{ margin: 0 }}>Stand</label>
-          <select id="pg-stand" className="input" value=${codigo || ""} onChange=${(e) => ir(`pagos-${e.target.value}`)} style=${{ flex: "1 1 260px" }}>
-            ${ordenados.map((s) => {
-              const d = porId.get(s.propietarioId);
-              return html`<option key=${s.codigo} value=${s.codigo}>${s.codigo} · ${d ? nombreCompleto(d) : "Sin propietario"}</option>`;
-            })}
-          </select>
+          <div style=${{ flex: "1 1 280px", minWidth: 0 }}>
+            <${Buscador} id="pg-stand" opciones=${opciones} valor=${codigo || ""} placeholder="Buscar por stand, DNI o nombre"
+              onElegir=${(v) => v && ir(`pagos-${v}`)} />
+          </div>
           <label className="sr" htmlFor="pg-anio">Año</label>
           <select id="pg-anio" className="input" value=${anio} onChange=${(e) => setAnio(Number(e.target.value))}>
             ${[h.anio, h.anio - 1].map((y) => html`<option key=${y} value=${y}>${y}</option>`)}
@@ -45,7 +45,7 @@ export function Pagos({ stand: standRuta }) {
               <div style=${{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                 <div>
                   <p style=${{ fontWeight: 700 }}>Stand ${stand.codigo} · ${dueno ? html`<a href=${`#ficha-${dueno.id}`}>${nombreCompleto(dueno)}</a>` : "Sin propietario"}</p>
-                  <p className="card-sub">${nombreGaleria(stand.galeria, true)}${stand.giro ? ` · ${stand.giro}` : ""}</p>
+                  <p className="card-sub">${nombreGaleria(stand.galeria)}${stand.giro ? ` · ${stand.giro}` : ""}</p>
                 </div>
                 <div style=${{ display: "flex", gap: 10, alignItems: "center" }}>
                   <${BadgeAtraso} meses=${deuda.meses} />

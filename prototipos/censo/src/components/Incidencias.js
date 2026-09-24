@@ -1,9 +1,10 @@
 // Panel para registrar una incidencia o llamada de atención.
 import { html, useState, useMemo } from "./html.js";
+import { Buscador, opcionesAsociados } from "./Buscador.js";
 import { LISTAS } from "../config.js";
 import { GRAVEDADES } from "../lib/types.js";
 import { hoy } from "../lib/formato.js";
-import { nombreCompleto, ordenarPorNumero } from "../lib/padron.js";
+import { nombreCompleto } from "../lib/padron.js";
 import { Campo, Entrada, Selector, Texto, Panel, mensajeError } from "./ui.js";
 import { registrarIncidencia } from "../api/incidencias.js";
 import { useApp } from "./contexto.js";
@@ -25,13 +26,7 @@ export function PanelIncidencia({ inicial, onCerrar }) {
   const [ocupado, setOcupado] = useState(false);
   const cambia = (k) => (v) => setI((x) => ({ ...x, [k]: v }));
 
-  const opcionesAsociado = useMemo(
-    () => ordenarPorNumero(datos.asociados).map((a) => {
-      const suyos = (derivados.mapaStands.get(a.id) || []).map((s) => s.codigo).join(", ");
-      return [a.id, `${nombreCompleto(a)}${suyos ? ` · ${suyos}` : ""}`];
-    }),
-    [datos.asociados, derivados.mapaStands],
-  );
+  const opcionesAsociado = useMemo(() => opcionesAsociados(datos.asociados, derivados.mapaStands), [datos.asociados, derivados.mapaStands]);
   const standsDelAsociado = derivados.mapaStands.get(i.asociadoId) || [];
 
   async function guardar() {
@@ -57,8 +52,9 @@ export function PanelIncidencia({ inicial, onCerrar }) {
       pie=${html`
         <button className="btn btn-ghost" onClick=${onCerrar}>Cancelar</button>
         <button className="btn btn-primary" disabled=${ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : "Registrar"}</button>`}>
-      <${Campo} id="i-asociado" etiqueta="Asociado" req error=${errores.asociadoId}>
-        <${Selector} id="i-asociado" valor=${i.asociadoId} onCambio=${cambia("asociadoId")} opciones=${opcionesAsociado} error=${errores.asociadoId} />
+      <${Campo} id="i-asociado" etiqueta="Asociado" req error=${errores.asociadoId} ayuda="Escribe el DNI, el nombre, el N° de asociado o el stand.">
+        <${Buscador} id="i-asociado" opciones=${opcionesAsociado} valor=${i.asociadoId} error=${errores.asociadoId}
+          placeholder="Buscar por DNI, nombre o stand" onElegir=${(v) => setI((x) => ({ ...x, asociadoId: v, stand: "" }))} />
       <//>
       <div className="form-rejilla" style=${{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         <${Campo} id="i-stand" etiqueta="Stand">

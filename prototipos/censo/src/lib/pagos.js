@@ -53,6 +53,7 @@ export function etiquetaAtraso(meses) {
 /** Stand por stand, con su deuda. Solo los que deben. */
 export function standsMorosos(stands, indice, anio, h) {
   return stands
+    .filter((s) => s.propietarioId) // un stand sin propietario registrado no tiene a quién cobrarle
     .map((s) => ({ stand: s, deuda: deudaStand(registrosDe(indice, s.codigo, anio), anio, h) }))
     .filter((x) => x.deuda.monto > 0)
     .sort((a, b) => b.deuda.monto - a.deuda.monto);

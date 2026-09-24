@@ -42,7 +42,7 @@ export function Reportes() {
       { titulo: "Meses de atraso", valor: (m) => m.deuda.meses }, { titulo: "Deuda (S/)", valor: (m) => m.deuda.monto },
     ], morosos)],
     ["Stands e inquilinos", () => bajar("stands", [
-      { titulo: "Stand", valor: (s) => s.codigo }, { titulo: "Galería", valor: (s) => nombreGaleria(s.galeria, true) }, { titulo: "Área m2", valor: (s) => s.area ?? "" },
+      { titulo: "Stand", valor: (s) => s.codigo }, { titulo: "Galería", valor: (s) => nombreGaleria(s.galeria) }, { titulo: "Área m2", valor: (s) => s.area ?? "" },
       { titulo: "Giro", valor: (s) => s.giro }, { titulo: "Propietario", valor: (s) => nombreCompleto(porId.get(s.propietarioId)) },
       { titulo: "Inquilino", valor: (s) => s.inquilino?.nombre || "" }, { titulo: "Estado", valor: (s) => ESTADOS_STAND[s.estado]?.label },
     ], datos.stands)],

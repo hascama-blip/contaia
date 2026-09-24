@@ -8,6 +8,7 @@ Estilo y organización por capas copiados de Radar Tributar·IA.
 | Carpeta | Papel | Equivalente en Radar |
 |---|---|---|
 | `src/config.js` | Galerías, cuotas, listas y regla de 3 incidencias | mapas ajustables (`REGLAS_CUENTA`, `MAPA_CASILLAS`) |
+| `src/plano.js` | **Distribución del plano** (un solo piso). Es lo único a cambiar con el plano real | — |
 | `src/lib/types.js` | Forma de cada documento y etiquetas de estados | `src/lib/types.ts` |
 | `src/lib/db.js` | **Única puerta a la base.** Nadie más la toca | `src/lib/db.ts` |
 | `src/lib/*.js` | Reglas puras: padrón, pagos, incidencias, validación, exportar | `src/lib/*.ts` |
@@ -21,6 +22,23 @@ Estilo y organización por capas copiados de Radar Tributar·IA.
 Regla: una pantalla lee datos del contexto y, para escribir, llama a `api/`.
 `api/` valida y llama a `lib/db.js`. Para pasar a Radar o a Postgres solo se
 reescribe `lib/db.js` (y `lib/archivos.js` para las fotos).
+
+## Plano
+
+`src/plano.js` describe bloques: `corredor` (pasillo con stands a ambos lados),
+`fila` (stands en línea) o `stands` (lista explícita `{codigo, x, y, w, h}` para
+formas irregulares), más ambientes e ingresos. `lib/plano.js` calcula la posición
+de cada stand y su color; `components/Plano.js` dibuja el SVG y la burbuja con
+"Ver detalle". El plano actual es **de ejemplo** (10 galerías: A–H, Patio de
+comidas y Pabellón de servicios). Con el plano real: se calca en `plano.js`
+(o se pasa la foto/PDF del plano para trazarlo) y el resto no cambia.
+
+## Documentos
+
+Cada asociado guarda `documentos: [{id, nombre, archivo, tipo, tamano, subidoAt}]`.
+El nombre visible sale del archivo (`Contrato_compraventa_A-02.pdf` →
+"Contrato compraventa A-02") y se puede renombrar. Acepta PDF, fotos y texto;
+Word/Excel no (se pide guardarlos como PDF).
 
 ## Datos
 
