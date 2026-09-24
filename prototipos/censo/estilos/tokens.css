@@ -1,0 +1,126 @@
+/* Tokens de diseño — mismos colores de Radar (tailwind.config.ts):
+   azul marino ASENCO (brand) + dorado (accent). Cambia aquí y se aplica en toda la app. */
+:root {
+  --brand-50: #eef3fa;
+  --brand-100: #d3e0f0;
+  --brand-400: #3f6ca8;
+  --brand-500: #234d82;
+  --brand-600: #173a66;
+  --brand-700: #102b4d;
+  --brand-800: #0b2140;
+  --brand-900: #081a33;
+  --accent-100: #fbedbf;
+  --accent-400: #edb91e;
+  --accent-500: #dca200;
+  --accent-600: #b98600;
+
+  /* Superficies y texto */
+  --fondo: #f3f6fb;
+  --superficie: #ffffff;
+  --superficie-2: #f8fafc;
+  --borde: #e2e8f0;
+  --borde-fuerte: #cbd5e1;
+  --texto: #1e293b;
+  --texto-2: #475569;
+  --texto-3: #64748b;
+  --texto-4: #94a3b8;
+  --primario: var(--brand-600);
+  --primario-hover: var(--brand-700);
+  --primario-texto: #ffffff;
+  --enlace: var(--brand-600);
+  --acento: var(--accent-400);
+  --acento-texto: var(--brand-900);
+  --anillo: var(--brand-100);
+
+  /* Semánticos (estado, no marca) */
+  --ok: #047857;
+  --ok-fondo: #d1fae5;
+  --alerta: #b45309;
+  --alerta-fondo: #fef3c7;
+  --peligro: #b91c1c;
+  --peligro-fondo: #fee2e2;
+  --info: var(--brand-600);
+  --info-fondo: var(--brand-50);
+  --neutro-fondo: #f1f5f9;
+
+  /* Franja principal (hero) */
+  --hero-desde: var(--brand-900);
+  --hero-hasta: var(--brand-600);
+
+  /* Tipografía: la misma pila de sistema de Radar */
+  --fuente: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-lg: 1.125rem;
+  --t-xl: 1.5rem;
+  --t-2xl: 2rem;
+
+  --radio: 12px;
+  --radio-sm: 8px;
+  --sombra: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sombra-2: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --ancho: 1152px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --fondo: #0a1424;
+    --superficie: #0f1d33;
+    --superficie-2: #13243e;
+    --borde: #1f3350;
+    --borde-fuerte: #2c4568;
+    --texto: #e2e8f0;
+    --texto-2: #cbd5e1;
+    --texto-3: #94a3b8;
+    --texto-4: #6b7f99;
+    --primario: #3f6ca8;
+    --primario-hover: #4f7cb8;
+    --enlace: #8fb3e3;
+    --anillo: #1d3a63;
+    --ok: #6ee7b7;
+    --ok-fondo: #0c3a2e;
+    --alerta: #fcd34d;
+    --alerta-fondo: #3d2e0a;
+    --peligro: #fca5a5;
+    --peligro-fondo: #43161a;
+    --info: #8fb3e3;
+    --info-fondo: #13294a;
+    --neutro-fondo: #172a45;
+    --hero-desde: #0b2140;
+    --hero-hasta: #1c4476;
+    --sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --sombra-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --fondo: #0a1424;
+  --superficie: #0f1d33;
+  --superficie-2: #13243e;
+  --borde: #1f3350;
+  --borde-fuerte: #2c4568;
+  --texto: #e2e8f0;
+  --texto-2: #cbd5e1;
+  --texto-3: #94a3b8;
+  --texto-4: #6b7f99;
+  --primario: #3f6ca8;
+  --primario-hover: #4f7cb8;
+  --enlace: #8fb3e3;
+  --anillo: #1d3a63;
+  --ok: #6ee7b7;
+  --ok-fondo: #0c3a2e;
+  --alerta: #fcd34d;
+  --alerta-fondo: #3d2e0a;
+  --peligro: #fca5a5;
+  --peligro-fondo: #43161a;
+  --info: #8fb3e3;
+  --info-fondo: #13294a;
+  --neutro-fondo: #172a45;
+  --hero-desde: #0b2140;
+  --hero-hasta: #1c4476;
+  --sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sombra-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
