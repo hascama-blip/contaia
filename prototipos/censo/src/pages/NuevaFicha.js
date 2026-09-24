@@ -122,7 +122,7 @@ export function NuevaFicha({ stand }) {
       <div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
         <button className="btn btn-primary btn-bloque" disabled=${ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : "Guardar ficha"}</button>
         <button className="btn btn-ghost" onClick=${descartar}>Descartar borrador</button>
-        <p className="ayuda" style=${{ textAlign: "center" }}>Con las dos casillas del compromiso marcadas, la ficha entra como "Actualizado" en el censo.</p>
+        <p className="ayuda" style=${{ textAlign: "center" }}>Con las dos casillas del compromiso marcadas, la ficha entra como "Actualizada".</p>
       </div>
     </div>`;
 }

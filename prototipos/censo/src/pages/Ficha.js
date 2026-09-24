@@ -88,7 +88,7 @@ export function Ficha({ id }) {
   async function estadoCenso(estado) {
     try {
       await cambiarEstadoCenso(id, estado, { por: usuario?.id });
-      avisar(`Censo: ${ESTADOS_CENSO[estado].label}.`);
+      avisar(`Ficha: ${ESTADOS_CENSO[estado].label}.`);
     } catch (e) {
       avisar(mensajeError(e), "error");
     }
@@ -175,8 +175,8 @@ export function Ficha({ id }) {
           <${Tarjeta}>
             <${FotoCampo} id="foto-ficha" valorId=${a.archivos?.foto} onArchivo=${subir("foto")} habilitado=${puedeSubir} />
           <//>
-          <${Tarjeta} titulo="Estado del censo">
-            <div className="segmentos" role="group" aria-label="Estado del censo" style=${{ flexWrap: "wrap" }}>
+          <${Tarjeta} titulo="Estado de la ficha">
+            <div className="segmentos" role="group" aria-label="Estado de la ficha" style=${{ flexWrap: "wrap" }}>
               ${Object.entries(ESTADOS_CENSO).map(([k, v]) => html`<button key=${k} aria-pressed=${estado === k} disabled=${!editable}
                 onClick=${() => estado !== k && estadoCenso(k)}>${v.label}</button>`)}
             </div>

@@ -31,7 +31,7 @@ export function Reportes() {
   const standsTxt = (a) => (mapaStands.get(a.id) || []).map((s) => s.codigo).join(" ");
   const descargas = [
     ["Padrón completo", () => bajar("padron-asociados", COLUMNAS_PADRON(mapaStands, atraso), ordenarPorNumero(datos.asociados))],
-    ["Pendientes de censo", () => bajar("pendientes-censo", [
+    ["Fichas pendientes", () => bajar("fichas-pendientes", [
       { titulo: "N°", valor: (a) => a.numero }, { titulo: "Asociado", valor: nombreCompleto }, { titulo: "Stands", valor: standsTxt },
       { titulo: "Celular", valor: (a) => a.celular }, { titulo: "Estado", valor: (a) => estadoCenso(a) }, { titulo: "Visita programada", valor: (a) => a.censo?.visita || "" },
     ], pendientes)],
@@ -71,7 +71,7 @@ export function Reportes() {
       <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Reportes" sub=${`Corte al ${fecha(hoy().iso)}`} />
 
       <div className="rejilla r-7-5">
-        <${Tarjeta} titulo="Avance del censo por galería" sinCuerpo>
+        <${Tarjeta} titulo="Avance de fichas por galería" sinCuerpo>
           <div className="tabla-caja" style=${{ marginTop: 10 }}>
             <table className="tabla">
               <thead><tr><th>Galería</th><th className="der">Stands</th><th className="der">Con ficha</th><th style=${{ width: "34%" }}>Avance</th></tr></thead>
@@ -90,7 +90,7 @@ export function Reportes() {
       </div>
 
       <div className="rejilla r-2">
-        <${Tarjeta} titulo="Pendientes de censo" sub=${`${pendientes.length} asociados por visitar o ubicar`} sinCuerpo>
+        <${Tarjeta} titulo="Fichas pendientes" sub=${`${pendientes.length} asociados por visitar o ubicar`} sinCuerpo>
           <div className="tabla-caja" style=${{ marginTop: 10, maxHeight: 420 }}>
             <table className="tabla">
               <tbody>${pendientes.map((a) => html`<tr key=${a.id}>

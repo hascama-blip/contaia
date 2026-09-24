@@ -40,7 +40,7 @@ export function corredoresDelPlano(plano) {
 }
 
 export const MODOS = {
-  censo: "Censo",
+  censo: "Fichas",
   pagos: "Pagos",
   ocupacion: "Ocupación",
 };

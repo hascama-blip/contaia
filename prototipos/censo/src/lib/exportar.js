@@ -205,7 +205,7 @@ export async function pdfFicha(a, { stands = [] } = {}) {
   pares([
     ["Fecha de ingreso", fecha(a.fechaIngreso)],
     ["Estado del asociado", ESTADOS_ASOCIADO[a.estado]?.label],
-    ["Estado del censo", ESTADOS_CENSO[a.censo?.estado || "pendiente"]?.label],
+    ["Estado de la ficha", ESTADOS_CENSO[a.censo?.estado || "pendiente"]?.label],
   ]);
   seccion("5 · Cónyuge o conviviente");
   pares([
@@ -282,7 +282,7 @@ export const COLUMNAS_PADRON = (mapaStands, atraso) => [
   { titulo: "Stands", valor: (a) => (mapaStands.get(a.id) || []).map((s) => s.codigo).join(" ") },
   { titulo: "Galería", valor: (a) => [...new Set((mapaStands.get(a.id) || []).map((s) => nombreGaleria(s.galeria)))].join(" / ") },
   { titulo: "Celular", valor: (a) => a.celular },
-  { titulo: "Estado del censo", valor: (a) => ESTADOS_CENSO[a.censo?.estado || "pendiente"]?.label },
+  { titulo: "Estado de la ficha", valor: (a) => ESTADOS_CENSO[a.censo?.estado || "pendiente"]?.label },
   { titulo: "Meses de atraso", valor: (a) => atraso(a).meses },
   { titulo: "Deuda (S/)", valor: (a) => atraso(a).monto },
   { titulo: "Fecha de ingreso", valor: (a) => a.fechaIngreso },

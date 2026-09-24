@@ -27,7 +27,7 @@ export function Cabecera({ seccion, usuario, hayEjemplos, puedeEscribir }) {
           <img src=${INSTITUCION.logo} alt="" width="36" height="36" />
           <span>
             <span className="marca-nombre">${INSTITUCION.nombre}</span>
-            <span className="marca-sub">Censo y gestión de propietarios</span>
+            <span className="marca-sub">Gestión de propietarios</span>
           </span>
         </a>
         <nav className="nav" aria-label="Secciones">

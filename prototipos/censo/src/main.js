@@ -120,7 +120,7 @@ function App() {
     <${Contexto.Provider} value=${ctx}>
       <${Cabecera} seccion=${ruta.seccion} usuario=${usuario} hayEjemplos=${hayEjemplos} puedeEscribir=${usuario.puedeEscribir} />
       <main>${pagina}</main>
-      <footer className="pie">${INSTITUCION.nombre} · RUC ${INSTITUCION.ruc} · Censo y gestión de propietarios · ${hoy().anio}</footer>
+      <footer className="pie">${INSTITUCION.nombre} · RUC ${INSTITUCION.ruc} · Gestión de propietarios · ${hoy().anio}</footer>
       ${aviso && html`<div className=${`toast ${aviso.tipo === "error" ? "error" : ""}`} role="status" aria-live="polite">${aviso.texto}</div>`}
     <//>`;
 }

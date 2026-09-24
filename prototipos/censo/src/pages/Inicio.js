@@ -53,7 +53,7 @@ export function Inicio() {
       <section className="hero">
         <div>
           <h1>Bienvenido al portal del Centro Comercial Inmaculada Concepción</h1>
-          <p>Comienza a gestionar el padrón, los stands, los pagos y el censo desde aquí.</p>
+          <p>Comienza a gestionar el padrón, los stands, los pagos y las fichas desde aquí.</p>
         </div>
         <div className="acciones">
           ${puedeEscribir !== false && html`<a className="btn btn-accent" href="#nueva">+ Nueva ficha</a>`}
@@ -75,16 +75,16 @@ function Logro({ avance }) {
   const meta = METAS.find((m) => m > pct);
   const faltan = meta ? Math.max(0, Math.ceil((meta / 100) * total) - censados) : 0;
   return html`
-    <div className="logro" role="group" aria-label="Avance del censo">
+    <div className="logro" role="group" aria-label="Avance de fichas">
       <div className="logro-cab">
         <div>
-          <span className="logro-eti">Avance del censo</span>
+          <span className="logro-eti">Avance de fichas</span>
           <span className="logro-cifra num">${pct}%</span>
           <span className="muted num" style=${{ fontSize: "var(--t-sm)" }}>${censados} de ${total} fichas</span>
         </div>
         <span className="logro-meta">${meta
           ? html`Próxima meta: <strong>${meta}%</strong> · faltan ${faltan} ${faltan === 1 ? "ficha" : "fichas"}`
-          : html`<strong>¡Censo completo!</strong>`}</span>
+          : html`<strong>¡Todas las fichas al día!</strong>`}</span>
       </div>
       <div className="logro-pista" role="progressbar" aria-valuenow=${pct} aria-valuemin="0" aria-valuemax="100">
         <span className="logro-ver" style=${{ width: `${pv}%` }}></span>
@@ -97,7 +97,7 @@ function Logro({ avance }) {
       <div className="leyenda">
         <span><i style=${{ background: "var(--ok)" }}></i>Verificadas ${verificados}</span>
         <span><i style=${{ background: "var(--info)" }}></i>Actualizadas ${actualizados}</span>
-        <span><i style=${{ background: "var(--neutro-fondo)", border: "1px solid var(--borde-fuerte)" }}></i>Por censar ${total - censados}</span>
+        <span><i style=${{ background: "var(--neutro-fondo)", border: "1px solid var(--borde-fuerte)" }}></i>Por actualizar ${total - censados}</span>
       </div>
     </div>`;
 }

@@ -45,15 +45,15 @@ export function Padron() {
             <option value="">Todas las galerías</option>
             ${GALERIAS.map((g) => html`<option key=${g.id} value=${g.id}>${g.nombre}</option>`)}
           </select>
-          <label className="sr" htmlFor="pad-censo">Estado del censo</label>
+          <label className="sr" htmlFor="pad-censo">Estado de la ficha</label>
           <select id="pad-censo" className="input" value=${filtro.censo} onChange=${cambia("censo")}>
-            <option value="">Todo estado de censo</option>
+            <option value="">Todo estado de ficha</option>
             ${Object.entries(ESTADOS_CENSO).map(([k, v]) => html`<option key=${k} value=${k}>${v.label}</option>`)}
           </select>
         </div>
         <div className="tabla-caja">
           <table className="tabla">
-            <thead><tr><th>N°</th><th>Asociado</th><th>DNI</th><th>Stands</th><th>Galería</th><th>Censo</th><th>Pagos</th></tr></thead>
+            <thead><tr><th>N°</th><th>Asociado</th><th>DNI</th><th>Stands</th><th>Galería</th><th>Ficha</th><th>Pagos</th></tr></thead>
             <tbody>
               ${lista.map((a) => {
                 const suyos = derivados.mapaStands.get(a.id) || [];
