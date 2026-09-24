@@ -133,11 +133,12 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
       </section>
       ${antesDeLista}
 
-      <section className="card">
-        <div className="card-cab" style=${{ paddingBottom: 12 }}>
+      <details className="card desplegable">
+        <summary className="card-cab" style=${{ paddingBottom: 12 }}>
           <div><h2 className="card-titulo">Recorrido en orden de inventario</h2>
             <p className="card-sub">${visibles.length} stands${filtrando ? " con el filtro actual" : ""}. Toca uno para verificar con el propietario presente.</p></div>
-        </div>
+          <span className="desplegable-flecha" aria-hidden="true"></span>
+        </summary>
         <div className="campo-lista">
           ${grupos.map((g) => html`
             <div key=${g.id}>
@@ -151,7 +152,7 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
             </div>`)}
           ${!grupos.length && html`<${Vacio}>${soloPendientes ? "No quedan stands pendientes con ese filtro." : "Ningún stand coincide."}<//>`}
         </div>
-      </section>
+      </details>
       ${actual?.asociado && html`<${PanelVisita} key=${abierto} asociado=${actual.asociado} stand=${actual.stand} onCerrar=${() => setAbierto(null)} />`}
     `;
   if (incrustado) return contenido;

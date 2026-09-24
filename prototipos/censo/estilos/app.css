@@ -486,3 +486,11 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .card, .panel { background: var(--superficie); }
 .plano-azul { background: #0b1628; border-radius: var(--radio); padding: 14px; }
 .plano-azul .leyenda { color: var(--texto-3); }
+
+/* Tarjeta desplegable (cerrada por defecto) */
+.desplegable > summary { cursor: pointer; list-style: none; padding-bottom: 16px !important; }
+.desplegable > summary::-webkit-details-marker { display: none; }
+.desplegable[open] > summary { padding-bottom: 12px !important; }
+.desplegable-flecha { width: 10px; height: 10px; border-right: 2px solid var(--texto-3); border-bottom: 2px solid var(--texto-3); transform: rotate(45deg); transition: transform 0.15s; flex-shrink: 0; margin-right: 4px; }
+.desplegable[open] .desplegable-flecha { transform: rotate(-135deg); }
+.desplegable > summary:hover .card-titulo { color: var(--enlace); }
