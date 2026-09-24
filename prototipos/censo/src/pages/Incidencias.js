@@ -57,7 +57,7 @@ export function Incidencias() {
       <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Llamadas de atención e incidencias" sub="Registro formal de hechos"
         acciones=${editable && html`<button className="btn btn-primary" onClick=${() => setPanel(true)}>Registrar incidencia</button>`} />
 
-      <div className="rejilla r-8-4" style=${{ alignItems: "start" }}>
+      <div className="rejilla">
         <section className="card">
           <div className="filtros">
             <label className="sr" htmlFor="inc-buscar">Buscar</label>
@@ -96,7 +96,7 @@ export function Incidencias() {
           </div>
         </section>
 
-        <div style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="rejilla r-2" style=${{ alignItems: "start" }}>
           ${alertas.map((al) => html`<div key=${al.asociadoId} className="aviso aviso-peligro" role="alert">
             <span><strong>Alerta automática.</strong> <a href=${`#ficha-${al.asociadoId}`} style=${{ color: "inherit", fontWeight: 700 }}>${nombreCompleto(porId.get(al.asociadoId))}</a> acumula ${al.cantidad} llamadas de atención en los últimos doce meses. Corresponde evaluar sanción según estatutos.</span>
           </div>`)}
