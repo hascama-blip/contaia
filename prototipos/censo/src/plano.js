@@ -9,38 +9,39 @@
 
 export const PLANO = {
   ancho: 1200,
-  alto: 560,
-  muro: { x: 10, y: 10, w: 1180, h: 540 },
-  corredor: { anchoStand: 46, altoStand: 44, pasillo: 34 },
+  alto: 616,
+  muro: { x: 8, y: 8, w: 1184, h: 600 },
+  // Cajas grandes y legibles (personas mayores): 60 × 54 por stand.
+  corredor: { anchoStand: 60, altoStand: 54, pasillo: 26 },
 
   bloques: [
-    { galeria: "A", tipo: "corredor", x: 140, y: 24, porLado: 4, abre: "abajo" },
-    { galeria: "B", tipo: "corredor", x: 276, y: 24, porLado: 4, abre: "abajo" },
-    { galeria: "C", tipo: "corredor", x: 412, y: 24, porLado: 4, abre: "abajo" },
-    { galeria: "D", tipo: "corredor", x: 548, y: 24, porLado: 4, abre: "abajo" },
-    { galeria: "E", tipo: "corredor", x: 140, y: 300, porLado: 4, abre: "arriba" },
-    { galeria: "F", tipo: "corredor", x: 276, y: 300, porLado: 4, abre: "arriba" },
-    { galeria: "G", tipo: "corredor", x: 412, y: 300, porLado: 4, abre: "arriba" },
-    { galeria: "H", tipo: "corredor", x: 548, y: 300, porLado: 4, abre: "arriba" },
-    { galeria: "P", tipo: "fila", x: 700, y: 24, n: 6, w: 80, h: 56, etiqueta: { x: 940, y: 104 } },
-    { galeria: "S", tipo: "fila", x: 700, y: 330, n: 4, w: 120, h: 100, etiqueta: { x: 940, y: 318 } },
+    { galeria: "A", tipo: "corredor", x: 92, y: 22, porLado: 4, abre: "abajo" },
+    { galeria: "B", tipo: "corredor", x: 246, y: 22, porLado: 4, abre: "abajo" },
+    { galeria: "C", tipo: "corredor", x: 400, y: 22, porLado: 4, abre: "abajo" },
+    { galeria: "D", tipo: "corredor", x: 554, y: 22, porLado: 4, abre: "abajo" },
+    { galeria: "E", tipo: "corredor", x: 92, y: 324, porLado: 4, abre: "arriba" },
+    { galeria: "F", tipo: "corredor", x: 246, y: 324, porLado: 4, abre: "arriba" },
+    { galeria: "G", tipo: "corredor", x: 400, y: 324, porLado: 4, abre: "arriba" },
+    { galeria: "H", tipo: "corredor", x: 554, y: 324, porLado: 4, abre: "arriba" },
+    { galeria: "P", tipo: "fila", x: 712, y: 22, n: 6, w: 79, h: 74, etiqueta: { x: 949, y: 118 } },
+    { galeria: "S", tipo: "fila", x: 712, y: 346, n: 4, w: 118.5, h: 124, etiqueta: { x: 949, y: 338 } },
   ],
 
   // Ambientes que no son stands (solo referencia visual).
   zonas: [
-    { tipo: "pasillo", texto: "Pasaje central", x: 12, y: 200, w: 1176, h: 100, tx: 620, ty: 254 },
-    { tipo: "mesas", texto: "", x: 700, y: 112, w: 480, h: 76 },
-    { tipo: "ambiente", texto: "Administración", x: 20, y: 24, w: 105, h: 176 },
-    { tipo: "ambiente", texto: "Guardianía", x: 20, y: 300, w: 105, h: 176 },
-    { tipo: "ambiente", texto: "Tópico", x: 20, y: 486, w: 105, h: 54 },
-    { tipo: "ambiente", texto: "SS.HH. Varones", x: 140, y: 486, w: 126, h: 54 },
-    { tipo: "ambiente", texto: "SS.HH. Damas", x: 276, y: 486, w: 126, h: 54 },
-    { tipo: "ambiente", texto: "Depósito", x: 412, y: 486, w: 262, h: 54 },
-    { tipo: "ambiente", texto: "Carga y descarga", x: 700, y: 446, w: 480, h: 94 },
+    { tipo: "pasillo", texto: "Pasaje central", x: 10, y: 238, w: 1180, h: 86, tx: 640, ty: 286 },
+    { tipo: "mesas", texto: "", x: 712, y: 128, w: 474, h: 104 },
+    { tipo: "ambiente", texto: "Administración", x: 16, y: 22, w: 66, h: 216 },
+    { tipo: "ambiente", texto: "Guardianía", x: 16, y: 324, w: 66, h: 216 },
+    { tipo: "ambiente", texto: "Tópico", x: 16, y: 548, w: 66, h: 52 },
+    { tipo: "ambiente", texto: "SS.HH. Varones", x: 92, y: 548, w: 146, h: 52 },
+    { tipo: "ambiente", texto: "SS.HH. Damas", x: 246, y: 548, w: 146, h: 52 },
+    { tipo: "ambiente", texto: "Depósito", x: 400, y: 548, w: 300, h: 52 },
+    { tipo: "ambiente", texto: "Carga y descarga", x: 712, y: 480, w: 474, h: 120 },
   ],
 
   ingresos: [
-    { texto: "Ingreso principal", lado: "izquierda", y: 215, h: 70 },
-    { texto: "Ingreso posterior", lado: "derecha", y: 215, h: 70 },
+    { texto: "Ingreso principal", lado: "izquierda", y: 246, h: 70 },
+    { texto: "Ingreso posterior", lado: "derecha", y: 246, h: 70 },
   ],
 };

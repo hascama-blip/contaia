@@ -371,23 +371,23 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 
 /* ---------- Plano del C.C. ---------- */
 .plano-caja { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.plano-lienzo { position: relative; min-width: 860px; }
+.plano-lienzo { position: relative; min-width: 900px; }
 .plano { display: block; width: 100%; height: auto; }
 .plano text { pointer-events: none; }
 .pl-muro { fill: var(--superficie); stroke: var(--texto-3); stroke-width: 3; pointer-events: none; }
 .pl-pasillo { fill: var(--pasillo); pointer-events: none; }
 .pl-ambiente { fill: var(--superficie-2); stroke: var(--borde-fuerte); stroke-dasharray: 4 3; pointer-events: none; }
-.pl-texto-ambiente { fill: var(--texto-3); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
-.pl-texto-pasillo { fill: var(--texto-4); font-size: 12px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; text-anchor: middle; }
-.pl-rotulo { fill: var(--texto-2); font-size: 11.5px; font-weight: 700; text-anchor: middle; }
+.pl-texto-ambiente { fill: var(--texto-3); font-size: 13px; text-anchor: middle; dominant-baseline: middle; }
+.pl-texto-pasillo { fill: var(--texto-3); font-size: 16px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; text-anchor: middle; }
+.pl-rotulo { fill: var(--texto); font-size: 15px; font-weight: 700; text-anchor: middle; }
 .pl-ingreso { stroke: var(--pasillo); stroke-width: 7; pointer-events: none; }
-.pl-texto-ingreso { fill: var(--enlace); font-size: 11px; font-weight: 700; }
+.pl-texto-ingreso { fill: var(--enlace); font-size: 13px; font-weight: 700; }
 .pl-mesa { fill: none; stroke: var(--borde-fuerte); pointer-events: none; }
 .pl-stand { cursor: pointer; outline: none; }
 .pl-stand rect { stroke-width: 1.2; transition: opacity 0.15s; }
 .pl-stand:hover rect, .pl-stand:focus-visible rect, .pl-activo rect { stroke-width: 2.6; }
-.pl-codigo { font-size: 10.5px; font-weight: 700; text-anchor: middle; fill: var(--texto); font-variant-numeric: tabular-nums; }
-.pl-sub { font-size: 9.5px; text-anchor: middle; fill: var(--texto-3); }
+.pl-codigo { font-size: 17px; font-weight: 800; text-anchor: middle; fill: var(--texto); font-variant-numeric: tabular-nums; }
+.pl-sub { font-size: 12px; text-anchor: middle; fill: var(--texto-3); }
 .pl-ok rect { fill: var(--ok-fondo); stroke: var(--ok); }
 .pl-info rect { fill: var(--info-fondo); stroke: var(--info); }
 .pl-alerta rect { fill: var(--alerta-fondo); stroke: var(--alerta); }
@@ -403,13 +403,13 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .leyenda .ley-neutro { background: var(--neutro-fondo); border: 1px solid var(--texto-4); }
 .leyenda .ley-vacio { background: var(--superficie); border: 1px dashed var(--borde-fuerte); }
 .burbuja {
-  position: absolute; z-index: 5; width: 272px;
+  position: absolute; z-index: 5; width: 300px;
   background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; box-shadow: var(--sombra-2);
   padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
 }
-.burbuja-cab { display: flex; gap: 8px; align-items: baseline; font-size: var(--t-sm); }
-.burbuja-nombre { font-weight: 700; font-size: var(--t-sm); }
-.burbuja-dato { font-size: var(--t-xs); color: var(--texto-2); }
+.burbuja-cab { display: flex; gap: 8px; align-items: baseline; font-size: var(--t-base); }
+.burbuja-nombre { font-weight: 700; font-size: var(--t-lg); }
+.burbuja-dato { font-size: var(--t-sm); color: var(--texto-2); }
 .burbuja-badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .burbuja-acciones { display: flex; gap: 8px; margin-top: 4px; }
 .barra-herr { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -503,3 +503,5 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .grupo-flecha.abierta { transform: rotate(45deg); }
 .tabla .fila-detalle td { background: var(--superficie-2); font-size: var(--t-sm); padding-left: 34px; }
 .tabla .fila-detalle td + td { padding-left: 14px; }
+.plano-azul .leyenda { font-size: var(--t-sm); gap: 18px; }
+.plano-azul .leyenda i { width: 16px; height: 16px; }

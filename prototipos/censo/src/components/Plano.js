@@ -16,9 +16,9 @@ const CORREDORES = corredoresDelPlano(PLANO);
 function Mesas({ x, y, w, h }) {
   const puntos = [];
   for (let cx = x + 30; cx < x + w - 10; cx += 56) {
-    for (let cy = y + 18; cy < y + h - 6; cy += 34) puntos.push([cx, cy]);
+    for (let cy = y + 24; cy < y + h - 6; cy += 48) puntos.push([cx, cy]);
   }
-  return html`<g aria-hidden="true">${puntos.map(([cx, cy]) => html`<circle key=${`${cx}-${cy}`} cx=${cx} cy=${cy} r="9" className="pl-mesa" />`)}</g>`;
+  return html`<g aria-hidden="true">${puntos.map(([cx, cy]) => html`<circle key=${`${cx}-${cy}`} cx=${cx} cy=${cy} r="11" className="pl-mesa" />`)}</g>`;
 }
 
 /**
@@ -127,7 +127,12 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
               ? html`<${Mesas} key=${`z${i}`} ...${z} />`
               : html`<g key=${`z${i}`}>
                   <rect x=${z.x} y=${z.y} width=${z.w} height=${z.h} className=${z.tipo === "pasillo" ? "pl-pasillo" : "pl-ambiente"} />
-                  ${z.texto && html`<text x=${z.tx ?? z.x + z.w / 2} y=${z.ty ?? z.y + z.h / 2} className=${z.tipo === "pasillo" ? "pl-texto-pasillo" : "pl-texto-ambiente"}>${z.texto}</text>`}
+                  ${z.texto && (() => {
+                    const cx = z.tx ?? z.x + z.w / 2, cy = z.ty ?? z.y + z.h / 2;
+                    const vertical = z.tipo === "ambiente" && z.h > z.w * 1.6;
+                    return html`<text x=${cx} y=${cy} transform=${vertical ? `rotate(-90 ${cx} ${cy})` : undefined}
+                      className=${z.tipo === "pasillo" ? "pl-texto-pasillo" : "pl-texto-ambiente"}>${z.texto}</text>`;
+                  })()}
                 </g>`)}
             ${CORREDORES.map((c) => html`<g key=${`c${c.galeria}`}>
               <rect x=${c.pasillo.x} y=${c.pasillo.y} width=${c.pasillo.w} height=${c.pasillo.h} className="pl-pasillo" />
@@ -138,7 +143,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
               const x = g.lado === "izquierda" ? PLANO.muro.x : PLANO.muro.x + PLANO.muro.w;
               return html`<g key=${g.texto}>
                 <line x1=${x} y1=${g.y} x2=${x} y2=${g.y + g.h} className="pl-ingreso" />
-                <text x=${g.lado === "izquierda" ? 24 : PLANO.muro.x + PLANO.muro.w - 14} y=${g.y + g.h / 2 + 4}
+                <text x=${g.lado === "izquierda" ? PLANO.muro.x + 10 : PLANO.muro.x + PLANO.muro.w - 10} y=${g.y + g.h / 2 + 4}
                   className="pl-texto-ingreso" textAnchor=${g.lado === "izquierda" ? "start" : "end"}>${g.lado === "izquierda" ? `→ ${g.texto}` : `${g.texto} ←`}</text>
               </g>`;
             })}
@@ -158,8 +163,8 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
                     if (e.key === "Escape") cerrar();
                   }}>
                   <rect x=${c.x + 1.5} y=${c.y + 1.5} width=${c.w - 3} height=${c.h - 3} rx="4" />
-                  <text x=${c.x + c.w / 2} y=${c.y + c.h / 2 + (grande ? -2 : 4)} className="pl-codigo">${c.codigo}</text>
-                  ${grande && html`<text x=${c.x + c.w / 2} y=${c.y + c.h / 2 + 13} className="pl-sub">${(porCodigo.get(c.codigo)?.giro || "").slice(0, 14)}</text>`}
+                  <text x=${c.x + c.w / 2} y=${c.y + c.h / 2 + (grande ? -3 : 6)} className="pl-codigo">${c.codigo}</text>
+                  ${grande && html`<text x=${c.x + c.w / 2} y=${c.y + c.h / 2 + 16} className="pl-sub">${(porCodigo.get(c.codigo)?.giro || "").slice(0, c.w > 100 ? 16 : 10)}</text>`}
                 </g>`;
             })}
           </svg>
