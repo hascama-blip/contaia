@@ -13,7 +13,7 @@ Cómo funciona:
      M, K y L se fijan por rango de números (RANGOS abajo, ajustable).
   5. El resto del dibujo (muros, SS.HH., escaleras) queda como fondo.
 """
-import sys, re, math, json
+import sys, re, math, json, statistics
 import pymupdf as fitz
 from shapely.geometry import LineString, Point, MultiPoint, Polygon, box
 from shapely.ops import polygonize, unary_union, voronoi_diagram, polylabel
@@ -39,6 +39,11 @@ for w in pag.get_text("words"):
     if re.fullmatch(r"1\d{3}[A-Z]?", w[4]):
         c = fitz.Point((w[0] + w[2]) / 2, (w[1] + w[3]) / 2) * M
         nums[re.match(r"\d+", w[4]).group()] = (c.x, c.y)
+# Correcciones de rótulos mal ubicados en el PDF (coordenadas de la página girada):
+# el "1032" está escrito sobre la línea entre 1035 y 1036; por numeración corrida
+# es la celda sin número entre 1031 y 1033.
+CORRECCIONES = {"1032": (1290, 1255)}
+nums.update(CORRECCIONES)
 letras = []
 for w in pag.get_text("words"):
     if re.fullmatch(r"[A-M]", w[4]):
@@ -76,9 +81,41 @@ for b in bloques:
     for cel in vd.geoms:
         k = next(k for k in dentro if cel.contains(puntos[k]))
         celdas[k] = cel.intersection(b)
-for k, (x, y) in nums.items():  # sin celda en el dibujo: caja chica en su número
-    if k not in celdas:
-        celdas[k] = box(x - 14, y - 11, x + 14, y + 11)
+mediana = statistics.median(c.area for c in celdas.values())
+# Stand solo en su bloque pero enorme (p. ej. 1396, que se "comía" la rampa de salida):
+# si sus dos vecinos de numeración siguen en fila, se repite el paso de la fila;
+# si no, se usa la cara más chica del dibujo que contiene su número.
+from shapely.affinity import translate
+for k in list(celdas):
+    if celdas[k].area <= 2.5 * mediana:
+        continue
+    n = int(k)
+    for a, b in ((str(n + 1), str(n + 2)), (str(n - 1), str(n - 2))):
+        if a in celdas and b in celdas and celdas[a].distance(celdas[b]) < 2:
+            ca, cb = celdas[a].centroid, celdas[b].centroid
+            celdas[k] = translate(celdas[a], ca.x - cb.x, ca.y - cb.y).difference(celdas[a])
+            break
+    else:
+        propias = sorted((f for f in caras if f.contains(puntos[k]) and f.area > 150), key=lambda f: f.area)
+        if propias:
+            celdas[k] = propias[0]
+# Sin celda en el dibujo (p. ej. 1022): se reparte con el stand vecino que ocupó su lugar.
+for k, (x, y) in nums.items():
+    if k in celdas:
+        continue
+    caja = box(x - 14, y - 11, x + 14, y + 11)
+    vecino = min(celdas, key=lambda j: celdas[j].distance(puntos[k]))
+    if celdas[vecino].distance(puntos[k]) < 15:
+        zona = unary_union([celdas[vecino], caja]) if not celdas[vecino].contains(puntos[k]) else celdas[vecino]
+        vd = voronoi_diagram(MultiPoint([puntos[k], puntos[vecino]]), envelope=zona.envelope.buffer(50))
+        for cel in vd.geoms:
+            parte = cel.intersection(zona)
+            if cel.contains(puntos[k]):
+                celdas[k] = parte
+            else:
+                celdas[vecino] = parte
+    else:
+        celdas[k] = caja
 
 def mayor(g):
     gs = [q for q in getattr(g, "geoms", [g]) if q.geom_type == "Polygon"]
@@ -112,7 +149,10 @@ for letra, a, b in RANGOS:
 
 # 5) Fondo: todo lo que no es stand ni leyenda
 ocupado = unary_union([c.buffer(0.6) for c in celdas.values()])
-fuera = prep(unary_union(FUERA))
+# Señales "S" (círculos amarillos a rayas) y sus marcos: no son parte del plano.
+senales = unary_union([box(*tuple(g["rect"] * M)).buffer(10) for g in dibujos
+                       if g.get("fill") and abs(g["fill"][0] - 1) < 0.02 and abs(g["fill"][1] - 0.75) < 0.02 and g["fill"][2] < 0.02])
+fuera = prep(unary_union(FUERA + [senales]))
 recorte = box(*RECORTE)
 def es_senal(g):  # rombos "S" de señalización y flechas de evacuación
     r = g["rect"] * M
@@ -141,7 +181,7 @@ for g in dibujos:
             if s.length < 0.8 or fuera.contains(s.centroid) or not recorte.contains(s.centroid):
                 continue
             giro = math.degrees(math.atan2(b.y - a.y, b.x - a.x)) % 90
-            if 40 < giro < 50 and 18 < s.length < 45:  # lados de los rombos "S" (señalización)
+            if 38 < giro < 52 and 15 < s.length < 75:  # lados de los rombos "S" (señalización)
                 continue
             resto = s.difference(ocupado)
             for q in getattr(resto, "geoms", [resto]):
@@ -216,6 +256,22 @@ for miembros in grupos.values():
     px, py = despejar(px, py, px - cx, py - cy)
     etiquetas.append({"galeria": galeria[miembros[0]], "x": round(px - X0, 1), "y": round(py - Y0, 1)})
 
+# Salidas de emergencia: rectángulos verdes "SALIDA" del PDF (sin la leyenda).
+# Vienen partidos en triángulos: se juntan las piezas que se tocan.
+piezas = []
+for g in dibujos:
+    f_ = g.get("fill")
+    if not f_ or not (f_[1] > 0.8 and f_[0] < 0.1 and f_[2] < 0.1):
+        continue
+    r = g["rect"] * M
+    if r.width * r.height < 300 or fuera.contains(Point((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)):
+        continue
+    pts_ = [((q * M).x, (q * M).y) for it in g["items"] for q in it[1:] if isinstance(q, fitz.Point)]
+    if len(pts_) >= 3:
+        piezas.append(MultiPoint(pts_).convex_hull)
+salidas = [g.convex_hull for g in getattr(unary_union([q.buffer(1) for q in piezas]), "geoms", [unary_union([q.buffer(1) for q in piezas])])]
+salidas = [g.buffer(-1, join_style=2).minimum_rotated_rectangle for g in salidas]
+
 def poli(g):
     return " ".join(pt(x, y) for x, y in list(g.exterior.coords)[:-1])
 stands = []
@@ -233,11 +289,12 @@ js = f"""// Plano REAL del C.C. "Inmaculada Concepción" — un solo piso (1er n
 // stands:    [código, galería, "x,y x,y …" (polígono), x del número, y del número]
 // fondo:     muros, SS.HH., escaleras y veredas (un solo trazo SVG)
 // rotulos:   pasajes, calles y ambientes, con su giro en grados
+// salidas:   salidas de emergencia (polígonos verdes del mapa de riesgo)
 // etiquetas: letra de cada bloque de galería
 export const PLANO = {json.dumps({"ancho": ancho, "alto": alto, "fuente": "Mapa de riesgo MR-01 · agosto 2025",
-    "stands": stands, "rotulos": rotulos, "etiquetas": etiquetas, "fondo": fondo}, ensure_ascii=False, separators=(",", ":"))};
+    "stands": stands, "salidas": [poli(g) for g in salidas], "rotulos": rotulos, "etiquetas": etiquetas, "fondo": fondo}, ensure_ascii=False, separators=(",", ":"))};
 """
 open(SALIDA, "w").write(js)
-print(f"{len(stands)} stands · {len(rotulos)} rótulos · {len(etiquetas)} etiquetas · {len(js)//1024} KB → {SALIDA}")
+print(f"{len(salidas)} salidas · {len(stands)} stands · {len(rotulos)} rótulos · {len(etiquetas)} etiquetas · {len(js)//1024} KB → {SALIDA}")
 from collections import Counter
 print(sorted(Counter(galeria.values()).items()))

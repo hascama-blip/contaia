@@ -381,6 +381,8 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .pl-calle { fill: var(--acento); font-size: 26px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; letter-spacing: 0.04em; }
 .pl-pasaje { fill: var(--acento); fill-opacity: 0.85; font-size: 14px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
 .pl-texto-ambiente { fill: var(--texto-3); font-size: 13px; text-anchor: middle; dominant-baseline: middle; }
+.pl-salida { fill: #22c55e; fill-opacity: 0.85; stroke: #bbf7d0; stroke-width: 1; }
+.pl-texto-salida { fill: #052e16; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; }
 .pl-galeria circle { fill: var(--acento); }
 .pl-galeria text { fill: var(--brand-900); font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .pl-stand { cursor: pointer; outline: none; }
@@ -404,6 +406,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .leyenda .ley-alerta { background: var(--alerta-fondo); border: 1px solid var(--alerta); }
 .leyenda .ley-peligro { background: var(--peligro-fondo); border: 1px solid var(--peligro); }
 .leyenda .ley-neutro { background: var(--neutro-fondo); border: 1px solid var(--texto-4); }
+.leyenda .ley-salida { background: #22c55e; }
 .leyenda .ley-vacio { background: var(--superficie); border: 1px dashed var(--borde-fuerte); }
 .burbuja {
   position: absolute; z-index: 5; width: 340px;

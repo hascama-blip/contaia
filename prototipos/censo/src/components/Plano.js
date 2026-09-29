@@ -146,6 +146,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
             aria-label="Plano del centro comercial con los stands coloreados por estado"
             onClick=${(e) => e.target === e.currentTarget && cerrar()}>
             <path d=${PLANO.fondo} className="pl-fondo" />
+            ${PLANO.salidas.map((pts, i) => html`<polygon key=${`s${i}`} points=${pts} className="pl-salida"><title>Salida de emergencia</title></polygon>`)}
             ${PLANO.rotulos.map((r, i) => html`<text key=${`r${i}`} transform=${`translate(${r.x} ${r.y}) rotate(${r.giro})`} className=${ROTULO[r.tipo]}>${r.texto}</text>`)}
             ${CELDAS.map((c) => {
               const tono = tonoStand(modo, info(c.codigo));
@@ -165,6 +166,11 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
                   <text x=${c.x} y=${c.y} className="pl-codigo">${c.codigo}</text>
                 </g>`;
             })}
+            ${PLANO.salidas.map((pts, i) => {
+              const xy = pts.split(" ").map((p) => p.split(",").map(Number));
+              const cx = xy.reduce((a, p) => a + p[0], 0) / xy.length, cy = xy.reduce((a, p) => a + p[1], 0) / xy.length;
+              return html`<text key=${`st${i}`} x=${cx} y=${cy} className="pl-texto-salida">SALIDA</text>`;
+            })}
             ${PLANO.etiquetas.map((e, i) => html`<g key=${`e${i}`} className="pl-galeria" aria-hidden="true">
               <circle cx=${e.x} cy=${e.y} r="13" /><text x=${e.x} y=${e.y}>${e.galeria}</text>
             </g>`)}
@@ -174,6 +180,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
       </div>
       <div className="leyenda" style=${{ marginTop: 12 }}>
         ${LEYENDAS[modo].map(([tono, texto]) => html`<span key=${tono}><i className=${`ley-${tono}`}></i>${texto} <span className="num muted">${conteo[tono] || 0}</span></span>`)}
+        <span><i className="ley-salida"></i>Salida de emergencia</span>
       </div>
       ${fueraDelPlano.length > 0 && html`<p className="ayuda" style=${{ marginTop: 8 }}>Registrados pero sin ubicación en el plano: ${fueraDelPlano.join(", ")}.</p>`}
     </div>`;
