@@ -42,8 +42,14 @@ for w in pag.get_text("words"):
 # Correcciones de rótulos mal ubicados en el PDF (coordenadas de la página girada):
 # el "1032" está escrito sobre la línea entre 1035 y 1036; por numeración corrida
 # es la celda sin número entre 1031 y 1033.
-CORRECCIONES = {"1032": (1290, 1255)}
+# El "C 1108" está encimado sobre la galería C; el 1108 es la celda sin número
+# entre 1107 y 1109 de la galería B.
+CORRECCIONES = {"1032": (1290, 1255), "1108": (1488, 255)}
 nums.update(CORRECCIONES)
+# Textos que no son stands.
+NO_SON_STANDS = set()
+for k in NO_SON_STANDS:
+    nums.pop(k, None)
 letras = []
 for w in pag.get_text("words"):
     if re.fullmatch(r"[A-M]", w[4]):
@@ -146,6 +152,85 @@ for letra, a, b in RANGOS:
     for k in ks:
         if a <= int(k) <= b:
             galeria[k] = letra
+
+# 4b) Stands cuadrados. Las líneas interiores del dibujo (muebles, divisiones)
+# dejan celdas con muescas; todos los stands son rectángulos. Por cada tramo
+# recto de un bloque se toma su rectángulo y se reparte entre los stands.
+def giro_dominante(g):
+    peso = {}
+    cs = list(g.exterior.coords)
+    for (x1, y1), (x2, y2) in zip(cs, cs[1:]):
+        a = round(math.degrees(math.atan2(y2 - y1, x2 - x1)) % 90 / 3) * 3 % 90
+        peso[a] = peso.get(a, 0) + math.hypot(x2 - x1, y2 - y1)
+    return max(peso, key=peso.get)
+def dif_giro(a, b):
+    d = abs(a - b) % 90
+    return min(d, 90 - d)
+giros = {k: giro_dominante(celdas[k]) for k in celdas}
+colocadas = []
+nuevas = {}
+for miembros in sorted(grupos.values(), key=len, reverse=True):
+    # tramos rectos: stands vecinos con el mismo giro
+    pad2 = {k: k for k in miembros}
+    def r2(k):
+        while pad2[k] != k:
+            pad2[k] = pad2[pad2[k]]; k = pad2[k]
+        return k
+    for i, a in enumerate(miembros):
+        for b in miembros[i + 1:]:
+            if dif_giro(giros[a], giros[b]) <= 7 and celdas[a].buffer(1).intersects(celdas[b]):
+                pad2[r2(a)] = r2(b)
+    tramos_ = {}
+    for k in miembros:
+        tramos_.setdefault(r2(k), []).append(k)
+    for tramo in sorted(tramos_.values(), key=len, reverse=True):
+        union = unary_union([celdas[k] for k in tramo])
+        rect = union.minimum_rotated_rectangle
+        if len(tramo) == 1 or union.area / rect.area < 0.8:
+            # tramo con curva (perímetro): cada stand, su propio rectángulo
+            partes = {k: celdas[k].minimum_rotated_rectangle for k in tramo}
+        else:
+            semillas = {k: celdas[k].centroid for k in tramo}
+            vd = voronoi_diagram(MultiPoint(list(semillas.values())), envelope=rect.buffer(50))
+            partes = {}
+            for cel in vd.geoms:
+                k = next(k for k, pt in semillas.items() if cel.contains(pt))
+                partes[k] = cel.intersection(rect)
+        ya = unary_union(colocadas) if colocadas else None
+        for k, g in partes.items():
+            if ya is not None:
+                resto = g.difference(ya)
+                if resto.area > 0.4 * g.area:  # en las esquinas no se pisa el tramo vecino
+                    g = resto
+                else:
+                    print("aviso: stand", k, "queda tapado por un tramo vecino")
+            nuevas[k] = mayor(g).simplify(0.4)
+        colocadas.extend(partes.values())
+celdas = nuevas
+
+# Stands que quedaron mucho más grandes que sus vecinos de fila (se "comen" un
+# pasillo, los SS.HH. o una escalera): se repite el paso de los dos vecinos.
+def vecinos_en_fila(k):
+    mismos = sorted((j for j in celdas if j != k and galeria.get(j) == galeria.get(k)), key=int)
+    arriba = [j for j in mismos if int(j) > int(k)][:2]
+    abajo = [j for j in reversed(mismos) if int(j) < int(k)][:2]
+    for par in (arriba, abajo):
+        if len(par) == 2:
+            a, b = par
+            if celdas[a].distance(celdas[k]) < 3 and celdas[a].distance(celdas[b]) < 3:
+                return a, b
+    return None
+for k in list(celdas):
+    par = vecinos_en_fila(k)
+    if not par:
+        continue
+    a, b = par
+    if celdas[k].area > 1.6 * max(celdas[a].area, celdas[b].area):
+        ca, cb = celdas[a].centroid, celdas[b].centroid
+        copia = translate(celdas[a], ca.x - cb.x, ca.y - cb.y)
+        if copia.intersection(celdas[k]).area > 0.5 * copia.area:
+            celdas[k] = copia.difference(celdas[a]).intersection(celdas[k].buffer(1))
+            celdas[k] = mayor(celdas[k]).simplify(0.4)
 
 # 5) Fondo: todo lo que no es stand ni leyenda
 ocupado = unary_union([c.buffer(0.6) for c in celdas.values()])
@@ -271,6 +356,30 @@ for g in dibujos:
         piezas.append(MultiPoint(pts_).convex_hull)
 salidas = [g.convex_hull for g in getattr(unary_union([q.buffer(1) for q in piezas]), "geoms", [unary_union([q.buffer(1) for q in piezas])])]
 salidas = [g.buffer(-1, join_style=2).minimum_rotated_rectangle for g in salidas]
+
+# Dos letras iguales casi juntas (bloques vecinos de la misma galería): queda una.
+unicas = []
+for e in etiquetas:
+    if not any(u["galeria"] == e["galeria"] and math.dist((u["x"], u["y"]), (e["x"], e["y"])) < 60 for u in unicas):
+        unicas.append(e)
+etiquetas = unicas
+
+# Nada del fondo debajo de las letras de galería (el PDF tiene un círculo en cada letra).
+libres = unary_union([Point(e["x"] + X0, e["y"] + Y0).buffer(17) for e in etiquetas] +
+                     [Point(lx, ly).buffer(14) for _, lx, ly in letras])
+d = []; ultimo = None
+for t in tramos:
+    resto = LineString(t).difference(libres)
+    for q in getattr(resto, "geoms", [resto]):
+        if q.geom_type != "LineString" or q.length < 1.5:
+            continue
+        cs = list(q.coords)
+        ini = pt(*cs[0])
+        if ini != ultimo:
+            d.append("M" + ini)
+        d.append("L" + " ".join(pt(*c) for c in cs[1:]))
+        ultimo = pt(*cs[-1])
+fondo = "".join(d)
 
 def poli(g):
     return " ".join(pt(x, y) for x, y in list(g.exterior.coords)[:-1])
