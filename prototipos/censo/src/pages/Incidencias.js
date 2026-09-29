@@ -35,7 +35,7 @@ export function Incidencias() {
       .filter((i) => {
         if (!partes.length) return true;
         const a = porId.get(i.asociadoId);
-        const pajar = normalizar(`${i.involucrado} ${i.stand} ${String(i.stand).replace("-", "")} ${i.tipo} ${a ? `${a.dni} ${a.numero} ${nombreCompleto(a)}` : ""}`);
+        const pajar = normalizar(`${i.involucrado} ${i.stand} ${i.tipo} ${a ? `${a.dni} ${a.numero} ${nombreCompleto(a)}` : ""}`);
         return partes.every((p) => pajar.includes(p));
       });
   }, [datos.incidencias, filtro, texto, porId]);

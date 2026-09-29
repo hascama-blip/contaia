@@ -94,7 +94,7 @@ export function Documentos({ asociado }) {
           onClick=${() => entrada.current?.click()} role="button" tabIndex="0"
           onKeyDown=${(e) => (e.key === "Enter" || e.key === " ") && entrada.current?.click()}>
           <strong>Arrastra aquí los archivos</strong> o haz clic para elegirlos.
-          <span className="ayuda">PDF, fotos (JPG, PNG) o texto, hasta 20 MB cada uno. Ej.: "Contrato_compraventa_A-02.pdf" se guarda como "Contrato compraventa A-02".</span>
+          <span className="ayuda">PDF, fotos (JPG, PNG) o texto, hasta 20 MB cada uno. Ej.: "Contrato_compraventa_1091.pdf" se guarda como "Contrato compraventa 1091".</span>
         </div>`}
 
       ${errores.length > 0 && html`<div className="aviso aviso-peligro" role="alert" style=${{ marginTop: 12 }}>

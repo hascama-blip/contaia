@@ -44,8 +44,8 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
         <${Campo} id="f-numero" etiqueta="N° de asociado" req error=${errores.numero}>
           <${Entrada} ...${c("numero")} placeholder="Ej. 018" inputMode="numeric" error=${errores.numero} />
         <//>
-        <${Campo} id="f-standsTexto" etiqueta="N° de stand (uno o varios)" req error=${errores.stands} ayuda="Separa con comas: A-12, A-13">
-          <${Entrada} ...${c("standsTexto")} placeholder="Ej. A-12, A-13" error=${errores.stands} autoCapitalize="characters" />
+        <${Campo} id="f-standsTexto" etiqueta="N° de stand (uno o varios)" req error=${errores.stands} ayuda="El número del plano. Si son varios, sepáralos con comas: 1091, 1092">
+          <${Entrada} ...${c("standsTexto")} placeholder="Ej. 1091, 1092" inputMode="numeric" error=${errores.stands} />
         <//>
         <${Campo} id="f-cuentaBancaria" etiqueta="N° de cuenta bancaria">
           <${Entrada} ...${c("cuentaBancaria")} placeholder="Ej. 193-2547896-0-11" inputMode="numeric" />

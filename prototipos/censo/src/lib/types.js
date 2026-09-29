@@ -47,7 +47,7 @@
  */
 
 /**
- * Stand (colección `stands`, id = código, p. ej. "A-12").
+ * Stand (colección `stands`, id = código, p. ej. "1091", el número del plano).
  * @typedef {Object} Stand
  * @property {string} codigo
  * @property {string} galeria              id de GALERIAS (A, B, C, S)
@@ -59,7 +59,7 @@
  */
 
 /**
- * Pagos de un stand en un año (colección `pagos`, id = "A-12_2026").
+ * Pagos de un stand en un año (colección `pagos`, id = "1091_2026").
  * `registros` va por "concepto-MM" (p. ej. "mantenimiento-09").
  * @typedef {Object} PagosAnio
  * @property {string} stand

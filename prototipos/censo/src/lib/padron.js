@@ -2,6 +2,7 @@
 // Funciones puras: reciben datos y devuelven resultados (no leen ni escriben la base).
 import { GALERIAS } from "../config.js";
 import { porcentaje } from "./formato.js";
+import { PLANO } from "../plano.js";
 
 export function normalizar(s) {
   return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -23,31 +24,33 @@ export function nombreCorto(a) {
   return `${apellidos(a)}, ${(a.nombres || "").charAt(0)}.`;
 }
 
+// Galería de cada stand según el plano real (código "1091" → "A").
+const GALERIA_DE = new Map(PLANO.stands.map(([codigo, galeria]) => [codigo, galeria]));
+
 export function galeriaDeCodigo(codigo) {
-  return String(codigo || "").split("-")[0];
+  return GALERIA_DE.get(String(codigo)) || "";
+}
+
+export function existeStand(codigo) {
+  return GALERIA_DE.has(String(codigo));
 }
 
 export function nombreGaleria(id) {
   return GALERIAS.find((x) => x.id === id)?.nombre || id || "—";
 }
 
-/** Orden de inventario: galería (A, B, C, S) y número de stand. */
+/** Orden de inventario: por número de stand (1001, 1002…). */
 export function compararCodigos(a, b) {
-  const ga = GALERIAS.findIndex((g) => g.id === galeriaDeCodigo(a));
-  const gb = GALERIAS.findIndex((g) => g.id === galeriaDeCodigo(b));
-  if (ga !== gb) return ga - gb;
-  return Number(String(a).split("-")[1]) - Number(String(b).split("-")[1]);
+  return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || String(a).localeCompare(String(b));
 }
 
-/** "a12, B-4; c07" → ["A-12", "B-04", "C-07"]. Devuelve también los inválidos. */
+/** "1091, 1092; 1105" → ["1091", "1092", "1105"]. Solo números que existen en el plano. */
 export function leerCodigos(texto) {
   const validos = [];
   const invalidos = [];
   for (const parte of String(texto || "").split(/[,;\s]+/).filter(Boolean)) {
-    const m = /^([a-zA-Z])-?(\d{1,3})$/.exec(parte.trim());
-    const gal = m && GALERIAS.find((g) => g.id === m[1].toUpperCase());
-    if (m && gal) {
-      const codigo = `${gal.id}-${m[2].padStart(2, "0")}`;
+    const codigo = parte.trim().replace(/^N?°?/i, "");
+    if (/^\d{4}$/.test(codigo) && existeStand(codigo)) {
       if (!validos.includes(codigo)) validos.push(codigo);
     } else {
       invalidos.push(parte);

@@ -8,7 +8,7 @@ Estilo y organización por capas copiados de Radar Tributar·IA.
 | Carpeta | Papel | Equivalente en Radar |
 |---|---|---|
 | `src/config.js` | Galerías, cuotas, listas y regla de 3 incidencias | mapas ajustables (`REGLAS_CUENTA`, `MAPA_CASILLAS`) |
-| `src/plano.js` | **Distribución del plano** (un solo piso). Es lo único a cambiar con el plano real | — |
+| `src/plano.js` | **Plano real** (generado desde el PDF con `herramientas/calcar_plano.py`) | — |
 | `src/lib/types.js` | Forma de cada documento y etiquetas de estados | `src/lib/types.ts` |
 | `src/lib/db.js` | **Única puerta a la base.** Nadie más la toca | `src/lib/db.ts` |
 | `src/lib/*.js` | Reglas puras: padrón, pagos, incidencias, validación, exportar | `src/lib/*.ts` |
@@ -23,21 +23,26 @@ Regla: una pantalla lee datos del contexto y, para escribir, llama a `api/`.
 `api/` valida y llama a `lib/db.js`. Para pasar a Radar o a Postgres solo se
 reescribe `lib/db.js` (y `lib/archivos.js` para las fotos).
 
-## Plano
+## Plano (real)
 
-`src/plano.js` describe bloques: `corredor` (pasillo con stands a ambos lados),
-`fila` (stands en línea) o `stands` (lista explícita `{codigo, x, y, w, h}` para
-formas irregulares), más ambientes e ingresos. `lib/plano.js` calcula la posición
-de cada stand y su color; `components/Plano.js` dibuja el SVG y la burbuja con
-"Ver detalle". El plano actual es **de ejemplo** (10 galerías: A–H, Patio de
-comidas y Pabellón de servicios). Con el plano real: se calca en `plano.js`
-(o se pasa la foto/PDF del plano para trazarlo) y el resto no cambia.
+`src/plano.js` es el **plano real** del C.C., calcado del *Mapa de riesgo MR-01*
+(agosto 2025) con `herramientas/calcar_plano.py`. Trae 396 stands numerados
+1001–1405, cada uno con su galería (A–M; M, K y L son las del perímetro) y su
+polígono, más el fondo (muros, SS.HH., escaleras), pasajes y calles.
+No se edita a mano: si el plano cambia, se vuelve a correr
+
+    pip install pymupdf shapely
+    python3 herramientas/calcar_plano.py MAPA_DE_RIESGO.pdf
+
+El código de un stand es su número del plano (`"1091"`); la galería sale del
+plano (`galeriaDeCodigo`). `lib/plano.js` da los stands y el color por estado;
+`components/Plano.js` dibuja el SVG, la burbuja con "Ver detalle" y el zoom.
 
 ## Documentos
 
 Cada asociado guarda `documentos: [{id, nombre, archivo, tipo, tamano, subidoAt}]`.
-El nombre visible sale del archivo (`Contrato_compraventa_A-02.pdf` →
-"Contrato compraventa A-02") y se puede renombrar. Acepta PDF, fotos y texto;
+El nombre visible sale del archivo (`Contrato_compraventa_1091.pdf` →
+"Contrato compraventa 1091") y se puede renombrar. Acepta PDF, fotos y texto;
 Word/Excel no (se pide guardarlos como PDF).
 
 ## Propietarios (ventas y traspasos)
@@ -53,8 +58,8 @@ stand desde la ficha también deja el tramo en el historial.
 
 ## Datos
 
-Colecciones: `asociados`, `stands` (id = código, p. ej. `A-12`; el dueño está en
-`propietarioId`, los anteriores en `historial`), `pagos` (id = `A-12_2026`, `registros["mantenimiento-09"]`),
+Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el dueño está en
+`propietarioId`, los anteriores en `historial`), `pagos` (id = `1091_2026`, `registros["mantenimiento-09"]`),
 `incidencias`. Los registros con `ejemplo: true` se vacían desde **Reportes**.
 
 ## Tecnología

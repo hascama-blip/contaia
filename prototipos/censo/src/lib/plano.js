@@ -1,43 +1,13 @@
 // Geometría del plano y colores por estado (funciones puras).
 import { estadoCenso } from "./padron.js";
 
-const pad = (n) => String(n).padStart(2, "0");
-
-/** Expande los bloques del plano en stands con posición: [{ codigo, galeria, x, y, w, h }]. */
+/** Stands del plano real: [{ codigo, galeria, puntos, x, y }] (x, y = dónde va el número). */
 export function standsDelPlano(plano) {
-  const salida = [];
-  const { anchoStand: sw, altoStand: sh, pasillo } = plano.corredor;
-  for (const b of plano.bloques) {
-    if (b.tipo === "corredor") {
-      for (let i = 0; i < b.porLado; i++) {
-        salida.push({ codigo: `${b.galeria}-${pad(i + 1)}`, galeria: b.galeria, x: b.x, y: b.y + i * sh, w: sw, h: sh });
-        salida.push({ codigo: `${b.galeria}-${pad(b.porLado + i + 1)}`, galeria: b.galeria, x: b.x + sw + pasillo, y: b.y + i * sh, w: sw, h: sh });
-      }
-    } else if (b.tipo === "fila") {
-      for (let i = 0; i < b.n; i++) {
-        salida.push({ codigo: `${b.galeria}-${pad(i + 1)}`, galeria: b.galeria, x: b.x + i * b.w, y: b.y, w: b.w, h: b.h });
-      }
-    } else if (b.tipo === "stands") {
-      for (const s of b.stands) salida.push({ galeria: b.galeria, ...s });
-    }
-  }
-  return salida;
+  return plano.stands.map(([codigo, galeria, puntos, x, y]) => ({ codigo, galeria, puntos, x, y }));
 }
 
-/** Pasillo interior y rótulo de cada galería tipo corredor. */
-export function corredoresDelPlano(plano) {
-  const { anchoStand: sw, altoStand: sh, pasillo } = plano.corredor;
-  return plano.bloques
-    .filter((b) => b.tipo === "corredor")
-    .map((b) => {
-      const alto = b.porLado * sh;
-      return {
-        galeria: b.galeria,
-        pasillo: { x: b.x + sw, y: b.y, w: pasillo, h: alto },
-        rotulo: { x: b.x + sw + pasillo / 2, y: b.abre === "abajo" ? b.y + alto + 16 : b.y - 8 },
-      };
-    });
-}
+/** Niveles de acercamiento del plano (1 = entra entero en la pantalla). */
+export const ZOOMS = [1, 1.6, 2.4];
 
 export const MODOS = {
   censo: "Fichas",

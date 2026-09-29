@@ -70,7 +70,7 @@ export function Buscador({ id, opciones, valor, onElegir, placeholder = "Buscar�
               <span className="buscador-titulo">${o.titulo}</span>
               ${o.detalle && html`<span className="buscador-detalle">${o.detalle}</span>`}
             </li>`)}
-          ${!resultados.length && html`<li className="buscador-vacio">Nada coincide con "${texto}". Prueba con el DNI o el código del stand (A-03).</li>`}
+          ${!resultados.length && html`<li className="buscador-vacio">Nada coincide con "${texto}". Prueba con el DNI o el número del stand (1091).</li>`}
         </ul>`}
     </div>`;
 }
@@ -83,7 +83,7 @@ export function opcionesAsociados(asociados, mapaStands) {
       valor: a.id,
       titulo: nombreCompleto(a),
       detalle: `N° ${a.numero} · DNI ${a.dni}${suyos.length ? ` · ${suyos.join(", ")}` : ""}`,
-      pajar: normalizar(`${a.numero} ${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${suyos.join(" ")} ${suyos.map((c) => c.replace("-", "")).join(" ")}`),
+      pajar: normalizar(`${a.numero} ${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${suyos.join(" ")}`),
     };
   });
 }
@@ -96,7 +96,7 @@ export function opcionesStands(stands, porId) {
       valor: s.codigo,
       titulo: `${s.codigo} · ${a ? nombreCompleto(a) : "Sin propietario"}`,
       detalle: [a && `DNI ${a.dni}`, s.giro].filter(Boolean).join(" · "),
-      pajar: normalizar(`${s.codigo} ${s.codigo.replace("-", "")} ${a ? `${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${a.numero}` : ""} ${s.giro || ""}`),
+      pajar: normalizar(`${s.codigo} ${a ? `${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${a.numero}` : ""} ${s.giro || ""}`),
     };
   });
 }

@@ -36,8 +36,8 @@ export function validarFicha(f, { asociados = [], stands = [], idActual = null }
 
   if (f.standsTexto !== undefined) {
     const { validos, invalidos } = leerCodigos(f.standsTexto);
-    if (invalidos.length) e.stands = `No reconozco: ${invalidos.join(", ")}. Usa la letra de la galería y el número, p. ej. A-12.`;
-    else if (!validos.length) e.stands = "Indica al menos un stand, p. ej. A-12.";
+    if (invalidos.length) e.stands = `No reconozco: ${invalidos.join(", ")}. Usa el número del stand que figura en el plano (1001 a 1405), p. ej. 1091.`;
+    else if (!validos.length) e.stands = "Indica al menos un stand, p. ej. 1091.";
     else {
       const ocupado = validos
         .map((c) => stands.find((s) => s.id === c || s.codigo === c))

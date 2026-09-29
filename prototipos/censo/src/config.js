@@ -10,8 +10,9 @@ export const INSTITUCION = {
   logo: "img/logo.jpg",
 };
 
-// Un solo piso. El orden es el del inventario (y el del recorrido del censo).
-// La ubicación de cada stand en el plano está en src/plano.js.
+// Galerías del plano real (Mapa de riesgo MR-01). Un solo piso; los stands se
+// numeran 1001…1405 y cada uno trae su galería en src/plano.js.
+// M, K y L son las galerías del perímetro (Jr. Ayacucho, fondo y Jr. Andahuaylas).
 export const GALERIAS = [
   { id: "A", nombre: "Galería A" },
   { id: "B", nombre: "Galería B" },
@@ -21,8 +22,11 @@ export const GALERIAS = [
   { id: "F", nombre: "Galería F" },
   { id: "G", nombre: "Galería G" },
   { id: "H", nombre: "Galería H" },
-  { id: "P", nombre: "Patio de comidas" },
-  { id: "S", nombre: "Pabellón de servicios" },
+  { id: "I", nombre: "Galería I" },
+  { id: "J", nombre: "Galería J" },
+  { id: "K", nombre: "Galería K" },
+  { id: "L", nombre: "Galería L" },
+  { id: "M", nombre: "Galería M" },
 ];
 
 // Cuotas que se cobran por stand. `mensual`: todos los meses; `meses`: solo esos.

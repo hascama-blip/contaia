@@ -5,7 +5,7 @@ import { FotoCampo } from "../components/Archivos.js";
 import { Plano } from "../components/Plano.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS, LISTAS } from "../config.js";
-import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado, existeStand } from "../lib/padron.js";
 import { MODOS } from "../lib/plano.js";
 import { fecha, hoy } from "../lib/formato.js";
 import { soloDigitos } from "../lib/validar.js";
@@ -101,8 +101,10 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
   }, [filas, texto, soloPendientes]);
 
   const filtrando = Boolean(texto.trim()) || soloPendientes;
-  const resaltar = filtrando ? new Set(visibles.map((f) => f.stand.codigo)) : null;
-  const enfocar = texto.trim() && visibles.length === 1 ? visibles[0].stand.codigo : null;
+  // Un número de stand del plano se ubica aunque aún no tenga ficha.
+  const numero = /^\d{4}$/.test(texto.trim()) && existeStand(texto.trim()) ? texto.trim() : null;
+  const resaltar = filtrando ? new Set([...visibles.map((f) => f.stand.codigo), ...(numero ? [numero] : [])]) : null;
+  const enfocar = numero || (texto.trim() && visibles.length === 1 ? visibles[0].stand.codigo : null);
   const grupos = GALERIAS.map((g) => ({ ...g, filas: visibles.filter((f) => f.stand.galeria === g.id) })).filter((g) => g.filas.length);
 
   const actual = abierto && {
@@ -114,11 +116,11 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
       <section className="card card-pad" style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <h2 className="card-titulo">Plano del C.C.</h2>
-          <p className="card-sub">Un solo piso. Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha.</p>
+          <p className="card-sub">Plano real: 396 stands (1001 al 1405) en las galerías A a la M. Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha.</p>
         </div>
         <div className="barra-herr">
           <label className="sr" htmlFor="cp-buscar">Buscar</label>
-          <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por stand, DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
+          <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por N° de stand (1091), DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
           <div className="segmentos en-linea" role="group" aria-label="Colorear el plano por">
             ${Object.entries(MODOS).map(([k, t]) => html`<button key=${k} aria-pressed=${modo === k} onClick=${() => setModo(k)}>${t}</button>`)}
           </div>
@@ -129,7 +131,7 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
         </div>
         <${Plano} modo=${modo} resaltar=${resaltar} enfocar=${enfocar} onVerificar=${setAbierto} />
         ${debajoDelPlano}
-        <p className="ayuda">Plano de ejemplo para la demostración. Con el plano real del C.C. se reemplaza la distribución y los colores siguen funcionando igual.</p>
+        <p className="ayuda">Fuente: Mapa de riesgo MR-01 del C.C. (agosto 2025).</p>
       </section>
       ${antesDeLista}
 
