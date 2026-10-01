@@ -502,6 +502,38 @@ body.on-contacto .fab-info{display:none}
 .toast .ic{width:18px;height:18px;margin-top:1px}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
+/* Cursos en video */
+.video-cover{position:relative;display:block;width:100%;aspect-ratio:16/9;border:0;padding:0;cursor:pointer;overflow:hidden;color:var(--ink);background:radial-gradient(circle at 18% 0%,color-mix(in srgb,var(--surface) 55%,transparent),transparent 60%),var(--tint)}
+.video-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+.video-cover.has-img::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,color-mix(in srgb,var(--scrim) 55%,transparent),transparent 55%)}
+.video-card:hover .video-cover img{transform:scale(1.04)}
+.video-cover .badge{position:absolute;top:14px;left:14px;background:var(--surface);z-index:1}
+.video-cover .course-pattern{z-index:0}
+.play-btn{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:var(--surface);color:var(--brand);display:grid;place-items:center;box-shadow:var(--shadow);z-index:1;transition:transform .2s}
+.play-btn .ic{width:26px;height:26px;fill:currentColor;margin-left:4px}
+.video-card:hover .play-btn{transform:translate(-50%,-50%) scale(1.08)}
+.dur{position:absolute;right:12px;bottom:12px;z-index:1;display:inline-flex;gap:5px;align-items:center;padding:6px 10px;border-radius:999px;background:color-mix(in srgb,var(--scrim) 82%,transparent);color:var(--on-hero);font:700 12.5px/1 var(--font-body);font-variant-numeric:tabular-nums}
+.dur .ic{width:14px;height:14px}
+.soon-tag{position:absolute;right:12px;top:14px;z-index:1;padding:6px 10px;border-radius:999px;background:var(--accent);color:var(--on-accent);font:700 12px/1 var(--font-body)}
+.video-card .course-body{padding-top:20px}
+.dlg-video{width:min(920px,calc(100vw - 32px))}
+.player{position:relative;aspect-ratio:16/9;background:var(--scrim);display:grid;place-items:center;overflow:hidden;color:var(--on-hero);flex:none}
+.player iframe,.player video{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--scrim)}
+.player .video-cover{position:absolute;inset:0;height:100%;aspect-ratio:auto;cursor:default}
+.player-cta{position:relative;z-index:2;display:grid;justify-items:center;gap:10px;text-align:center;padding:16px}
+.player-cta small{color:var(--on-hero);background:color-mix(in srgb,var(--scrim) 70%,transparent);padding:4px 10px;border-radius:999px;font-size:13px}
+.player-soon{display:grid;gap:8px;justify-items:center;text-align:center;padding:16px}
+.player-soon .ic{width:40px;height:40px}
+.player-soon strong{font:600 20px/1.2 var(--font-display)}
+.player-soon span{color:var(--on-hero-soft)}
+.vd-close{position:absolute;top:12px;right:12px;z-index:3}
+.vd-body{padding:22px;display:grid;gap:10px;overflow-y:auto}
+.vd-body h2{font-size:clamp(20px,2.6vw,26px);font-weight:700}
+.vd-body p{color:var(--ink-soft)}
+.vd-meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--ink-soft);font-size:14px}
+.vd-meta span{display:inline-flex;align-items:center;gap:6px}
+.vd-meta .ic{width:16px;height:16px;color:var(--brand-bright)}
+
 /* Panel de administración */
 .dlg-admin{width:min(1140px,calc(100vw - 24px));height:calc(100dvh - 32px);max-height:none}
 .adm-lock{margin:auto;display:grid;gap:14px;justify-items:center;text-align:center;padding:40px 24px;width:min(400px,100%)}
@@ -643,6 +675,7 @@ body.on-contacto .fab-info{display:none}
         <div class="sub-panel" id="sub-panel">
           <div class="sub-card">
             <a class="sub-item" href="#cursos-gratuitos"><span class="sub-ico free" data-icon="gift"></span><span><strong>Cursos gratuitos</strong><small>Prevención y autocuidado sin costo para asociados · <span data-count="gratis">6</span> cursos</small></span></a>
+            <a class="sub-item" href="#cursos-videos" data-needs-videos><span class="sub-ico free" data-icon="video"></span><span><strong>Cursos en video</strong><small>Gratis, cortos y a tu ritmo · <span data-count="video">3</span> videos</small></span></a>
             <a class="sub-item" href="#cursos-pago"><span class="sub-ico paid" data-icon="award"></span><span><strong>Cursos de pago</strong><small>Con certificado y tarifa preferencial de asociado · <span data-count="pago">6</span> cursos</small></span></a>
             <a class="sub-item" href="#cursos"><span class="sub-ico all" data-icon="book"></span><span><strong>Todos los cursos</strong><small>Calendario completo de inicios</small></span></a>
           </div>
@@ -667,6 +700,7 @@ body.on-contacto .fab-info{display:none}
     <a class="d-link" href="#cursos" data-nav="cursos">Cursos</a>
     <div class="d-sub">
       <a href="#cursos-gratuitos"><span data-icon="gift"></span>Cursos gratuitos</a>
+      <a href="#cursos-videos" data-needs-videos><span data-icon="video"></span>Cursos en video</a>
       <a href="#cursos-pago"><span data-icon="award"></span>Cursos de pago</a>
     </div>
     <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
@@ -713,6 +747,21 @@ body.on-contacto .fab-info{display:none}
         <span class="quick-ico qi-brand" data-icon="whatsapp"></span>
         <div><h3>¿Necesitas orientación?</h3><p>Te ayudamos a elegir el curso adecuado según tu edad, trabajo y familia.</p><span class="more">Contáctanos<span data-icon="arrowRight"></span></span></div>
       </a>
+    </div>
+  </div>
+
+  <div class="section flush-top" data-needs-videos>
+    <div class="wrap">
+      <div class="head-row">
+        <div class="section-head">
+          <span class="eyebrow">Gratis · a tu ritmo</span>
+          <h2>Cursos cortos en video</h2>
+          <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+          <p>Aprende en 20 o 30 minutos, cuando quieras y desde donde estés.</p>
+        </div>
+        <a class="btn btn-line" href="#cursos-videos">Ver todos los videos<span data-icon="arrowRight"></span></a>
+      </div>
+      <div class="course-grid" id="home-videos"></div>
     </div>
   </div>
 
@@ -877,6 +926,7 @@ body.on-contacto .fab-info{display:none}
           <div class="seg" id="seg-tipo" role="group" aria-label="Tipo de curso">
             <button type="button" data-tipo="todos" aria-pressed="true">Todos <span class="count" data-count="todos">12</span></button>
             <button type="button" data-tipo="gratis" aria-pressed="false">Gratuitos <span class="count" data-count="gratis">6</span></button>
+            <button type="button" data-tipo="video" aria-pressed="false" data-needs-videos>En video <span class="count" data-count="video">3</span></button>
             <button type="button" data-tipo="pago" aria-pressed="false">De pago <span class="count" data-count="pago">6</span></button>
           </div>
           <div class="tools">
@@ -887,12 +937,14 @@ body.on-contacto .fab-info{display:none}
               <option value="Presencial">Presencial</option>
               <option value="Virtual">Virtual</option>
               <option value="Semipresencial">Semipresencial</option>
+              <option value="Video">En video</option>
             </select>
           </div>
         </div>
         <div class="chips" id="chips-cat" role="group" aria-label="Área"></div>
       </div>
       <div class="type-note free" id="note-gratis" hidden><span data-icon="gift"></span><p><strong>Cursos gratuitos:</strong> se financian con el fondo solidario de la mutual. Las vacantes se asignan por orden de inscripción y el asociado puede inscribir a sus familiares directos.</p></div>
+      <div class="type-note free" id="note-video" hidden><span data-icon="video"></span><p><strong>Cursos en video:</strong> gratis, de 20 a 30 minutos, para ver cuando quieras. No necesitas inscribirte.</p></div>
       <div class="type-note paid" id="note-pago" hidden><span data-icon="tag"></span><p><strong>Cursos de pago:</strong> los asociados pagan la tarifa preferencial. Familiares y público general pagan el precio regular. Incluyen certificado con horas académicas.</p></div>
       <p class="results-line" id="results-line" aria-live="polite"></p>
       <div class="course-grid" id="course-grid"></div>
@@ -1011,6 +1063,7 @@ body.on-contacto .fab-info{display:none}
       <h4>Cursos</h4>
       <ul class="footer-links">
         <li><a href="#cursos-gratuitos">Cursos gratuitos</a></li>
+        <li data-needs-videos><a href="#cursos-videos">Cursos en video</a></li>
         <li><a href="#cursos-pago">Cursos de pago</a></li>
         <li><a href="#cursos">Calendario de inicios</a></li>
       </ul>
@@ -1040,6 +1093,7 @@ body.on-contacto .fab-info{display:none}
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <dialog class="dlg" id="dlg-curso" aria-labelledby="cd-title"></dialog>
+<dialog class="dlg dlg-video" id="dlg-video" aria-labelledby="vd-title"></dialog>
 
 <dialog class="dlg dlg-admin" id="dlg-admin" aria-label="Administración del sitio">
   <div class="adm-lock" id="adm-lock">
@@ -1117,6 +1171,8 @@ const I = {
   arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   pause: '<path d="M9 5v14M15 5v14"/>',
   play: '<path d="M8 5l11 7-11 7z"/>',
+  video: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.2-2.5z"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
   upload: '<path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
@@ -1176,13 +1232,25 @@ function hydrateIcons(root) {
 }
 const LOGO_SVG = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg>';
 
+/* ---------- Áreas de los cursos ---------- */
+const CATS = {
+  'Prevención': { icon: 'shield', tint: 'var(--t-prev)' },
+  'Primeros auxilios': { icon: 'firstAid', tint: 'var(--t-aux)' },
+  'Cuidados': { icon: 'handHeart', tint: 'var(--t-cui)' },
+  'Salud mental': { icon: 'mind', tint: 'var(--t-men)' },
+  'Nutrición': { icon: 'apple', tint: 'var(--t-nut)' },
+  'Farmacología': { icon: 'pill', tint: 'var(--t-far)' }
+};
+const MODS = { Presencial: 'building', Virtual: 'monitor', Semipresencial: 'layers', Video: 'video' };
+
 /* ---------- Contenido editable del sitio (valores de ejemplo) ---------- */
 const ARTS = {
   prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['gift', 'Sin costo para asociados']] },
   cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
   comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
 };
-const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-pago', 'Cursos de pago'], ['#contacto', 'Contáctanos']];
+const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-videos', 'Cursos en video'], ['#cursos-pago', 'Cursos de pago'], ['#contacto', 'Contáctanos']];
+const MAX_VIDEOS = 40;
 const POS = { centro: '50% 50%', izquierda: '15% 50%', derecha: '85% 50%', arriba: '50% 15%', abajo: '50% 85%' };
 const POS_LABEL = { centro: 'Centro', izquierda: 'Izquierda', derecha: 'Derecha', arriba: 'Arriba', abajo: 'Abajo' };
 const MAX_SLIDES = 8;
@@ -1246,6 +1314,11 @@ const DEFAULT_SITE = {
   conectores: { formDestino: 'whatsapp', formEndpoint: '' },
   seguridad: { pinHash: '' },
   logo: null,
+  videos: [
+    { id: 'video-lavado-manos', titulo: 'Lavado de manos correcto', descripcion: 'Los cinco momentos del lavado de manos y la técnica recomendada por la OMS, paso a paso, para el hogar y el trabajo.', minutos: 20, cat: 'Prevención', url: '', portada: null, docente: 'Licenciada en enfermería (CEP)' },
+    { id: 'video-presion-casa', titulo: 'Cómo tomar la presión arterial en casa', descripcion: 'Cómo elegir el tensiómetro, prepararte antes de medir y anotar tus valores para llevarlos a tu control médico.', minutos: 25, cat: 'Cuidados', url: '', portada: null, docente: 'Médico internista (CMP)' },
+    { id: 'video-atragantamiento', titulo: 'Qué hacer ante un atragantamiento', descripcion: 'Maniobra de Heimlich en adultos y niños, y cómo ayudar a un lactante, con demostraciones.', minutos: 30, cat: 'Primeros auxilios', url: '', portada: null, docente: 'Médico emergenciólogo (CMP)' }
+  ],
   slides: [
     { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
     { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
@@ -1274,9 +1347,20 @@ function normSlide(s) {
     img: safeSrc(s.img), pos: POS[s.pos] ? s.pos : 'centro'
   };
 }
+function normVideo(v) {
+  v = v || {};
+  const m = parseInt(v.minutos, 10);
+  return {
+    id: (String(v.id || '').replace(/[^\w-]/g, '').slice(0, 50)) || 'video-' + uid(),
+    titulo: str(v.titulo, 120), descripcion: str(v.descripcion, 600),
+    minutos: m > 0 && m <= 600 ? m : 20, cat: CATS[v.cat] ? v.cat : 'Prevención',
+    url: str(v.url, 500).trim(), portada: safeSrc(v.portada), docente: str(v.docente, 120)
+  };
+}
 function mergeSite(raw) {
   const d = JSON.parse(JSON.stringify(DEFAULT_SITE));
-  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); return d; }
+  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); d.videos = d.videos.map(normVideo); return d; }
+  d.videos = (Array.isArray(raw.videos) ? raw.videos.slice(0, MAX_VIDEOS) : d.videos).map(normVideo);
   ['contacto', 'redes', 'textos'].forEach(sec => {
     if (raw[sec] && typeof raw[sec] === 'object') Object.keys(d[sec]).forEach(k => { if (typeof raw[sec][k] === 'string') d[sec][k] = raw[sec][k].slice(0, 600); });
   });
@@ -1304,10 +1388,26 @@ function cloneSite(s) {
     conectores: Object.assign({}, s.conectores), seguridad: Object.assign({}, s.seguridad),
     botones: Object.fromEntries(Object.entries(s.botones).map(e => [e[0], Object.assign({}, e[1])])),
     logo: s.logo, logoUrl: s.logoUrl || null, logoBlob: s.logoBlob || null,
-    slides: s.slides.map(x => Object.assign({}, x, { confirm: false }))
+    slides: s.slides.map(x => Object.assign({}, x, { confirm: false })),
+    videos: s.videos.map(x => Object.assign({}, x, { confirm: false }))
   };
 }
 let site = mergeSite(null);
+
+/* Videos: YouTube, Vimeo, Google Drive o archivo MP4/WebM.
+   Dentro del visor de Claude no se permiten reproductores de otros sitios: ahí el video se abre en una pestaña nueva.
+   En el sitio publicado en tu dominio, el video se reproduce dentro de la página. */
+const canEmbed = !(window.claude && typeof window.claude.use === 'function');
+function parseVideo(url) {
+  const u = safeUrl(url);
+  if (!u) return null;
+  let m;
+  if ((m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/i))) return { prov: 'YouTube', embed: 'https://www.youtube-nocookie.com/embed/' + m[1] + '?rel=0', url: u };
+  if ((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)(?:\/(\w+))?/i))) return { prov: 'Vimeo', embed: 'https://player.vimeo.com/video/' + m[1] + (m[2] ? '?h=' + m[2] : ''), url: u };
+  if ((m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]{20,})/i))) return { prov: 'Google Drive', embed: 'https://drive.google.com/file/d/' + m[1] + '/preview', url: u };
+  if (/\.(mp4|webm)(\?|#|$)/i.test(u)) return { prov: 'archivo de video', file: u, url: u };
+  return { prov: 'otro sitio', url: u };
+}
 
 /* Enlaces de contacto */
 const digits = v => String(v || '').replace(/\D/g, '');
@@ -1343,15 +1443,7 @@ function applyBtn(el, key) {
 }
 
 /* ---------- Datos de cursos ---------- */
-const CATS = {
-  'Prevención': { icon: 'shield', tint: 'var(--t-prev)' },
-  'Primeros auxilios': { icon: 'firstAid', tint: 'var(--t-aux)' },
-  'Cuidados': { icon: 'handHeart', tint: 'var(--t-cui)' },
-  'Salud mental': { icon: 'mind', tint: 'var(--t-men)' },
-  'Nutrición': { icon: 'apple', tint: 'var(--t-nut)' },
-  'Farmacología': { icon: 'pill', tint: 'var(--t-far)' }
-};
-const MODS = { Presencial: 'building', Virtual: 'monitor', Semipresencial: 'layers' };
+
 const COURSES = [
   { id: 'primeros-auxilios-hogar', titulo: 'Primeros auxilios en el hogar', cat: 'Primeros auxilios', tipo: 'gratis', modalidad: 'Presencial', horas: 8, inicio: '2026-10-17',
     horario: 'Sábados 17 y 24 de octubre, 9:00 a. m. a 12:00 m.', vacantes: 30, docente: 'Licenciada en enfermería (CEP)',
@@ -1440,9 +1532,64 @@ function courseCard(c) {
     '</div></article>';
 }
 
-const counts = { todos: COURSES.length, gratis: COURSES.filter(c => c.tipo === 'gratis').length, pago: COURSES.filter(c => c.tipo === 'pago').length };
-$$('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count]; });
-$$('[data-count-label]').forEach(el => { const n = counts[el.dataset.countLabel]; el.textContent = n + (n === 1 ? ' curso disponible' : ' cursos disponibles'); });
+function updateCounts() {
+  const v = site.videos.length;
+  const counts = { todos: COURSES.length + v, gratis: COURSES.filter(c => c.tipo === 'gratis').length + v, pago: COURSES.filter(c => c.tipo === 'pago').length, video: v };
+  $$('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count]; });
+  $$('[data-count-label]').forEach(el => { const n = counts[el.dataset.countLabel]; el.textContent = n + (n === 1 ? ' curso disponible' : ' cursos disponibles'); });
+  $$('[data-needs-videos]').forEach(el => { el.hidden = !v; });
+}
+
+/* ---------- Tarjetas y reproductor de cursos en video ---------- */
+const PLAY_SVG = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5l11 7-11 7z"/></svg>';
+function videoCoverInner(v) {
+  const cat = CATS[v.cat] || CATS['Prevención'];
+  const src = v.portadaUrl || v.portada;
+  return (src ? '<img src="' + esc(src) + '" alt="" loading="lazy">' : '<span class="course-pattern">' + icon(cat.icon) + '</span>') +
+    '<span class="badge badge-free">Gratis</span>' + (parseVideo(v.url) ? '' : '<span class="soon-tag">Próximamente</span>') +
+    '<span class="play-btn">' + PLAY_SVG + '</span><span class="dur">' + icon('clock') + v.minutos + ' min</span>';
+}
+function videoCard(v) {
+  const cat = CATS[v.cat] || CATS['Prevención'];
+  const src = v.portadaUrl || v.portada;
+  const ready = !!parseVideo(v.url);
+  const titulo = v.titulo || 'Video sin título';
+  return '<article class="course video-card" style="--tint:' + cat.tint + '">' +
+    '<button class="video-cover' + (src ? ' has-img' : '') + '" type="button" data-video="' + esc(v.id) + '" aria-label="Ver video: ' + esc(titulo) + '">' + videoCoverInner(v) + '</button>' +
+    '<div class="course-body"><p class="course-cat">' + esc(v.cat) + ' · Video</p>' +
+    '<h3 class="course-title">' + esc(titulo) + '</h3>' +
+    (v.descripcion ? '<p class="course-sum">' + esc(v.descripcion) + '</p>' : '') +
+    '<ul class="course-meta"><li>' + icon('video') + 'En video</li><li>' + icon('clock') + v.minutos + ' min</li><li>' + icon('calendar') + (ready ? 'Disponible ahora' : 'Próximamente') + '</li></ul>' +
+    '<div class="course-foot"><div class="price is-free"><strong>Gratis</strong><span>sin inscripción</span></div><button class="btn btn-soft btn-sm" type="button" data-video="' + esc(v.id) + '">' + (ready ? 'Ver video' : 'Ver detalle') + '</button></div>' +
+    '</div></article>';
+}
+function renderHomeVideos() { $('#home-videos').innerHTML = site.videos.slice(0, 3).map(videoCard).join(''); }
+const dlgV = $('#dlg-video');
+function openVideo(id) {
+  const v = site.videos.find(x => x.id === id);
+  if (!v) return;
+  const cat = CATS[v.cat] || CATS['Prevención'];
+  const pv = parseVideo(v.url);
+  const titulo = v.titulo || 'Video sin título';
+  const src = v.portadaUrl || v.portada;
+  let player;
+  if (!pv) player = '<div class="player-soon">' + icon('clock') + '<strong>Muy pronto disponible</strong><span>Estamos preparando este video.</span></div>';
+  else if (canEmbed && pv.embed) player = '<iframe src="' + esc(pv.embed) + '" title="' + esc(titulo) + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+  else if (canEmbed && pv.file) player = '<video controls preload="metadata" src="' + esc(pv.file) + '"' + (src ? ' poster="' + esc(src) + '"' : '') + '></video>';
+  else player = '<span class="video-cover' + (src ? ' has-img' : '') + '" style="--tint:' + cat.tint + '">' + (src ? '<img src="' + esc(src) + '" alt="">' : '<span class="course-pattern">' + icon(cat.icon) + '</span>') + '</span>' +
+    '<div class="player-cta"><a class="btn btn-accent" href="' + esc(pv.url) + '" target="_blank" rel="noopener">' + icon('play') + 'Ver el video</a><small>Se abre en ' + esc(pv.prov) + '</small></div>';
+  dlgV.innerHTML = '<div class="player">' + player + '<button class="icon-btn vd-close" type="button" data-close aria-label="Cerrar">' + icon('close') + '</button></div>' +
+    '<div class="vd-body"><div class="cd-tags"><span class="badge badge-free">Gratis</span><span class="cd-cat">' + icon(cat.icon) + esc(v.cat) + '</span></div>' +
+    '<h2 id="vd-title">' + esc(titulo) + '</h2>' +
+    '<div class="vd-meta"><span>' + icon('clock') + v.minutos + ' minutos</span><span>' + icon('video') + 'A tu ritmo, sin inscripción</span>' + (v.docente ? '<span>' + icon('stethoscope') + esc(v.docente) + '</span>' : '') + '</div>' +
+    (v.descripcion ? '<p>' + esc(v.descripcion) + '</p>' : '') + '</div>' +
+    '<div class="dlg-foot">' + (pv ? '<a class="btn btn-line" href="' + esc(pv.url) + '" target="_blank" rel="noopener">' + icon('external') + 'Abrir en ' + esc(pv.prov) + '</a>' : '') +
+    '<a class="btn btn-accent" href="#cursos-gratuitos" data-close>Ver más cursos gratuitos</a></div>';
+  dlgV.showModal();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-video]'); if (b) openVideo(b.dataset.video); });
+dlgV.addEventListener('click', e => { if (e.target === dlgV || e.target.closest('[data-close]')) dlgV.close(); });
+dlgV.addEventListener('close', () => { dlgV.innerHTML = ''; });
 
 /* ---------- Inicio: próximos inicios ---------- */
 let homeTipo = 'todos';
@@ -1459,21 +1606,28 @@ $('#chips-cat').innerHTML = '<button class="chip" type="button" data-cat="todas"
   Object.keys(CATS).map(k => '<button class="chip" type="button" data-cat="' + esc(k) + '" aria-pressed="false">' + icon(CATS[k].icon) + esc(k) + '</button>').join('');
 function renderCourses() {
   const q = norm(filters.q.trim());
-  const list = sortByDate(COURSES.filter(c =>
+  const vids = (['todos', 'gratis', 'video'].includes(filters.tipo) && (filters.mod === 'todas' || filters.mod === 'Video'))
+    ? site.videos.filter(v => (filters.cat === 'todas' || v.cat === filters.cat) && (!q || norm(v.titulo + ' ' + v.descripcion + ' ' + v.cat).includes(q)))
+    : [];
+  const list = filters.tipo === 'video' || filters.mod === 'Video' ? [] : sortByDate(COURSES.filter(c =>
     (filters.tipo === 'todos' || c.tipo === filters.tipo) &&
     (filters.cat === 'todas' || c.cat === filters.cat) &&
     (filters.mod === 'todas' || c.modalidad === filters.mod) &&
     (!q || norm(c.titulo + ' ' + c.resumen + ' ' + c.cat + ' ' + c.temario.join(' ')).includes(q))
   ));
-  $('#course-grid').innerHTML = list.map(courseCard).join('');
-  $('#empty').hidden = list.length > 0;
+  $('#course-grid').innerHTML = vids.map(videoCard).join('') + list.map(courseCard).join('');
+  $('#empty').hidden = vids.length + list.length > 0;
   $$('#seg-tipo button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tipo === filters.tipo)));
   $$('#chips-cat .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cat === filters.cat)));
   $('#note-gratis').hidden = filters.tipo !== 'gratis';
   $('#note-pago').hidden = filters.tipo !== 'pago';
+  $('#note-video').hidden = filters.tipo !== 'video';
   const kind = filters.tipo === 'gratis' ? (list.length === 1 ? ' gratuito' : ' gratuitos') : filters.tipo === 'pago' ? ' de pago' : '';
-  $('#results-line').textContent = list.length ? 'Mostrando ' + list.length + (list.length === 1 ? ' curso' : ' cursos') + kind + ', ordenados por fecha de inicio.' : '';
-  const label = filters.tipo === 'gratis' ? 'Cursos gratuitos' : filters.tipo === 'pago' ? 'Cursos de pago' : 'Cursos';
+  const parts = [];
+  if (vids.length) parts.push(vids.length + (vids.length === 1 ? ' curso en video' : ' cursos en video'));
+  if (list.length) parts.push(list.length + (list.length === 1 ? ' curso' : ' cursos') + kind + ' con fecha de inicio');
+  $('#results-line').textContent = parts.length ? 'Mostrando ' + parts.join(' y ') + '.' : '';
+  const label = filters.tipo === 'gratis' ? 'Cursos gratuitos' : filters.tipo === 'pago' ? 'Cursos de pago' : filters.tipo === 'video' ? 'Cursos en video' : 'Cursos';
   $('#t-cursos').textContent = label;
   $('#crumb-cursos').textContent = label;
 }
@@ -1533,14 +1687,13 @@ dlgC.addEventListener('click', e => {
 });
 
 /* ---------- Navegación entre páginas ---------- */
-const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-pago': 'cursos', contacto: 'contacto' };
+const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-videos': 'cursos', 'cursos-pago': 'cursos', contacto: 'contacto' };
 let currentPage = null;
 function route(h) {
   if (h == null) h = decodeURIComponent(location.hash.slice(1));
-  if (h === 'admin') { if (!currentPage) route(''); openAdmin(); return; }
   const page = ALIAS[h];
   if (!page) return;
-  if (page === 'cursos') setTipo(h === 'cursos-gratuitos' ? 'gratis' : h === 'cursos-pago' ? 'pago' : 'todos');
+  if (page === 'cursos') setTipo(h === 'cursos-gratuitos' ? 'gratis' : h === 'cursos-pago' ? 'pago' : h === 'cursos-videos' ? 'video' : 'todos');
   $$('.page').forEach(p => { p.hidden = p.dataset.page !== page; });
   currentPage = page;
   document.body.classList.toggle('on-contacto', page === 'contacto');
@@ -1626,6 +1779,9 @@ function applySite() {
   const ms = $('#fab-ms'); const msH = safeUrl(site.redes.messenger);
   ms.hidden = !(site.botones.burbujaMs.visible && msH); if (msH) ms.href = msH;
   const mp = mapLink(); $$('[data-map]').forEach(a => { a.hidden = !mp; if (mp) a.href = mp; });
+  updateCounts();
+  renderHomeVideos();
+  renderCourses();
   document.title = c.nombre || 'Instituto Mutualista';
   $('#t-inicio').textContent = (c.nombre || 'Instituto') + ': cursos de salud para asociados';
 }
@@ -1704,7 +1860,7 @@ const LS_SITE = 'instituto-mutualista-sitio';
 let readOnly = false;
 let persisted = new Set();
 let legacyPortada = false;
-const collectPaths = s => new Set([s.logo].concat(s.slides.map(x => x.img)).filter(isPath));
+const collectPaths = s => new Set([s.logo].concat(s.slides.map(x => x.img), s.videos.map(x => x.portada)).filter(isPath));
 
 async function loadSite() {
   let loaded = null;
@@ -1723,7 +1879,7 @@ async function loadSite() {
 
 /* ---------- Panel de administración (oculto) ---------- */
 const dlgA = $('#dlg-admin');
-const TABS = [['portada', 'Portada', 'image'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
+const TABS = [['portada', 'Portada', 'image'], ['videos', 'Cursos en video', 'video'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
 let admTab = 'portada';
 let draft = null;
 let dirty = false;
@@ -1772,7 +1928,6 @@ $('#lock-form').addEventListener('submit', e => {
 });
 function closeAdmin() {
   dlgA.close();
-  try { if (location.hash === '#admin') history.replaceState(null, '', '#' + (currentPage || 'inicio')); } catch (e) { /* sin historial */ }
 }
 function requestClose() {
   if (!$('#adm-app').hidden && dirty) { $('#adm-confirm').hidden = false; return; }
@@ -1857,6 +2012,48 @@ function edRow(s, i, n) {
         '<button class="icon-btn" type="button" data-act="del" aria-label="Quitar diapositiva ' + (i + 1) + '"' + (n === 1 ? ' disabled' : '') + '>' + icon('trash') + '</button>') +
     '</div></li>';
 }
+function vidHint(url) {
+  if (!String(url || '').trim()) return { t: 'Vacío: el video se muestra como “Próximamente”.', c: '' };
+  const pv = parseVideo(url);
+  if (!pv) return { t: 'Revisa el enlace: debe ser una dirección web.', c: 'bad' };
+  if (pv.embed || pv.file) return { t: (pv.prov === 'archivo de video' ? 'Archivo de video' : pv.prov) + ' reconocido. En tu sitio se reproduce dentro de la página.', c: 'good' };
+  return { t: 'Enlace no reconocido como YouTube, Vimeo o Google Drive: se abrirá en una pestaña nueva.', c: '' };
+}
+function vidRow(v, i, n) {
+  const cat = CATS[v.cat] || CATS['Prevención'];
+  const src = v.portadaUrl || v.portada;
+  const h = vidHint(v.url);
+  const opt = (val, label, sel) => '<option value="' + esc(val) + '"' + (val === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+  return '<li class="ed-row vid-row" data-v="' + i + '">' +
+    '<div class="ed-thumb"><div class="ed-ph" style="background:var(--surface-2);color:var(--brand)"><span class="ed-num">' + (i + 1) + '</span>' +
+    (src ? '<img src="' + esc(src) + '" alt="">' : icon(cat.icon)) + '</div>' +
+    '<label class="btn btn-line btn-xs file-btn">' + icon('upload') + '<span>' + (src ? 'Cambiar portada' : 'Subir portada') + '</span><input type="file" accept="image/jpeg,image/png,image/webp" data-act="vid-cover" aria-label="Elegir portada del video ' + (i + 1) + '"></label>' +
+    (src ? '<button class="btn btn-line btn-xs" type="button" data-act="vid-cover-off">Quitar portada</button>' : '<small class="adm-hint">Sin portada se usa el color del área.</small>') +
+    '</div>' +
+    '<div class="ed-fields">' +
+    '<label class="ed-f ed-wide"><span>Título</span><input id="vid-titulo-' + v.id + '" data-vf="titulo" maxlength="120" value="' + esc(v.titulo) + '" placeholder="Ej.: Cómo prevenir caídas en casa"></label>' +
+    '<label class="ed-f ed-wide"><span>Enlace del video (YouTube, Vimeo o Google Drive)</span><input id="vid-url-' + v.id + '" data-vf="url" inputmode="url" maxlength="500" value="' + esc(v.url) + '" placeholder="https://youtu.be/…"><small class="adm-hint ' + h.c + '" id="vid-url-' + v.id + '-hint">' + esc(h.t) + '</small></label>' +
+    '<label class="ed-f"><span>Duración (minutos)</span><input id="vid-min-' + v.id + '" data-vf="minutos" type="number" min="1" max="600" value="' + v.minutos + '"></label>' +
+    '<label class="ed-f"><span>Área</span><select id="vid-cat-' + v.id + '" data-vf="cat">' + Object.keys(CATS).map(k => opt(k, k, v.cat)).join('') + '</select></label>' +
+    '<label class="ed-f ed-wide"><span>Expositor (opcional)</span><input id="vid-doc-' + v.id + '" data-vf="docente" maxlength="120" value="' + esc(v.docente) + '" placeholder="Ej.: Médico internista (CMP)"></label>' +
+    '<label class="ed-f ed-wide"><span>Descripción</span><textarea id="vid-desc-' + v.id + '" data-vf="descripcion" rows="2" maxlength="600" placeholder="Qué aprenderá la persona en este video">' + esc(v.descripcion) + '</textarea></label>' +
+    '</div>' +
+    '<div class="ed-actions">' +
+    (v.confirm
+      ? '<div class="ed-confirm">¿Quitar este video?<div><button class="btn btn-line btn-xs" type="button" data-act="vid-del-yes">Sí, quitar</button><button class="btn btn-line btn-xs" type="button" data-act="vid-del-no">No</button></div></div>'
+      : '<button class="icon-btn" type="button" data-act="vid-up" aria-label="Subir video ' + (i + 1) + '"' + (i === 0 ? ' disabled' : '') + '>' + icon('up') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="vid-down" aria-label="Bajar video ' + (i + 1) + '"' + (i === n - 1 ? ' disabled' : '') + '>' + icon('down') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="vid-del" aria-label="Quitar video ' + (i + 1) + '">' + icon('trash') + '</button>') +
+    '</div></li>';
+}
+function panelVideos() {
+  return '<h3>Cursos en video</h3><p class="adm-intro">Videos cortos y gratuitos. Se muestran en Inicio (los 3 primeros de la lista) y en Cursos, con la etiqueta “Gratis”. Los primeros de la lista aparecen primero.</p>' +
+    '<p class="adm-note">' + icon('info') + '<span>Un video de 20 o 30 minutos pesa demasiado para guardarlo dentro de la página. Súbelo a YouTube como <strong>“No listado”</strong> (o a Vimeo, o a Google Drive con acceso para “cualquier persona con el enlace”) y pega aquí el enlace.</span></p>' +
+    '<p style="margin-top:16px"><button class="btn btn-brand btn-sm" type="button" data-act="vid-add"' + (draft.videos.length >= MAX_VIDEOS ? ' disabled' : '') + '>' + icon('video') + 'Agregar video</button></p>' +
+    (draft.videos.length
+      ? '<ol class="ed-list">' + draft.videos.map((v, i) => vidRow(v, i, draft.videos.length)).join('') + '</ol>'
+      : '<div class="empty" style="margin-top:16px">' + icon('video') + '<h3>Aún no hay cursos en video</h3><p>Pulsa “Agregar video” y pega el enlace. Mientras no haya videos, la sección no se muestra en la web.</p></div>');
+}
 function waHint() { const n = waNumber(draft); return n ? 'Enlace que se usará: wa.me/' + n : 'Escribe el número con código de país, por ejemplo +51 987 654 321.'; }
 function mapHint() { return safeUrl(draft.contacto.mapa) ? 'Se usará este enlace.' : 'Vacío: se buscará la dirección en Google Maps.'; }
 function panelContacto() {
@@ -1940,13 +2137,12 @@ function panelSeguridad() {
     '<div class="adm-grid"><label class="ed-f"><span>Nuevo PIN</span><input id="pin-new" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label>' +
     '<label class="ed-f"><span>Repite el nuevo PIN</span><input id="pin-rep" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label></div>' +
     '<p style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" data-act="pin">' + icon('lock') + 'Cambiar PIN</button><span class="adm-hint" id="pin-msg"></span></p>' +
-    '<h3>Cómo entrar al panel</h3><p class="adm-intro">El panel no tiene ningún botón visible. Se abre de estas tres formas:</p><ul class="access-list">' +
-    '<li><span class="quick-ico qi-brand">' + icon('link') + '</span><span>Agrega <code>#admin</code> al final del enlace de la página.</span></li>' +
+    '<h3>Cómo entrar al panel</h3><p class="adm-intro">El panel no tiene ningún botón visible ni dirección propia. Se abre solo de estas dos formas:</p><ul class="access-list">' +
     '<li><span class="quick-ico qi-brand">' + icon('keyboard') + '</span><span>En computadora, presiona <code>Alt</code> + <code>Shift</code> + <code>A</code>.</span></li>' +
     '<li><span class="quick-ico qi-brand">' + icon('pointer') + '</span><span>Haz clic 5 veces seguidas en el símbolo <code>©</code> del pie de página.</span></li></ul>' +
     '<p class="adm-note">' + icon('info') + '<span>El PIN evita que un visitante entre por accidente. La protección real está en el guardado: solo las personas con permiso de edición de esta página pueden publicar cambios. En el sitio final, el panel debe ir detrás de un inicio de sesión en el servidor.</span></p>';
 }
-const PANELS = { portada: panelPortada, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
+const PANELS = { portada: panelPortada, videos: panelVideos, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
 function renderPanel(focusId) {
   $('#adm-panel').innerHTML = PANELS[admTab]();
   if (focusId) { const f = document.getElementById(focusId); if (f) f.focus(); }
@@ -1964,6 +2160,16 @@ admPanel.addEventListener('input', e => {
     if (t.dataset.path.startsWith('redes.') && hint) { const h = urlHint(t.value); hint.textContent = h.t; hint.className = 'adm-hint ' + h.c; }
     const card = t.closest('[data-bkey]');
     if (card && !t.hasAttribute('data-rerender')) { const k = card.dataset.bkey; $('#btn-' + k + '-prev').innerHTML = btnPreview(draft.botones[k]); }
+    return;
+  }
+  const vrow = t.closest('.vid-row');
+  if (vrow && t.dataset.vf) {
+    const v = draft.videos[+vrow.dataset.v];
+    if (t.dataset.vf === 'minutos') { const m = parseInt(t.value, 10); if (m > 0 && m <= 600) v.minutos = m; }
+    else v[t.dataset.vf] = t.value;
+    markDirty();
+    if (t.dataset.vf === 'cat') { const ph = $('.ed-ph', vrow); const svg = ph && !ph.querySelector('img') ? ph.querySelector('svg.ic') : null; if (svg) svg.outerHTML = icon((CATS[t.value] || CATS['Prevención']).icon); }
+    if (t.dataset.vf === 'url') { const hint = document.getElementById(t.id + '-hint'); const h = vidHint(t.value); if (hint) { hint.textContent = h.t; hint.className = 'adm-hint ' + h.c; } }
     return;
   }
   const row = t.closest('.ed-row');
@@ -1993,6 +2199,14 @@ admPanel.addEventListener('change', async e => {
     catch (err) { setStatus('No se pudo leer esa imagen. Prueba con un JPG o PNG.', 'error'); }
     return;
   }
+  if (t.dataset.act === 'vid-cover') {
+    const v = draft.videos[+t.closest('.vid-row').dataset.v];
+    const file = t.files && t.files[0];
+    if (!file) return;
+    try { const r = await compress(file, 1280); v.portadaBlob = r.blob; v.portadaUrl = r.imgUrl; v.portada = null; markDirty(); renderPanel(); }
+    catch (err) { setStatus('No se pudo leer esa imagen. Prueba con un JPG o PNG.', 'error'); }
+    return;
+  }
   if (t.dataset.act === 'logo') {
     const file = t.files && t.files[0];
     if (!file) return;
@@ -2004,6 +2218,20 @@ admPanel.addEventListener('click', e => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   const act = b.dataset.act;
+  if (act.startsWith('vid-')) {
+    const vr = b.closest('.vid-row');
+    const j = vr ? +vr.dataset.v : -1;
+    const vl = draft.videos;
+    if (act === 'vid-add') { if (vl.length < MAX_VIDEOS) { vl.unshift({ id: 'video-' + uid(), titulo: '', descripcion: '', minutos: 20, cat: 'Prevención', url: '', portada: null, docente: '', confirm: false }); markDirty(); renderPanel('vid-titulo-' + vl[0].id); } return; }
+    if (act === 'vid-up' && j > 0) { const t = vl[j - 1]; vl[j - 1] = vl[j]; vl[j] = t; markDirty(); }
+    else if (act === 'vid-down' && j < vl.length - 1) { const t = vl[j + 1]; vl[j + 1] = vl[j]; vl[j] = t; markDirty(); }
+    else if (act === 'vid-del') { vl.forEach(v => { v.confirm = false; }); vl[j].confirm = true; }
+    else if (act === 'vid-del-no') { vl[j].confirm = false; }
+    else if (act === 'vid-del-yes') { vl.splice(j, 1); markDirty(); }
+    else if (act === 'vid-cover-off') { const v = vl[j]; v.portada = null; v.portadaUrl = null; v.portadaBlob = null; markDirty(); }
+    renderPanel();
+    return;
+  }
   const row = b.closest('.ed-row');
   const i = row ? +row.dataset.i : -1;
   const sl = draft.slides;
@@ -2033,12 +2261,12 @@ admPanel.addEventListener('click', e => {
 ['dragleave', 'drop'].forEach(t => admPanel.addEventListener(t, e => { const d = e.target.closest && e.target.closest('.ed-drop'); if (d) { e.preventDefault(); d.classList.remove('is-over'); } }));
 admPanel.addEventListener('drop', e => { if (e.target.closest && e.target.closest('.ed-drop')) addFiles(e.dataTransfer && e.dataTransfer.files); });
 
-async function compress(file) {
+async function compress(file, maxSide) {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image(); img.src = url; await img.decode();
     const w0 = img.naturalWidth, h0 = img.naturalHeight;
-    const scale = Math.min(1, 1920 / Math.max(w0, h0));
+    const scale = Math.min(1, (maxSide || 1920) / Math.max(w0, h0));
     const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     c.getContext('2d').drawImage(img, 0, 0, w, h);
@@ -2084,13 +2312,15 @@ async function addFiles(files) {
 /* Guardar */
 const blobToDataURL = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
 const slideMeta = (s, img) => ({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
-function serialize(d, slides, logo) {
-  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, seguridad: d.seguridad, logo: logo, slides: slides };
+const videoMeta = (v, portada) => ({ id: v.id, titulo: v.titulo, descripcion: v.descripcion, minutos: v.minutos, cat: v.cat, url: v.url.trim(), portada: portada, docente: v.docente });
+function serialize(d, slides, logo, videos) {
+  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
 }
 function commitDraft() {
   const keepSession = session.get('im-admin') === currentPinHash();
   site = cloneSite(draft);
   site.slides.forEach(s => { delete s.confirm; delete s.warn; });
+  site.videos.forEach(v => { delete v.confirm; });
   if (keepSession) session.set('im-admin', currentPinHash());
   dirty = false;
   applySite(); cur = 0; renderHero();
@@ -2118,14 +2348,21 @@ $('#adm-save').addEventListener('click', async () => {
       let logo = isPath(draft.logo) ? draft.logo : null;
       if (draft.logoBlob) { logo = 'imagenes/logo-' + uid() + '.png'; files[logo] = draft.logoBlob; }
       if (logo) keep.add(logo);
+      const videos = draft.videos.map(v => {
+        let por = isPath(v.portada) ? v.portada : null;
+        if (v.portadaBlob) { por = 'imagenes/' + v.id + '-' + uid() + '.jpg'; files[por] = v.portadaBlob; }
+        if (por) keep.add(por);
+        return videoMeta(v, por);
+      });
       persisted.forEach(p => { if (!keep.has(p)) files[p] = null; });
       if (legacyPortada) files['portada.json'] = null;
-      files['sitio.json'] = JSON.stringify(serialize(draft, slides, logo), null, 2);
+      files['sitio.json'] = JSON.stringify(serialize(draft, slides, logo, videos), null, 2);
       try {
         await publishWithRetry(art, files);
         persisted = keep; legacyPortada = false;
         draft.slides.forEach((s, k) => { s.img = slides[k].img; s.blob = null; });
         draft.logo = logo; draft.logoBlob = null;
+        draft.videos.forEach((v, k) => { v.portada = videos[k].portada; v.portadaBlob = null; });
         commitDraft(); renderPanel();
         setStatus('Cambios guardados y publicados para todos los visitantes.', 'ok');
       } catch (err) {
@@ -2143,7 +2380,9 @@ $('#adm-save').addEventListener('click', async () => {
       const slides = [];
       for (const s of draft.slides) slides.push(slideMeta(s, s.blob ? await blobToDataURL(s.blob) : s.img));
       const logo = draft.logoBlob ? await blobToDataURL(draft.logoBlob) : draft.logo;
-      const ok = store.set(LS_SITE, serialize(draft, slides, logo));
+      const videos = [];
+      for (const v of draft.videos) videos.push(videoMeta(v, v.portadaBlob ? await blobToDataURL(v.portadaBlob) : v.portada));
+      const ok = store.set(LS_SITE, serialize(draft, slides, logo, videos));
       commitDraft(); renderPanel();
       setStatus(ok ? 'Cambios guardados en este navegador.' : 'Los cambios se ven en esta sesión, pero no caben en el almacenamiento del navegador. Usa menos fotos o fotos más livianas.', ok ? 'ok' : 'error');
       return;
@@ -2279,7 +2518,7 @@ renderHero();
 setPaused(paused);
 siteReady = loadSite();
 const startHash = decodeURIComponent(location.hash.slice(1));
-route(startHash === 'admin' ? 'admin' : (startHash in ALIAS ? null : ''));
+route(startHash in ALIAS ? null : '');
 })();
 </script>
 </body></html>

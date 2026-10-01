@@ -9,14 +9,17 @@ mutualista que ofrece cursos de salud preventivos y de especialización a sus as
   pasos de inscripción.
 - **Nosotros**: quiénes somos, modelo (gratuito / tarifa asociado / certificación), misión,
   visión, valores y equipo.
-- **Cursos** (con submenú *Gratuitos* / *De pago*): filtros por tipo, área, modalidad y
-  búsqueda; ficha de cada curso con temario, horario, docente y precios.
+- **Cursos** (con submenú *Gratuitos* / *En video* / *De pago*): filtros por tipo, área,
+  modalidad y búsqueda; ficha de cada curso con temario, horario, docente y precios.
+- **Cursos en video** (gratis, de 20 a 30 min): sección en Inicio (los 3 primeros) y en Cursos
+  (`#cursos-videos`). Se reproducen dentro de la página con YouTube, Vimeo, Google Drive o un
+  archivo MP4/WebM. Dentro del visor de Claude los reproductores externos están bloqueados, así
+  que ahí el video se abre en una pestaña nueva.
 - **Contáctanos**: datos de contacto, formulario con validación (DNI, celular, Ley 29733),
   redes sociales, mapa y preguntas frecuentes.
 
 ## Administrador oculto
-No hay ningún botón visible. Se abre de tres formas:
-- agregando `#admin` al final del enlace;
+No hay ningún botón visible ni dirección propia. Se abre de dos formas:
 - con `Alt` + `Shift` + `A` en computadora;
 - con 5 clics seguidos en el símbolo `©` del pie de página.
 
@@ -25,6 +28,7 @@ Pide un **PIN** (por defecto `2026`; se cambia en la pestaña *Seguridad*). Pest
 | Pestaña | Qué se edita |
 | --- | --- |
 | Portada | Fotos del carrusel (subir, cambiar, quitar, encuadre, orden), antetítulo, título, texto y botón de cada diapositiva |
+| Cursos en video | Agregar, ordenar y quitar videos gratuitos: título, enlace (YouTube no listado, Vimeo o Google Drive), duración, área, expositor, descripción y portada |
 | Contacto | Nombre, lema, logo, WhatsApp, mensaje inicial de WhatsApp, teléfono, correo, horario, dirección, enlace de Google Maps |
 | Redes sociales | Facebook, Instagram, TikTok, YouTube, LinkedIn, Messenger (vacío = no se muestra) |
 | Botones | Texto y destino de cada botón de contacto (página, WhatsApp, llamada, correo, red social u otro enlace) y burbujas flotantes de WhatsApp / Messenger |
