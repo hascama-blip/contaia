@@ -12,9 +12,9 @@
   --brand:#0f7f7a; --brand-strong:#0a5d62; --on-brand:#ffffff; --brand-soft:#d3eeea;
   --accent:#f2a541; --accent-strong:#e5922a; --on-accent:#2e1d05;
   --free:#147a55; --free-bg:#d8f2e5; --paid:#285f9c; --paid-bg:#e0eaf7;
-  --danger:#b93a26; --focus:#16968e;
+  --danger:#b93a26; --danger-bg:#fbe4df; --focus:#16968e;
   --hero-1:#0b5a61; --hero-2:#12878a; --hero-3:#58c2b6; --on-hero:#ffffff; --on-hero-soft:rgba(255,255,255,.86);
-  --scrim:#073237; --wa:#1c9f55; --on-wa:#ffffff;
+  --scrim:#073237; --wa:#1c9f55; --on-wa:#ffffff; --ms:#0a72e8; --on-ms:#ffffff;
   --t-prev:#d6f0ea; --t-aux:#fae1d9; --t-cui:#dde9f8; --t-men:#e8e3f5; --t-nut:#e4f1d6; --t-far:#f7ead2;
   --shadow:0 1px 2px rgba(16,60,64,.06),0 10px 28px rgba(16,60,64,.09);
   --shadow-sm:0 1px 3px rgba(16,60,64,.12);
@@ -31,9 +31,9 @@
     --brand:#2fb3a9; --brand-strong:#82ddd3; --on-brand:#06201f; --brand-soft:#16393b;
     --accent:#f3b257; --accent-strong:#f7c57c; --on-accent:#2e1d05;
     --free:#62d5a5; --free-bg:#11392b; --paid:#8db9ec; --paid-bg:#152f4b;
-    --danger:#ff917c; --focus:#82ddd3;
+    --danger:#ff917c; --danger-bg:#3d1f1a; --focus:#82ddd3;
     --hero-1:#07343a; --hero-2:#0b585b; --hero-3:#167f78; --on-hero:#f1fbfa; --on-hero-soft:rgba(241,251,250,.84);
-    --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff;
+    --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff; --ms:#2f86f0; --on-ms:#ffffff;
     --t-prev:#143a36; --t-aux:#3a2520; --t-cui:#172c45; --t-men:#29253f; --t-nut:#21331a; --t-far:#372c18;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px rgba(0,0,0,.35);
     --shadow-sm:0 1px 3px rgba(0,0,0,.4);
@@ -48,9 +48,9 @@
   --brand:#2fb3a9; --brand-strong:#82ddd3; --on-brand:#06201f; --brand-soft:#16393b;
   --accent:#f3b257; --accent-strong:#f7c57c; --on-accent:#2e1d05;
   --free:#62d5a5; --free-bg:#11392b; --paid:#8db9ec; --paid-bg:#152f4b;
-  --danger:#ff917c; --focus:#82ddd3;
+  --danger:#ff917c; --danger-bg:#3d1f1a; --focus:#82ddd3;
   --hero-1:#07343a; --hero-2:#0b585b; --hero-3:#167f78; --on-hero:#f1fbfa; --on-hero-soft:rgba(241,251,250,.84);
-  --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff;
+  --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff; --ms:#2f86f0; --on-ms:#ffffff;
   --t-prev:#143a36; --t-aux:#3a2520; --t-cui:#172c45; --t-men:#29253f; --t-nut:#21331a; --t-far:#372c18;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px rgba(0,0,0,.35);
   --shadow-sm:0 1px 3px rgba(0,0,0,.4);
@@ -66,6 +66,7 @@ img{max-width:100%;display:block}
 [hidden]{display:none!important}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
 h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);line-height:1.2;margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
 p{margin:0}
 a{color:var(--brand-strong)}
@@ -80,6 +81,7 @@ a{color:var(--brand-strong)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 22px;border-radius:999px;border:1.5px solid transparent;font:600 15px/1 var(--font-display);text-decoration:none;white-space:nowrap;background:none;transition:background-color .2s,color .2s,border-color .2s,transform .2s,box-shadow .2s}
 .btn:active{transform:translateY(1px)}
 .btn .ic{width:18px;height:18px}
+.btn-ic:empty{display:none}
 .btn-accent{background:var(--accent);color:var(--on-accent)}
 .btn-accent:hover{background:var(--accent-strong)}
 .btn-brand{background:var(--brand);color:var(--on-brand)}
@@ -88,13 +90,15 @@ a{color:var(--brand-strong)}
 .btn-soft:hover{background:var(--surface-3)}
 .btn-line{background:var(--surface);border-color:var(--line);color:var(--ink)}
 .btn-line:hover{border-color:var(--brand);color:var(--brand-strong)}
+.btn-wa{background:var(--wa);color:var(--on-wa)}
+.btn-wa:hover{filter:brightness(1.07)}
 .btn-ghost-light{border-color:color-mix(in srgb,var(--on-hero) 65%,transparent);color:var(--on-hero)}
 .btn-ghost-light:hover{background:color-mix(in srgb,var(--on-hero) 14%,transparent)}
 .btn-sm{min-height:40px;padding:0 18px;font-size:14px}
 .btn-xs{min-height:32px;padding:0 12px;font-size:13px;gap:6px}
 .btn[disabled]{opacity:.6;cursor:progress}
 .icon-btn{width:40px;height:40px;display:inline-grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0;flex:none}
-.icon-btn:hover{border-color:var(--brand);color:var(--brand-strong)}
+.icon-btn:hover:not(:disabled){border-color:var(--brand);color:var(--brand-strong)}
 .icon-btn .ic{width:20px;height:20px}
 
 /* Barra superior y cabecera */
@@ -103,14 +107,23 @@ a{color:var(--brand-strong)}
 .topbar-list{display:flex;gap:22px;list-style:none;margin:0;padding:0}
 .topbar-list li,.topbar-note{display:flex;align-items:center;gap:7px}
 .topbar .ic{width:15px;height:15px}
+.topbar-right{display:flex;align-items:center;gap:14px}
 @media (max-width:1120px){.topbar-note{display:none}}
 @media (max-width:860px){.topbar{display:none}}
+.social{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.soc{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;text-decoration:none;transition:background-color .2s,color .2s,transform .2s}
+.soc:hover{transform:translateY(-1px)}
+.soc .ic{width:17px;height:17px}
+.topbar .soc{width:28px;height:28px;color:var(--on-hero-soft)}
+.topbar .soc:hover{color:var(--on-hero);background:color-mix(in srgb,var(--on-hero) 12%,transparent)}
 
 .site-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:color-mix(in srgb,var(--surface) 90%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
 .header-row{display:flex;align-items:center;gap:20px;min-height:74px}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);margin-right:auto;min-width:0}
-.brand-mark{width:46px;height:46px;border-radius:15px;flex:none;display:grid;place-items:center;color:var(--on-hero);background:linear-gradient(140deg,var(--hero-1),var(--hero-3))}
+.brand-mark{width:46px;height:46px;border-radius:15px;flex:none;display:grid;place-items:center;color:var(--on-hero);background:linear-gradient(140deg,var(--hero-1),var(--hero-3));overflow:hidden}
 .brand-mark svg{width:28px;height:28px}
+.brand-mark.has-logo{background:none;width:auto;max-width:150px;border-radius:10px}
+.brand-mark.has-logo img{height:46px;width:auto;max-width:150px;object-fit:contain}
 .brand-name{display:block;font:600 17px/1.15 var(--font-display);letter-spacing:-.01em}
 .brand-tag{display:block;font-size:12.5px;color:var(--ink-soft);line-height:1.3}
 .nav{display:flex;align-items:center;gap:2px}
@@ -136,7 +149,7 @@ a{color:var(--brand-strong)}
 .sub-item strong{display:block;font:600 15px/1.25 var(--font-display)}
 .sub-item small{display:block;color:var(--ink-soft);font-size:13px;line-height:1.4}
 .menu-btn{display:none}
-@media (max-width:980px){.nav,.header-cta{display:none}.menu-btn{display:inline-grid}}
+@media (max-width:980px){.nav,.header-cta{display:none!important}.menu-btn{display:inline-grid}}
 
 /* Menú móvil */
 .drawer{position:fixed;inset:0;z-index:60;display:grid;grid-template-columns:1fr min(360px,88vw);visibility:hidden;transition:visibility 0s .3s}
@@ -154,8 +167,9 @@ body.menu-open .drawer-panel{transform:none}
 .d-sub a:hover{background:var(--surface-2);color:var(--ink)}
 .d-cta{margin-top:14px}
 .d-info{margin-top:auto;padding-top:20px;display:grid;gap:8px;font-size:14px;color:var(--ink-soft)}
-.d-info span{display:flex;gap:8px;align-items:center}
+.d-info>span{display:flex;gap:8px;align-items:center}
 .d-info .ic{width:16px;height:16px;color:var(--brand)}
+.d-info .soc{background:var(--brand-soft);color:var(--brand-strong)}
 
 /* Portada / carrusel */
 .hero{position:relative;isolation:isolate;overflow:hidden;color:var(--on-hero);background:radial-gradient(70% 90% at 88% 8%,color-mix(in srgb,var(--hero-3) 85%,transparent) 0%,transparent 60%),linear-gradient(115deg,var(--hero-1) 0%,var(--hero-2) 58%,var(--hero-3) 100%)}
@@ -217,9 +231,6 @@ body.menu-open .drawer-panel{transform:none}
 @keyframes progress{to{transform:scaleX(1)}}
 .hero-pause{pointer-events:auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;padding:0;margin-left:6px;border:1.5px solid color-mix(in srgb,var(--on-hero) 50%,transparent);background:none;color:var(--on-hero)}
 .hero-pause .ic{width:14px;height:14px}
-.hero-edit{position:absolute;top:16px;right:clamp(16px,2vw,28px);z-index:4;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid color-mix(in srgb,var(--on-hero) 35%,transparent);background:color-mix(in srgb,var(--scrim) 35%,transparent);color:var(--on-hero);font:600 13px/1 var(--font-display);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.hero-edit:hover{background:color-mix(in srgb,var(--scrim) 55%,transparent)}
-.hero-edit .ic{width:15px;height:15px}
 .hero-single .hero-arrow,.hero-single .hero-bar{display:none}
 .wave{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:clamp(46px,7vw,110px);z-index:2;pointer-events:none;display:block}
 .wave .w1{fill:color-mix(in srgb,var(--on-hero) 16%,transparent)}
@@ -233,6 +244,8 @@ body.menu-open .drawer-panel{transform:none}
 /* Secciones */
 .section{padding-block:clamp(52px,7vw,92px)}
 .section.tight{padding-block:clamp(28px,4vw,44px) clamp(40px,5vw,64px)}
+.section.flush-top{padding-top:0}
+.section.near-top{padding-top:clamp(28px,4vw,44px)}
 .band{background:var(--surface-2)}
 .section-head{display:grid;gap:12px;max-width:680px;margin-bottom:clamp(28px,4vw,40px)}
 .section-head.center{text-align:center;justify-items:center;margin-inline:auto}
@@ -249,7 +262,7 @@ body.menu-open .drawer-panel{transform:none}
 .quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .quick-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:border-color .2s,box-shadow .2s,transform .2s}
 .quick-card:hover{border-color:var(--brand);box-shadow:var(--shadow);transform:translateY(-2px)}
-.quick-ico{width:52px;height:52px;border-radius:16px;display:grid;place-items:center}
+.quick-ico{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .quick-ico .ic{width:24px;height:24px}
 .qi-free{background:var(--free-bg);color:var(--free)}
 .qi-paid{background:var(--paid-bg);color:var(--paid)}
@@ -391,10 +404,10 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .dlg[open]{display:flex;flex-direction:column;animation:dlg-in .25s ease}
 .dlg::backdrop{background:var(--overlay)}
 @keyframes dlg-in{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
-.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;border-bottom:1px solid var(--line)}
 .dlg-head h2{font-size:20px}
 .dlg-body{padding:22px;overflow-y:auto;flex:1;min-height:0}
-.dlg-foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;align-items:center;padding:16px 22px;border-top:1px solid var(--line);background:var(--bg)}
+.dlg-foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;align-items:center;padding:14px 22px;border-top:1px solid var(--line);background:var(--bg)}
 .cd-hero{position:relative;padding:28px 72px 26px 26px;background:radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--surface) 55%,transparent),transparent 55%),var(--tint);display:grid;gap:10px}
 .cd-close{position:absolute;top:16px;right:16px}
 .cd-tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -422,40 +435,6 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .cd-price span{display:block;color:var(--ink-soft);font-size:14px;margin-top:2px}
 @media (max-width:680px){.cd-grid{grid-template-columns:minmax(0,1fr)}.cd-hero{padding-right:64px}}
 
-/* Editor de portada */
-.dlg-wide{width:min(1000px,calc(100vw - 32px))}
-.ed-help{color:var(--ink-soft);font-size:15px;margin-bottom:16px}
-.ed-drop{display:grid;justify-items:center;gap:8px;padding:24px;border:2px dashed var(--line);border-radius:18px;text-align:center;background:var(--bg);color:var(--ink-soft);transition:border-color .2s,background-color .2s}
-.ed-drop.is-over{border-color:var(--brand);background:var(--brand-soft)}
-.ed-drop .ic{width:30px;height:30px;color:var(--brand)}
-.ed-drop strong{color:var(--ink);font-family:var(--font-display);font-weight:600}
-.ed-drop small{font-size:13px}
-.ed-list{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:14px}
-.ed-row{display:grid;grid-template-columns:210px minmax(0,1fr) auto;gap:16px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
-.ed-thumb{display:grid;gap:8px;align-content:start}
-.ed-ph{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:linear-gradient(115deg,var(--hero-1),var(--hero-3));display:grid;place-items:center;color:var(--on-hero)}
-.ed-ph img{width:100%;height:100%;object-fit:cover}
-.ed-ph .ic{width:34px;height:34px;stroke-width:1.4}
-.ed-num{position:absolute;top:8px;left:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:var(--surface);color:var(--ink);font:700 12px/24px var(--font-display);text-align:center}
-.ed-warn{font-size:12.5px;color:var(--danger);line-height:1.35}
-.ed-change{position:relative;overflow:hidden;justify-self:start}
-.ed-change input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.ed-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.ed-f{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--ink-soft)}
-.ed-wide{grid-column:1/-1}
-.ed-f input,.ed-f select,.ed-f textarea{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--bg);color:var(--ink);font-size:15px;font-weight:400;width:100%;resize:vertical}
-.ed-f input:focus,.ed-f select:focus,.ed-f textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
-.ed-f select:disabled{opacity:.55}
-.ed-actions{display:flex;flex-direction:column;gap:6px;align-items:center}
-.ed-confirm{display:grid;gap:6px;justify-items:center;font-size:13px;font-weight:600;color:var(--danger);text-align:center}
-.ed-confirm div{display:flex;gap:4px}
-.ed-status{margin-right:auto;font-size:13.5px;color:var(--ink-soft);display:flex;gap:8px;align-items:flex-start;max-width:520px;line-height:1.4}
-.ed-status .ic{width:16px;height:16px;color:var(--brand);margin-top:1px}
-.ed-status.is-error{color:var(--danger)}
-.ed-status.is-error .ic{color:var(--danger)}
-.ed-reset{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-soft)}
-@media (max-width:760px){.ed-row{grid-template-columns:minmax(0,1fr)}.ed-actions{flex-direction:row;justify-content:flex-end}.ed-fields{grid-template-columns:minmax(0,1fr)}.ed-status{max-width:none;flex-basis:100%}}
-
 /* Contacto */
 .contact-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:clamp(24px,4vw,52px);align-items:start}
 .contact-info{display:grid;gap:14px}
@@ -468,6 +447,9 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .c-val{font-weight:600;overflow-wrap:anywhere;line-height:1.35}
 .copy-btn{width:36px;height:36px}
 .copy-btn .ic{width:17px;height:17px}
+.contact-social{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:600;color:var(--ink-soft);font-size:15px}
+.contact-social .soc{background:var(--brand-soft);color:var(--brand-strong)}
+.contact-social .soc:hover{background:var(--brand);color:var(--on-brand)}
 .map-card{border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
 .map-art{position:relative;height:150px;background-color:var(--surface-2);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:30px 30px}
 .map-art::before{content:"";position:absolute;left:-10%;right:-10%;top:58%;height:18px;background:var(--surface);transform:rotate(-8deg);box-shadow:0 0 0 1px var(--line)}
@@ -479,7 +461,7 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .map-foot span{font-size:14px;color:var(--ink-soft)}
 .form-card{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(20px,3vw,32px);box-shadow:var(--shadow)}
 .form-card h2{font-size:22px;margin-bottom:4px}
-.form-card>p{color:var(--ink-soft);font-size:15px;margin-bottom:18px}
+.form-sub{color:var(--ink-soft);font-size:15px;margin-bottom:18px}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .field{display:grid;gap:2px;align-content:start;border:1.5px solid var(--line);border-radius:12px;padding:8px 12px 6px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
 .field:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
@@ -496,11 +478,13 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .check.invalid{color:var(--danger)}
 .req-note{font-size:13px;color:var(--ink-soft);margin-top:10px}
 .form-submit{width:100%}
+.form-error{margin-top:12px;padding:10px 14px;border-radius:12px;background:var(--danger-bg);color:var(--danger);font-size:14.5px;font-weight:600}
 .form-ok{display:grid;justify-items:center;text-align:center;gap:12px;padding:28px 8px}
 .ok-ico{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:var(--free-bg);color:var(--free)}
 .ok-ico .ic{width:32px;height:32px;stroke-width:2.2}
 .form-ok h3{font-size:22px}
-.form-ok p{color:var(--ink-soft);max-width:44ch}
+.form-ok p{color:var(--ink-soft);max-width:46ch}
+.ok-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .demo-note{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--surface-2);color:var(--ink-soft)}
 @media (max-width:900px){.contact-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:520px){.form-grid{grid-template-columns:minmax(0,1fr)}}
@@ -518,22 +502,30 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .site-footer .brand{color:var(--on-hero);margin:0 0 14px}
 .site-footer .brand-tag{color:var(--on-hero-soft)}
 .site-footer .brand-mark{background:color-mix(in srgb,var(--on-hero) 14%,transparent)}
+.site-footer .brand-mark.has-logo{background:var(--surface);padding:4px}
+.site-footer .brand-mark.has-logo img{height:40px}
 .site-footer h4{color:var(--on-hero);font-size:15px;margin-bottom:14px}
 .site-footer p{font-size:15px;max-width:40ch}
 .site-footer a{color:var(--on-hero-soft);text-decoration:none}
 .site-footer a:hover{color:var(--on-hero);text-decoration:underline}
+.site-footer .social{margin-top:16px}
+.site-footer .soc{background:color-mix(in srgb,var(--on-hero) 12%,transparent);color:var(--on-hero)}
+.site-footer .soc:hover{background:color-mix(in srgb,var(--on-hero) 24%,transparent);text-decoration:none}
 .footer-links{list-style:none;padding:0;margin:0;display:grid;gap:9px;font-size:15px}
 .footer-links li{display:flex;gap:8px;align-items:flex-start}
 .footer-links .ic{width:16px;height:16px;margin-top:4px}
 .footer-bottom{border-top:1px solid color-mix(in srgb,var(--on-hero) 15%,transparent);padding-block:18px 26px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+.copy-mark{cursor:default;user-select:none}
 @media (max-width:900px){.footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.footer-grid{grid-template-columns:minmax(0,1fr)}.footer-bottom{padding-bottom:96px}}
 
 /* Botones flotantes y avisos */
 .fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;gap:10px;align-items:center}
-.fab-wa{width:56px;height:56px;border-radius:50%;background:var(--wa);color:var(--on-wa);display:grid;place-items:center;box-shadow:var(--shadow);transition:transform .2s}
-.fab-wa:hover{transform:scale(1.06)}
-.fab-wa .ic{width:28px;height:28px}
+.fab-bubble{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;box-shadow:var(--shadow);transition:transform .2s}
+.fab-bubble:hover{transform:scale(1.06)}
+.fab-bubble .ic{width:28px;height:28px}
+.fab-wa{background:var(--wa);color:var(--on-wa)}
+.fab-ms{background:var(--ms);color:var(--on-ms)}
 .fab-info{box-shadow:var(--shadow)}
 body.on-contacto .fab-info{display:none}
 @media (max-width:560px){.fab-info{display:none}}
@@ -541,6 +533,109 @@ body.on-contacto .fab-info{display:none}
 .toast{background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;font-size:14.5px;line-height:1.45;box-shadow:var(--shadow);display:flex;gap:10px;align-items:flex-start;animation:toast-in .25s ease}
 .toast .ic{width:18px;height:18px;margin-top:1px}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Panel de administración */
+.dlg-admin{width:min(1140px,calc(100vw - 24px));height:calc(100dvh - 32px);max-height:none}
+.adm-lock{margin:auto;display:grid;gap:14px;justify-items:center;text-align:center;padding:40px 24px;width:min(400px,100%)}
+.adm-lock .lock-ico{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong)}
+.adm-lock .lock-ico .ic{width:30px;height:30px}
+.adm-lock h2{font-size:24px}
+.adm-lock p{color:var(--ink-soft)}
+.adm-lock form{display:grid;gap:10px;width:100%}
+.pin-input{height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);text-align:center;font:600 22px/1 var(--font-display);letter-spacing:.4em;color:var(--ink);width:100%}
+.pin-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.lock-err{color:var(--danger);font-weight:600;font-size:14px;min-height:1.4em}
+.adm-app{display:flex;flex-direction:column;flex:1;min-height:0}
+.adm-head-actions{display:flex;gap:8px;align-items:center}
+.adm-body{display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0}
+.adm-tabs{display:flex;flex-direction:column;gap:2px;padding:14px;border-right:1px solid var(--line);background:var(--bg);overflow-y:auto}
+.adm-tab{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;border:0;background:none;text-align:left;font:600 14.5px/1.2 var(--font-display);color:var(--ink-soft)}
+.adm-tab .ic{width:18px;height:18px}
+.adm-tab:hover{color:var(--ink);background:var(--surface-2)}
+.adm-tab[aria-selected="true"]{background:var(--brand-soft);color:var(--brand-strong)}
+.adm-panel{padding:24px;overflow-y:auto;min-height:0}
+.adm-panel h3{font-size:19px}
+.adm-panel h3:not(:first-child){margin-top:28px}
+.adm-panel h4{font-size:15px;margin:22px 0 10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-body);font-weight:700}
+.adm-intro{color:var(--ink-soft);font-size:15px;margin:6px 0 18px;max-width:72ch}
+.adm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.adm-hint{font-size:12.5px;font-weight:400;color:var(--ink-soft);line-height:1.4;overflow-wrap:anywhere}
+.adm-hint.bad{color:var(--danger);font-weight:600}
+.adm-hint.good{color:var(--free)}
+.adm-logo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.adm-logo-prev{width:120px;height:64px;border-radius:12px;display:grid;place-items:center;background:var(--bg);border:1px dashed var(--line);overflow:hidden}
+.adm-logo-prev img{max-width:100%;max-height:100%;object-fit:contain}
+.adm-logo-prev .brand-mark{width:46px;height:46px}
+.adm-logo p{font-size:13.5px;color:var(--ink-soft);flex:1 1 200px}
+.adm-logo .btns{display:flex;gap:8px;flex-wrap:wrap}
+.file-btn{position:relative;overflow:hidden}
+.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.bcard{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface);margin-bottom:12px}
+.bcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.bcard-head strong{font:600 16px/1.3 var(--font-display);display:block}
+.bcard-head small{display:block;color:var(--ink-soft);font-size:13px}
+.bcard-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:12px;align-items:start}
+.bcard-preview{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);overflow-wrap:anywhere}
+.bcard-preview .ic{width:15px;height:15px;color:var(--brand)}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+.switch input{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:999px;background:var(--surface-3);position:relative;cursor:pointer;transition:background-color .2s;flex:none;margin:0}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow-sm);transition:transform .2s}
+.switch input:checked{background:var(--brand)}
+.switch input:checked::after{transform:translateX(18px)}
+.radio-cards{display:grid;gap:10px}
+.radio-card{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;align-items:start;padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);cursor:pointer}
+.radio-card:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.radio-card input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand)}
+.radio-card strong{display:block;font:600 15.5px/1.3 var(--font-display)}
+.radio-card span{display:block;color:var(--ink-soft);font-size:14px;line-height:1.45;margin-top:2px}
+.access-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.access-list li{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:15px}
+.access-list .quick-ico{width:36px;height:36px;border-radius:10px}
+.access-list .quick-ico .ic{width:18px;height:18px}
+.access-list code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:var(--surface-2);padding:2px 6px;border-radius:6px}
+.adm-note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:var(--surface-2);color:var(--ink-soft);font-size:14px;margin-top:16px}
+.adm-note .ic{width:18px;height:18px;color:var(--brand);margin-top:1px}
+.adm-status{margin-right:auto;font-size:13.5px;color:var(--ink-soft);display:flex;gap:8px;align-items:flex-start;max-width:560px;line-height:1.4}
+.adm-status .ic{width:16px;height:16px;color:var(--brand);margin-top:1px}
+.adm-status.is-error,.adm-status.is-error .ic{color:var(--danger)}
+.adm-status.is-ok,.adm-status.is-ok .ic{color:var(--free)}
+.adm-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:600;color:var(--danger)}
+.ed-drop{display:grid;justify-items:center;gap:8px;padding:24px;border:2px dashed var(--line);border-radius:18px;text-align:center;background:var(--bg);color:var(--ink-soft);transition:border-color .2s,background-color .2s;cursor:pointer}
+.ed-drop.is-over{border-color:var(--brand);background:var(--brand-soft)}
+.ed-drop .ic{width:30px;height:30px;color:var(--brand)}
+.ed-drop strong{color:var(--ink);font-family:var(--font-display);font-weight:600}
+.ed-drop small{font-size:13px}
+.ed-list{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:14px}
+.ed-row{display:grid;grid-template-columns:210px minmax(0,1fr) auto;gap:16px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.ed-thumb{display:grid;gap:8px;align-content:start}
+.ed-ph{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:linear-gradient(115deg,var(--hero-1),var(--hero-3));display:grid;place-items:center;color:var(--on-hero)}
+.ed-ph img{width:100%;height:100%;object-fit:cover}
+.ed-ph .ic{width:34px;height:34px;stroke-width:1.4}
+.ed-num{position:absolute;top:8px;left:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:var(--surface);color:var(--ink);font:700 12px/24px var(--font-display);text-align:center}
+.ed-warn{font-size:12.5px;color:var(--danger);line-height:1.35}
+.ed-thumb .btn{justify-self:start}
+.ed-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ed-f{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--ink-soft);align-content:start}
+.ed-wide{grid-column:1/-1}
+.ed-f input,.ed-f select,.ed-f textarea{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--bg);color:var(--ink);font-size:15px;font-weight:400;width:100%;resize:vertical}
+.ed-f input:focus,.ed-f select:focus,.ed-f textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.ed-f select:disabled{opacity:.55}
+.ed-f .lab{display:flex;align-items:center;gap:6px}
+.ed-f .lab .ic{width:16px;height:16px;color:var(--brand)}
+.ed-actions{display:flex;flex-direction:column;gap:6px;align-items:center}
+.ed-confirm{display:grid;gap:6px;justify-items:center;font-size:13px;font-weight:600;color:var(--danger);text-align:center}
+.ed-confirm div{display:flex;gap:4px}
+.ed-reset{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-top:14px}
+@media (max-width:820px){
+  .adm-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .adm-tabs{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px}
+  .adm-tab{white-space:nowrap}
+  .adm-grid,.bcard-grid,.ed-fields{grid-template-columns:minmax(0,1fr)}
+  .ed-row{grid-template-columns:minmax(0,1fr)}
+  .ed-actions{flex-direction:row;justify-content:flex-end}
+  .adm-status{max-width:none;flex-basis:100%}
+  .adm-panel{padding:18px}
+}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
@@ -554,20 +649,21 @@ body.on-contacto .fab-info{display:none}
 <div class="topbar">
   <div class="wrap">
     <ul class="topbar-list">
-      <li><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
-      <li><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
-      <li><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
+      <li data-item="telefono"><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
+      <li data-item="correo"><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
+      <li data-item="horario"><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
     </ul>
-    <span class="topbar-note"><span data-icon="handHeart"></span>Exclusivo para asociados y sus familias</span>
+    <div class="topbar-right">
+      <span class="topbar-note"><span data-icon="handHeart"></span><span data-txt="avisoBarra">Exclusivo para asociados y sus familias</span></span>
+      <div class="social" data-social hidden></div>
+    </div>
   </div>
 </div>
 
 <header class="site-header">
   <div class="wrap header-row">
-    <a class="brand" href="#inicio" aria-label="Instituto Mutualista, ir al inicio">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg>
-      </span>
+    <a class="brand" href="#inicio">
+      <span class="brand-mark" data-logo aria-hidden="true"></span>
       <span><span class="brand-name" data-cfg="nombre">Instituto Mutualista</span><span class="brand-tag" data-cfg="lema">Formación en salud para asociados</span></span>
     </a>
     <nav class="nav" aria-label="Principal">
@@ -586,7 +682,7 @@ body.on-contacto .fab-info{display:none}
       </div>
       <a class="nav-link" href="#contacto" data-nav="contacto">Contáctanos</a>
     </nav>
-    <a class="btn btn-accent btn-sm header-cta" href="#contacto">Inscríbete</a>
+    <a class="btn btn-accent btn-sm header-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Inscríbete</span></a>
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="drawer"><span data-icon="menu"></span></button>
   </div>
 </header>
@@ -606,11 +702,12 @@ body.on-contacto .fab-info{display:none}
       <a href="#cursos-pago"><span data-icon="award"></span>Cursos de pago</a>
     </div>
     <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
-    <a class="btn btn-accent d-cta" href="#contacto">Inscríbete</a>
+    <a class="btn btn-accent d-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Inscríbete</span></a>
     <div class="d-info">
-      <span><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></span>
-      <span><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></span>
-      <span><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></span>
+      <span data-item="telefono"><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></span>
+      <span data-item="correo"><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></span>
+      <span data-item="horario"><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></span>
+      <div class="social" data-social hidden></div>
     </div>
   </div>
 </div>
@@ -619,7 +716,7 @@ body.on-contacto .fab-info{display:none}
 
 <!-- ============ INICIO ============ -->
 <section class="page" data-page="inicio" aria-labelledby="t-inicio">
-  <h1 class="sr-only" id="t-inicio">Instituto Mutualista: cursos de salud para asociados</h1>
+  <h1 class="sr-only" id="t-inicio">Cursos de salud para asociados</h1>
 
   <div class="hero" id="hero" aria-roledescription="carrusel" aria-label="Portada">
     <div class="hero-track" id="hero-track" aria-live="off"></div>
@@ -631,7 +728,6 @@ body.on-contacto .fab-info{display:none}
         <button class="hero-pause" id="hero-pause" type="button" aria-label="Pausar carrusel"><span data-icon="pause"></span></button>
       </div>
     </div>
-    <button class="hero-edit" id="hero-edit" type="button"><span data-icon="edit"></span>Editar portada</button>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
 
@@ -652,7 +748,7 @@ body.on-contacto .fab-info{display:none}
     </div>
   </div>
 
-  <div class="section" style="padding-top:0">
+  <div class="section flush-top">
     <div class="wrap">
       <div class="head-row">
         <div class="section-head">
@@ -702,11 +798,14 @@ body.on-contacto .fab-info{display:none}
     </div>
   </div>
 
-  <div class="section" style="padding-top:0">
+  <div class="section flush-top">
     <div class="wrap">
       <div class="cta-band">
-        <div><h2>¿No sabes qué curso elegir?</h2><p>Cuéntanos qué te interesa cuidar: tu salud, la de un familiar o tu preparación ante emergencias. Te recomendamos el curso ideal.</p></div>
-        <div class="cta-actions"><a class="btn btn-accent" href="#contacto">Solicitar información</a><a class="btn btn-ghost-light" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener"><span data-icon="whatsapp"></span>WhatsApp</a></div>
+        <div><h2 data-txt="inicioCtaTitulo">¿No sabes qué curso elegir?</h2><p data-txt="inicioCtaTexto">Cuéntanos qué te interesa cuidar: tu salud, la de un familiar o tu preparación ante emergencias. Te recomendamos el curso ideal.</p></div>
+        <div class="cta-actions">
+          <a class="btn btn-accent" data-btn="franja1" href="#contacto"><span class="btn-ic"></span><span class="btn-text">Solicitar información</span></a>
+          <a class="btn btn-ghost-light" data-btn="franja2" href="#contacto"><span class="btn-ic"></span><span class="btn-text">WhatsApp</span></a>
+        </div>
       </div>
     </div>
   </div>
@@ -719,7 +818,7 @@ body.on-contacto .fab-info{display:none}
       <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Nosotros</span></nav>
       <h1 id="t-nosotros">Nosotros</h1>
       <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p>Somos el instituto de formación en salud de la mutual: educación preventiva y práctica para los asociados y sus familias.</p>
+      <p data-txt="nosotrosIntro">Somos el instituto de formación en salud de la mutual: educación preventiva y práctica para los asociados y sus familias.</p>
     </div>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
@@ -728,10 +827,10 @@ body.on-contacto .fab-info{display:none}
     <div class="wrap split">
       <div class="prose">
         <span class="eyebrow">Quiénes somos</span>
-        <h2>Un instituto creado por y para los asociados</h2>
-        <p class="lead">El Instituto Mutualista nace dentro de nuestra mutual con una idea sencilla: si nos apoyamos entre todos, también podemos aprender juntos a cuidar la salud.</p>
-        <p>Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado a una tarifa preferencial para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
-        <p>Trabajamos con horarios pensados para quien trabaja: clases virtuales por la noche, talleres presenciales los sábados y grupos reducidos para las prácticas.</p>
+        <h2 data-txt="quienesTitulo">Un instituto creado por y para los asociados</h2>
+        <p class="lead" data-txt="quienesLead">El Instituto Mutualista nace dentro de nuestra mutual con una idea sencilla: si nos apoyamos entre todos, también podemos aprender juntos a cuidar la salud.</p>
+        <p data-txt="quienesTexto1">Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado a una tarifa preferencial para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
+        <p data-txt="quienesTexto2">Trabajamos con horarios pensados para quien trabaja: clases virtuales por la noche, talleres presenciales los sábados y grupos reducidos para las prácticas.</p>
       </div>
       <aside class="model-card" aria-label="Nuestro modelo">
         <h3>Nuestro modelo</h3>
@@ -744,8 +843,8 @@ body.on-contacto .fab-info{display:none}
 
   <div class="section band">
     <div class="wrap mv-grid">
-      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="target"></span><h3>Misión</h3></div><p>Brindar formación en salud accesible, práctica y de calidad a los asociados y sus familias, con énfasis en la prevención y el autocuidado.</p></article>
-      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="eye"></span><h3>Visión</h3></div><p>Ser el referente en educación preventiva en salud entre las mutuales del país, con una comunidad de asociados que sabe cuidar y cuidarse.</p></article>
+      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="target"></span><h3>Misión</h3></div><p data-txt="mision">Brindar formación en salud accesible, práctica y de calidad a los asociados y sus familias, con énfasis en la prevención y el autocuidado.</p></article>
+      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="eye"></span><h3>Visión</h3></div><p data-txt="vision">Ser el referente en educación preventiva en salud entre las mutuales del país, con una comunidad de asociados que sabe cuidar y cuidarse.</p></article>
     </div>
   </div>
 
@@ -798,12 +897,12 @@ body.on-contacto .fab-info{display:none}
       <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span id="crumb-cursos">Cursos</span></nav>
       <h1 id="t-cursos">Cursos</h1>
       <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p>Elige entre cursos preventivos gratuitos y cursos con certificado a tarifa preferencial para asociados.</p>
+      <p data-txt="cursosIntro">Elige entre cursos preventivos gratuitos y cursos con certificado a tarifa preferencial para asociados.</p>
     </div>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
 
-  <div class="section" style="padding-top:clamp(28px,4vw,44px)">
+  <div class="section near-top">
     <div class="wrap">
       <div class="filters">
         <div class="filter-row">
@@ -841,33 +940,34 @@ body.on-contacto .fab-info{display:none}
       <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Contáctanos</span></nav>
       <h1 id="t-contacto">Contáctanos</h1>
       <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p>Déjanos tus datos y te orientamos sobre cursos, fechas e inscripciones.</p>
+      <p data-txt="contactoIntro">Déjanos tus datos y te orientamos sobre cursos, fechas e inscripciones.</p>
     </div>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
 
-  <div class="section" style="padding-top:clamp(28px,4vw,44px)">
+  <div class="section near-top">
     <div class="wrap contact-grid">
       <div class="contact-info">
-        <h2>¿Tienes dudas o necesitas orientación?</h2>
-        <p>Escríbenos y un asesor te responderá en horario de atención. También puedes llamarnos o visitarnos en la sede.</p>
+        <h2 data-txt="contactoTitulo">¿Tienes dudas o necesitas orientación?</h2>
+        <p data-txt="contactoTexto">Escríbenos y un asesor te responderá en horario de atención. También puedes llamarnos o visitarnos en la sede.</p>
         <ul class="c-list">
-          <li class="c-item"><span class="c-ico" data-icon="whatsapp"></span><div><small>WhatsApp</small><span class="c-val" data-cfg="whatsapp">+51 900 000 000</span></div><button class="icon-btn copy-btn" type="button" data-copy="whatsapp" aria-label="Copiar número de WhatsApp"><span data-icon="copy"></span></button></li>
-          <li class="c-item"><span class="c-ico" data-icon="phone"></span><div><small>Teléfono</small><span class="c-val" data-cfg="telefono">(01) 000 0000</span></div><button class="icon-btn copy-btn" type="button" data-copy="telefono" aria-label="Copiar teléfono"><span data-icon="copy"></span></button></li>
-          <li class="c-item"><span class="c-ico" data-icon="mail"></span><div><small>Correo</small><span class="c-val" data-cfg="correo">informes@institutomutualista.pe</span></div><button class="icon-btn copy-btn" type="button" data-copy="correo" aria-label="Copiar correo"><span data-icon="copy"></span></button></li>
-          <li class="c-item"><span class="c-ico" data-icon="clock"></span><div><small>Horario de atención</small><span class="c-val" data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></div><span></span></li>
+          <li class="c-item" data-item="whatsapp"><span class="c-ico" data-icon="whatsapp"></span><div><small>WhatsApp</small><span class="c-val" data-cfg="whatsapp">+51 900 000 000</span></div><button class="icon-btn copy-btn" type="button" data-copy="whatsapp" aria-label="Copiar número de WhatsApp"><span data-icon="copy"></span></button></li>
+          <li class="c-item" data-item="telefono"><span class="c-ico" data-icon="phone"></span><div><small>Teléfono</small><span class="c-val" data-cfg="telefono">(01) 000 0000</span></div><button class="icon-btn copy-btn" type="button" data-copy="telefono" aria-label="Copiar teléfono"><span data-icon="copy"></span></button></li>
+          <li class="c-item" data-item="correo"><span class="c-ico" data-icon="mail"></span><div><small>Correo</small><span class="c-val" data-cfg="correo">informes@institutomutualista.pe</span></div><button class="icon-btn copy-btn" type="button" data-copy="correo" aria-label="Copiar correo"><span data-icon="copy"></span></button></li>
+          <li class="c-item" data-item="horario"><span class="c-ico" data-icon="clock"></span><div><small>Horario de atención</small><span class="c-val" data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></div><span></span></li>
         </ul>
-        <a class="btn btn-brand" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener" style="justify-self:start"><span data-icon="whatsapp"></span>Contactar con un asesor</a>
-        <div class="map-card" style="margin-top:8px">
+        <a class="btn btn-brand" data-btn="asesor" href="#contacto" style="justify-self:start"><span class="btn-ic"></span><span class="btn-text">Contactar con un asesor</span></a>
+        <div class="contact-social" data-social-wrap hidden><span>Síguenos</span><div class="social" data-social></div></div>
+        <div class="map-card" data-item="direccion">
           <div class="map-art" aria-hidden="true"><span class="map-pin"><span></span></span></div>
-          <div class="map-foot"><div><strong>Sede principal</strong><span data-cfg="direccion">Lima, Perú</span></div><a class="btn btn-line btn-sm" data-cfg-href="mapa" href="https://www.google.com/maps/search/?api=1&amp;query=Lima%2C%20Per%C3%BA" target="_blank" rel="noopener"><span data-icon="mapPin"></span>Ver en Google Maps</a></div>
+          <div class="map-foot"><div><strong>Sede principal</strong><span data-cfg="direccion">Lima, Perú</span></div><a class="btn btn-line btn-sm" data-map href="https://www.google.com/maps" target="_blank" rel="noopener"><span data-icon="mapPin"></span>Ver en Google Maps</a></div>
         </div>
       </div>
 
       <div class="form-card" id="form-card">
         <div id="form-wrap">
-          <h2>Solicitar información</h2>
-          <p>Te respondemos en menos de 24 horas hábiles.</p>
+          <h2 data-txt="formTitulo">Solicitar información</h2>
+          <p class="form-sub" data-txt="formRespuesta">Te respondemos en menos de 24 horas hábiles.</p>
           <form id="contact-form" novalidate>
             <div class="form-grid">
               <div class="field"><label for="f-nombres">Nombres*</label><input id="f-nombres" name="nombres" autocomplete="given-name" placeholder="Ingresa tus nombres"><span class="err" hidden></span></div>
@@ -883,16 +983,18 @@ body.on-contacto .fab-info{display:none}
               <label class="check" id="check-datos"><input type="checkbox" id="f-datos" name="datos"><span>Autorizo el tratamiento de mis datos personales conforme a la Ley N.° 29733.*</span></label>
               <label class="check"><input type="checkbox" id="f-wa" name="avisos"><span>Quiero recibir el calendario de cursos por WhatsApp.</span></label>
             </div>
-            <button class="btn btn-accent form-submit" type="submit">Enviar solicitud</button>
+            <button class="btn btn-accent form-submit" id="form-submit" type="submit">Enviar solicitud</button>
+            <p class="form-error" id="form-error" hidden></p>
             <p class="req-note">* Campos obligatorios</p>
           </form>
         </div>
         <div class="form-ok" id="form-ok" hidden>
           <span class="ok-ico" data-icon="check"></span>
           <h3 id="ok-title">¡Gracias!</h3>
-          <p id="ok-text">Así verá el asociado la confirmación de su solicitud.</p>
-          <p class="demo-note">Vista previa: en el sitio publicado, este formulario se conecta al correo o sistema de admisión del instituto.</p>
-          <button class="btn btn-soft btn-sm" type="button" id="form-again">Enviar otra solicitud</button>
+          <p id="ok-text"></p>
+          <div class="ok-actions" id="ok-actions"></div>
+          <p class="demo-note" id="ok-note" hidden>Vista previa: el formulario está en modo demostración. Elige a dónde llegan las solicitudes en el administrador, pestaña Conectores.</p>
+          <button class="btn btn-line btn-sm" type="button" id="form-again">Enviar otra solicitud</button>
         </div>
       </div>
     </div>
@@ -922,10 +1024,11 @@ body.on-contacto .fab-info{display:none}
   <div class="wrap footer-grid">
     <div>
       <a class="brand" href="#inicio">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg></span>
+        <span class="brand-mark" data-logo aria-hidden="true"></span>
         <span><span class="brand-name" data-cfg="nombre">Instituto Mutualista</span><span class="brand-tag" data-cfg="lema">Formación en salud para asociados</span></span>
       </a>
-      <p>Cursos preventivos y de especialización en salud para los asociados de la mutual y sus familias.</p>
+      <p data-txt="pieTexto">Cursos preventivos y de especialización en salud para los asociados de la mutual y sus familias.</p>
+      <div class="social" data-social hidden></div>
     </div>
     <div>
       <h4>Navegación</h4>
@@ -947,47 +1050,60 @@ body.on-contacto .fab-info{display:none}
     <div>
       <h4>Contacto</h4>
       <ul class="footer-links">
-        <li><span data-icon="mapPin"></span><span data-cfg="direccion">Lima, Perú</span></li>
-        <li><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
-        <li><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
-        <li><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
+        <li data-item="direccion"><span data-icon="mapPin"></span><span data-cfg="direccion">Lima, Perú</span></li>
+        <li data-item="whatsapp"><span data-icon="whatsapp"></span><span data-cfg="whatsapp">+51 900 000 000</span></li>
+        <li data-item="telefono"><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
+        <li data-item="correo"><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
+        <li data-item="horario"><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
       </ul>
     </div>
   </div>
   <div class="wrap footer-bottom">
-    <span>© 2026 <span data-cfg="nombre">Instituto Mutualista</span>. Todos los derechos reservados.</span>
-    <span>Formación en salud para asociados</span>
+    <span><span class="copy-mark" id="copy-mark">©</span> 2026 <span data-cfg="nombre">Instituto Mutualista</span>. Todos los derechos reservados.</span>
+    <span data-cfg="lema">Formación en salud para asociados</span>
   </div>
 </footer>
 
 <div class="fab">
-  <a class="btn btn-accent fab-info" href="#contacto">Solicitar información</a>
-  <a class="fab-wa" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp"><span data-icon="whatsapp"></span></a>
+  <a class="btn btn-accent fab-info" data-btn="flotante" href="#contacto"><span class="btn-ic"></span><span class="btn-text">Solicitar información</span></a>
+  <a class="fab-bubble fab-ms" id="fab-ms" href="https://m.me/" target="_blank" rel="noopener" aria-label="Escribir por Messenger" hidden><span data-icon="messenger"></span></a>
+  <a class="fab-bubble fab-wa" id="fab-wa" href="https://wa.me/" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp"><span data-icon="whatsapp"></span></a>
 </div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <dialog class="dlg" id="dlg-curso" aria-labelledby="cd-title"></dialog>
 
-<dialog class="dlg dlg-wide" id="dlg-portada" aria-labelledby="ed-title">
-  <div class="dlg-head">
-    <h2 id="ed-title">Editar portada del inicio</h2>
-    <button class="icon-btn" type="button" data-close aria-label="Cerrar"><span data-icon="close"></span></button>
+<dialog class="dlg dlg-admin" id="dlg-admin" aria-label="Administración del sitio">
+  <div class="adm-lock" id="adm-lock">
+    <span class="lock-ico" data-icon="lock"></span>
+    <h2>Administración</h2>
+    <p>Ingresa el PIN para editar la portada, los contactos, los botones y los textos del sitio.</p>
+    <form id="lock-form" autocomplete="off">
+      <label class="sr-only" for="lock-pin">PIN</label>
+      <input class="pin-input" id="lock-pin" type="password" inputmode="numeric" maxlength="12" placeholder="••••">
+      <p class="lock-err" id="lock-err" aria-live="polite"></p>
+      <button class="btn btn-brand" type="submit">Entrar</button>
+      <button class="btn btn-line btn-sm" type="button" data-adm-close>Cancelar</button>
+    </form>
   </div>
-  <div class="dlg-body">
-    <p class="ed-help">Sube fotos horizontales (ideal 1920 × 800 px, JPG o PNG). Cada imagen es una diapositiva: puedes escribir su título y texto, elegir a dónde lleva el botón, ajustar el encuadre y cambiar el orden.</p>
-    <label class="ed-drop" id="ed-drop">
-      <span data-icon="upload"></span>
-      <strong>Arrastra imágenes aquí o haz clic para elegirlas</strong>
-      <small>Hasta 8 diapositivas. Las fotos se optimizan automáticamente.</small>
-      <input class="sr-only" id="ed-files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
-    </label>
-    <ol class="ed-list" id="ed-list"></ol>
-  </div>
-  <div class="dlg-foot">
-    <p class="ed-status" id="ed-status"><span data-icon="info"></span><span id="ed-status-text">Comprobando dónde se guardarán los cambios…</span></p>
-    <span class="ed-reset" id="ed-reset-wrap"><button class="btn btn-line btn-sm" type="button" id="ed-reset"><span data-icon="refresh"></span>Restaurar ejemplo</button></span>
-    <button class="btn btn-line btn-sm" type="button" data-close>Cancelar</button>
-    <button class="btn btn-brand btn-sm" type="button" id="ed-save">Guardar portada</button>
+  <div class="adm-app" id="adm-app" hidden>
+    <div class="dlg-head">
+      <h2>Administración del sitio</h2>
+      <div class="adm-head-actions">
+        <button class="btn btn-line btn-xs" type="button" id="adm-logout"><span data-icon="logout"></span>Cerrar sesión</button>
+        <button class="icon-btn" type="button" data-adm-close aria-label="Cerrar administración"><span data-icon="close"></span></button>
+      </div>
+    </div>
+    <div class="adm-body">
+      <div class="adm-tabs" id="adm-tabs" role="tablist" aria-label="Secciones del administrador"></div>
+      <div class="adm-panel" id="adm-panel" role="tabpanel"></div>
+    </div>
+    <div class="dlg-foot">
+      <p class="adm-status" id="adm-status"><span data-icon="info"></span><span id="adm-status-text">Comprobando dónde se guardarán los cambios…</span></p>
+      <div class="adm-confirm" id="adm-confirm" hidden>Tienes cambios sin guardar.<button class="btn btn-line btn-xs" type="button" id="adm-keep">Seguir editando</button><button class="btn btn-line btn-xs" type="button" id="adm-discard-close">Salir sin guardar</button></div>
+      <button class="btn btn-line btn-sm" type="button" id="adm-discard">Descartar cambios</button>
+      <button class="btn btn-brand btn-sm" type="button" id="adm-save">Guardar cambios</button>
+    </div>
   </div>
 </dialog>
 
@@ -996,31 +1112,33 @@ body.on-contacto .fab-info{display:none}
 'use strict';
 document.documentElement.lang = 'es';
 
-/* ---------- Configuración editable ---------- */
-const CONFIG = {
-  nombre: 'Instituto Mutualista',
-  lema: 'Formación en salud para asociados',
-  telefono: '(01) 000 0000',
-  whatsapp: '+51 900 000 000',
-  whatsappLink: 'https://wa.me/51900000000',
-  correo: 'informes@institutomutualista.pe',
-  direccion: 'Lima, Perú',
-  horario: 'Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00',
-  mapa: 'https://www.google.com/maps/search/?api=1&query=Lima%2C%20Per%C3%BA'
-};
-
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const str = (v, max) => String(v == null ? '' : v).slice(0, max);
-const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 };
+const session = {
+  get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { /* sin sesión */ } }
+};
+const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+const setPath = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
+function hashPin(pin) {
+  let h1 = 0xdeadbeef ^ 31, h2 = 0x41c6ce57 ^ 31;
+  const s = 'instituto-mutualista|' + pin;
+  for (let i = 0; i < s.length; i++) { const ch = s.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+const DEFAULT_PIN = '2026';
 
 const I = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -1061,17 +1179,199 @@ const I = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
   whatsapp: '<path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>',
+  messenger: '<path d="M12 3C7 3 3 6.8 3 11.5c0 2.6 1.2 4.9 3.2 6.4V21l3-1.6c.9.2 1.8.4 2.8.4 5 0 9-3.8 9-8.5S17 3 12 3z"/><path d="M7.5 13.5l3-3 2.5 2 3.5-3"/>',
+  facebook: '<path d="M17 2.5h-3a5 5 0 0 0-5 5v3H6v4h3v7h4v-7h3l1-4h-4v-3a1 1 0 0 1 1-1h3z"/>',
+  instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/>',
+  tiktok: '<path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.5 2.5 2.5 4.5 5 4.5"/>',
+  youtube: '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/>',
+  linkedin: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7.5 10.5v6M7.5 7.5h.01M11.5 16.5v-6M11.5 13a2.5 2.5 0 0 1 5 0v3.5"/>',
   gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8S10.5 3.5 8 4.2 7.5 8 12 8zm0 0s1.5-4.5 4-3.8.5 3.8-4 3.8z"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
   eye: '<path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/>',
   refresh: '<path d="M4 12a8 8 0 0 1 14-5.3L20 8M20 4v4h-4M20 12a8 8 0 0 1-14 5.3L4 16M4 20v-4h4"/>',
   clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
-  ticket: '<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z"/><path d="M14 6v2M14 11v2M14 16v2"/>'
+  ticket: '<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z"/><path d="M14 6v2M14 11v2M14 16v2"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+  lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  type: '<path d="M5 7V4.5h14V7M12 4.5v15M9 19.5h6"/>',
+  share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>',
+  send: '<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>',
+  keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  pointer: '<path d="M8 3v12l3-3 2.5 6 2.5-1-2.5-6H18z"/>'
 };
 const icon = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (I[n] || '') + '</svg>';
 function hydrateIcons(root) {
   $$('[data-icon]', root || document).forEach(el => { el.innerHTML = icon(el.dataset.icon); el.removeAttribute('data-icon'); });
+}
+const LOGO_SVG = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg>';
+
+/* ---------- Contenido editable del sitio (valores de ejemplo) ---------- */
+const ARTS = {
+  prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['gift', 'Sin costo para asociados']] },
+  cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
+  comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
+};
+const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-pago', 'Cursos de pago'], ['#contacto', 'Contáctanos']];
+const POS = { centro: '50% 50%', izquierda: '15% 50%', derecha: '85% 50%', arriba: '50% 15%', abajo: '50% 85%' };
+const POS_LABEL = { centro: 'Centro', izquierda: 'Izquierda', derecha: 'Derecha', arriba: 'Arriba', abajo: 'Abajo' };
+const MAX_SLIDES = 8;
+const SOCIALS = [
+  { k: 'facebook', label: 'Facebook', icon: 'facebook', ph: 'facebook.com/tuinstituto' },
+  { k: 'instagram', label: 'Instagram', icon: 'instagram', ph: 'instagram.com/tuinstituto' },
+  { k: 'tiktok', label: 'TikTok', icon: 'tiktok', ph: 'tiktok.com/@tuinstituto' },
+  { k: 'youtube', label: 'YouTube', icon: 'youtube', ph: 'youtube.com/@tuinstituto' },
+  { k: 'linkedin', label: 'LinkedIn', icon: 'linkedin', ph: 'linkedin.com/company/tuinstituto' },
+  { k: 'messenger', label: 'Messenger', icon: 'messenger', ph: 'm.me/tuinstituto' }
+];
+const BTN_TIPOS = [
+  ['pagina', 'Una página del sitio', null], ['whatsapp', 'WhatsApp', 'whatsapp'], ['telefono', 'Llamar al teléfono', 'phone'],
+  ['correo', 'Escribir un correo', 'mail'], ['messenger', 'Messenger', 'messenger'], ['facebook', 'Facebook', 'facebook'],
+  ['instagram', 'Instagram', 'instagram'], ['tiktok', 'TikTok', 'tiktok'], ['youtube', 'YouTube', 'youtube'], ['url', 'Otro enlace', 'link']
+];
+const TIPO_ICON = Object.fromEntries(BTN_TIPOS.map(t => [t[0], t[2]]));
+const BTN_DEFS = [
+  { k: 'cabecera', nombre: 'Botón de la cabecera', donde: 'Arriba a la derecha en todas las páginas y en el menú del celular.' },
+  { k: 'flotante', nombre: 'Botón flotante', donde: 'Esquina inferior derecha, junto a la burbuja de WhatsApp.', visible: true },
+  { k: 'franja1', nombre: 'Franja final del inicio · botón principal', donde: 'Bloque turquesa al final de la página de inicio.' },
+  { k: 'franja2', nombre: 'Franja final del inicio · botón secundario', donde: 'Al lado del botón principal de esa franja.' },
+  { k: 'asesor', nombre: 'Botón de Contáctanos', donde: 'Debajo de los datos de contacto en la página Contáctanos.' },
+  { k: 'curso', nombre: 'Botón de la ficha de cada curso', donde: 'Al abrir el detalle de un curso. Con WhatsApp, el mensaje incluye el nombre del curso.' }
+];
+const TEXT_GROUPS = [
+  ['Barra superior', [['avisoBarra', 'Aviso de la barra superior']]],
+  ['Inicio', [['inicioCtaTitulo', 'Franja final: título'], ['inicioCtaTexto', 'Franja final: texto', true]]],
+  ['Nosotros', [['nosotrosIntro', 'Introducción bajo el título', true], ['quienesTitulo', 'Quiénes somos: título'], ['quienesLead', 'Quiénes somos: párrafo destacado', true], ['quienesTexto1', 'Quiénes somos: segundo párrafo', true], ['quienesTexto2', 'Quiénes somos: tercer párrafo', true], ['mision', 'Misión', true], ['vision', 'Visión', true]]],
+  ['Cursos', [['cursosIntro', 'Introducción bajo el título', true]]],
+  ['Contáctanos', [['contactoIntro', 'Introducción bajo el título', true], ['contactoTitulo', 'Título junto a los datos'], ['contactoTexto', 'Texto junto a los datos', true], ['formTitulo', 'Título del formulario'], ['formRespuesta', 'Texto bajo el título del formulario']]],
+  ['Pie de página', [['pieTexto', 'Descripción del pie de página', true]]]
+];
+const FORM_DEST = [
+  ['whatsapp', 'Enviar por WhatsApp', 'Al enviar, el visitante pulsa un botón que abre WhatsApp con sus datos ya escritos hacia tu número. Funciona sin servidor.'],
+  ['correo', 'Enviar por correo', 'Abre el programa de correo del visitante con sus datos hacia tu correo. Depende de que tenga un correo configurado.'],
+  ['endpoint', 'Servicio externo', 'Envía los datos a la dirección de un servicio de formularios (Formspree, Google Apps Script, Make o Zapier). Funciona cuando el sitio está publicado en tu propio dominio.'],
+  ['ninguno', 'Solo demostración', 'Muestra la confirmación sin enviar los datos a ningún lado.']
+];
+
+const DEFAULT_SITE = {
+  version: 2,
+  contacto: {
+    nombre: 'Instituto Mutualista', lema: 'Formación en salud para asociados',
+    whatsapp: '+51 900 000 000', whatsappMensaje: 'Hola, quiero información sobre los cursos del instituto.',
+    telefono: '(01) 000 0000', correo: 'informes@institutomutualista.pe',
+    direccion: 'Lima, Perú', horario: 'Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00', mapa: ''
+  },
+  redes: { facebook: '', instagram: '', tiktok: '', youtube: '', linkedin: '', messenger: '' },
+  botones: {
+    cabecera: { texto: 'Inscríbete', tipo: 'pagina', valor: '#contacto' },
+    flotante: { texto: 'Solicitar información', tipo: 'pagina', valor: '#contacto', visible: true },
+    franja1: { texto: 'Solicitar información', tipo: 'pagina', valor: '#contacto' },
+    franja2: { texto: 'WhatsApp', tipo: 'whatsapp', valor: '' },
+    asesor: { texto: 'Contactar con un asesor', tipo: 'whatsapp', valor: '' },
+    curso: { texto: 'Consultar por WhatsApp', tipo: 'whatsapp', valor: '' },
+    burbujaWa: { visible: true },
+    burbujaMs: { visible: false }
+  },
+  textos: {},
+  conectores: { formDestino: 'whatsapp', formEndpoint: '' },
+  seguridad: { pinHash: '' },
+  logo: null,
+  slides: [
+    { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
+    { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
+    { id: 'ejemplo-3', eyebrow: 'Somos una mutual', title: 'Formación que nace de la ayuda mutua', text: 'Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.', cta: 'Conócenos', href: '#nosotros', art: 'comunidad', img: null, pos: 'centro' }
+  ]
+};
+// Los textos por defecto salen del propio HTML (lo que ve el visitante sin cambios).
+$$('[data-txt]').forEach(el => { if (!(el.dataset.txt in DEFAULT_SITE.textos)) DEFAULT_SITE.textos[el.dataset.txt] = el.textContent.trim(); });
+
+const isPath = p => typeof p === 'string' && /^(portada|imagenes)\/[\w.-]+\.(jpe?g|png|webp)$/i.test(p);
+const safeSrc = s => (isPath(s) || (typeof s === 'string' && (/^data:image\/(jpeg|png|webp);base64,/i.test(s) || /^blob:/i.test(s)))) ? s : null;
+const safePage = h => PAGES_OPT.some(p => p[0] === h) ? h : '#contacto';
+function safeUrl(v) {
+  v = String(v || '').trim();
+  if (!v || /\s/.test(v)) return null;
+  if (/^[a-z][\w+.-]*:/i.test(v) && !/^https?:/i.test(v)) return null;
+  if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  try { const u = new URL(v); return (/^https?:$/.test(u.protocol) && u.hostname.includes('.')) ? u.href : null; } catch (e) { return null; }
+}
+function normSlide(s) {
+  s = s || {};
+  return {
+    id: (String(s.id || '').replace(/[^\w-]/g, '').slice(0, 40)) || uid(),
+    eyebrow: str(s.eyebrow, 80), title: str(s.title, 120), text: str(s.text, 260),
+    cta: str(s.cta, 40), href: safePage(s.href), art: ARTS[s.art] ? s.art : null,
+    img: safeSrc(s.img), pos: POS[s.pos] ? s.pos : 'centro'
+  };
+}
+function mergeSite(raw) {
+  const d = JSON.parse(JSON.stringify(DEFAULT_SITE));
+  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); return d; }
+  ['contacto', 'redes', 'textos'].forEach(sec => {
+    if (raw[sec] && typeof raw[sec] === 'object') Object.keys(d[sec]).forEach(k => { if (typeof raw[sec][k] === 'string') d[sec][k] = raw[sec][k].slice(0, 600); });
+  });
+  if (raw.botones && typeof raw.botones === 'object') Object.keys(d.botones).forEach(k => {
+    const b = raw.botones[k]; if (!b || typeof b !== 'object') return;
+    if (typeof b.texto === 'string' && 'texto' in d.botones[k]) d.botones[k].texto = b.texto.slice(0, 40);
+    if (TIPO_ICON.hasOwnProperty(b.tipo) && 'tipo' in d.botones[k]) d.botones[k].tipo = b.tipo;
+    if (typeof b.valor === 'string' && 'valor' in d.botones[k]) d.botones[k].valor = b.valor.slice(0, 500);
+    if (typeof b.visible === 'boolean' && 'visible' in d.botones[k]) d.botones[k].visible = b.visible;
+  });
+  if (raw.conectores) {
+    if (FORM_DEST.some(f => f[0] === raw.conectores.formDestino)) d.conectores.formDestino = raw.conectores.formDestino;
+    if (typeof raw.conectores.formEndpoint === 'string') d.conectores.formEndpoint = raw.conectores.formEndpoint.slice(0, 500);
+  }
+  if (raw.seguridad && typeof raw.seguridad.pinHash === 'string') d.seguridad.pinHash = raw.seguridad.pinHash.slice(0, 40);
+  d.logo = safeSrc(raw.logo);
+  if (Array.isArray(raw.slides) && raw.slides.length) d.slides = raw.slides.slice(0, MAX_SLIDES).map(normSlide);
+  else d.slides = d.slides.map(normSlide);
+  return d;
+}
+function cloneSite(s) {
+  return {
+    version: 2,
+    contacto: Object.assign({}, s.contacto), redes: Object.assign({}, s.redes), textos: Object.assign({}, s.textos),
+    conectores: Object.assign({}, s.conectores), seguridad: Object.assign({}, s.seguridad),
+    botones: Object.fromEntries(Object.entries(s.botones).map(e => [e[0], Object.assign({}, e[1])])),
+    logo: s.logo, logoUrl: s.logoUrl || null, logoBlob: s.logoBlob || null,
+    slides: s.slides.map(x => Object.assign({}, x, { confirm: false }))
+  };
+}
+let site = mergeSite(null);
+
+/* Enlaces de contacto */
+const digits = v => String(v || '').replace(/\D/g, '');
+function waNumber(s) { const d = digits((s || site).contacto.whatsapp); if (d.length === 9 && d[0] === '9') return '51' + d; return d.length >= 8 ? d : ''; }
+function waLink(msg, s) { const n = waNumber(s); return n ? 'https://wa.me/' + n + (msg ? '?text=' + encodeURIComponent(msg) : '') : null; }
+function mapLink(s) { s = s || site; return safeUrl(s.contacto.mapa) || (s.contacto.direccion ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.contacto.direccion) : null); }
+function resolveBtn(b, extra, s) {
+  s = s || site;
+  const c = s.contacto;
+  switch (b.tipo) {
+    case 'pagina': return { href: safePage(b.valor), ext: false };
+    case 'whatsapp': {
+      let msg = b.valor || c.whatsappMensaje;
+      if (extra && extra.curso) msg = b.valor ? b.valor + ' Curso: ' + extra.curso.titulo : 'Hola, quiero información del curso "' + extra.curso.titulo + '".';
+      const h = waLink(msg, s); return { href: h, ext: true };
+    }
+    case 'telefono': { const d = String(c.telefono || '').replace(/[^\d+]/g, ''); return { href: d ? 'tel:' + d : null, ext: false }; }
+    case 'correo': return { href: c.correo && c.correo.includes('@') ? 'mailto:' + c.correo.trim() : null, ext: false };
+    case 'url': return { href: safeUrl(b.valor), ext: true };
+    default: return { href: safeUrl(s.redes[b.tipo]), ext: true };
+  }
+}
+function applyBtn(el, key) {
+  const b = site.botones[key];
+  if (!b) return;
+  const r = resolveBtn(b);
+  el.hidden = !r.href || (b.visible === false);
+  if (!r.href) return;
+  el.href = r.href;
+  if (r.ext) { el.target = '_blank'; el.rel = 'noopener'; } else { el.removeAttribute('target'); el.removeAttribute('rel'); }
+  const t = $('.btn-text', el); if (t) t.textContent = b.texto || 'Contáctanos';
+  const ic = $('.btn-ic', el); if (ic) ic.innerHTML = TIPO_ICON[b.tipo] ? icon(TIPO_ICON[b.tipo]) : '';
 }
 
 /* ---------- Datos de cursos ---------- */
@@ -1084,7 +1384,6 @@ const CATS = {
   'Farmacología': { icon: 'pill', tint: 'var(--t-far)' }
 };
 const MODS = { Presencial: 'building', Virtual: 'monitor', Semipresencial: 'layers' };
-
 const COURSES = [
   { id: 'primeros-auxilios-hogar', titulo: 'Primeros auxilios en el hogar', cat: 'Primeros auxilios', tipo: 'gratis', modalidad: 'Presencial', horas: 8, inicio: '2026-10-17',
     horario: 'Sábados 17 y 24 de octubre, 9:00 a. m. a 12:00 m.', vacantes: 30, docente: 'Licenciada en enfermería (CEP)',
@@ -1173,7 +1472,6 @@ function courseCard(c) {
     '</div></article>';
 }
 
-/* ---------- Contadores ---------- */
 const counts = { todos: COURSES.length, gratis: COURSES.filter(c => c.tipo === 'gratis').length, pago: COURSES.filter(c => c.tipo === 'pago').length };
 $$('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count]; });
 $$('[data-count-label]').forEach(el => { const n = counts[el.dataset.countLabel]; el.textContent = n + (n === 1 ? ' curso disponible' : ' cursos disponibles'); });
@@ -1230,7 +1528,9 @@ function openCourse(id) {
   if (!c) return;
   const cat = CATS[c.cat];
   const free = c.tipo === 'gratis';
-  const waText = encodeURIComponent('Hola, quiero información del curso "' + c.titulo + '".');
+  const bc = site.botones.curso;
+  const r = resolveBtn(bc, { curso: c });
+  const contactBtn = r.href ? '<a class="btn btn-line" href="' + esc(r.href) + '"' + (r.ext ? ' target="_blank" rel="noopener"' : '') + '>' + (TIPO_ICON[bc.tipo] ? icon(TIPO_ICON[bc.tipo]) : '') + esc(bc.texto || 'Consultar') + '</a>' : '';
   const price = free
     ? '<div class="cd-price"><strong style="color:var(--free)">Gratis</strong><span>Sin costo para asociados y familiares directos</span></div>'
     : '<div class="cd-price"><strong>' + soles(c.precio.asociado) + '</strong><span>Tarifa de asociado · Familiares y público: ' + soles(c.precio.publico) + '</span></div>';
@@ -1247,14 +1547,10 @@ function openCourse(id) {
     fact('book', 'Duración', c.horas + ' horas académicas') + fact(MODS[c.modalidad], 'Modalidad', c.modalidad) +
     fact('ticket', 'Vacantes', c.vacantes + ' por grupo') + fact('stethoscope', 'Docente', c.docente) +
     fact('award', 'Certificación', c.certificado) + price + '</dl></div></div>' +
-    '<div class="dlg-foot"><a class="btn btn-line" href="' + esc(CONFIG.whatsappLink) + '?text=' + waText + '" target="_blank" rel="noopener">' + icon('whatsapp') + 'Consultar por WhatsApp</a>' +
-    '<button class="btn btn-accent" type="button" data-enroll="' + c.id + '">Inscribirme</button></div>';
+    '<div class="dlg-foot">' + contactBtn + '<button class="btn btn-accent" type="button" data-enroll="' + c.id + '">Inscribirme</button></div>';
   dlgC.showModal();
 }
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-course]');
-  if (b) openCourse(b.dataset.course);
-});
+document.addEventListener('click', e => { const b = e.target.closest('[data-course]'); if (b) openCourse(b.dataset.course); });
 dlgC.addEventListener('click', e => {
   if (e.target === dlgC || e.target.closest('[data-close]')) { dlgC.close(); return; }
   const en = e.target.closest('[data-enroll]');
@@ -1273,6 +1569,7 @@ const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'c
 let currentPage = null;
 function route(h) {
   if (h == null) h = decodeURIComponent(location.hash.slice(1));
+  if (h === 'admin') { if (!currentPage) route(''); openAdmin(); return; }
   const page = ALIAS[h];
   if (!page) return;
   if (page === 'cursos') setTipo(h === 'cursos-gratuitos' ? 'gratis' : h === 'cursos-pago' ? 'pago' : 'todos');
@@ -1300,7 +1597,6 @@ window.addEventListener('popstate', () => route());
 window.addEventListener('hashchange', () => route());
 $('#skip-link').addEventListener('click', e => { e.preventDefault(); $('#main').focus(); });
 
-/* Submenú de cursos */
 const navSub = $('#nav-sub');
 const subToggle = $('#sub-toggle');
 function closeSub(suppress) {
@@ -1321,16 +1617,17 @@ navSub.addEventListener('mouseleave', () => navSub.classList.remove('suppress'))
 navSub.addEventListener('focusin', () => navSub.classList.remove('suppress'));
 document.addEventListener('click', e => { if (!navSub.contains(e.target)) closeSub(false); });
 
-/* Menú móvil */
 const drawer = $('#drawer');
 const menuBtn = $('#menu-btn');
 function openMenu() { document.body.classList.add('menu-open'); drawer.inert = false; menuBtn.setAttribute('aria-expanded', 'true'); setTimeout(() => { const f = $('.drawer-panel [data-close-menu]'); if (f) f.focus(); }, 50); }
 function closeMenu() { if (!document.body.classList.contains('menu-open')) return; document.body.classList.remove('menu-open'); drawer.inert = true; menuBtn.setAttribute('aria-expanded', 'false'); }
 menuBtn.addEventListener('click', openMenu);
 drawer.addEventListener('click', e => { if (e.target.closest('[data-close-menu]')) closeMenu(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenu(); closeSub(false); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeMenu(); closeSub(false); }
+  if (e.altKey && e.shiftKey && e.code === 'KeyA') { e.preventDefault(); openAdmin(); }
+});
 
-/* ---------- Avisos ---------- */
 function toast(msg, ic) {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -1340,41 +1637,37 @@ function toast(msg, ic) {
   setTimeout(() => t.remove(), 4800);
 }
 
-/* ---------- Portada (carrusel) ---------- */
-const ARTS = {
-  prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['gift', 'Sin costo para asociados']] },
-  cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
-  comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
-};
-const LINKS = [['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-pago', 'Cursos de pago'], ['#nosotros', 'Nosotros'], ['#contacto', 'Contáctanos']];
-const POS = { centro: '50% 50%', izquierda: '15% 50%', derecha: '85% 50%', arriba: '50% 15%', abajo: '50% 85%' };
-const POS_LABEL = { centro: 'Centro', izquierda: 'Izquierda', derecha: 'Derecha', arriba: 'Arriba', abajo: 'Abajo' };
-const DEFAULT_SLIDES = [
-  { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
-  { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
-  { id: 'ejemplo-3', eyebrow: 'Somos una mutual', title: 'Formación que nace de la ayuda mutua', text: 'Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.', cta: 'Conócenos', href: '#nosotros', art: 'comunidad', img: null, pos: 'centro' }
-];
-const MAX_SLIDES = 8;
-const LS_KEY = 'instituto-mutualista-portada';
-const safeHref = h => LINKS.some(l => l[0] === h) ? h : '#cursos';
-const safeSrc = s => (typeof s === 'string' && (/^portada\/[\w.-]+\.(jpe?g|png|webp)$/i.test(s) || /^data:image\/(jpeg|png|webp);base64,/i.test(s) || /^blob:/i.test(s))) ? s : null;
-function normSlide(s) {
-  s = s || {};
-  return {
-    id: (String(s.id || '').replace(/[^\w-]/g, '').slice(0, 40)) || uid(),
-    eyebrow: str(s.eyebrow, 80), title: str(s.title, 120), text: str(s.text, 260),
-    cta: str(s.cta, 40), href: safeHref(s.href), art: ARTS[s.art] ? s.art : null,
-    img: safeSrc(s.img), pos: POS[s.pos] ? s.pos : 'centro'
-  };
+/* ---------- Aplicar contenido editable a la página ---------- */
+function applySite() {
+  const c = site.contacto;
+  $$('[data-cfg]').forEach(el => { el.textContent = c[el.dataset.cfg] || ''; });
+  $$('[data-txt]').forEach(el => { const v = site.textos[el.dataset.txt]; el.textContent = v || ''; el.hidden = !v; });
+  $$('[data-item]').forEach(el => { el.hidden = !String(c[el.dataset.item] || '').trim(); });
+  const logoSrc = site.logoUrl || site.logo;
+  $$('[data-logo]').forEach(el => {
+    el.classList.toggle('has-logo', !!logoSrc);
+    el.innerHTML = logoSrc ? '<img src="' + esc(logoSrc) + '" alt="">' : LOGO_SVG;
+  });
+  const nets = SOCIALS.filter(s => safeUrl(site.redes[s.k]));
+  const socHTML = nets.map(s => '<a class="soc" href="' + esc(safeUrl(site.redes[s.k])) + '" target="_blank" rel="noopener" aria-label="' + s.label + '" title="' + s.label + '">' + icon(s.icon) + '</a>').join('');
+  $$('[data-social]').forEach(box => { box.innerHTML = socHTML; box.hidden = !nets.length; });
+  $$('[data-social-wrap]').forEach(w => { w.hidden = !nets.length; });
+  $$('[data-btn]').forEach(el => applyBtn(el, el.dataset.btn));
+  const wa = $('#fab-wa'); const waH = waLink(c.whatsappMensaje);
+  wa.hidden = !(site.botones.burbujaWa.visible && waH); if (waH) wa.href = waH;
+  const ms = $('#fab-ms'); const msH = safeUrl(site.redes.messenger);
+  ms.hidden = !(site.botones.burbujaMs.visible && msH); if (msH) ms.href = msH;
+  const mp = mapLink(); $$('[data-map]').forEach(a => { a.hidden = !mp; if (mp) a.href = mp; });
+  document.title = c.nombre || 'Instituto Mutualista';
+  $('#t-inicio').textContent = (c.nombre || 'Instituto') + ': cursos de salud para asociados';
 }
-let slides = DEFAULT_SLIDES.map(normSlide);
-let persisted = new Set();
+
+/* ---------- Portada (carrusel) ---------- */
 let cur = 0;
 const hero = $('#hero');
 const track = $('#hero-track');
 const dotsEl = $('#hero-dots');
 let paused = reduceMotion;
-
 function artHTML(key) {
   const a = ARTS[key] || ARTS.prevencion;
   return '<div class="slide-art" aria-hidden="true"><div class="ring r1"></div><div class="ring r2"></div>' +
@@ -1387,7 +1680,7 @@ function slideHTML(s, i, n) {
   const hasCopy = !!(s.eyebrow || s.title || s.text);
   const cls = ['slide', src ? 'has-photo' : 'has-art', hasCopy ? '' : 'no-copy'].join(' ');
   return '<article class="' + cls + '" role="group" aria-roledescription="diapositiva" aria-label="' + (i + 1) + ' de ' + n + '">' +
-    (src ? '<div class="slide-media"><img src="' + esc(src) + '" alt="" style="object-position:' + POS[s.pos] + '"' + '></div>' : '') +
+    (src ? '<div class="slide-media"><img src="' + esc(src) + '" alt="" style="object-position:' + POS[s.pos] + '"></div>' : '') +
     '<div class="wrap slide-inner"><div class="slide-copy">' +
     (s.eyebrow ? '<p class="slide-eyebrow">' + esc(s.eyebrow) + '</p>' : '') +
     (s.title ? '<h2 class="slide-title">' + esc(s.title) + '</h2>' : '') +
@@ -1396,6 +1689,7 @@ function slideHTML(s, i, n) {
     '</div>' + (src ? '' : artHTML(s.art)) + '</div></article>';
 }
 function renderHero() {
+  const slides = site.slides;
   const n = slides.length;
   track.innerHTML = slides.map((s, i) => slideHTML(s, i, n)).join('');
   dotsEl.innerHTML = slides.map((s, i) => '<button class="hero-dot" type="button" aria-label="Ir a la diapositiva ' + (i + 1) + '"><span class="pip"><span class="fill"></span></span></button>').join('');
@@ -1403,7 +1697,7 @@ function renderHero() {
   go(Math.min(cur, n - 1));
 }
 function go(i) {
-  const n = slides.length;
+  const n = site.slides.length;
   cur = ((i % n) + n) % n;
   $$('.slide', track).forEach((el, k) => { el.classList.toggle('is-active', k === cur); el.setAttribute('aria-hidden', String(k !== cur)); });
   const dots = $$('.hero-dot', dotsEl);
@@ -1418,16 +1712,12 @@ function setPaused(p) {
   b.setAttribute('aria-label', p ? 'Reproducir carrusel' : 'Pausar carrusel');
   b.innerHTML = icon(p ? 'play' : 'pause');
 }
-dotsEl.addEventListener('animationend', e => { if (e.target.classList.contains('fill') && slides.length > 1) go(cur + 1); });
+dotsEl.addEventListener('animationend', e => { if (e.target.classList.contains('fill') && site.slides.length > 1) go(cur + 1); });
 dotsEl.addEventListener('click', e => { const d = e.target.closest('.hero-dot'); if (d) go($$('.hero-dot', dotsEl).indexOf(d)); });
 $('#hero-prev').addEventListener('click', () => go(cur - 1));
 $('#hero-next').addEventListener('click', () => go(cur + 1));
 $('#hero-pause').addEventListener('click', () => setPaused(!paused));
-hero.addEventListener('keydown', e => {
-  if (e.target.matches('input,textarea,select')) return;
-  if (e.key === 'ArrowLeft') go(cur - 1);
-  if (e.key === 'ArrowRight') go(cur + 1);
-});
+hero.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') go(cur - 1); if (e.key === 'ArrowRight') go(cur + 1); });
 let swipeX = null;
 track.addEventListener('pointerdown', e => { swipeX = e.clientX; });
 track.addEventListener('pointerup', e => {
@@ -1437,68 +1727,159 @@ track.addEventListener('pointerup', e => {
 });
 track.addEventListener('pointercancel', () => { swipeX = null; });
 
-/* Persistencia de la portada:
-   - Publicada en Claude: se guarda como archivos de la propia página (portada.json + fotos) y la ven todos.
-   - Archivo abierto localmente: se guarda en este navegador.
-   - Sin permiso de edición: los cambios solo se ven en la pantalla actual. */
+/* ---------- Dónde se guardan los cambios ----------
+   Publicado en Claude: archivos de la propia página (sitio.json + imagenes/*), los ve todo visitante.
+   Archivo abierto localmente: en este navegador. Sin permiso de edición: solo en la pantalla actual. */
 const inViewer = !!(window.claude && typeof window.claude.use === 'function');
 const artifactP = inViewer ? new Promise(r => r(window.claude.use('artifact'))).catch(() => null) : Promise.resolve(null);
+const LS_SITE = 'instituto-mutualista-sitio';
 let readOnly = false;
+let persisted = new Set();
+let legacyPortada = false;
+const collectPaths = s => new Set([s.logo].concat(s.slides.map(x => x.img)).filter(isPath));
 
-async function loadPortada() {
-  try {
-    const r = await fetch('portada.json', { cache: 'no-store' });
-    if (r.ok) {
-      const data = await r.json();
-      if (data && Array.isArray(data.slides) && data.slides.length) {
-        slides = data.slides.slice(0, MAX_SLIDES).map(normSlide);
-        persisted = new Set(slides.map(s => s.img).filter(p => p && p.startsWith('portada/')));
-        cur = 0; renderHero();
-      }
-    }
-  } catch (e) { /* sin portada publicada: se usa la de ejemplo */ }
-  if (!inViewer) {
-    const local = store.get(LS_KEY);
-    if (local && Array.isArray(local.slides) && local.slides.length) {
-      slides = local.slides.slice(0, MAX_SLIDES).map(normSlide);
-      cur = 0; renderHero();
-    }
+async function loadSite() {
+  let loaded = null;
+  try { const r = await fetch('sitio.json', { cache: 'no-store' }); if (r.ok) loaded = await r.json(); } catch (e) { /* sin archivo */ }
+  if (!loaded) {
+    try {
+      const r = await fetch('portada.json', { cache: 'no-store' });
+      if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.slides)) { loaded = { slides: d.slides }; legacyPortada = true; } }
+    } catch (e) { /* sin archivo */ }
   }
+  let changed = false;
+  if (loaded) { site = mergeSite(loaded); persisted = collectPaths(site); changed = true; }
+  if (!inViewer) { const local = store.get(LS_SITE); if (local) { site = mergeSite(local); changed = true; } }
+  if (changed) { applySite(); cur = 0; renderHero(); }
 }
 
-/* ---------- Editor de portada ---------- */
-const dlgP = $('#dlg-portada');
-const edList = $('#ed-list');
-let draft = [];
+/* ---------- Panel de administración (oculto) ---------- */
+const dlgA = $('#dlg-admin');
+const TABS = [['portada', 'Portada', 'image'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
+let admTab = 'portada';
+let draft = null;
+let dirty = false;
 let resetArmed = false;
+let lockFails = 0, lockUntil = 0;
 
-function setStatus(msg, isError) {
-  $('#ed-status-text').textContent = msg;
-  $('#ed-status').classList.toggle('is-error', !!isError);
+const currentPinHash = () => site.seguridad.pinHash || hashPin(DEFAULT_PIN);
+let siteReady = Promise.resolve();
+let opening = false;
+async function openAdmin() {
+  if (dlgA.open || opening) return;
+  opening = true;
+  try { await siteReady; } finally { opening = false; }
+  if (dlgA.open) return;
+  const unlocked = session.get('im-admin') === currentPinHash();
+  $('#adm-lock').hidden = unlocked;
+  $('#adm-app').hidden = !unlocked;
+  $('#lock-err').textContent = '';
+  $('#lock-pin').value = '';
+  if (unlocked) startEditing();
+  dlgA.showModal();
+  if (!unlocked) setTimeout(() => $('#lock-pin').focus(), 30);
+}
+function startEditing() {
+  draft = cloneSite(site);
+  dirty = false; resetArmed = false;
+  $('#adm-confirm').hidden = true;
+  renderTabs(); renderPanel();
+  describeMode();
+}
+$('#lock-form').addEventListener('submit', e => {
+  e.preventDefault();
+  if (Date.now() < lockUntil) { $('#lock-err').textContent = 'Demasiados intentos. Espera unos segundos.'; return; }
+  const pin = $('#lock-pin').value.trim();
+  if (hashPin(pin) === currentPinHash()) {
+    lockFails = 0;
+    session.set('im-admin', currentPinHash());
+    $('#adm-lock').hidden = true; $('#adm-app').hidden = false;
+    startEditing();
+  } else {
+    lockFails++;
+    if (lockFails >= 5) { lockUntil = Date.now() + 30000; lockFails = 0; }
+    $('#lock-err').textContent = 'PIN incorrecto.';
+    $('#lock-pin').select();
+  }
+});
+function closeAdmin() {
+  dlgA.close();
+  try { if (location.hash === '#admin') history.replaceState(null, '', '#' + (currentPage || 'inicio')); } catch (e) { /* sin historial */ }
+}
+function requestClose() {
+  if (!$('#adm-app').hidden && dirty) { $('#adm-confirm').hidden = false; return; }
+  closeAdmin();
+}
+dlgA.addEventListener('cancel', e => { e.preventDefault(); requestClose(); });
+dlgA.addEventListener('click', e => { if (e.target.closest('[data-adm-close]')) requestClose(); });
+$('#adm-keep').addEventListener('click', () => { $('#adm-confirm').hidden = true; });
+$('#adm-discard-close').addEventListener('click', () => { dirty = false; closeAdmin(); });
+$('#adm-logout').addEventListener('click', () => { session.set('im-admin', null); dirty = false; closeAdmin(); });
+$('#adm-discard').addEventListener('click', () => { startEditing(); setStatus('Cambios descartados. Se muestra lo que está publicado.'); });
+let copyClicks = 0, copyTimer = null;
+$('#copy-mark').addEventListener('click', () => {
+  copyClicks++; clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => { copyClicks = 0; }, 2500);
+  if (copyClicks >= 5) { copyClicks = 0; openAdmin(); }
+});
+
+function setStatus(msg, kind) {
+  $('#adm-status-text').textContent = msg;
+  $('#adm-status').classList.toggle('is-error', kind === 'error');
+  $('#adm-status').classList.toggle('is-ok', kind === 'ok');
 }
 async function describeMode() {
-  if (!inViewer) { setStatus('Vista local: la portada se guarda en este navegador. Para que la vean todos, el sitio final necesita un servidor o gestor de contenidos.'); return; }
+  if (!inViewer) { setStatus('Vista local: los cambios se guardan en este navegador. En el sitio final se necesita un servidor o gestor de contenidos para que los vean todos.'); return; }
   const art = await artifactP;
-  if (art && !readOnly) setStatus('Al guardar, la portada se actualiza para todas las personas que abren esta página (requiere permiso de edición).');
-  else setStatus('Esta vista es de solo lectura: puedes probar el editor, pero los cambios se verán solo en tu pantalla.');
+  if (art && !readOnly) setStatus('Al guardar, los cambios se publican para todas las personas que abren esta página.');
+  else setStatus('Esta vista es de solo lectura: puedes probar el panel, pero los cambios se verán solo en tu pantalla.');
+}
+function markDirty() { dirty = true; $('#adm-confirm').hidden = true; }
+
+function renderTabs() {
+  $('#adm-tabs').innerHTML = TABS.map(t => '<button class="adm-tab" type="button" role="tab" id="tab-' + t[0] + '" data-tab="' + t[0] + '" aria-selected="' + (t[0] === admTab) + '" aria-controls="adm-panel">' + icon(t[2]) + t[1] + '</button>').join('');
+  $('#adm-panel').setAttribute('aria-labelledby', 'tab-' + admTab);
+}
+$('#adm-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; admTab = b.dataset.tab; renderTabs(); renderPanel(); $('#adm-panel').scrollTop = 0; });
+
+function fieldHTML(path, label, o) {
+  o = o || {};
+  const id = 'adm-' + path.replace(/\./g, '-');
+  const v = getPath(draft, path) || '';
+  const input = o.area
+    ? '<textarea id="' + id + '" data-path="' + path + '" rows="' + (o.rows || 3) + '" maxlength="' + (o.max || 600) + '" placeholder="' + esc(o.ph || '') + '">' + esc(v) + '</textarea>'
+    : '<input id="' + id + '" data-path="' + path + '" type="' + (o.type || 'text') + '" maxlength="' + (o.max || 200) + '" value="' + esc(v) + '" placeholder="' + esc(o.ph || '') + '"' + (o.mode ? ' inputmode="' + o.mode + '"' : '') + ' autocomplete="off">';
+  return '<label class="ed-f' + (o.wide ? ' ed-wide' : '') + '"><span class="lab">' + (o.icon ? icon(o.icon) : '') + esc(label) + '</span>' + input +
+    (o.hint != null ? '<small class="adm-hint" id="' + id + '-hint">' + esc(o.hint) + '</small>' : '') + '</label>';
+}
+const optHTML = (val, label, sel) => '<option value="' + esc(val) + '"' + (val === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+
+function panelPortada() {
+  return '<h3>Portada del inicio</h3><p class="adm-intro">Cada diapositiva puede tener una foto, un título, un texto y un botón. Para cambiar la imagen de una diapositiva usa “Cambiar foto”. Ideal: fotos horizontales de 1920 × 800 px.</p>' +
+    (draft.slides.length < MAX_SLIDES
+      ? '<label class="ed-drop" id="ed-drop">' + icon('upload') + '<strong>Arrastra fotos aquí o haz clic para agregarlas</strong><small>Hasta ' + MAX_SLIDES + ' diapositivas. Las fotos se optimizan solas.</small><input class="sr-only" id="adm-files" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>'
+      : '<p class="adm-note">' + icon('info') + '<span>La portada ya tiene ' + MAX_SLIDES + ' diapositivas, el máximo. Quita una para agregar otra.</span></p>') +
+    '<ol class="ed-list">' + draft.slides.map((s, i) => edRow(s, i, draft.slides.length)).join('') + '</ol>' +
+    '<div class="ed-reset" id="ed-reset-wrap">' + (resetArmed
+      ? '¿Volver a la portada de ejemplo?<button class="btn btn-line btn-xs" type="button" data-act="reset-yes">Sí</button><button class="btn btn-line btn-xs" type="button" data-act="reset-no">No</button>'
+      : '<button class="btn btn-line btn-sm" type="button" data-act="reset">' + icon('refresh') + 'Restaurar portada de ejemplo</button>') + '</div>';
 }
 function edRow(s, i, n) {
   const src = s.imgUrl || s.img;
-  const opt = (val, label, sel) => '<option value="' + esc(val) + '"' + (val === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
   return '<li class="ed-row" data-i="' + i + '">' +
     '<div class="ed-thumb"><div class="ed-ph"><span class="ed-num">' + (i + 1) + '</span>' +
     (src ? '<img src="' + esc(src) + '" alt="" style="object-position:' + POS[s.pos] + '">' : icon((ARTS[s.art] || ARTS.prevencion).icon)) + '</div>' +
     (s.warn ? '<span class="ed-warn">' + esc(s.warn) + '</span>' : '') +
-    '<label class="btn btn-line btn-xs ed-change">' + icon('upload') + '<span>' + (src ? 'Cambiar foto' : 'Poner foto') + '</span><input type="file" accept="image/jpeg,image/png,image/webp" data-act="replace" aria-label="Elegir foto para la diapositiva ' + (i + 1) + '"></label>' +
-    (src && s.art ? '<button class="btn btn-line btn-xs" type="button" data-act="unphoto">Usar ilustración</button>' : '') +
+    '<label class="btn btn-line btn-xs file-btn">' + icon('upload') + '<span>' + (src ? 'Cambiar foto' : 'Poner foto') + '</span><input type="file" accept="image/jpeg,image/png,image/webp" data-act="replace" aria-label="Elegir foto para la diapositiva ' + (i + 1) + '"></label>' +
+    (src ? '<button class="btn btn-line btn-xs" type="button" data-act="unphoto">' + (s.art ? 'Usar ilustración' : 'Quitar foto') + '</button>' : '') +
     '</div>' +
     '<div class="ed-fields">' +
     '<label class="ed-f"><span>Antetítulo</span><input id="ed-eyebrow-' + s.id + '" data-f="eyebrow" maxlength="80" value="' + esc(s.eyebrow) + '" placeholder="Ej.: Nuevo curso"></label>' +
     '<label class="ed-f"><span>Texto del botón</span><input id="ed-cta-' + s.id + '" data-f="cta" maxlength="40" value="' + esc(s.cta) + '" placeholder="Vacío = sin botón"></label>' +
     '<label class="ed-f ed-wide"><span>Título</span><input id="ed-title-' + s.id + '" data-f="title" maxlength="120" value="' + esc(s.title) + '" placeholder="Vacío = solo la foto"></label>' +
     '<label class="ed-f ed-wide"><span>Texto</span><textarea id="ed-text-' + s.id + '" data-f="text" rows="2" maxlength="260" placeholder="Una o dos líneas">' + esc(s.text) + '</textarea></label>' +
-    '<label class="ed-f"><span>El botón lleva a</span><select id="ed-href-' + s.id + '" data-f="href">' + LINKS.map(l => opt(l[0], l[1], s.href)).join('') + '</select></label>' +
-    '<label class="ed-f"><span>Encuadre de la foto</span><select id="ed-pos-' + s.id + '" data-f="pos"' + (src ? '' : ' disabled') + '>' + Object.keys(POS).map(k => opt(k, POS_LABEL[k], s.pos)).join('') + '</select></label>' +
+    '<label class="ed-f"><span>El botón lleva a</span><select id="ed-href-' + s.id + '" data-f="href">' + PAGES_OPT.map(l => optHTML(l[0], l[1], s.href)).join('') + '</select></label>' +
+    '<label class="ed-f"><span>Encuadre de la foto</span><select id="ed-pos-' + s.id + '" data-f="pos"' + (src ? '' : ' disabled') + '>' + Object.keys(POS).map(k => optHTML(k, POS_LABEL[k], s.pos)).join('') + '</select></label>' +
     '</div>' +
     '<div class="ed-actions">' +
     (s.confirm
@@ -1508,38 +1889,190 @@ function edRow(s, i, n) {
         '<button class="icon-btn" type="button" data-act="del" aria-label="Quitar diapositiva ' + (i + 1) + '"' + (n === 1 ? ' disabled' : '') + '>' + icon('trash') + '</button>') +
     '</div></li>';
 }
-function renderEditor() {
-  edList.innerHTML = draft.map((s, i) => edRow(s, i, draft.length)).join('');
-  $('#ed-drop').hidden = draft.length >= MAX_SLIDES;
+function waHint() { const n = waNumber(draft); return n ? 'Enlace que se usará: wa.me/' + n : 'Escribe el número con código de país, por ejemplo +51 987 654 321.'; }
+function mapHint() { return safeUrl(draft.contacto.mapa) ? 'Se usará este enlace.' : 'Vacío: se buscará la dirección en Google Maps.'; }
+function panelContacto() {
+  const logoSrc = draft.logoUrl || draft.logo;
+  return '<h3>Identidad</h3><p class="adm-intro">El nombre y el lema aparecen en la cabecera, el pie de página y la pestaña del navegador.</p>' +
+    '<div class="adm-logo"><div class="adm-logo-prev">' + (logoSrc ? '<img src="' + esc(logoSrc) + '" alt="Logo actual">' : '<span class="brand-mark">' + LOGO_SVG + '</span>') + '</div>' +
+    '<p>Logo en PNG con fondo transparente o JPG. Se muestra a 46 px de alto. Sin logo, se usa el ícono del corazón.</p>' +
+    '<div class="btns"><label class="btn btn-line btn-sm file-btn">' + icon('upload') + '<span>' + (logoSrc ? 'Cambiar logo' : 'Subir logo') + '</span><input type="file" accept="image/png,image/jpeg,image/webp" data-act="logo"></label>' +
+    (logoSrc ? '<button class="btn btn-line btn-sm" type="button" data-act="logo-off">Quitar logo</button>' : '') + '</div></div>' +
+    '<div class="adm-grid">' + fieldHTML('contacto.nombre', 'Nombre del instituto', { max: 60 }) + fieldHTML('contacto.lema', 'Lema', { max: 80 }) + '</div>' +
+    '<h3>Datos de contacto</h3><p class="adm-intro">Los botones de WhatsApp, llamada y correo de todo el sitio usan estos datos. Si dejas un dato vacío, se oculta donde aparece.</p>' +
+    '<div class="adm-grid">' +
+    fieldHTML('contacto.whatsapp', 'Número de WhatsApp', { icon: 'whatsapp', mode: 'tel', max: 25, hint: waHint() }) +
+    fieldHTML('contacto.telefono', 'Teléfono', { icon: 'phone', mode: 'tel', max: 30, hint: 'Se muestra tal como lo escribas.' }) +
+    fieldHTML('contacto.whatsappMensaje', 'Mensaje inicial de WhatsApp', { icon: 'send', area: true, rows: 2, wide: true, max: 300, hint: 'Texto que aparece escrito al abrir el chat desde la burbuja o los botones.' }) +
+    fieldHTML('contacto.correo', 'Correo', { icon: 'mail', type: 'email', max: 80 }) +
+    fieldHTML('contacto.horario', 'Horario de atención', { icon: 'clock', max: 80 }) +
+    fieldHTML('contacto.direccion', 'Dirección', { icon: 'mapPin', max: 120 }) +
+    fieldHTML('contacto.mapa', 'Enlace de Google Maps', { icon: 'link', mode: 'url', max: 500, ph: 'https://maps.app.goo.gl/…', hint: mapHint() }) +
+    '</div>';
 }
-function renderResetBtn() {
-  $('#ed-reset-wrap').innerHTML = resetArmed
-    ? '¿Volver a la portada de ejemplo?<button class="btn btn-line btn-xs" type="button" id="ed-reset-yes">Sí</button><button class="btn btn-line btn-xs" type="button" id="ed-reset-no">No</button>'
-    : '<button class="btn btn-line btn-sm" type="button" id="ed-reset">' + icon('refresh') + 'Restaurar ejemplo</button>';
+function urlHint(v) { if (!String(v || '').trim()) return { t: 'Vacío: no se muestra.', c: '' }; const u = safeUrl(v); return u ? { t: 'Se abrirá: ' + u, c: 'good' } : { t: 'Revisa el enlace: debe ser una dirección web, por ejemplo facebook.com/tuinstituto.', c: 'bad' }; }
+function panelRedes() {
+  return '<h3>Redes sociales</h3><p class="adm-intro">Pega el enlace de cada red. Las que tengan enlace aparecen como íconos en la barra superior, el pie de página, el menú del celular y la página Contáctanos.</p>' +
+    '<div class="adm-grid">' + SOCIALS.map(s => {
+      const h = urlHint(draft.redes[s.k]);
+      return fieldHTML('redes.' + s.k, s.label, { icon: s.icon, mode: 'url', max: 300, ph: s.ph, hint: h.t }).replace('class="adm-hint"', 'class="adm-hint ' + h.c + '"');
+    }).join('') + '</div>' +
+    '<p class="adm-note">' + icon('info') + '<span>El enlace de Messenger también activa la burbuja de Messenger si la enciendes en la pestaña Botones.</span></p>';
 }
-function openEditor() {
-  draft = slides.map(s => Object.assign({}, s, { confirm: false }));
-  resetArmed = false;
-  renderResetBtn();
-  renderEditor();
-  setStatus('Comprobando dónde se guardarán los cambios…');
-  describeMode();
-  dlgP.showModal();
+function btnPreview(b) {
+  const r = resolveBtn(b, null, draft);
+  if (!r.href) {
+    const why = b.tipo === 'whatsapp' ? 'falta el número de WhatsApp en Contacto' : b.tipo === 'telefono' ? 'falta el teléfono en Contacto' : b.tipo === 'correo' ? 'falta el correo en Contacto' : b.tipo === 'url' ? 'escribe un enlace válido' : 'falta el enlace en Redes sociales';
+    return '<span class="adm-hint bad">' + icon('info') + 'Oculto: ' + why + '.</span>';
+  }
+  let shown = r.href;
+  try { shown = decodeURIComponent(r.href); } catch (e) { /* enlace sin codificar */ }
+  shown = r.href.startsWith('#') ? 'Página: ' + (PAGES_OPT.find(p => p[0] === r.href) || ['', ''])[1] : shown.replace(/^https:\/\//, '').slice(0, 120);
+  return icon('link') + '<span>' + esc(shown) + '</span>';
 }
-$('#hero-edit').addEventListener('click', openEditor);
-dlgP.addEventListener('click', e => { if (e.target === dlgP || e.target.closest('[data-close]')) dlgP.close(); });
+function bcardHTML(d) {
+  const b = draft.botones[d.k];
+  let valor = '';
+  if (b.tipo === 'pagina') valor = '<label class="ed-f"><span>Página</span><select id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor">' + PAGES_OPT.map(p => optHTML(p[0], p[1], safePage(b.valor))).join('') + '</select></label>';
+  else if (b.tipo === 'whatsapp') valor = '<label class="ed-f"><span>Mensaje (opcional)</span><input id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor" maxlength="300" value="' + esc(b.valor) + '" placeholder="Vacío = mensaje inicial de Contacto"></label>';
+  else if (b.tipo === 'url') valor = '<label class="ed-f"><span>Enlace</span><input id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor" inputmode="url" maxlength="500" value="' + esc(b.valor) + '" placeholder="https://…"></label>';
+  else valor = '<div class="ed-f"><span>Dato que usa</span><small class="adm-hint">' + (b.tipo === 'telefono' ? 'El teléfono de la pestaña Contacto.' : b.tipo === 'correo' ? 'El correo de la pestaña Contacto.' : 'El enlace de ' + (SOCIALS.find(s => s.k === b.tipo) || { label: '' }).label + ' en Redes sociales.') + '</small></div>';
+  return '<div class="bcard" data-bkey="' + d.k + '"><div class="bcard-head"><div><strong>' + esc(d.nombre) + '</strong><small>' + esc(d.donde) + '</small></div>' +
+    (d.visible ? '<label class="switch"><input type="checkbox" id="btn-' + d.k + '-vis" data-bool="botones.' + d.k + '.visible"' + (b.visible ? ' checked' : '') + '>Mostrar</label>' : '') + '</div>' +
+    '<div class="bcard-grid">' +
+    '<label class="ed-f"><span>Texto del botón</span><input id="btn-' + d.k + '-texto" data-path="botones.' + d.k + '.texto" maxlength="40" value="' + esc(b.texto) + '"></label>' +
+    '<label class="ed-f"><span>Lleva a</span><select id="btn-' + d.k + '-tipo" data-path="botones.' + d.k + '.tipo" data-rerender>' + BTN_TIPOS.map(t => optHTML(t[0], t[1], b.tipo)).join('') + '</select></label>' +
+    valor + '</div><div class="bcard-preview" id="btn-' + d.k + '-prev">' + btnPreview(b) + '</div></div>';
+}
+function panelBotones() {
+  return '<h3>Botones de contacto</h3><p class="adm-intro">Cambia el texto de cada botón y a dónde lleva: una página del sitio, WhatsApp, una llamada, un correo o una red social. Los números y enlaces se toman de las pestañas Contacto y Redes sociales.</p>' +
+    BTN_DEFS.map(bcardHTML).join('') +
+    '<h3>Burbujas flotantes</h3><p class="adm-intro">Botones redondos fijos en la esquina inferior derecha.</p>' +
+    '<div class="bcard"><div class="bcard-head"><div><strong>Burbuja de WhatsApp</strong><small>Abre el chat con el mensaje inicial de Contacto.</small></div><label class="switch"><input type="checkbox" id="btn-burbujaWa" data-bool="botones.burbujaWa.visible"' + (draft.botones.burbujaWa.visible ? ' checked' : '') + '>Mostrar</label></div></div>' +
+    '<div class="bcard"><div class="bcard-head"><div><strong>Burbuja de Messenger</strong><small>' + (safeUrl(draft.redes.messenger) ? 'Abre ' + esc(safeUrl(draft.redes.messenger)) : 'Primero agrega el enlace de Messenger en Redes sociales.') + '</small></div><label class="switch"><input type="checkbox" id="btn-burbujaMs" data-bool="botones.burbujaMs.visible"' + (draft.botones.burbujaMs.visible ? ' checked' : '') + '>Mostrar</label></div></div>';
+}
+function panelTextos() {
+  return '<h3>Textos del sitio</h3><p class="adm-intro">Edita los textos principales de cada página. Si dejas un texto vacío, ese bloque se oculta.</p>' +
+    TEXT_GROUPS.map(g => '<h4>' + esc(g[0]) + '</h4><div class="adm-grid">' + g[1].map(f => fieldHTML('textos.' + f[0], f[1], { area: !!f[2], rows: 3, wide: !!f[2], max: 600 })).join('') + '</div>').join('');
+}
+function panelConectores() {
+  const dest = draft.conectores.formDestino;
+  return '<h3>Formulario de contacto</h3><p class="adm-intro">Elige a dónde llegan las solicitudes que envían los visitantes desde Contáctanos o desde el botón “Inscribirme” de cada curso.</p>' +
+    '<div class="radio-cards">' + FORM_DEST.map(f => '<label class="radio-card"><input type="radio" name="adm-dest" value="' + f[0] + '"' + (f[0] === dest ? ' checked' : '') + '><div><strong>' + esc(f[1]) + '</strong><span>' + esc(f[2]) + '</span></div></label>').join('') + '</div>' +
+    '<div id="endpoint-box" style="margin-top:14px"' + (dest === 'endpoint' ? '' : ' hidden') + '>' +
+    fieldHTML('conectores.formEndpoint', 'Dirección del servicio de formularios', { icon: 'plug', mode: 'url', max: 500, ph: 'https://formspree.io/f/xxxxxxx', hint: 'Recibe los datos en formato JSON por POST.' }) + '</div>' +
+    (dest === 'whatsapp' && !waNumber(draft) ? '<p class="adm-note">' + icon('info') + '<span>Falta el número de WhatsApp en la pestaña Contacto.</span></p>' : '') +
+    (dest === 'correo' && !String(draft.contacto.correo).includes('@') ? '<p class="adm-note">' + icon('info') + '<span>Falta el correo en la pestaña Contacto.</span></p>' : '') +
+    '<h3>Otros conectores</h3><ul class="access-list">' +
+    '<li><span class="quick-ico qi-brand">' + icon('mapPin') + '</span><span>Mapa: se configura en Contacto (enlace de Google Maps o la dirección).</span></li>' +
+    '<li><span class="quick-ico qi-brand">' + icon('messenger') + '</span><span>Messenger y redes: se configuran en Redes sociales y se usan en Botones.</span></li></ul>';
+}
+function panelSeguridad() {
+  return '<h3>PIN del administrador</h3><p class="adm-intro">Cambia el PIN de 4 a 12 dígitos que pide este panel. El cambio se aplica al guardar.</p>' +
+    '<div class="adm-grid"><label class="ed-f"><span>Nuevo PIN</span><input id="pin-new" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label>' +
+    '<label class="ed-f"><span>Repite el nuevo PIN</span><input id="pin-rep" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label></div>' +
+    '<p style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" data-act="pin">' + icon('lock') + 'Cambiar PIN</button><span class="adm-hint" id="pin-msg"></span></p>' +
+    '<h3>Cómo entrar al panel</h3><p class="adm-intro">El panel no tiene ningún botón visible. Se abre de estas tres formas:</p><ul class="access-list">' +
+    '<li><span class="quick-ico qi-brand">' + icon('link') + '</span><span>Agrega <code>#admin</code> al final del enlace de la página.</span></li>' +
+    '<li><span class="quick-ico qi-brand">' + icon('keyboard') + '</span><span>En computadora, presiona <code>Alt</code> + <code>Shift</code> + <code>A</code>.</span></li>' +
+    '<li><span class="quick-ico qi-brand">' + icon('pointer') + '</span><span>Haz clic 5 veces seguidas en el símbolo <code>©</code> del pie de página.</span></li></ul>' +
+    '<p class="adm-note">' + icon('info') + '<span>El PIN evita que un visitante entre por accidente. La protección real está en el guardado: solo las personas con permiso de edición de esta página pueden publicar cambios. En el sitio final, el panel debe ir detrás de un inicio de sesión en el servidor.</span></p>';
+}
+const PANELS = { portada: panelPortada, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
+function renderPanel(focusId) {
+  $('#adm-panel').innerHTML = PANELS[admTab]();
+  if (focusId) { const f = document.getElementById(focusId); if (f) f.focus(); }
+}
+
+/* Edición de campos */
+const admPanel = $('#adm-panel');
+admPanel.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.path) {
+    setPath(draft, t.dataset.path, t.value); markDirty();
+    const hint = document.getElementById(t.id + '-hint');
+    if (t.dataset.path === 'contacto.whatsapp' && hint) hint.textContent = waHint();
+    if (t.dataset.path === 'contacto.mapa' && hint) hint.textContent = mapHint();
+    if (t.dataset.path.startsWith('redes.') && hint) { const h = urlHint(t.value); hint.textContent = h.t; hint.className = 'adm-hint ' + h.c; }
+    const card = t.closest('[data-bkey]');
+    if (card && !t.hasAttribute('data-rerender')) { const k = card.dataset.bkey; $('#btn-' + k + '-prev').innerHTML = btnPreview(draft.botones[k]); }
+    return;
+  }
+  const row = t.closest('.ed-row');
+  if (row && t.dataset.f) {
+    draft.slides[+row.dataset.i][t.dataset.f] = t.value; markDirty();
+    if (t.dataset.f === 'pos') { const im = $('.ed-ph img', row); if (im) im.style.objectPosition = POS[t.value]; }
+  }
+});
+admPanel.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.hasAttribute('data-rerender')) {
+    const k = t.closest('[data-bkey]').dataset.bkey;
+    const b = draft.botones[k];
+    b.tipo = t.value;
+    if (b.tipo === 'pagina') b.valor = safePage(b.valor); else if (b.tipo !== 'whatsapp' && b.tipo !== 'url') b.valor = '';
+    else if (b.valor && b.valor.startsWith('#')) b.valor = '';
+    markDirty(); renderPanel(t.id); return;
+  }
+  if (t.dataset.bool) { setPath(draft, t.dataset.bool, t.checked); markDirty(); return; }
+  if (t.name === 'adm-dest') { draft.conectores.formDestino = t.value; markDirty(); renderPanel(); return; }
+  if (t.id === 'adm-files') { await addFiles(t.files); t.value = ''; return; }
+  if (t.dataset.act === 'replace') {
+    const s = draft.slides[+t.closest('.ed-row').dataset.i];
+    const file = t.files && t.files[0];
+    if (!file) return;
+    try { const r = await compress(file); s.blob = r.blob; s.imgUrl = r.imgUrl; s.warn = r.warn; s.img = null; markDirty(); renderPanel(); }
+    catch (err) { setStatus('No se pudo leer esa imagen. Prueba con un JPG o PNG.', 'error'); }
+    return;
+  }
+  if (t.dataset.act === 'logo') {
+    const file = t.files && t.files[0];
+    if (!file) return;
+    try { const r = await compressLogo(file); draft.logoBlob = r.blob; draft.logoUrl = r.url; markDirty(); renderPanel(); }
+    catch (err) { setStatus('No se pudo leer ese logo. Prueba con un PNG o JPG.', 'error'); }
+  }
+});
+admPanel.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  const row = b.closest('.ed-row');
+  const i = row ? +row.dataset.i : -1;
+  const sl = draft.slides;
+  if (act === 'up' && i > 0) { const t = sl[i - 1]; sl[i - 1] = sl[i]; sl[i] = t; markDirty(); }
+  else if (act === 'down' && i < sl.length - 1) { const t = sl[i + 1]; sl[i + 1] = sl[i]; sl[i] = t; markDirty(); }
+  else if (act === 'del') { sl.forEach(s => { s.confirm = false; }); sl[i].confirm = true; }
+  else if (act === 'del-no') { sl[i].confirm = false; }
+  else if (act === 'del-yes') { sl.splice(i, 1); markDirty(); }
+  else if (act === 'unphoto') { const s = sl[i]; s.img = null; s.imgUrl = null; s.blob = null; s.warn = ''; markDirty(); }
+  else if (act === 'reset') { resetArmed = true; }
+  else if (act === 'reset-no') { resetArmed = false; }
+  else if (act === 'reset-yes') { resetArmed = false; draft.slides = mergeSite(null).slides.map(s => Object.assign(s, { confirm: false })); markDirty(); }
+  else if (act === 'logo-off') { draft.logo = null; draft.logoUrl = null; draft.logoBlob = null; markDirty(); }
+  else if (act === 'pin') {
+    const a = $('#pin-new').value.trim(), r = $('#pin-rep').value.trim(), msg = $('#pin-msg');
+    if (!/^\d{4,12}$/.test(a)) { msg.textContent = 'El PIN debe tener de 4 a 12 dígitos.'; msg.className = 'adm-hint bad'; return; }
+    if (a !== r) { msg.textContent = 'Los dos PIN no coinciden.'; msg.className = 'adm-hint bad'; return; }
+    draft.seguridad.pinHash = hashPin(a); markDirty();
+    $('#pin-new').value = ''; $('#pin-rep').value = '';
+    msg.textContent = 'PIN listo. Pulsa “Guardar cambios” para aplicarlo.'; msg.className = 'adm-hint good';
+    return;
+  }
+  else return;
+  renderPanel();
+});
+['dragenter', 'dragover'].forEach(t => admPanel.addEventListener(t, e => { const d = e.target.closest && e.target.closest('.ed-drop'); if (d) { e.preventDefault(); d.classList.add('is-over'); } }));
+['dragleave', 'drop'].forEach(t => admPanel.addEventListener(t, e => { const d = e.target.closest && e.target.closest('.ed-drop'); if (d) { e.preventDefault(); d.classList.remove('is-over'); } }));
+admPanel.addEventListener('drop', e => { if (e.target.closest && e.target.closest('.ed-drop')) addFiles(e.dataTransfer && e.dataTransfer.files); });
 
 async function compress(file) {
   const url = URL.createObjectURL(file);
   try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
+    const img = new Image(); img.src = url; await img.decode();
     const w0 = img.naturalWidth, h0 = img.naturalHeight;
     const scale = Math.min(1, 1920 / Math.max(w0, h0));
     const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
     c.getContext('2d').drawImage(img, 0, 0, w, h);
     const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.84));
     if (!blob) throw new Error('canvas');
@@ -1549,147 +2082,116 @@ async function compress(file) {
     return { blob: blob, imgUrl: URL.createObjectURL(blob), warn: warn };
   } finally { URL.revokeObjectURL(url); }
 }
+async function compressLogo(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const scale = Math.min(1, 320 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('canvas');
+    return { blob: blob, url: URL.createObjectURL(blob) };
+  } finally { URL.revokeObjectURL(url); }
+}
 async function addFiles(files) {
   const list = Array.from(files || []).filter(f => /^image\/(jpeg|png|webp)$/.test(f.type));
-  if (!list.length) { setStatus('Elige imágenes JPG, PNG o WebP.', true); return; }
-  const room = MAX_SLIDES - draft.length;
-  if (room <= 0) { setStatus('La portada admite hasta ' + MAX_SLIDES + ' diapositivas. Quita alguna para agregar otra.', true); return; }
-  setStatus('Optimizando ' + Math.min(room, list.length) + (list.length === 1 ? ' imagen…' : ' imágenes…'));
+  if (!list.length) { setStatus('Elige imágenes JPG, PNG o WebP.', 'error'); return; }
+  const room = MAX_SLIDES - draft.slides.length;
+  if (room <= 0) { setStatus('La portada admite hasta ' + MAX_SLIDES + ' diapositivas.', 'error'); return; }
+  setStatus('Optimizando ' + (Math.min(room, list.length) === 1 ? 'la imagen…' : Math.min(room, list.length) + ' imágenes…'));
   for (const f of list.slice(0, room)) {
     try {
       const r = await compress(f);
-      draft.push({ id: uid(), eyebrow: '', title: '', text: '', cta: 'Ver cursos', href: '#cursos', art: null, img: null, pos: 'centro', blob: r.blob, imgUrl: r.imgUrl, warn: r.warn, confirm: false });
-    } catch (e) { setStatus('No se pudo leer "' + f.name + '". Prueba con otra imagen.', true); }
+      draft.slides.push({ id: uid(), eyebrow: '', title: '', text: '', cta: 'Ver cursos', href: '#cursos', art: null, img: null, pos: 'centro', blob: r.blob, imgUrl: r.imgUrl, warn: r.warn, confirm: false });
+      markDirty();
+    } catch (e) { setStatus('No se pudo leer "' + f.name + '". Prueba con otra imagen.', 'error'); }
   }
-  renderEditor();
-  if (list.length > room) setStatus('Se agregaron ' + room + ' imágenes. El máximo es ' + MAX_SLIDES + ' diapositivas.', true);
-  else describeMode();
+  renderPanel();
+  if (list.length > room) setStatus('Se agregaron ' + room + ' imágenes. El máximo es ' + MAX_SLIDES + ' diapositivas.', 'error');
+  else setStatus('Imágenes agregadas. Escribe sus textos y pulsa “Guardar cambios”.');
 }
-$('#ed-files').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
-const drop = $('#ed-drop');
-['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('is-over'); }));
-['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('is-over'); }));
-drop.addEventListener('drop', e => addFiles(e.dataTransfer && e.dataTransfer.files));
 
-edList.addEventListener('input', e => {
-  const row = e.target.closest('.ed-row'); const f = e.target.dataset.f;
-  if (!row || !f) return;
-  draft[+row.dataset.i][f] = e.target.value;
-  if (f === 'pos') { const im = $('.ed-ph img', row); if (im) im.style.objectPosition = POS[e.target.value]; }
-});
-edList.addEventListener('change', async e => {
-  if (e.target.dataset.act !== 'replace') return;
-  const row = e.target.closest('.ed-row'); const s = draft[+row.dataset.i];
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
-  try {
-    const r = await compress(file);
-    s.blob = r.blob; s.imgUrl = r.imgUrl; s.warn = r.warn; s.img = null;
-    renderEditor();
-  } catch (err) { setStatus('No se pudo leer esa imagen. Prueba con un JPG o PNG.', true); }
-});
-edList.addEventListener('click', e => {
-  const b = e.target.closest('button[data-act]');
-  if (!b) return;
-  const i = +b.closest('.ed-row').dataset.i;
-  const act = b.dataset.act;
-  if (act === 'up' && i > 0) { const t = draft[i - 1]; draft[i - 1] = draft[i]; draft[i] = t; }
-  else if (act === 'down' && i < draft.length - 1) { const t = draft[i + 1]; draft[i + 1] = draft[i]; draft[i] = t; }
-  else if (act === 'del') { draft.forEach(s => { s.confirm = false; }); draft[i].confirm = true; }
-  else if (act === 'del-no') { draft[i].confirm = false; }
-  else if (act === 'del-yes') { draft.splice(i, 1); }
-  else if (act === 'unphoto') { const s = draft[i]; s.img = null; s.imgUrl = null; s.blob = null; s.warn = ''; }
-  renderEditor();
-});
-$('#ed-reset-wrap').addEventListener('click', e => {
-  const t = e.target.closest('button');
-  if (!t) return;
-  if (t.id === 'ed-reset') resetArmed = true;
-  else if (t.id === 'ed-reset-no') resetArmed = false;
-  else if (t.id === 'ed-reset-yes') { resetArmed = false; draft = DEFAULT_SLIDES.map(s => Object.assign(normSlide(s), { confirm: false })); renderEditor(); }
-  renderResetBtn();
-});
-
+/* Guardar */
 const blobToDataURL = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
-function commit(next) {
-  slides = next.map(s => { const o = Object.assign({}, s); delete o.confirm; delete o.warn; return o; });
-  cur = 0;
-  renderHero();
+const slideMeta = (s, img) => ({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
+function serialize(d, slides, logo) {
+  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, seguridad: d.seguridad, logo: logo, slides: slides };
+}
+function commitDraft() {
+  const keepSession = session.get('im-admin') === currentPinHash();
+  site = cloneSite(draft);
+  site.slides.forEach(s => { delete s.confirm; delete s.warn; });
+  if (keepSession) session.set('im-admin', currentPinHash());
+  dirty = false;
+  applySite(); cur = 0; renderHero();
 }
 async function publishWithRetry(art, files) {
   try { return await art.publish(files); }
   catch (err) {
-    if (err && (err.code === 'upstream_error' || !err.code)) {
-      await new Promise(r => setTimeout(r, 600 + Math.random() * 900));
-      return art.publish(files);
-    }
+    if (err && (err.code === 'upstream_error' || !err.code)) { await new Promise(r => setTimeout(r, 600 + Math.random() * 900)); return art.publish(files); }
     throw err;
   }
 }
-$('#ed-save').addEventListener('click', async () => {
-  const btn = $('#ed-save');
+$('#adm-save').addEventListener('click', async () => {
+  const btn = $('#adm-save');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
     const art = await artifactP;
     if (art && !readOnly) {
-      const files = {}; const keep = new Set(); const meta = [];
-      for (const s of draft) {
-        let img = s.img && s.img.startsWith('portada/') ? s.img : null;
-        if (s.blob) { img = 'portada/' + s.id + '.jpg'; files[img] = s.blob; }
+      const files = {}, keep = new Set();
+      const slides = draft.slides.map(s => {
+        let img = isPath(s.img) ? s.img : null;
+        if (s.blob) { img = 'imagenes/' + s.id + '-' + uid() + '.jpg'; files[img] = s.blob; }
         if (img) keep.add(img);
-        meta.push({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
-      }
+        return slideMeta(s, img);
+      });
+      let logo = isPath(draft.logo) ? draft.logo : null;
+      if (draft.logoBlob) { logo = 'imagenes/logo-' + uid() + '.png'; files[logo] = draft.logoBlob; }
+      if (logo) keep.add(logo);
       persisted.forEach(p => { if (!keep.has(p)) files[p] = null; });
-      files['portada.json'] = JSON.stringify({ version: 1, actualizado: new Date().toISOString(), slides: meta }, null, 2);
+      if (legacyPortada) files['portada.json'] = null;
+      files['sitio.json'] = JSON.stringify(serialize(draft, slides, logo), null, 2);
       try {
         await publishWithRetry(art, files);
-        persisted = keep;
-        draft.forEach((s, k) => { s.img = meta[k].img; s.blob = null; });
-        commit(draft);
-        dlgP.close();
-        toast('Portada guardada. Todos los visitantes verán estos cambios.', 'check');
-        return;
+        persisted = keep; legacyPortada = false;
+        draft.slides.forEach((s, k) => { s.img = slides[k].img; s.blob = null; });
+        draft.logo = logo; draft.logoBlob = null;
+        commitDraft(); renderPanel();
+        setStatus('Cambios guardados y publicados para todos los visitantes.', 'ok');
       } catch (err) {
         const code = err && err.code;
-        if (code === 'conflict') { setStatus('Otra persona guardó la portada hace un momento. La página se actualizará con su versión; vuelve a intentarlo después.', true); return; }
-        if (code === 'rate_limited') { setStatus('Se guardó varias veces seguidas. Espera un minuto y vuelve a guardar.', true); return; }
-        if (code === 'too_large') { setStatus('Las imágenes pesan demasiado en conjunto. Quita alguna y vuelve a guardar.', true); return; }
-        if (code === 'invalid_content' || code === 'transform_error') { setStatus('Una de las imágenes no se pudo guardar. Prueba con JPG o PNG.', true); return; }
-        if (code === 'upstream_error' || !code) { setStatus('No se pudo guardar por un problema del servicio. Intenta de nuevo en unos minutos.', true); return; }
-        readOnly = true;
-        commit(draft);
-        dlgP.close();
-        toast('Esta vista es de solo lectura: la nueva portada se ve solo en tu pantalla.', 'info');
-        return;
+        if (code === 'conflict') setStatus('Otra persona guardó cambios hace un momento. La página se actualizará con su versión; vuelve a hacer tus cambios después.', 'error');
+        else if (code === 'rate_limited') setStatus('Se guardó varias veces seguidas. Espera un minuto y vuelve a guardar.', 'error');
+        else if (code === 'too_large') setStatus('Las imágenes pesan demasiado en conjunto. Quita alguna y vuelve a guardar.', 'error');
+        else if (code === 'invalid_content' || code === 'transform_error') setStatus('Una de las imágenes no se pudo guardar. Prueba con JPG o PNG.', 'error');
+        else if (code === 'upstream_error' || !code) setStatus('No se pudo guardar por un problema del servicio. Intenta de nuevo en unos minutos.', 'error');
+        else { readOnly = true; commitDraft(); renderPanel(); setStatus('Tu acceso a esta página es de solo lectura: los cambios se ven solo en tu pantalla.', 'error'); }
       }
-    }
-    if (!inViewer) {
-      const meta = [];
-      for (const s of draft) {
-        let img = s.img;
-        if (s.blob) img = await blobToDataURL(s.blob);
-        meta.push({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
-      }
-      const ok = store.set(LS_KEY, { slides: meta });
-      commit(draft);
-      dlgP.close();
-      toast(ok ? 'Portada guardada en este navegador.' : 'La portada se ve en esta sesión, pero no cabe en el almacenamiento del navegador. Usa menos fotos.', ok ? 'check' : 'info');
       return;
     }
-    commit(draft);
-    dlgP.close();
-    toast('Esta vista es de solo lectura: la nueva portada se ve solo en tu pantalla.', 'info');
+    if (!inViewer) {
+      const slides = [];
+      for (const s of draft.slides) slides.push(slideMeta(s, s.blob ? await blobToDataURL(s.blob) : s.img));
+      const logo = draft.logoBlob ? await blobToDataURL(draft.logoBlob) : draft.logo;
+      const ok = store.set(LS_SITE, serialize(draft, slides, logo));
+      commitDraft(); renderPanel();
+      setStatus(ok ? 'Cambios guardados en este navegador.' : 'Los cambios se ven en esta sesión, pero no caben en el almacenamiento del navegador. Usa menos fotos o fotos más livianas.', ok ? 'ok' : 'error');
+      return;
+    }
+    commitDraft(); renderPanel();
+    setStatus('Esta vista es de solo lectura: los cambios se ven solo en tu pantalla.', 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Guardar portada';
+    btn.disabled = false; btn.textContent = 'Guardar cambios';
   }
 });
 
-/* ---------- Contacto ---------- */
+/* ---------- Formulario de contacto ---------- */
 const sel = $('#f-curso');
 sel.innerHTML = '<option value="">Aún no lo sé, quiero orientación</option>' +
   '<optgroup label="Cursos gratuitos">' + sortByDate(COURSES.filter(c => c.tipo === 'gratis')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>' +
   '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + ' · ' + soles(c.precio.asociado) + '</option>').join('') + '</optgroup>';
-
 const form = $('#contact-form');
 const RULES = {
   'f-nombres': v => v.trim().length >= 2 || 'Ingresa tus nombres.',
@@ -1714,8 +2216,35 @@ Object.keys(RULES).forEach(id => {
 });
 $('#f-dni').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); });
 $('#f-datos').addEventListener('change', e => { $('#check-datos').classList.toggle('invalid', !e.target.checked); });
-form.addEventListener('submit', e => {
+function readForm() {
+  const c = byId(sel.value);
+  return {
+    nombres: $('#f-nombres').value.trim(), apellidos: $('#f-apellidos').value.trim(), dni: $('#f-dni').value.trim(),
+    codigo: $('#f-codigo').value.trim(), celular: $('#f-celular').value.trim(), correo: $('#f-correo').value.trim(),
+    curso: c ? c.titulo : '', mensaje: $('#f-mensaje').value.trim(), avisos: $('#f-wa').checked, origen: site.contacto.nombre
+  };
+}
+function formText(d) {
+  return 'Hola, envío mi solicitud de información:\n' +
+    '- Nombre: ' + d.nombres + ' ' + d.apellidos + '\n- DNI: ' + d.dni + '\n' +
+    (d.codigo ? '- Código de asociado: ' + d.codigo + '\n' : '') +
+    '- Celular: ' + d.celular + '\n- Correo: ' + d.correo + '\n' +
+    '- Curso: ' + (d.curso || 'Quiero orientación') + '\n' +
+    (d.mensaje ? '- Mensaje: ' + d.mensaje + '\n' : '') +
+    '- Calendario por WhatsApp: ' + (d.avisos ? 'Sí' : 'No');
+}
+function showOk(title, text, actionsHTML, demo) {
+  $('#ok-title').textContent = title;
+  $('#ok-text').textContent = text;
+  $('#ok-actions').innerHTML = actionsHTML || '';
+  $('#ok-note').hidden = !demo;
+  $('#form-wrap').hidden = true;
+  $('#form-ok').hidden = false;
+}
+let lastFormText = '';
+form.addEventListener('submit', async e => {
   e.preventDefault();
+  $('#form-error').hidden = true;
   const results = Object.keys(RULES).map(checkField);
   const datos = $('#f-datos').checked;
   $('#check-datos').classList.toggle('invalid', !datos);
@@ -1724,44 +2253,65 @@ form.addEventListener('submit', e => {
     if (firstBad) $('#' + firstBad).focus(); else $('#f-datos').focus();
     return;
   }
-  const nombre = $('#f-nombres').value.trim().split(/\s+/)[0];
-  const c = byId(sel.value);
-  $('#ok-title').textContent = '¡Gracias, ' + nombre + '!';
-  $('#ok-text').textContent = c
-    ? 'Recibimos tu solicitud para "' + c.titulo + '". Te escribiremos al ' + $('#f-celular').value.trim() + ' para confirmar tu vacante.'
-    : 'Recibimos tu consulta. Un asesor te escribirá al ' + $('#f-celular').value.trim() + ' para orientarte.';
-  $('#form-wrap').hidden = true;
-  $('#form-ok').hidden = false;
+  const d = readForm();
+  const text = formText(d);
+  lastFormText = text;
+  const nombre = d.nombres.split(/\s+/)[0];
+  const dest = site.conectores.formDestino;
+  const wa = waLink(text);
+  const mail = site.contacto.correo && site.contacto.correo.includes('@') ? site.contacto.correo.trim() : '';
+  if (dest === 'whatsapp' && wa) {
+    showOk('¡Casi listo, ' + nombre + '!', 'Para terminar, envía tu solicitud por WhatsApp. Se abrirá el chat con tus datos ya escritos.',
+      '<a class="btn btn-wa" href="' + esc(wa) + '" target="_blank" rel="noopener">' + icon('whatsapp') + 'Enviar por WhatsApp</a>');
+  } else if (dest === 'correo' && mail) {
+    const href = 'mailto:' + mail + '?subject=' + encodeURIComponent('Solicitud de información' + (d.curso ? ': ' + d.curso : '')) + '&body=' + encodeURIComponent(text);
+    showOk('¡Casi listo, ' + nombre + '!', 'Para terminar, envía tu solicitud a ' + mail + '. Si no se abre tu correo, copia los datos y pégalos en un mensaje.',
+      '<a class="btn btn-brand" href="' + esc(href) + '">' + icon('mail') + 'Enviar por correo</a><button class="btn btn-line" type="button" data-copy-form>' + icon('copy') + 'Copiar datos</button>');
+  } else if (dest === 'endpoint' && safeUrl(site.conectores.formEndpoint)) {
+    const btn = $('#form-submit'); btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      const r = await fetch(safeUrl(site.conectores.formEndpoint), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(d) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showOk('¡Gracias, ' + nombre + '!', 'Recibimos tu solicitud. Te escribiremos al ' + d.celular + ' para ' + (d.curso ? 'confirmar tu vacante.' : 'orientarte.'));
+    } catch (err) {
+      const fe = $('#form-error');
+      fe.innerHTML = '';
+      fe.append('No pudimos enviar tu solicitud. Inténtalo de nuevo en unos minutos' + (wa ? ' o ' : '.'));
+      if (wa) { const a = document.createElement('a'); a.href = wa; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'envíala por WhatsApp'; fe.append(a, '.'); }
+      fe.hidden = false;
+      return;
+    } finally { btn.disabled = false; btn.textContent = 'Enviar solicitud'; }
+  } else {
+    showOk('¡Gracias, ' + nombre + '!', d.curso ? 'Recibimos tu solicitud para "' + d.curso + '". Te escribiremos al ' + d.celular + ' para confirmar tu vacante.' : 'Recibimos tu consulta. Un asesor te escribirá al ' + d.celular + ' para orientarte.', '', true);
+  }
   form.reset();
 });
 $('#form-again').addEventListener('click', () => { $('#form-ok').hidden = true; $('#form-wrap').hidden = false; $('#f-nombres').focus(); });
 
-/* Copiar datos de contacto */
-document.addEventListener('click', async e => {
-  const b = e.target.closest('[data-copy]');
-  if (!b) return;
-  const text = CONFIG[b.dataset.copy];
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('Copiado: ' + text, 'check');
-  } catch (err) {
-    const span = b.parentElement.querySelector('.c-val');
-    const range = document.createRange(); range.selectNodeContents(span);
-    const s = window.getSelection(); s.removeAllRanges(); s.addRange(range);
-    toast('Texto seleccionado. Cópialo con Ctrl+C o mantén presionado.', 'info');
+/* Copiar */
+async function copyText(text, fallbackEl) {
+  try { await navigator.clipboard.writeText(text); toast('Copiado.', 'check'); }
+  catch (err) {
+    if (fallbackEl) { const range = document.createRange(); range.selectNodeContents(fallbackEl); const s = window.getSelection(); s.removeAllRanges(); s.addRange(range); }
+    toast('No se pudo copiar automáticamente. Selecciona el texto y cópialo.', 'info');
   }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-copy]');
+  if (b) { copyText(site.contacto[b.dataset.copy] || '', b.parentElement.querySelector('.c-val')); return; }
+  if (e.target.closest('[data-copy-form]')) copyText(lastFormText, $('#ok-text'));
 });
 
 /* ---------- Inicio ---------- */
-$$('[data-cfg]').forEach(el => { const v = CONFIG[el.dataset.cfg]; if (v) el.textContent = v; });
-$$('[data-cfg-href]').forEach(el => { const v = CONFIG[el.dataset.cfgHref]; if (v) el.href = v; });
 hydrateIcons();
+applySite();
 renderHome();
 renderCourses();
 renderHero();
 setPaused(paused);
-route(decodeURIComponent(location.hash.slice(1)) in ALIAS ? null : '');
-loadPortada();
+siteReady = loadSite();
+const startHash = decodeURIComponent(location.hash.slice(1));
+route(startHash === 'admin' ? 'admin' : (startHash in ALIAS ? null : ''));
 })();
 </script>
 </body></html>

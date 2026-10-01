@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "contacto": {
+    "nombre": "Instituto Mutualista",
+    "lema": "Formación en salud para asociados",
+    "whatsapp": "+51 900 000 000",
+    "whatsappMensaje": "Hola, quiero información sobre los cursos del instituto.",
+    "telefono": "(01) 000 0000",
+    "correo": "informes@institutomutualista.pe",
+    "direccion": "Lima, Perú",
+    "horario": "Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00",
+    "mapa": ""
+  },
+  "redes": { "facebook": "", "instagram": "", "tiktok": "", "youtube": "", "linkedin": "", "messenger": "" },
+  "botones": {
+    "cabecera": { "texto": "Inscríbete", "tipo": "pagina", "valor": "#contacto" },
+    "flotante": { "texto": "Solicitar información", "tipo": "pagina", "valor": "#contacto", "visible": true },
+    "franja1": { "texto": "Solicitar información", "tipo": "pagina", "valor": "#contacto" },
+    "franja2": { "texto": "WhatsApp", "tipo": "whatsapp", "valor": "" },
+    "asesor": { "texto": "Contactar con un asesor", "tipo": "whatsapp", "valor": "" },
+    "curso": { "texto": "Consultar por WhatsApp", "tipo": "whatsapp", "valor": "" },
+    "burbujaWa": { "visible": true },
+    "burbujaMs": { "visible": false }
+  },
+  "conectores": { "formDestino": "whatsapp", "formEndpoint": "" },
+  "seguridad": { "pinHash": "" },
+  "logo": null,
+  "slides": [
+    { "id": "ejemplo-1", "eyebrow": "Cursos preventivos gratuitos", "title": "Cuida tu salud y la de tu familia", "text": "Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.", "cta": "Ver cursos gratuitos", "href": "#cursos-gratuitos", "art": "prevencion", "img": null, "pos": "centro" },
+    { "id": "ejemplo-2", "eyebrow": "Cursos con certificado", "title": "Formación práctica con respaldo profesional", "text": "RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.", "cta": "Ver cursos de pago", "href": "#cursos-pago", "art": "cursos", "img": null, "pos": "centro" },
+    { "id": "ejemplo-3", "eyebrow": "Somos una mutual", "title": "Formación que nace de la ayuda mutua", "text": "Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.", "cta": "Conócenos", "href": "#nosotros", "art": "comunidad", "img": null, "pos": "centro" }
+  ]
+}
