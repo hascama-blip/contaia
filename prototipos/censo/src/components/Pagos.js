@@ -1,15 +1,15 @@
 // Cuadro anual de pagos de un stand y panel para registrar un pago.
 import { html, useState, useMemo } from "./html.js";
 import { Buscador, opcionesStands } from "./Buscador.js";
-import { CONCEPTOS, MESES, MESES_LARGO, MEDIOS_PAGO } from "../config.js";
+import { CONCEPTOS, MESES, MESES_LARGO, MEDIOS_PAGO, COBRANZA_DESDE } from "../config.js";
 import { estadoCuota, claveRegistro } from "../lib/pagos.js";
 import { soles, fecha, hoy } from "../lib/formato.js";
 import { Campo, Entrada, Selector, Panel, mensajeError } from "./ui.js";
 import { registrarPago } from "../api/pagos.js";
 import { useApp } from "./contexto.js";
 
-const SIMBOLO = { pagado: "✓", vencido: "×", pendiente: "!", futuro: "", na: "·" };
-const TEXTO = { pagado: "Pagado", vencido: "Vencido", pendiente: "Pendiente (mes en curso)", futuro: "Aún no vence", na: "No se cobra" };
+const SIMBOLO = { pagado: "✓", vencido: "×", pendiente: "!", futuro: "", antes: "–", na: "·" };
+const TEXTO = { pagado: "Pagado", vencido: "Vencido", pendiente: "Pendiente (mes en curso)", futuro: "Aún no vence", antes: "Antes del registro en el sistema", na: "No se cobra" };
 
 export function Leyenda() {
   return html`
@@ -18,6 +18,7 @@ export function Leyenda() {
       <span><i className="c-pendiente"></i>Mes en curso</span>
       <span><i className="c-vencido"></i>Vencido</span>
       <span><i className="c-futuro" style=${{ border: "1px solid var(--borde)" }}></i>Por vencer</span>
+      <span><i className="c-antes"></i>Antes de ${MESES_LARGO[COBRANZA_DESDE.mes - 1]} ${COBRANZA_DESDE.anio} (sin registro)</span>
     </div>`;
 }
 
@@ -40,7 +41,7 @@ export function CuadroAnual({ registros, anio, onCelda }) {
                 const titulo = reg
                   ? `${c.nombre} ${MESES_LARGO[i]}: ${soles(reg.monto)} · ${reg.medio} · ${fecha(reg.fecha)}`
                   : `${c.nombre} ${MESES_LARGO[i]}: ${TEXTO[est]}`;
-                const clic = onCelda && (est === "vencido" || est === "pendiente" || est === "futuro");
+                const clic = onCelda && (est === "vencido" || est === "pendiente" || est === "futuro" || est === "antes");
                 return html`<td key=${mes}>
                   ${clic
                     ? html`<button type="button" className=${`celda c-${est}`} title=${`${titulo} — tocar para registrar`} aria-label=${titulo} onClick=${() => onCelda(c.id, mes)}>${SIMBOLO[est]}</button>`

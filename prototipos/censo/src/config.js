@@ -6,7 +6,7 @@ export const INSTITUCION = {
   nombre: "C.C. “Inmaculada Concepción”",
   nombrePlano: "C.C. \"Inmaculada Concepción\"",
   ruc: "20386547565",
-  ciudad: "Huancayo",
+  ciudad: "Lima",
   logo: "img/logo.jpg",
 };
 
@@ -37,16 +37,22 @@ export const CONCEPTOS = [
   { id: "extraordinaria", nombre: "Cuota extraordinaria", monto: 100, meses: ["07"] },
 ];
 
+// Desde cuándo se registran los pagos en el sistema. Las cuotas anteriores no se
+// cuentan como deuda (no hay registro de ellas aquí); se pueden cargar si se tienen.
+export const COBRANZA_DESDE = { anio: 2026, mes: 10 };
+
 export const MEDIOS_PAGO = ["Yape / Plin", "Efectivo", "Depósito", "Transferencia"];
 
 export const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
 export const MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
 
 export const LISTAS = {
-  departamentos: ["Junín", "Lima", "Huancavelica", "Ayacucho", "Pasco", "Cusco", "Otro"],
-  provincias: ["Huancayo", "Chupaca", "Concepción", "Jauja", "Tarma", "Satipo", "Otra"],
-  distritos: ["Huancayo", "El Tambo", "Chilca", "Pilcomayo", "Sapallanga", "Huancán", "Otro"],
-  instruccion: ["Primaria", "Secundaria incompleta", "Secundaria completa", "Superior técnica", "Universitaria"],
+  // Sugerencias (se puede escribir otro): las más frecuentes en el padrón.
+  departamentos: ["Lima", "Ayacucho", "Apurímac", "Huancavelica", "Junín", "Cusco", "Puno", "Huánuco", "Áncash", "Arequipa", "Piura", "Cajamarca"],
+  provincias: ["Lima", "Huamanga", "Cangallo", "Andahuaylas", "Tayacaja", "Huancayo", "Abancay", "Huanta", "La Mar"],
+  distritos: ["San Juan de Lurigancho", "Cercado de Lima", "Rímac", "La Victoria", "Comas", "El Agustino", "Santa Anita", "Los Olivos",
+    "San Martín de Porres", "Independencia", "Carabayllo", "San Juan de Miraflores", "Ate", "Villa El Salvador", "Callao"],
+  instruccion: ["Sin instrucción", "Primaria", "Secundaria", "Técnico", "Superior", "Universitaria", "Maestría"],
   estadoCivil: ["Soltero(a)", "Casado(a)", "Conviviente", "Divorciado(a)", "Viudo(a)"],
   estudios: ["Ninguno", "Inicial", "Primaria", "Secundaria", "Superior técnica", "Universitaria"],
   parentescos: ["Padre", "Madre", "Hermano(a)", "Nieto(a)", "Sobrino(a)", "Otro"],

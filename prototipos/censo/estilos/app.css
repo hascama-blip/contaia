@@ -309,6 +309,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .c-vencido { background: var(--peligro-fondo); color: var(--peligro); }
 .c-futuro { background: var(--superficie-2); color: var(--texto-4); }
 .c-na { background: transparent; color: var(--texto-4); }
+.c-antes { background: transparent; color: var(--texto-4); border: 1px dashed var(--borde-fuerte); }
 .leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--t-xs); color: var(--texto-3); align-items: center; }
 .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
 .leyenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }

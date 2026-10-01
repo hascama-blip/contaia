@@ -125,6 +125,11 @@ export async function cambiarEstadoCenso(id, estado, { por } = {}) {
   });
 }
 
+/** La ficha transcrita del libro ya se revisó (se quita el aviso, la nota queda). */
+export async function marcarRevisada(id, { por } = {}) {
+  await db.actualizarAsociado(id, { revisar: false, revisadoPor: por || null, actualizadoAt: ahoraISO() });
+}
+
 /** Datos que se corrigen en el recorrido (celular y estado civil). */
 export async function actualizarDatosCampo(id, { celular, estadoCivil }) {
   const cel = soloDigitos(celular);

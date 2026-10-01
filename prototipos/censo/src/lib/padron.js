@@ -112,7 +112,7 @@ export function filtrarPadron(asociados, mapaStands, { texto = "", galeria = "",
   return asociados.filter((a) => {
     const suyos = mapaStands.get(a.id) || [];
     if (galeria && !suyos.some((s) => s.galeria === galeria)) return false;
-    if (censo && estadoCenso(a) !== censo) return false;
+    if (censo === "revisar" ? !a.revisar : censo && estadoCenso(a) !== censo) return false;
     if (!q) return true;
     const pajar = normalizar([a.numero, a.dni, a.nombres, a.apellidoPaterno, a.apellidoMaterno, ...suyos.map((s) => s.codigo)].join(" "));
     return q.split(/\s+/).every((p) => pajar.includes(p));

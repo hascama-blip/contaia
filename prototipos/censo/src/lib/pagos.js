@@ -1,6 +1,6 @@
 // Reglas de cobranza: estado de cada cuota, deuda por stand, morosidad y recaudación.
 // Funciones puras (no tocan la base).
-import { CONCEPTOS, GALERIAS } from "../config.js";
+import { CONCEPTOS, GALERIAS, COBRANZA_DESDE } from "../config.js";
 import { pad } from "./formato.js";
 import { idPagos } from "./db.js";
 
@@ -12,10 +12,16 @@ export function conceptoAplica(concepto, mes) {
   return Boolean(concepto.mensual || concepto.meses?.includes(pad(mes)));
 }
 
-/** "pagado" | "pendiente" (mes en curso) | "vencido" | "futuro" | "na" (no se cobra ese mes) */
+/** ¿El mes es anterior al inicio del registro de pagos en el sistema? */
+export function antesDeCobranza(mes, anio) {
+  return anio < COBRANZA_DESDE.anio || (anio === COBRANZA_DESDE.anio && mes < COBRANZA_DESDE.mes);
+}
+
+/** "pagado" | "pendiente" (mes en curso) | "vencido" | "futuro" | "antes" (sin registro en el sistema) | "na" (no se cobra) */
 export function estadoCuota(registros, concepto, mes, anio, h) {
   if (!conceptoAplica(concepto, mes)) return "na";
   if (registros?.[claveRegistro(concepto.id, mes)]) return "pagado";
+  if (antesDeCobranza(mes, anio)) return "antes";
   if (anio < h.anio || (anio === h.anio && mes < h.mes)) return "vencido";
   if (anio === h.anio && mes === h.mes) return "pendiente";
   return "futuro";

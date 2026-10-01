@@ -49,6 +49,7 @@ export function Padron() {
           <select id="pad-censo" className="input" value=${filtro.censo} onChange=${cambia("censo")}>
             <option value="">Todo estado de ficha</option>
             ${Object.entries(ESTADOS_CENSO).map(([k, v]) => html`<option key=${k} value=${k}>${v.label}</option>`)}
+            <option value="revisar">Por revisar (notas del libro) · ${datos.asociados.filter((a) => a.revisar).length}</option>
           </select>
         </div>
         <div className="tabla-caja">

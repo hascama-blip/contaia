@@ -15,7 +15,7 @@ import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
 import { fecha, soles } from "../lib/formato.js";
 import { nombresDe } from "../lib/usuario.js";
-import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo } from "../api/asociados.js";
+import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo, marcarRevisada } from "../api/asociados.js";
 import { pdfFicha, descargar } from "../lib/exportar.js";
 
 const PESTANAS = [
@@ -121,9 +121,9 @@ export function Ficha({ id }) {
       ${!stands.length && html`<${Vacio}>${anteriores.length ? "Hoy no tiene stands a su nombre." : "Sin stands asignados."}<//>`}
       ${stands.length > 0 && html`
         <div className="tabla-caja"><table className="tabla">
-          <thead><tr><th>Stand</th><th>Galería</th><th>Área</th><th>Giro</th><th>Inquilino actual</th><th>Estado</th>${editable && html`<th></th>`}</tr></thead>
+          <thead><tr><th>Stand</th><th>Galería</th><th>N° cuenta</th><th>Área</th><th>Giro</th><th>Inquilino actual</th><th>Estado</th>${editable && html`<th></th>`}</tr></thead>
           <tbody>${stands.map((s) => html`<tr key=${s.codigo}>
-            <td className="fuerte num">${s.codigo}</td><td>${nombreGaleria(s.galeria)}</td>
+            <td className="fuerte num">${s.codigo}</td><td>${nombreGaleria(s.galeria)}</td><td className="num">${s.cuenta || "—"}</td>
             <td className="num">${s.area ? `${s.area} m²` : "—"}</td><td>${s.giro || "—"}</td>
             <td>${s.inquilino?.nombre || "—"}</td><td><${BadgeStand} estado=${s.estado} /></td>
             ${editable && html`<td><button className="btn btn-ghost btn-sm" onClick=${() => setPanel({ tipo: "traspaso", stand: s })}>Registrar venta</button></td>`}</tr>`)}</tbody>
@@ -182,6 +182,12 @@ export function Ficha({ id }) {
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${bajarPDF}>Descargar ficha PDF</button>`}
           ${editable && html`<button className="btn btn-primary" disabled=${!sucio || ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : sucio ? "Guardar cambios" : "Sin cambios"}</button>`}`} />
+
+      ${a.revisar && html`
+        <div className="aviso aviso-alerta" role="status" style=${{ alignItems: "center", flexWrap: "wrap" }}>
+          <span style=${{ flex: "1 1 320px" }}><strong>Ficha por revisar.</strong> ${a.observaciones || "Revisa los datos con la ficha del libro."}</span>
+          ${editable && html`<button className="btn btn-ghost btn-sm" onClick=${() => marcarRevisada(id, { por: usuario?.id }).then(() => avisar("Ficha marcada como revisada."), (e) => avisar(mensajeError(e), "error"))}>Ya la revisé</button>`}
+        </div>`}
 
       <div className="rejilla r-8-4" style=${{ alignItems: "start" }}>
         <section className="card">

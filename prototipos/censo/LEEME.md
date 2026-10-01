@@ -56,6 +56,22 @@ queda sin stands, su ficha pasa a "Transferido" (sigue en el padrón, fuera del
 avance). La línea 1.º → 2.º → actual sale de `lib/propietarios.js`. Quitar un
 stand desde la ficha también deja el tramo en el historial.
 
+## Padrón real (importación)
+
+El padrón se cargó desde el Excel transcrito del Libro de Padrón con
+`herramientas/importar_padron.py` (252 asociados, 331 stands). El script genera
+los documentos en una carpeta fuera del repo (los datos personales no se versionan):
+
+    python3 herramientas/importar_padron.py Padron_Asociados.xlsx /ruta/salida
+
+- N° de asociado "S/N" → `S/N-1`, `S/N-2`… (ids `asn1`…).
+- Fichas con observaciones de la transcripción → `revisar: true` (aviso en la
+  ficha y filtro "Por revisar" en el Padrón; se quita con "Ya la revisé").
+- Un stand en dos fichas (posible traspaso) queda a nombre de la ficha con N°.
+- `stand.cuenta` = N° de cuenta de ese stand (columna "N° Cuenta Bco.").
+- Pagos: `COBRANZA_DESDE` (config.js) marca desde qué mes se registran; lo
+  anterior no cuenta como deuda.
+
 ## Datos
 
 Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el dueño está en
