@@ -1,0 +1,1767 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Instituto Mutualista</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+/* Layout: clínica serena — fondo verde agua muy claro, portada turquesa con ola suave,
+   contenido en columna de 1180px; tarjetas solo para cursos, formularios y accesos. */
+:root{
+  --bg:#f4f9f8; --surface:#ffffff; --surface-2:#e8f4f1; --surface-3:#d8ede8;
+  --ink:#143a40; --ink-soft:#4b6a6f; --line:#d2e5e1;
+  --brand:#0f7f7a; --brand-strong:#0a5d62; --on-brand:#ffffff; --brand-soft:#d3eeea;
+  --accent:#f2a541; --accent-strong:#e5922a; --on-accent:#2e1d05;
+  --free:#147a55; --free-bg:#d8f2e5; --paid:#285f9c; --paid-bg:#e0eaf7;
+  --danger:#b93a26; --focus:#16968e;
+  --hero-1:#0b5a61; --hero-2:#12878a; --hero-3:#58c2b6; --on-hero:#ffffff; --on-hero-soft:rgba(255,255,255,.86);
+  --scrim:#073237; --wa:#1c9f55; --on-wa:#ffffff;
+  --t-prev:#d6f0ea; --t-aux:#fae1d9; --t-cui:#dde9f8; --t-men:#e8e3f5; --t-nut:#e4f1d6; --t-far:#f7ead2;
+  --shadow:0 1px 2px rgba(16,60,64,.06),0 10px 28px rgba(16,60,64,.09);
+  --shadow-sm:0 1px 3px rgba(16,60,64,.12);
+  --orb-shadow:0 30px 60px rgba(3,35,38,.35);
+  --overlay:rgba(9,40,44,.55);
+  --font-display:"Lexend","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-body:"Nunito Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --radius:16px; --wrap:1180px; --slide-ms:7000ms;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b181b; --surface:#11252a; --surface-2:#142d33; --surface-3:#1b3a41;
+    --ink:#e1f1f0; --ink-soft:#9cbcbe; --line:#22434a;
+    --brand:#2fb3a9; --brand-strong:#82ddd3; --on-brand:#06201f; --brand-soft:#16393b;
+    --accent:#f3b257; --accent-strong:#f7c57c; --on-accent:#2e1d05;
+    --free:#62d5a5; --free-bg:#11392b; --paid:#8db9ec; --paid-bg:#152f4b;
+    --danger:#ff917c; --focus:#82ddd3;
+    --hero-1:#07343a; --hero-2:#0b585b; --hero-3:#167f78; --on-hero:#f1fbfa; --on-hero-soft:rgba(241,251,250,.84);
+    --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff;
+    --t-prev:#143a36; --t-aux:#3a2520; --t-cui:#172c45; --t-men:#29253f; --t-nut:#21331a; --t-far:#372c18;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px rgba(0,0,0,.35);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.4);
+    --orb-shadow:0 30px 60px rgba(0,0,0,.45);
+    --overlay:rgba(2,14,16,.7);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b181b; --surface:#11252a; --surface-2:#142d33; --surface-3:#1b3a41;
+  --ink:#e1f1f0; --ink-soft:#9cbcbe; --line:#22434a;
+  --brand:#2fb3a9; --brand-strong:#82ddd3; --on-brand:#06201f; --brand-soft:#16393b;
+  --accent:#f3b257; --accent-strong:#f7c57c; --on-accent:#2e1d05;
+  --free:#62d5a5; --free-bg:#11392b; --paid:#8db9ec; --paid-bg:#152f4b;
+  --danger:#ff917c; --focus:#82ddd3;
+  --hero-1:#07343a; --hero-2:#0b585b; --hero-3:#167f78; --on-hero:#f1fbfa; --on-hero-soft:rgba(241,251,250,.84);
+  --scrim:#03191c; --wa:#1c9f55; --on-wa:#ffffff;
+  --t-prev:#143a36; --t-aux:#3a2520; --t-cui:#172c45; --t-men:#29253f; --t-nut:#21331a; --t-far:#372c18;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px rgba(0,0,0,.35);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.4);
+  --orb-shadow:0 30px 60px rgba(0,0,0,.45);
+  --overlay:rgba(2,14,16,.7);
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);line-height:1.2;margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+p{margin:0}
+a{color:var(--brand-strong)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:8px}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:clamp(16px,4vw,32px)}
+.ic{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.skip{position:absolute;left:16px;top:-60px;z-index:100;background:var(--surface);color:var(--ink);padding:10px 16px;border-radius:10px;box-shadow:var(--shadow)}
+.skip:focus{top:12px}
+
+/* Botones */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 22px;border-radius:999px;border:1.5px solid transparent;font:600 15px/1 var(--font-display);text-decoration:none;white-space:nowrap;background:none;transition:background-color .2s,color .2s,border-color .2s,transform .2s,box-shadow .2s}
+.btn:active{transform:translateY(1px)}
+.btn .ic{width:18px;height:18px}
+.btn-accent{background:var(--accent);color:var(--on-accent)}
+.btn-accent:hover{background:var(--accent-strong)}
+.btn-brand{background:var(--brand);color:var(--on-brand)}
+.btn-brand:hover{background:var(--brand-strong)}
+.btn-soft{background:var(--brand-soft);color:var(--brand-strong)}
+.btn-soft:hover{background:var(--surface-3)}
+.btn-line{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-line:hover{border-color:var(--brand);color:var(--brand-strong)}
+.btn-ghost-light{border-color:color-mix(in srgb,var(--on-hero) 65%,transparent);color:var(--on-hero)}
+.btn-ghost-light:hover{background:color-mix(in srgb,var(--on-hero) 14%,transparent)}
+.btn-sm{min-height:40px;padding:0 18px;font-size:14px}
+.btn-xs{min-height:32px;padding:0 12px;font-size:13px;gap:6px}
+.btn[disabled]{opacity:.6;cursor:progress}
+.icon-btn{width:40px;height:40px;display:inline-grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0;flex:none}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand-strong)}
+.icon-btn .ic{width:20px;height:20px}
+
+/* Barra superior y cabecera */
+.topbar{background:var(--hero-1);color:var(--on-hero-soft);font-size:13.5px}
+.topbar .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:38px}
+.topbar-list{display:flex;gap:22px;list-style:none;margin:0;padding:0}
+.topbar-list li,.topbar-note{display:flex;align-items:center;gap:7px}
+.topbar .ic{width:15px;height:15px}
+@media (max-width:1120px){.topbar-note{display:none}}
+@media (max-width:860px){.topbar{display:none}}
+
+.site-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:color-mix(in srgb,var(--surface) 90%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.header-row{display:flex;align-items:center;gap:20px;min-height:74px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);margin-right:auto;min-width:0}
+.brand-mark{width:46px;height:46px;border-radius:15px;flex:none;display:grid;place-items:center;color:var(--on-hero);background:linear-gradient(140deg,var(--hero-1),var(--hero-3))}
+.brand-mark svg{width:28px;height:28px}
+.brand-name{display:block;font:600 17px/1.15 var(--font-display);letter-spacing:-.01em}
+.brand-tag{display:block;font-size:12.5px;color:var(--ink-soft);line-height:1.3}
+.nav{display:flex;align-items:center;gap:2px}
+.nav-link{position:relative;display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;font:500 15px/1 var(--font-display);color:var(--ink);text-decoration:none}
+.nav-link:hover{color:var(--brand-strong);background:var(--surface-2)}
+.nav-link[aria-current="page"]{color:var(--brand-strong)}
+.nav-link[aria-current="page"]::after{content:"";position:absolute;left:14px;right:14px;bottom:3px;height:3px;border-radius:3px;background:var(--accent)}
+.nav-sub{position:relative;display:flex;align-items:center}
+.sub-toggle{border:0;background:none;padding:8px 6px;margin-left:-12px;border-radius:8px;color:var(--ink-soft)}
+.sub-toggle .ic{width:16px;height:16px;transition:transform .2s}
+.sub-toggle:hover{color:var(--brand-strong)}
+.sub-panel{position:absolute;top:100%;left:-8px;padding-top:10px;width:340px;opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s,transform .18s,visibility 0s .18s;z-index:5}
+.nav-sub:hover .sub-panel,.nav-sub:focus-within .sub-panel,.nav-sub.is-open .sub-panel{opacity:1;visibility:visible;transform:none;transition:opacity .18s,transform .18s}
+.nav-sub:hover .sub-toggle .ic,.nav-sub.is-open .sub-toggle .ic{transform:rotate(180deg)}
+.nav-sub.suppress .sub-panel{opacity:0;visibility:hidden}
+.sub-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:8px;display:grid;gap:2px}
+.sub-item{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;align-items:center;padding:10px;border-radius:12px;text-decoration:none;color:var(--ink)}
+.sub-item:hover{background:var(--surface-2)}
+.sub-ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
+.sub-ico.free{background:var(--free-bg);color:var(--free)}
+.sub-ico.paid{background:var(--paid-bg);color:var(--paid)}
+.sub-ico.all{background:var(--brand-soft);color:var(--brand-strong)}
+.sub-item strong{display:block;font:600 15px/1.25 var(--font-display)}
+.sub-item small{display:block;color:var(--ink-soft);font-size:13px;line-height:1.4}
+.menu-btn{display:none}
+@media (max-width:980px){.nav,.header-cta{display:none}.menu-btn{display:inline-grid}}
+
+/* Menú móvil */
+.drawer{position:fixed;inset:0;z-index:60;display:grid;grid-template-columns:1fr min(360px,88vw);visibility:hidden;transition:visibility 0s .3s}
+.drawer-backdrop{background:var(--overlay);opacity:0;transition:opacity .25s;border:0;padding:0}
+.drawer-panel{background:var(--surface);transform:translateX(100%);transition:transform .3s ease;padding:calc(16px + env(safe-area-inset-top,0px)) 20px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+body.menu-open{overflow:hidden}
+body.menu-open .drawer{visibility:visible;transition:none}
+body.menu-open .drawer-backdrop{opacity:1}
+body.menu-open .drawer-panel{transform:none}
+.drawer-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.d-link{display:block;padding:13px 12px;border-radius:12px;font:600 18px/1.2 var(--font-display);color:var(--ink);text-decoration:none}
+.d-link[aria-current="page"]{background:var(--surface-2);color:var(--brand-strong)}
+.d-sub{display:grid;gap:2px;padding-left:12px;margin:-2px 0 6px}
+.d-sub a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--ink-soft);text-decoration:none;font-weight:600}
+.d-sub a:hover{background:var(--surface-2);color:var(--ink)}
+.d-cta{margin-top:14px}
+.d-info{margin-top:auto;padding-top:20px;display:grid;gap:8px;font-size:14px;color:var(--ink-soft)}
+.d-info span{display:flex;gap:8px;align-items:center}
+.d-info .ic{width:16px;height:16px;color:var(--brand)}
+
+/* Portada / carrusel */
+.hero{position:relative;isolation:isolate;overflow:hidden;color:var(--on-hero);background:radial-gradient(70% 90% at 88% 8%,color-mix(in srgb,var(--hero-3) 85%,transparent) 0%,transparent 60%),linear-gradient(115deg,var(--hero-1) 0%,var(--hero-2) 58%,var(--hero-3) 100%)}
+.hero::before,.hero::after{content:"";position:absolute;border-radius:50%;z-index:-2;pointer-events:none;background:radial-gradient(circle,color-mix(in srgb,var(--on-hero) 14%,transparent),transparent 70%)}
+.hero::before{width:520px;height:520px;left:-160px;top:-180px}
+.hero::after{width:380px;height:380px;left:38%;bottom:-160px}
+.hero :focus-visible{outline-color:var(--accent)}
+.hero-track{display:grid;touch-action:pan-y}
+.slide{grid-area:1/1;position:relative;z-index:0;opacity:0;visibility:hidden;transition:opacity .9s ease,visibility 0s linear .9s}
+.slide.is-active{opacity:1;visibility:visible;z-index:1;transition:opacity .9s ease}
+.slide-media{position:absolute;inset:0;z-index:-1;overflow:hidden}
+.slide-media img{width:100%;height:100%;object-fit:cover;transform:scale(1.06);transition:transform 8s ease-out}
+.slide.is-active .slide-media img{transform:scale(1)}
+.slide-media::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--scrim) 88%,transparent) 0%,color-mix(in srgb,var(--scrim) 62%,transparent) 42%,color-mix(in srgb,var(--scrim) 8%,transparent) 80%)}
+.slide.no-copy .slide-media::after{background:linear-gradient(0deg,color-mix(in srgb,var(--scrim) 50%,transparent),transparent 45%)}
+.slide-inner{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);align-items:center;gap:40px;min-height:clamp(440px,44vw,580px);padding-block:56px 128px}
+.slide.has-photo .slide-inner{grid-template-columns:minmax(0,640px)}
+.slide-copy{display:grid;gap:18px;justify-items:start;max-width:600px}
+.slide-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:color-mix(in srgb,var(--on-hero) 15%,transparent);font:700 12.5px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase}
+.slide-title{font:700 clamp(32px,4.6vw,58px)/1.06 var(--font-display);color:var(--on-hero);letter-spacing:-.025em}
+.slide-text{font-size:clamp(16px,1.4vw,19px);line-height:1.55;color:var(--on-hero-soft);max-width:50ch}
+.slide-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.slide.is-active .slide-copy>*{animation:rise .8s cubic-bezier(.2,.7,.2,1) both}
+.slide.is-active .slide-copy>:nth-child(2){animation-delay:.08s}
+.slide.is-active .slide-copy>:nth-child(3){animation-delay:.16s}
+.slide.is-active .slide-copy>:nth-child(4){animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.slide-art{position:relative;width:min(100%,440px);aspect-ratio:1;justify-self:center}
+.ring{position:absolute;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--on-hero) 28%,transparent)}
+.ring.r1{inset:0}
+.ring.r2{inset:11%;border-style:dashed;animation:spin 90s linear infinite}
+.orb{position:absolute;inset:23%;border-radius:50%;background:var(--surface);color:var(--brand);display:grid;place-items:center;box-shadow:var(--orb-shadow)}
+.orb .ic{width:46%;height:46%;stroke-width:1.25}
+.art-pulse{position:absolute;left:-14%;right:-14%;top:50%;height:90px;transform:translateY(-50%);z-index:-1;overflow:visible}
+.art-pulse path{fill:none;stroke:color-mix(in srgb,var(--on-hero) 55%,transparent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:640;animation:trace 5s ease-in-out infinite}
+.art-chip{position:absolute;display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;background:var(--surface);color:var(--ink);font:600 14px/1.25 var(--font-display);box-shadow:var(--shadow);max-width:220px;animation:float 6s ease-in-out infinite alternate}
+.art-chip .chip-ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong);flex:none}
+.art-chip .ic{width:18px;height:18px}
+.art-chip.c1{top:9%;left:-6%}
+.art-chip.c2{bottom:11%;right:-6%;animation-delay:-3s}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes float{from{transform:translateY(-5px)}to{transform:translateY(6px)}}
+@keyframes trace{0%{stroke-dashoffset:640}55%,100%{stroke-dashoffset:0}}
+
+.hero-arrow{position:absolute;top:calc(50% - 44px);z-index:3;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;padding:0;border:1.5px solid color-mix(in srgb,var(--on-hero) 55%,transparent);background:color-mix(in srgb,var(--on-hero) 8%,transparent);color:var(--on-hero);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:background-color .2s}
+.hero-arrow:hover{background:color-mix(in srgb,var(--on-hero) 20%,transparent)}
+.hero-arrow.prev{left:clamp(8px,1.6vw,24px)}
+.hero-arrow.next{right:clamp(8px,1.6vw,24px)}
+.hero-bar{position:absolute;left:0;right:0;bottom:clamp(64px,8vw,104px);z-index:3;pointer-events:none}
+.hero-bar .wrap{display:flex;align-items:center;gap:6px}
+.hero-dots{display:flex;align-items:center;gap:2px;pointer-events:auto}
+.hero-dot{height:28px;min-width:22px;padding:0 5px;border:0;background:none;display:grid;place-items:center}
+.pip{display:block;width:10px;height:10px;border-radius:999px;background:color-mix(in srgb,var(--on-hero) 42%,transparent);position:relative;overflow:hidden;transition:width .35s ease}
+.hero-dot.is-active .pip{width:44px;background:color-mix(in srgb,var(--on-hero) 30%,transparent)}
+.fill{position:absolute;inset:0;background:var(--on-hero);transform-origin:left;transform:scaleX(0)}
+.hero-dot.is-active .fill{animation:progress var(--slide-ms) linear forwards}
+.hero.is-paused .fill,.hero:hover .fill,.hero:focus-within .fill{animation-play-state:paused}
+@keyframes progress{to{transform:scaleX(1)}}
+.hero-pause{pointer-events:auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;padding:0;margin-left:6px;border:1.5px solid color-mix(in srgb,var(--on-hero) 50%,transparent);background:none;color:var(--on-hero)}
+.hero-pause .ic{width:14px;height:14px}
+.hero-edit{position:absolute;top:16px;right:clamp(16px,2vw,28px);z-index:4;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid color-mix(in srgb,var(--on-hero) 35%,transparent);background:color-mix(in srgb,var(--scrim) 35%,transparent);color:var(--on-hero);font:600 13px/1 var(--font-display);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.hero-edit:hover{background:color-mix(in srgb,var(--scrim) 55%,transparent)}
+.hero-edit .ic{width:15px;height:15px}
+.hero-single .hero-arrow,.hero-single .hero-bar{display:none}
+.wave{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:clamp(46px,7vw,110px);z-index:2;pointer-events:none;display:block}
+.wave .w1{fill:color-mix(in srgb,var(--on-hero) 16%,transparent)}
+.wave .w2{fill:var(--bg)}
+@media (max-width:760px){
+  .slide-art{display:none}
+  .slide-inner,.slide.has-photo .slide-inner{grid-template-columns:minmax(0,1fr);min-height:420px;padding-block:64px 120px}
+  .hero-arrow{display:none}
+}
+
+/* Secciones */
+.section{padding-block:clamp(52px,7vw,92px)}
+.section.tight{padding-block:clamp(28px,4vw,44px) clamp(40px,5vw,64px)}
+.band{background:var(--surface-2)}
+.section-head{display:grid;gap:12px;max-width:680px;margin-bottom:clamp(28px,4vw,40px)}
+.section-head.center{text-align:center;justify-items:center;margin-inline:auto}
+.section-head h2{font-size:clamp(28px,3.4vw,40px);font-weight:700;letter-spacing:-.02em}
+.section-head p{color:var(--ink-soft);font-size:17px}
+.head-row{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:28px}
+.head-row .section-head{margin-bottom:0}
+.eyebrow{font:700 12.5px/1.2 var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--brand)}
+.dashes{display:flex;gap:6px;align-items:center}
+.dashes span{display:block;height:4px;border-radius:4px;width:20px;background:var(--brand)}
+.dashes span:nth-child(2){width:48px;background:var(--accent)}
+
+/* Accesos rápidos */
+.quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.quick-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:border-color .2s,box-shadow .2s,transform .2s}
+.quick-card:hover{border-color:var(--brand);box-shadow:var(--shadow);transform:translateY(-2px)}
+.quick-ico{width:52px;height:52px;border-radius:16px;display:grid;place-items:center}
+.quick-ico .ic{width:24px;height:24px}
+.qi-free{background:var(--free-bg);color:var(--free)}
+.qi-paid{background:var(--paid-bg);color:var(--paid)}
+.qi-brand{background:var(--brand-soft);color:var(--brand-strong)}
+.quick-card h3{font-size:18px;margin-bottom:4px}
+.quick-card p{color:var(--ink-soft);font-size:15px;line-height:1.5}
+.more{display:inline-flex;align-items:center;gap:6px;margin-top:10px;color:var(--brand-strong);font:600 14px/1 var(--font-display)}
+.more .ic{width:16px;height:16px;transition:transform .2s}
+.quick-card:hover .more .ic{transform:translateX(3px)}
+@media (max-width:900px){.quick-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Selector segmentado */
+.seg{display:inline-flex;flex-wrap:wrap;padding:4px;border-radius:999px;background:var(--surface-2);gap:4px}
+.seg button{border:0;background:none;padding:9px 16px;border-radius:999px;font:600 14.5px/1 var(--font-display);color:var(--ink-soft);display:inline-flex;gap:8px;align-items:center}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
+.seg .count{font:700 12px/1 var(--font-body);padding:4px 7px;border-radius:999px;background:var(--surface-3);color:var(--ink-soft);font-variant-numeric:tabular-nums}
+
+/* Tarjetas de curso */
+.course-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+@media (max-width:1020px){.course-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.course-grid{grid-template-columns:minmax(0,1fr)}}
+.course{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s}
+.course:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--brand) 40%,var(--line))}
+.course-art{position:relative;aspect-ratio:2/1;background:radial-gradient(circle at 18% 0%,color-mix(in srgb,var(--surface) 55%,transparent),transparent 60%),var(--tint)}
+.course-pattern{position:absolute;right:-24px;top:-30px;color:color-mix(in srgb,var(--ink) 9%,transparent)}
+.course-pattern .ic{width:180px;height:180px;stroke-width:1}
+.course-art .badge{position:absolute;top:14px;left:14px;background:var(--surface)}
+.course-icon{position:absolute;left:20px;bottom:-26px;width:56px;height:56px;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--brand-strong);box-shadow:var(--shadow)}
+.course-icon .ic{width:26px;height:26px}
+.course-body{padding:40px 20px 20px;display:flex;flex-direction:column;gap:10px;flex:1}
+.course-cat{font:700 12px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+.course-title{font-size:19px;line-height:1.25}
+.course-sum{color:var(--ink-soft);font-size:15px;line-height:1.55}
+.course-meta{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--ink-soft);font-size:14px}
+.course-meta li{display:inline-flex;align-items:center;gap:6px}
+.course-meta .ic{width:16px;height:16px;color:var(--brand)}
+.course-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.price strong{display:block;font:700 21px/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.price span{display:block;font-size:13px;color:var(--ink-soft);margin-top:3px}
+.price.is-free strong{color:var(--free)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font:700 12.5px/1 var(--font-body);letter-spacing:.02em}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.badge-free{background:var(--free-bg);color:var(--free)}
+.badge-paid{background:var(--paid-bg);color:var(--paid)}
+
+/* Beneficios y pasos */
+.benefits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px}
+.benefit{display:grid;gap:10px;align-content:start}
+.benefit-ico{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--brand-strong);box-shadow:var(--shadow-sm)}
+.benefit-ico .ic{width:24px;height:24px}
+.benefit h3{font-size:17px}
+.benefit p{color:var(--ink-soft);font-size:15px;line-height:1.55}
+@media (max-width:960px){.benefits{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.benefits{grid-template-columns:minmax(0,1fr)}}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;list-style:none;padding:0;margin:0}
+.step{position:relative;display:grid;gap:10px;align-content:start;padding:24px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line)}
+.step-num{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font:700 16px/1 var(--font-display)}
+.step h3{font-size:18px}
+.step p{color:var(--ink-soft);font-size:15px;line-height:1.55}
+.step:not(:last-child)::after{content:"";position:absolute;top:44px;right:-25px;width:26px;border-top:2px dashed var(--line)}
+@media (max-width:860px){.steps{grid-template-columns:minmax(0,1fr)}.step:not(:last-child)::after{display:none}}
+
+.cta-band{position:relative;overflow:hidden;isolation:isolate;border-radius:24px;padding:clamp(28px,4.5vw,52px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;color:var(--on-hero);background:linear-gradient(115deg,var(--hero-1),var(--hero-2) 70%,var(--hero-3))}
+.cta-band::after{content:"";position:absolute;right:-80px;top:-120px;width:340px;height:340px;border-radius:50%;border:40px solid color-mix(in srgb,var(--on-hero) 8%,transparent);z-index:-1}
+.cta-band h2{color:var(--on-hero);font-size:clamp(24px,3vw,34px);font-weight:700}
+.cta-band p{color:var(--on-hero-soft);margin-top:8px;max-width:56ch}
+.cta-actions{display:flex;flex-wrap:wrap;gap:12px}
+@media (max-width:760px){.cta-band{grid-template-columns:minmax(0,1fr)}}
+
+/* Cabecera de páginas internas */
+.page-hero{position:relative;overflow:hidden;isolation:isolate;color:var(--on-hero);background:radial-gradient(60% 120% at 90% 0%,color-mix(in srgb,var(--hero-3) 80%,transparent),transparent 60%),linear-gradient(115deg,var(--hero-1),var(--hero-2))}
+.page-hero .wrap{display:grid;gap:14px;justify-items:center;text-align:center;padding-block:clamp(44px,6vw,72px) clamp(84px,10vw,128px)}
+.crumbs{display:flex;gap:8px;font-size:14px;color:var(--on-hero-soft)}
+.crumbs a{color:inherit;text-decoration:none}
+.crumbs a:hover{color:var(--on-hero);text-decoration:underline}
+.page-hero h1{font:700 clamp(36px,5.2vw,58px)/1.05 var(--font-display);color:var(--on-hero);letter-spacing:-.025em}
+.page-hero p{max-width:58ch;color:var(--on-hero-soft);font-size:18px}
+.page-hero .dashes span{background:var(--on-hero)}
+.page-hero .dashes span:nth-child(2){background:var(--accent)}
+
+/* Nosotros */
+.split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(28px,5vw,64px);align-items:start}
+.prose{display:grid;gap:14px;max-width:62ch}
+.prose h2{font-size:clamp(28px,3.4vw,40px);font-weight:700;letter-spacing:-.02em}
+.prose p{color:var(--ink-soft);font-size:16.5px}
+.prose .lead{font-size:19px;color:var(--ink);line-height:1.55}
+.model-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:26px;display:grid;gap:18px;box-shadow:var(--shadow)}
+.model-card h3{font-size:19px}
+.model-item{display:grid;grid-template-columns:46px minmax(0,1fr);gap:14px;align-items:start}
+.model-item .quick-ico{width:46px;height:46px;border-radius:14px}
+.model-item h4{font-size:16px}
+.model-item p{color:var(--ink-soft);font-size:15px;line-height:1.5;margin-top:2px}
+.mv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.mv{padding:30px;border-radius:22px;background:var(--surface);border:1px solid var(--line);display:grid;gap:12px;align-content:start}
+.mv-head{display:flex;align-items:center;gap:12px}
+.mv-head .quick-ico{width:46px;height:46px;border-radius:14px}
+.mv h3{font-size:22px}
+.mv p{color:var(--ink-soft);font-size:16.5px}
+.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.value{display:grid;gap:10px;align-content:start;padding-top:18px;border-top:3px solid var(--brand-soft)}
+.value h3{font-size:18px}
+.value p{color:var(--ink-soft);font-size:15px;line-height:1.55}
+.team{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.role{padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);display:grid;gap:10px;align-content:start}
+.role h3{font-size:17px}
+.role p{color:var(--ink-soft);font-size:15px;line-height:1.55}
+@media (max-width:960px){.split{grid-template-columns:minmax(0,1fr)}.values,.team{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.mv-grid,.values,.team{grid-template-columns:minmax(0,1fr)}}
+
+/* Cursos: filtros */
+.filters{display:grid;gap:16px;padding:18px;border-radius:20px;background:var(--surface);border:1px solid var(--line);margin-bottom:22px}
+.filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:7px;color:var(--ink)}
+.chip .ic{width:16px;height:16px;color:var(--brand)}
+.chip:hover{border-color:var(--brand)}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.chip[aria-pressed="true"] .ic{color:var(--on-brand)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;flex:1 1 380px;justify-content:flex-end}
+.search{position:relative;flex:1 1 220px;max-width:340px}
+.search .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--ink-soft);pointer-events:none}
+.input-pill{width:100%;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--bg);padding:0 16px;color:var(--ink);font-size:15px}
+.search .input-pill{padding-left:42px}
+.input-pill:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
+.type-note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;font-size:15px;margin-bottom:22px}
+.type-note .ic{margin-top:2px}
+.type-note.free{background:var(--free-bg);color:var(--free)}
+.type-note.paid{background:var(--paid-bg);color:var(--paid)}
+.type-note p{color:var(--ink)}
+.results-line{color:var(--ink-soft);font-size:14.5px;margin-bottom:16px}
+.empty{display:grid;justify-items:center;gap:12px;text-align:center;padding:48px 16px;border:1.5px dashed var(--line);border-radius:20px;color:var(--ink-soft)}
+.empty .ic{width:36px;height:36px;color:var(--brand)}
+.empty h3{font-size:19px}
+
+/* Diálogos */
+.dlg{border:0;padding:0;border-radius:22px;background:var(--surface);color:var(--ink);width:min(780px,calc(100vw - 32px));max-height:calc(100dvh - 40px);box-shadow:0 30px 80px rgba(0,0,0,.3);overflow:hidden}
+.dlg[open]{display:flex;flex-direction:column;animation:dlg-in .25s ease}
+.dlg::backdrop{background:var(--overlay)}
+@keyframes dlg-in{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.dlg-head h2{font-size:20px}
+.dlg-body{padding:22px;overflow-y:auto;flex:1;min-height:0}
+.dlg-foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;align-items:center;padding:16px 22px;border-top:1px solid var(--line);background:var(--bg)}
+.cd-hero{position:relative;padding:28px 72px 26px 26px;background:radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--surface) 55%,transparent),transparent 55%),var(--tint);display:grid;gap:10px}
+.cd-close{position:absolute;top:16px;right:16px}
+.cd-tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cd-tags .badge{background:var(--surface)}
+.cd-cat{display:inline-flex;align-items:center;gap:6px;font:700 12px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.cd-cat .ic{width:16px;height:16px}
+.cd-hero h2{font-size:clamp(22px,3vw,30px);font-weight:700}
+.cd-hero p{color:var(--ink);max-width:60ch}
+.cd-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:24px}
+.cd-main{display:grid;gap:12px;align-content:start}
+.cd-main h3{display:flex;align-items:center;gap:8px;font-size:16px}
+.cd-main h3 .ic{color:var(--brand)}
+.cd-main h3:not(:first-child){margin-top:10px}
+.cd-main p{color:var(--ink-soft)}
+.temario{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.temario li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px;color:var(--ink);font-size:15.5px;line-height:1.45}
+.temario .ic{width:18px;height:18px;color:var(--free);margin-top:2px}
+.cd-facts{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;align-self:start}
+.fact{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px}
+.fact .ic{width:18px;height:18px;color:var(--brand);margin-top:2px}
+.fact dt{font-size:12.5px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.fact dd{margin:0;font-size:15px;line-height:1.45}
+.cd-price{border-top:1px solid var(--line);padding-top:12px}
+.cd-price strong{font:700 24px/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.cd-price span{display:block;color:var(--ink-soft);font-size:14px;margin-top:2px}
+@media (max-width:680px){.cd-grid{grid-template-columns:minmax(0,1fr)}.cd-hero{padding-right:64px}}
+
+/* Editor de portada */
+.dlg-wide{width:min(1000px,calc(100vw - 32px))}
+.ed-help{color:var(--ink-soft);font-size:15px;margin-bottom:16px}
+.ed-drop{display:grid;justify-items:center;gap:8px;padding:24px;border:2px dashed var(--line);border-radius:18px;text-align:center;background:var(--bg);color:var(--ink-soft);transition:border-color .2s,background-color .2s}
+.ed-drop.is-over{border-color:var(--brand);background:var(--brand-soft)}
+.ed-drop .ic{width:30px;height:30px;color:var(--brand)}
+.ed-drop strong{color:var(--ink);font-family:var(--font-display);font-weight:600}
+.ed-drop small{font-size:13px}
+.ed-list{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:14px}
+.ed-row{display:grid;grid-template-columns:210px minmax(0,1fr) auto;gap:16px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.ed-thumb{display:grid;gap:8px;align-content:start}
+.ed-ph{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:linear-gradient(115deg,var(--hero-1),var(--hero-3));display:grid;place-items:center;color:var(--on-hero)}
+.ed-ph img{width:100%;height:100%;object-fit:cover}
+.ed-ph .ic{width:34px;height:34px;stroke-width:1.4}
+.ed-num{position:absolute;top:8px;left:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:var(--surface);color:var(--ink);font:700 12px/24px var(--font-display);text-align:center}
+.ed-warn{font-size:12.5px;color:var(--danger);line-height:1.35}
+.ed-change{position:relative;overflow:hidden;justify-self:start}
+.ed-change input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.ed-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ed-f{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.ed-wide{grid-column:1/-1}
+.ed-f input,.ed-f select,.ed-f textarea{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--bg);color:var(--ink);font-size:15px;font-weight:400;width:100%;resize:vertical}
+.ed-f input:focus,.ed-f select:focus,.ed-f textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.ed-f select:disabled{opacity:.55}
+.ed-actions{display:flex;flex-direction:column;gap:6px;align-items:center}
+.ed-confirm{display:grid;gap:6px;justify-items:center;font-size:13px;font-weight:600;color:var(--danger);text-align:center}
+.ed-confirm div{display:flex;gap:4px}
+.ed-status{margin-right:auto;font-size:13.5px;color:var(--ink-soft);display:flex;gap:8px;align-items:flex-start;max-width:520px;line-height:1.4}
+.ed-status .ic{width:16px;height:16px;color:var(--brand);margin-top:1px}
+.ed-status.is-error{color:var(--danger)}
+.ed-status.is-error .ic{color:var(--danger)}
+.ed-reset{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-soft)}
+@media (max-width:760px){.ed-row{grid-template-columns:minmax(0,1fr)}.ed-actions{flex-direction:row;justify-content:flex-end}.ed-fields{grid-template-columns:minmax(0,1fr)}.ed-status{max-width:none;flex-basis:100%}}
+
+/* Contacto */
+.contact-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:clamp(24px,4vw,52px);align-items:start}
+.contact-info{display:grid;gap:14px}
+.contact-info h2{font-size:clamp(26px,3vw,36px);font-weight:700;letter-spacing:-.02em}
+.contact-info>p{color:var(--ink-soft);font-size:17px}
+.c-list{list-style:none;padding:0;margin:10px 0 4px;display:grid;gap:10px}
+.c-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 12px 12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.c-ico{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong)}
+.c-item small{display:block;color:var(--ink-soft);font-size:13px;font-weight:600}
+.c-val{font-weight:600;overflow-wrap:anywhere;line-height:1.35}
+.copy-btn{width:36px;height:36px}
+.copy-btn .ic{width:17px;height:17px}
+.map-card{border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.map-art{position:relative;height:150px;background-color:var(--surface-2);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:30px 30px}
+.map-art::before{content:"";position:absolute;left:-10%;right:-10%;top:58%;height:18px;background:var(--surface);transform:rotate(-8deg);box-shadow:0 0 0 1px var(--line)}
+.map-art::after{content:"";position:absolute;top:-10%;bottom:-10%;left:62%;width:14px;background:var(--surface);transform:rotate(12deg);box-shadow:0 0 0 1px var(--line)}
+.map-pin{position:absolute;left:50%;top:44%;transform:translate(-50%,-100%);z-index:1;width:46px;height:46px;border-radius:50% 50% 50% 4px;rotate:-45deg;background:var(--accent);display:grid;place-items:center;box-shadow:var(--shadow)}
+.map-pin span{rotate:45deg;width:14px;height:14px;border-radius:50%;background:var(--on-accent)}
+.map-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;flex-wrap:wrap}
+.map-foot strong{display:block;font-family:var(--font-display);font-weight:600}
+.map-foot span{font-size:14px;color:var(--ink-soft)}
+.form-card{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(20px,3vw,32px);box-shadow:var(--shadow)}
+.form-card h2{font-size:22px;margin-bottom:4px}
+.form-card>p{color:var(--ink-soft);font-size:15px;margin-bottom:18px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.field{display:grid;gap:2px;align-content:start;border:1.5px solid var(--line);border-radius:12px;padding:8px 12px 6px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
+.field:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.field label{font-size:13px;color:var(--ink-soft);font-weight:700}
+.field input,.field select,.field textarea{border:0;background:transparent;padding:2px 0 4px;font-size:16px;outline:none;width:100%;color:var(--ink);resize:vertical}
+.field input::placeholder,.field textarea::placeholder{color:color-mix(in srgb,var(--ink-soft) 75%,transparent)}
+.field select option,.field select optgroup{background:var(--surface);color:var(--ink)}
+.field.full{grid-column:1/-1}
+.field.invalid{border-color:var(--danger)}
+.err{font-size:13px;color:var(--danger);font-weight:600}
+.checks{display:grid;gap:10px;margin:16px 0 18px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--ink-soft);line-height:1.45}
+.check input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand);flex:none}
+.check.invalid{color:var(--danger)}
+.req-note{font-size:13px;color:var(--ink-soft);margin-top:10px}
+.form-submit{width:100%}
+.form-ok{display:grid;justify-items:center;text-align:center;gap:12px;padding:28px 8px}
+.ok-ico{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:var(--free-bg);color:var(--free)}
+.ok-ico .ic{width:32px;height:32px;stroke-width:2.2}
+.form-ok h3{font-size:22px}
+.form-ok p{color:var(--ink-soft);max-width:44ch}
+.demo-note{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--surface-2);color:var(--ink-soft)}
+@media (max-width:900px){.contact-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.form-grid{grid-template-columns:minmax(0,1fr)}}
+.faq{display:grid;gap:10px;max-width:820px;margin-inline:auto}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 18px}
+.faq summary{list-style:none;cursor:pointer;padding:16px 0;font:600 16px/1.35 var(--font-display);display:flex;justify-content:space-between;gap:16px;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .ic{color:var(--brand);transition:transform .2s}
+.faq details[open] summary .ic{transform:rotate(180deg)}
+.faq details p{padding:0 0 16px;color:var(--ink-soft)}
+
+/* Pie de página */
+.site-footer{background:var(--hero-1);color:var(--on-hero-soft)}
+.footer-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.3fr;gap:32px;padding-block:56px 32px}
+.site-footer .brand{color:var(--on-hero);margin:0 0 14px}
+.site-footer .brand-tag{color:var(--on-hero-soft)}
+.site-footer .brand-mark{background:color-mix(in srgb,var(--on-hero) 14%,transparent)}
+.site-footer h4{color:var(--on-hero);font-size:15px;margin-bottom:14px}
+.site-footer p{font-size:15px;max-width:40ch}
+.site-footer a{color:var(--on-hero-soft);text-decoration:none}
+.site-footer a:hover{color:var(--on-hero);text-decoration:underline}
+.footer-links{list-style:none;padding:0;margin:0;display:grid;gap:9px;font-size:15px}
+.footer-links li{display:flex;gap:8px;align-items:flex-start}
+.footer-links .ic{width:16px;height:16px;margin-top:4px}
+.footer-bottom{border-top:1px solid color-mix(in srgb,var(--on-hero) 15%,transparent);padding-block:18px 26px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+@media (max-width:900px){.footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.footer-grid{grid-template-columns:minmax(0,1fr)}.footer-bottom{padding-bottom:96px}}
+
+/* Botones flotantes y avisos */
+.fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;gap:10px;align-items:center}
+.fab-wa{width:56px;height:56px;border-radius:50%;background:var(--wa);color:var(--on-wa);display:grid;place-items:center;box-shadow:var(--shadow);transition:transform .2s}
+.fab-wa:hover{transform:scale(1.06)}
+.fab-wa .ic{width:28px;height:28px}
+.fab-info{box-shadow:var(--shadow)}
+body.on-contacto .fab-info{display:none}
+@media (max-width:560px){.fab-info{display:none}}
+.toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:70;display:grid;gap:8px;width:min(480px,calc(100vw - 32px));pointer-events:none}
+.toast{background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;font-size:14.5px;line-height:1.45;box-shadow:var(--shadow);display:flex;gap:10px;align-items:flex-start;animation:toast-in .25s ease}
+.toast .ic{width:18px;height:18px;margin-top:1px}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .hero-dot.is-active .fill{animation-duration:var(--slide-ms)!important}
+}
+</style>
+
+<a class="skip" href="#main" id="skip-link">Saltar al contenido</a>
+
+<div class="topbar">
+  <div class="wrap">
+    <ul class="topbar-list">
+      <li><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
+      <li><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
+      <li><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
+    </ul>
+    <span class="topbar-note"><span data-icon="handHeart"></span>Exclusivo para asociados y sus familias</span>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="#inicio" aria-label="Instituto Mutualista, ir al inicio">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg>
+      </span>
+      <span><span class="brand-name" data-cfg="nombre">Instituto Mutualista</span><span class="brand-tag" data-cfg="lema">Formación en salud para asociados</span></span>
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a class="nav-link" href="#inicio" data-nav="inicio">Inicio</a>
+      <a class="nav-link" href="#nosotros" data-nav="nosotros">Nosotros</a>
+      <div class="nav-sub" id="nav-sub">
+        <a class="nav-link" href="#cursos" data-nav="cursos">Cursos</a>
+        <button class="sub-toggle" id="sub-toggle" type="button" aria-expanded="false" aria-controls="sub-panel" aria-label="Ver tipos de cursos"><span data-icon="chevDown"></span></button>
+        <div class="sub-panel" id="sub-panel">
+          <div class="sub-card">
+            <a class="sub-item" href="#cursos-gratuitos"><span class="sub-ico free" data-icon="gift"></span><span><strong>Cursos gratuitos</strong><small>Prevención y autocuidado sin costo para asociados · <span data-count="gratis">6</span> cursos</small></span></a>
+            <a class="sub-item" href="#cursos-pago"><span class="sub-ico paid" data-icon="award"></span><span><strong>Cursos de pago</strong><small>Con certificado y tarifa preferencial de asociado · <span data-count="pago">6</span> cursos</small></span></a>
+            <a class="sub-item" href="#cursos"><span class="sub-ico all" data-icon="book"></span><span><strong>Todos los cursos</strong><small>Calendario completo de inicios</small></span></a>
+          </div>
+        </div>
+      </div>
+      <a class="nav-link" href="#contacto" data-nav="contacto">Contáctanos</a>
+    </nav>
+    <a class="btn btn-accent btn-sm header-cta" href="#contacto">Inscríbete</a>
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="drawer"><span data-icon="menu"></span></button>
+  </div>
+</header>
+
+<div class="drawer" id="drawer" inert>
+  <button class="drawer-backdrop" type="button" tabindex="-1" aria-label="Cerrar menú" data-close-menu></button>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menú principal">
+    <div class="drawer-head">
+      <span class="brand-name">Menú</span>
+      <button class="icon-btn" type="button" data-close-menu aria-label="Cerrar menú"><span data-icon="close"></span></button>
+    </div>
+    <a class="d-link" href="#inicio" data-nav="inicio">Inicio</a>
+    <a class="d-link" href="#nosotros" data-nav="nosotros">Nosotros</a>
+    <a class="d-link" href="#cursos" data-nav="cursos">Cursos</a>
+    <div class="d-sub">
+      <a href="#cursos-gratuitos"><span data-icon="gift"></span>Cursos gratuitos</a>
+      <a href="#cursos-pago"><span data-icon="award"></span>Cursos de pago</a>
+    </div>
+    <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
+    <a class="btn btn-accent d-cta" href="#contacto">Inscríbete</a>
+    <div class="d-info">
+      <span><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></span>
+      <span><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></span>
+      <span><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></span>
+    </div>
+  </div>
+</div>
+
+<main id="main" tabindex="-1">
+
+<!-- ============ INICIO ============ -->
+<section class="page" data-page="inicio" aria-labelledby="t-inicio">
+  <h1 class="sr-only" id="t-inicio">Instituto Mutualista: cursos de salud para asociados</h1>
+
+  <div class="hero" id="hero" aria-roledescription="carrusel" aria-label="Portada">
+    <div class="hero-track" id="hero-track" aria-live="off"></div>
+    <button class="hero-arrow prev" id="hero-prev" type="button" aria-label="Diapositiva anterior"><span data-icon="chevLeft"></span></button>
+    <button class="hero-arrow next" id="hero-next" type="button" aria-label="Diapositiva siguiente"><span data-icon="chevRight"></span></button>
+    <div class="hero-bar">
+      <div class="wrap">
+        <div class="hero-dots" id="hero-dots"></div>
+        <button class="hero-pause" id="hero-pause" type="button" aria-label="Pausar carrusel"><span data-icon="pause"></span></button>
+      </div>
+    </div>
+    <button class="hero-edit" id="hero-edit" type="button"><span data-icon="edit"></span>Editar portada</button>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section tight">
+    <div class="wrap quick-grid">
+      <a class="quick-card" href="#cursos-gratuitos">
+        <span class="quick-ico qi-free" data-icon="gift"></span>
+        <div><h3>Cursos gratuitos</h3><p>Prevención, primeros auxilios y autocuidado sin costo para ti y tu familia.</p><span class="more"><span data-count-label="gratis">6 cursos disponibles</span><span data-icon="arrowRight"></span></span></div>
+      </a>
+      <a class="quick-card" href="#cursos-pago">
+        <span class="quick-ico qi-paid" data-icon="award"></span>
+        <div><h3>Cursos con certificado</h3><p>Formación práctica con horas académicas y tarifa preferencial de asociado.</p><span class="more">Ver cursos de pago<span data-icon="arrowRight"></span></span></div>
+      </a>
+      <a class="quick-card" href="#contacto">
+        <span class="quick-ico qi-brand" data-icon="whatsapp"></span>
+        <div><h3>¿Necesitas orientación?</h3><p>Te ayudamos a elegir el curso adecuado según tu edad, trabajo y familia.</p><span class="more">Contáctanos<span data-icon="arrowRight"></span></span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="head-row">
+        <div class="section-head">
+          <span class="eyebrow">Calendario</span>
+          <h2>Próximos inicios</h2>
+          <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="seg" id="home-tabs" role="group" aria-label="Tipo de curso">
+          <button type="button" data-tipo="todos" aria-pressed="true">Todos</button>
+          <button type="button" data-tipo="gratis" aria-pressed="false">Gratuitos</button>
+          <button type="button" data-tipo="pago" aria-pressed="false">De pago</button>
+        </div>
+      </div>
+      <div class="course-grid" id="home-grid"></div>
+      <p style="margin-top:28px;text-align:center"><a class="btn btn-line" href="#cursos">Ver todos los cursos<span data-icon="arrowRight"></span></a></p>
+    </div>
+  </div>
+
+  <div class="section band">
+    <div class="wrap">
+      <div class="section-head center">
+        <span class="eyebrow">Por qué estudiar aquí</span>
+        <h2>Aprender salud con calma y respaldo</h2>
+        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <div class="benefits">
+        <div class="benefit"><span class="benefit-ico" data-icon="stethoscope"></span><h3>Docentes colegiados</h3><p>Médicos, enfermeras, nutricionistas y psicólogos con experiencia clínica y docente.</p></div>
+        <div class="benefit"><span class="benefit-ico" data-icon="calendar"></span><h3>Horarios para quien trabaja</h3><p>Clases virtuales por la noche y talleres presenciales los sábados por la mañana.</p></div>
+        <div class="benefit"><span class="benefit-ico" data-icon="award"></span><h3>Certificado con horas académicas</h3><p>Respaldo formal para tu desarrollo personal y laboral. Una hora académica son 45 minutos.</p></div>
+        <div class="benefit"><span class="benefit-ico" data-icon="handHeart"></span><h3>Beneficio mutual</h3><p>Cursos preventivos gratuitos y hasta 40 % de descuento en cursos con certificado.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="wrap">
+      <div class="section-head center">
+        <span class="eyebrow">Inscripción</span>
+        <h2>Cómo inscribirte en tres pasos</h2>
+        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <ol class="steps">
+        <li class="step"><span class="step-num">1</span><h3>Elige tu curso</h3><p>Revisa los cursos gratuitos y de pago, sus fechas, horarios y modalidad.</p></li>
+        <li class="step"><span class="step-num">2</span><h3>Envía tu solicitud</h3><p>Completa el formulario con tu DNI o escríbenos por WhatsApp.</p></li>
+        <li class="step"><span class="step-num">3</span><h3>Confirma tu vacante</h3><p>Validamos tu condición de asociado y te enviamos el enlace o la dirección de la clase.</p></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="cta-band">
+        <div><h2>¿No sabes qué curso elegir?</h2><p>Cuéntanos qué te interesa cuidar: tu salud, la de un familiar o tu preparación ante emergencias. Te recomendamos el curso ideal.</p></div>
+        <div class="cta-actions"><a class="btn btn-accent" href="#contacto">Solicitar información</a><a class="btn btn-ghost-light" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener"><span data-icon="whatsapp"></span>WhatsApp</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NOSOTROS ============ -->
+<section class="page" data-page="nosotros" aria-labelledby="t-nosotros" hidden>
+  <div class="page-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Nosotros</span></nav>
+      <h1 id="t-nosotros">Nosotros</h1>
+      <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p>Somos el instituto de formación en salud de la mutual: educación preventiva y práctica para los asociados y sus familias.</p>
+    </div>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section">
+    <div class="wrap split">
+      <div class="prose">
+        <span class="eyebrow">Quiénes somos</span>
+        <h2>Un instituto creado por y para los asociados</h2>
+        <p class="lead">El Instituto Mutualista nace dentro de nuestra mutual con una idea sencilla: si nos apoyamos entre todos, también podemos aprender juntos a cuidar la salud.</p>
+        <p>Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado a una tarifa preferencial para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
+        <p>Trabajamos con horarios pensados para quien trabaja: clases virtuales por la noche, talleres presenciales los sábados y grupos reducidos para las prácticas.</p>
+      </div>
+      <aside class="model-card" aria-label="Nuestro modelo">
+        <h3>Nuestro modelo</h3>
+        <div class="model-item"><span class="quick-ico qi-free" data-icon="gift"></span><div><h4>Cursos gratuitos</h4><p>Prevención y autocuidado sin costo para el asociado y su familia directa.</p></div></div>
+        <div class="model-item"><span class="quick-ico qi-paid" data-icon="tag"></span><div><h4>Tarifa de asociado</h4><p>Hasta 40 % menos que el precio regular en los cursos con certificado.</p></div></div>
+        <div class="model-item"><span class="quick-ico qi-brand" data-icon="award"></span><div><h4>Certificación</h4><p>Constancia en cursos gratuitos y certificado con horas académicas en cursos de pago.</p></div></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="section band">
+    <div class="wrap mv-grid">
+      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="target"></span><h3>Misión</h3></div><p>Brindar formación en salud accesible, práctica y de calidad a los asociados y sus familias, con énfasis en la prevención y el autocuidado.</p></article>
+      <article class="mv"><div class="mv-head"><span class="quick-ico qi-brand" data-icon="eye"></span><h3>Visión</h3></div><p>Ser el referente en educación preventiva en salud entre las mutuales del país, con una comunidad de asociados que sabe cuidar y cuidarse.</p></article>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="wrap">
+      <div class="section-head center">
+        <span class="eyebrow">Lo que nos guía</span>
+        <h2>Nuestros valores</h2>
+        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <div class="values">
+        <div class="value"><span class="quick-ico qi-brand" data-icon="handHeart"></span><h3>Solidaridad</h3><p>Los aportes de todos sostienen los cursos gratuitos de cada uno.</p></div>
+        <div class="value"><span class="quick-ico qi-free" data-icon="shield"></span><h3>Prevención</h3><p>Enseñamos a actuar antes de que aparezca la enfermedad.</p></div>
+        <div class="value"><span class="quick-ico qi-paid" data-icon="stethoscope"></span><h3>Rigor profesional</h3><p>Cada curso lo diseña y dicta un profesional de la salud colegiado.</p></div>
+        <div class="value"><span class="quick-ico qi-brand" data-icon="users"></span><h3>Cercanía</h3><p>Horarios, formatos y lenguaje pensados para el asociado.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section band">
+    <div class="wrap">
+      <div class="section-head center">
+        <span class="eyebrow">Equipo</span>
+        <h2>Quiénes hacen posible cada curso</h2>
+        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <div class="team">
+        <div class="role"><span class="quick-ico qi-brand" data-icon="clipboard"></span><h3>Coordinación académica</h3><p>Planifica el calendario, evalúa a los docentes y vela por la calidad de cada curso.</p></div>
+        <div class="role"><span class="quick-ico qi-paid" data-icon="stethoscope"></span><h3>Docentes de salud</h3><p>Médicos, enfermeras, nutricionistas, psicólogos y químicos farmacéuticos colegiados (CMP, CEP, CNP, CPsP, CQFP).</p></div>
+        <div class="role"><span class="quick-ico qi-free" data-icon="heartPulse"></span><h3>Comité de salud</h3><p>Define las prioridades preventivas a partir de las necesidades de los asociados.</p></div>
+        <div class="role"><span class="quick-ico qi-brand" data-icon="phone"></span><h3>Atención al asociado</h3><p>Resuelve dudas, gestiona inscripciones y valida la condición de asociado.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="wrap">
+      <div class="cta-band">
+        <div><h2>Empieza por un curso gratuito</h2><p>Los cursos preventivos están abiertos a todos los asociados y sus familiares directos.</p></div>
+        <div class="cta-actions"><a class="btn btn-accent" href="#cursos-gratuitos">Ver cursos gratuitos</a><a class="btn btn-ghost-light" href="#contacto">Contáctanos</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CURSOS ============ -->
+<section class="page" data-page="cursos" aria-labelledby="t-cursos" hidden>
+  <div class="page-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span id="crumb-cursos">Cursos</span></nav>
+      <h1 id="t-cursos">Cursos</h1>
+      <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p>Elige entre cursos preventivos gratuitos y cursos con certificado a tarifa preferencial para asociados.</p>
+    </div>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section" style="padding-top:clamp(28px,4vw,44px)">
+    <div class="wrap">
+      <div class="filters">
+        <div class="filter-row">
+          <div class="seg" id="seg-tipo" role="group" aria-label="Tipo de curso">
+            <button type="button" data-tipo="todos" aria-pressed="true">Todos <span class="count" data-count="todos">12</span></button>
+            <button type="button" data-tipo="gratis" aria-pressed="false">Gratuitos <span class="count" data-count="gratis">6</span></button>
+            <button type="button" data-tipo="pago" aria-pressed="false">De pago <span class="count" data-count="pago">6</span></button>
+          </div>
+          <div class="tools">
+            <label class="search"><span class="sr-only">Buscar curso</span><span data-icon="search"></span><input class="input-pill" id="f-buscar" type="search" placeholder="Buscar: RCP, nutrición, estrés…" autocomplete="off"></label>
+            <label class="sr-only" for="f-modalidad">Modalidad</label>
+            <select class="input-pill" id="f-modalidad">
+              <option value="todas">Todas las modalidades</option>
+              <option value="Presencial">Presencial</option>
+              <option value="Virtual">Virtual</option>
+              <option value="Semipresencial">Semipresencial</option>
+            </select>
+          </div>
+        </div>
+        <div class="chips" id="chips-cat" role="group" aria-label="Área"></div>
+      </div>
+      <div class="type-note free" id="note-gratis" hidden><span data-icon="gift"></span><p><strong>Cursos gratuitos:</strong> se financian con el fondo solidario de la mutual. Las vacantes se asignan por orden de inscripción y el asociado puede inscribir a sus familiares directos.</p></div>
+      <div class="type-note paid" id="note-pago" hidden><span data-icon="tag"></span><p><strong>Cursos de pago:</strong> los asociados pagan la tarifa preferencial. Familiares y público general pagan el precio regular. Incluyen certificado con horas académicas.</p></div>
+      <p class="results-line" id="results-line" aria-live="polite"></p>
+      <div class="course-grid" id="course-grid"></div>
+      <div class="empty" id="empty" hidden><span data-icon="search"></span><h3>No hay cursos con esos filtros</h3><p>Prueba con otra área o modalidad, o escríbenos y te avisamos cuando abramos uno.</p><button class="btn btn-soft btn-sm" type="button" id="clear-filters">Quitar filtros</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACTO ============ -->
+<section class="page" data-page="contacto" aria-labelledby="t-contacto" hidden>
+  <div class="page-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Contáctanos</span></nav>
+      <h1 id="t-contacto">Contáctanos</h1>
+      <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p>Déjanos tus datos y te orientamos sobre cursos, fechas e inscripciones.</p>
+    </div>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section" style="padding-top:clamp(28px,4vw,44px)">
+    <div class="wrap contact-grid">
+      <div class="contact-info">
+        <h2>¿Tienes dudas o necesitas orientación?</h2>
+        <p>Escríbenos y un asesor te responderá en horario de atención. También puedes llamarnos o visitarnos en la sede.</p>
+        <ul class="c-list">
+          <li class="c-item"><span class="c-ico" data-icon="whatsapp"></span><div><small>WhatsApp</small><span class="c-val" data-cfg="whatsapp">+51 900 000 000</span></div><button class="icon-btn copy-btn" type="button" data-copy="whatsapp" aria-label="Copiar número de WhatsApp"><span data-icon="copy"></span></button></li>
+          <li class="c-item"><span class="c-ico" data-icon="phone"></span><div><small>Teléfono</small><span class="c-val" data-cfg="telefono">(01) 000 0000</span></div><button class="icon-btn copy-btn" type="button" data-copy="telefono" aria-label="Copiar teléfono"><span data-icon="copy"></span></button></li>
+          <li class="c-item"><span class="c-ico" data-icon="mail"></span><div><small>Correo</small><span class="c-val" data-cfg="correo">informes@institutomutualista.pe</span></div><button class="icon-btn copy-btn" type="button" data-copy="correo" aria-label="Copiar correo"><span data-icon="copy"></span></button></li>
+          <li class="c-item"><span class="c-ico" data-icon="clock"></span><div><small>Horario de atención</small><span class="c-val" data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></div><span></span></li>
+        </ul>
+        <a class="btn btn-brand" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener" style="justify-self:start"><span data-icon="whatsapp"></span>Contactar con un asesor</a>
+        <div class="map-card" style="margin-top:8px">
+          <div class="map-art" aria-hidden="true"><span class="map-pin"><span></span></span></div>
+          <div class="map-foot"><div><strong>Sede principal</strong><span data-cfg="direccion">Lima, Perú</span></div><a class="btn btn-line btn-sm" data-cfg-href="mapa" href="https://www.google.com/maps/search/?api=1&amp;query=Lima%2C%20Per%C3%BA" target="_blank" rel="noopener"><span data-icon="mapPin"></span>Ver en Google Maps</a></div>
+        </div>
+      </div>
+
+      <div class="form-card" id="form-card">
+        <div id="form-wrap">
+          <h2>Solicitar información</h2>
+          <p>Te respondemos en menos de 24 horas hábiles.</p>
+          <form id="contact-form" novalidate>
+            <div class="form-grid">
+              <div class="field"><label for="f-nombres">Nombres*</label><input id="f-nombres" name="nombres" autocomplete="given-name" placeholder="Ingresa tus nombres"><span class="err" hidden></span></div>
+              <div class="field"><label for="f-apellidos">Apellidos*</label><input id="f-apellidos" name="apellidos" autocomplete="family-name" placeholder="Ingresa tus apellidos"><span class="err" hidden></span></div>
+              <div class="field"><label for="f-dni">DNI*</label><input id="f-dni" name="dni" inputmode="numeric" maxlength="8" placeholder="8 dígitos"><span class="err" hidden></span></div>
+              <div class="field"><label for="f-codigo">Código de asociado</label><input id="f-codigo" name="codigo" placeholder="Opcional"></div>
+              <div class="field"><label for="f-celular">Celular*</label><input id="f-celular" name="celular" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel-national" placeholder="9XX XXX XXX"><span class="err" hidden></span></div>
+              <div class="field"><label for="f-correo">Correo*</label><input id="f-correo" name="correo" type="email" autocomplete="email" placeholder="tucorreo@ejemplo.com"><span class="err" hidden></span></div>
+              <div class="field full"><label for="f-curso">Curso de interés</label><select id="f-curso" name="curso"></select></div>
+              <div class="field full"><label for="f-mensaje">Mensaje</label><textarea id="f-mensaje" name="mensaje" rows="3" placeholder="Cuéntanos qué necesitas"></textarea></div>
+            </div>
+            <div class="checks">
+              <label class="check" id="check-datos"><input type="checkbox" id="f-datos" name="datos"><span>Autorizo el tratamiento de mis datos personales conforme a la Ley N.° 29733.*</span></label>
+              <label class="check"><input type="checkbox" id="f-wa" name="avisos"><span>Quiero recibir el calendario de cursos por WhatsApp.</span></label>
+            </div>
+            <button class="btn btn-accent form-submit" type="submit">Enviar solicitud</button>
+            <p class="req-note">* Campos obligatorios</p>
+          </form>
+        </div>
+        <div class="form-ok" id="form-ok" hidden>
+          <span class="ok-ico" data-icon="check"></span>
+          <h3 id="ok-title">¡Gracias!</h3>
+          <p id="ok-text">Así verá el asociado la confirmación de su solicitud.</p>
+          <p class="demo-note">Vista previa: en el sitio publicado, este formulario se conecta al correo o sistema de admisión del instituto.</p>
+          <button class="btn btn-soft btn-sm" type="button" id="form-again">Enviar otra solicitud</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section band">
+    <div class="wrap">
+      <div class="section-head center">
+        <span class="eyebrow">Preguntas frecuentes</span>
+        <h2>Antes de inscribirte</h2>
+        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <div class="faq">
+        <details><summary>¿Quiénes pueden inscribirse?<span data-icon="chevDown"></span></summary><p>Los asociados activos y sus familiares directos (cónyuge, hijos y padres). Los cursos de pago también están abiertos al público general con el precio regular.</p></details>
+        <details><summary>¿Los cursos gratuitos dan certificado?<span data-icon="chevDown"></span></summary><p>Entregan una constancia de participación. Los cursos de pago otorgan un certificado con horas académicas (una hora académica equivale a 45 minutos).</p></details>
+        <details><summary>¿Cómo acredito que soy asociado?<span data-icon="chevDown"></span></summary><p>Solo necesitas tu DNI. Al recibir tu solicitud validamos tu condición en el padrón de la mutual.</p></details>
+        <details><summary>¿Puedo pagar en cuotas?<span data-icon="chevDown"></span></summary><p>Sí. Los cursos de 20 horas académicas a más se pueden pagar en dos cuotas: la primera al inscribirte y la segunda a mitad del curso.</p></details>
+        <details><summary>¿Qué pasa si falto a una clase?<span data-icon="chevDown"></span></summary><p>Las clases virtuales quedan grabadas durante 15 días. Para obtener el certificado necesitas asistir al menos al 80 % de las sesiones.</p></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div>
+      <a class="brand" href="#inicio">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 27s-10-6.2-10-13.3A5.6 5.6 0 0 1 16 10a5.6 5.6 0 0 1 10 3.7C26 20.8 16 27 16 27z"/><path d="M16 13.5v8M12 17.5h8"/></svg></span>
+        <span><span class="brand-name" data-cfg="nombre">Instituto Mutualista</span><span class="brand-tag" data-cfg="lema">Formación en salud para asociados</span></span>
+      </a>
+      <p>Cursos preventivos y de especialización en salud para los asociados de la mutual y sus familias.</p>
+    </div>
+    <div>
+      <h4>Navegación</h4>
+      <ul class="footer-links">
+        <li><a href="#inicio">Inicio</a></li>
+        <li><a href="#nosotros">Nosotros</a></li>
+        <li><a href="#cursos">Cursos</a></li>
+        <li><a href="#contacto">Contáctanos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Cursos</h4>
+      <ul class="footer-links">
+        <li><a href="#cursos-gratuitos">Cursos gratuitos</a></li>
+        <li><a href="#cursos-pago">Cursos de pago</a></li>
+        <li><a href="#cursos">Calendario de inicios</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contacto</h4>
+      <ul class="footer-links">
+        <li><span data-icon="mapPin"></span><span data-cfg="direccion">Lima, Perú</span></li>
+        <li><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></li>
+        <li><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></li>
+        <li><span data-icon="clock"></span><span data-cfg="horario">Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>© 2026 <span data-cfg="nombre">Instituto Mutualista</span>. Todos los derechos reservados.</span>
+    <span>Formación en salud para asociados</span>
+  </div>
+</footer>
+
+<div class="fab">
+  <a class="btn btn-accent fab-info" href="#contacto">Solicitar información</a>
+  <a class="fab-wa" data-cfg-href="whatsappLink" href="https://wa.me/51900000000" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp"><span data-icon="whatsapp"></span></a>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<dialog class="dlg" id="dlg-curso" aria-labelledby="cd-title"></dialog>
+
+<dialog class="dlg dlg-wide" id="dlg-portada" aria-labelledby="ed-title">
+  <div class="dlg-head">
+    <h2 id="ed-title">Editar portada del inicio</h2>
+    <button class="icon-btn" type="button" data-close aria-label="Cerrar"><span data-icon="close"></span></button>
+  </div>
+  <div class="dlg-body">
+    <p class="ed-help">Sube fotos horizontales (ideal 1920 × 800 px, JPG o PNG). Cada imagen es una diapositiva: puedes escribir su título y texto, elegir a dónde lleva el botón, ajustar el encuadre y cambiar el orden.</p>
+    <label class="ed-drop" id="ed-drop">
+      <span data-icon="upload"></span>
+      <strong>Arrastra imágenes aquí o haz clic para elegirlas</strong>
+      <small>Hasta 8 diapositivas. Las fotos se optimizan automáticamente.</small>
+      <input class="sr-only" id="ed-files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+    </label>
+    <ol class="ed-list" id="ed-list"></ol>
+  </div>
+  <div class="dlg-foot">
+    <p class="ed-status" id="ed-status"><span data-icon="info"></span><span id="ed-status-text">Comprobando dónde se guardarán los cambios…</span></p>
+    <span class="ed-reset" id="ed-reset-wrap"><button class="btn btn-line btn-sm" type="button" id="ed-reset"><span data-icon="refresh"></span>Restaurar ejemplo</button></span>
+    <button class="btn btn-line btn-sm" type="button" data-close>Cancelar</button>
+    <button class="btn btn-brand btn-sm" type="button" id="ed-save">Guardar portada</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+document.documentElement.lang = 'es';
+
+/* ---------- Configuración editable ---------- */
+const CONFIG = {
+  nombre: 'Instituto Mutualista',
+  lema: 'Formación en salud para asociados',
+  telefono: '(01) 000 0000',
+  whatsapp: '+51 900 000 000',
+  whatsappLink: 'https://wa.me/51900000000',
+  correo: 'informes@institutomutualista.pe',
+  direccion: 'Lima, Perú',
+  horario: 'Lun–Vie 8:30 a 17:30 · Sáb 9:00 a 13:00',
+  mapa: 'https://www.google.com/maps/search/?api=1&query=Lima%2C%20Per%C3%BA'
+};
+
+/* ---------- Utilidades ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+
+const I = {
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  chevDown: '<path d="M6 9l6 6 6-6"/>',
+  chevLeft: '<path d="M15 6l-6 6 6 6"/>',
+  chevRight: '<path d="M9 6l6 6-6 6"/>',
+  arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  pause: '<path d="M9 5v14M15 5v14"/>',
+  play: '<path d="M8 5l11 7-11 7z"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+  upload: '<path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+  heartPulse: '<path d="M20.8 8.6a5 5 0 0 0-8.8-3.2 5 5 0 0 0-8.8 3.2c0 5.4 8.8 10.9 8.8 10.9s8.8-5.5 8.8-10.9z"/><path d="M3.5 12h4l2-3 3 6 2-3h6"/>',
+  stethoscope: '<path d="M6 3H5v5a4 4 0 0 0 8 0V3h-1"/><path d="M9 12v2a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="10" r="2"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  firstAid: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M12 10.5v6M9 13.5h6"/>',
+  mind: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
+  apple: '<path d="M12 7.5c-1.6-1-5-1.4-6.4 1.5S5 16 7.5 19c1.5 1.8 3 1.5 4.5.8 1.5.7 3 1 4.5-.8 2.5-3 3.4-7.1 1.9-10S13.6 6.5 12 7.5z"/><path d="M12 7.5c0-2 1-3.5 3-4.5"/>',
+  pill: '<path d="M10.5 20.5l10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7z"/><path d="M8.5 8.5l7 7"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  building: '<path d="M4 21V6l8-3 8 3v15M2.5 21h19"/><path d="M10 21v-4h4v4M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  mapPin: '<path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  phone: '<path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5L12 13l8.5-6.5"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 21l5-3 5 3-1.5-7"/>',
+  handHeart: '<path d="M12 11.5S7.5 8.8 7.5 6a2.3 2.3 0 0 1 4.5-.7A2.3 2.3 0 0 1 16.5 6c0 2.8-4.5 5.5-4.5 5.5z"/><path d="M2.5 15h3.5l3 2h4.5a1.5 1.5 0 0 0 0-3H11"/><path d="M13.5 17l5.2-2.2a1.6 1.6 0 0 1 1.8 2.5L17 21H6.5"/>',
+  book: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v14H5.5A1.5 1.5 0 0 0 4 18.5zM4 18.5A1.5 1.5 0 0 0 5.5 20H20"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+  whatsapp: '<path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8S10.5 3.5 8 4.2 7.5 8 12 8zm0 0s1.5-4.5 4-3.8.5 3.8-4 3.8z"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  eye: '<path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/>',
+  refresh: '<path d="M4 12a8 8 0 0 1 14-5.3L20 8M20 4v4h-4M20 12a8 8 0 0 1-14 5.3L4 16M4 20v-4h4"/>',
+  clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+  ticket: '<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z"/><path d="M14 6v2M14 11v2M14 16v2"/>'
+};
+const icon = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (I[n] || '') + '</svg>';
+function hydrateIcons(root) {
+  $$('[data-icon]', root || document).forEach(el => { el.innerHTML = icon(el.dataset.icon); el.removeAttribute('data-icon'); });
+}
+
+/* ---------- Datos de cursos ---------- */
+const CATS = {
+  'Prevención': { icon: 'shield', tint: 'var(--t-prev)' },
+  'Primeros auxilios': { icon: 'firstAid', tint: 'var(--t-aux)' },
+  'Cuidados': { icon: 'handHeart', tint: 'var(--t-cui)' },
+  'Salud mental': { icon: 'mind', tint: 'var(--t-men)' },
+  'Nutrición': { icon: 'apple', tint: 'var(--t-nut)' },
+  'Farmacología': { icon: 'pill', tint: 'var(--t-far)' }
+};
+const MODS = { Presencial: 'building', Virtual: 'monitor', Semipresencial: 'layers' };
+
+const COURSES = [
+  { id: 'primeros-auxilios-hogar', titulo: 'Primeros auxilios en el hogar', cat: 'Primeros auxilios', tipo: 'gratis', modalidad: 'Presencial', horas: 8, inicio: '2026-10-17',
+    horario: 'Sábados 17 y 24 de octubre, 9:00 a. m. a 12:00 m.', vacantes: 30, docente: 'Licenciada en enfermería (CEP)',
+    resumen: 'Qué hacer ante atragantamientos, quemaduras, cortes y caídas en casa mientras llega la ayuda.',
+    temario: ['Cómo evaluar una emergencia y a quién llamar: SAMU 106 y Bomberos 116', 'Atragantamiento en adultos, niños y lactantes', 'Heridas, sangrado y quemaduras', 'Golpes, caídas y posibles fracturas', 'Cómo armar el botiquín del hogar'],
+    dirigido: 'Asociados y familiares directos mayores de 14 años.', certificado: 'Constancia de participación' },
+  { id: 'diabetes-hipertension', titulo: 'Prevención de diabetes e hipertensión', cat: 'Prevención', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-10-08',
+    horario: 'Jueves 8, 15 y 22 de octubre, 7:00 a 8:30 p. m.', vacantes: 100, docente: 'Médico internista (CMP)',
+    resumen: 'Factores de riesgo, señales de alerta y hábitos que reducen la probabilidad de enfermar.',
+    temario: ['Qué son la diabetes tipo 2 y la hipertensión', 'Factores de riesgo que sí puedes cambiar', 'Cómo leer tu presión arterial y tu glucosa', 'Alimentación y actividad física en la vida diaria', 'Cuándo acudir al médico'],
+    dirigido: 'Asociados y familiares, en especial mayores de 35 años.', certificado: 'Constancia de participación' },
+  { id: 'salud-mental-estres', titulo: 'Salud mental y manejo del estrés', cat: 'Salud mental', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-10-14',
+    horario: 'Miércoles 14, 21 y 28 de octubre, 7:00 a 8:30 p. m.', vacantes: 60, docente: 'Psicóloga clínica (CPsP)',
+    resumen: 'Herramientas prácticas para reconocer el estrés, regular las emociones y pedir ayuda a tiempo.',
+    temario: ['Estrés, ansiedad y agotamiento: cómo diferenciarlos', 'Técnicas de respiración y relajación', 'Sueño y descanso reparador', 'Cómo acompañar a un familiar que atraviesa una crisis', 'Dónde pedir ayuda profesional'],
+    dirigido: 'Asociados y familiares mayores de 16 años.', certificado: 'Constancia de participación' },
+  { id: 'alimentacion-familia', titulo: 'Alimentación saludable en familia', cat: 'Nutrición', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-11-05',
+    horario: 'Jueves 5, 12 y 19 de noviembre, 7:00 a 8:30 p. m.', vacantes: 100, docente: 'Nutricionista (CNP)',
+    resumen: 'Cómo planificar comidas balanceadas y económicas para niños, adultos y adultos mayores.',
+    temario: ['El plato saludable y las porciones', 'Cómo leer los octógonos y el etiquetado', 'Loncheras saludables para escolares', 'Alimentación del adulto mayor', 'Menú semanal con presupuesto ajustado'],
+    dirigido: 'Asociados y familiares.', certificado: 'Constancia de participación' },
+  { id: 'deteccion-cancer', titulo: 'Detección temprana del cáncer', cat: 'Prevención', tipo: 'gratis', modalidad: 'Presencial', horas: 3, inicio: '2026-10-24',
+    horario: 'Sábado 24 de octubre, 10:00 a. m. a 12:15 p. m.', vacantes: 80, docente: 'Médico oncólogo (CMP)',
+    resumen: 'Signos de alarma y chequeos recomendados según tu edad para detectar el cáncer a tiempo.',
+    temario: ['Signos de alarma que no debes ignorar', 'Chequeos preventivos según edad y sexo', 'Cáncer de mama, cuello uterino, próstata y colon', 'Mitos frecuentes sobre el cáncer', 'Cómo acceder a los tamizajes'],
+    dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Constancia de participación' },
+  { id: 'pausas-activas', titulo: 'Pausas activas y ergonomía', cat: 'Prevención', tipo: 'gratis', modalidad: 'Semipresencial', horas: 4, inicio: '2026-11-12',
+    horario: 'Jueves 12 de noviembre (virtual) y sábado 14 (práctica presencial)', vacantes: 40, docente: 'Tecnólogo médico en terapia física (CTMP)',
+    resumen: 'Ejercicios breves y ajustes de postura para prevenir dolores de espalda, cuello y muñecas.',
+    temario: ['Posturas que generan dolor y cómo corregirlas', 'Cómo ajustar silla, mesa y pantalla', 'Rutina de pausas activas de 5 minutos', 'Prevención del dolor lumbar', 'Práctica guiada en grupo'],
+    dirigido: 'Asociados que pasan muchas horas sentados o de pie.', certificado: 'Constancia de participación' },
+  { id: 'rcp-soporte-vital', titulo: 'RCP y soporte vital básico', cat: 'Primeros auxilios', tipo: 'pago', modalidad: 'Presencial', horas: 12, inicio: '2026-10-31',
+    horario: 'Sábados 31 de octubre y 7 de noviembre, 8:30 a. m. a 1:00 p. m.', vacantes: 20, docente: 'Médico emergenciólogo (CMP)',
+    resumen: 'Reanimación cardiopulmonar en adultos, niños y lactantes, con práctica en maniquí y uso del DEA.',
+    temario: ['Cadena de supervivencia y seguridad de la escena', 'RCP de alta calidad en adultos, niños y lactantes', 'Uso del desfibrilador externo automático (DEA)', 'Obstrucción de la vía aérea', 'Práctica en maniquí y evaluación final'],
+    dirigido: 'Asociados, familiares y público general mayores de 16 años.', certificado: 'Certificado de 12 horas académicas', precio: { asociado: 120, publico: 180 } },
+  { id: 'cuidado-adulto-mayor', titulo: 'Cuidado del adulto mayor en casa', cat: 'Cuidados', tipo: 'pago', modalidad: 'Semipresencial', horas: 24, inicio: '2026-11-07',
+    horario: 'Del 7 al 28 de noviembre: teoría virtual los martes y práctica presencial los sábados', vacantes: 25, docente: 'Licenciada en enfermería geriátrica (CEP)',
+    resumen: 'Higiene, movilización, alimentación y prevención de caídas para cuidar con seguridad a un adulto mayor.',
+    temario: ['Cambios propios del envejecimiento', 'Higiene y confort de la persona dependiente', 'Movilización y traslado sin lesionarse', 'Prevención de caídas y úlceras por presión', 'Manejo de medicamentos y señales de alarma', 'Cuidar al cuidador'],
+    dirigido: 'Familiares cuidadores y público general.', certificado: 'Certificado de 24 horas académicas', precio: { asociado: 150, publico: 240 } },
+  { id: 'funciones-vitales-inyectables', titulo: 'Funciones vitales e inyectables', cat: 'Cuidados', tipo: 'pago', modalidad: 'Presencial', horas: 20, inicio: '2026-11-14',
+    horario: 'Sábados 14, 21 y 28 de noviembre y 5 de diciembre, 9:00 a. m. a 12:45 p. m.', vacantes: 18, docente: 'Licenciado en enfermería (CEP)',
+    resumen: 'Medición de presión arterial, pulso, temperatura, saturación y glucosa, y técnica segura de inyectables.',
+    temario: ['Presión arterial: técnica y valores normales', 'Pulso, respiración, temperatura y saturación', 'Control de glucosa capilar', 'Vías de administración de medicamentos', 'Inyección intramuscular y subcutánea', 'Bioseguridad y manejo de residuos'],
+    dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Certificado de 20 horas académicas', precio: { asociado: 140, publico: 220 } },
+  { id: 'uso-seguro-medicamentos', titulo: 'Uso seguro de medicamentos', cat: 'Farmacología', tipo: 'pago', modalidad: 'Virtual', horas: 16, inicio: '2026-10-20',
+    horario: 'Martes y jueves del 20 de octubre al 12 de noviembre, 7:00 a 8:30 p. m.', vacantes: 80, docente: 'Químico farmacéutico (CQFP)',
+    resumen: 'Cómo leer una receta, evitar la automedicación y guardar correctamente los medicamentos en casa.',
+    temario: ['Cómo leer una receta y el prospecto', 'Riesgos de la automedicación y del mal uso de antibióticos', 'Interacciones con alimentos y otros medicamentos', 'Medicamentos genéricos y de marca', 'Almacenamiento y desecho seguro en casa'],
+    dirigido: 'Asociados, cuidadores y público general.', certificado: 'Certificado de 16 horas académicas', precio: { asociado: 90, publico: 150 } },
+  { id: 'emergencias-prehospitalarias', titulo: 'Atención prehospitalaria de emergencias', cat: 'Primeros auxilios', tipo: 'pago', modalidad: 'Presencial', horas: 30, inicio: '2026-11-21',
+    horario: 'Sábados del 21 de noviembre al 19 de diciembre, 8:30 a. m. a 1:00 p. m.', vacantes: 18, docente: 'Médico emergenciólogo (CMP) y equipo paramédico',
+    resumen: 'Evaluación inicial, inmovilización y traslado de pacientes en accidentes y emergencias frecuentes.',
+    temario: ['Evaluación primaria y secundaria (ABCDE)', 'Control de hemorragias y manejo del shock', 'Inmovilización y traslado de lesionados', 'Emergencias médicas: infarto, ACV y convulsiones', 'Atención de múltiples víctimas', 'Simulacro final'],
+    dirigido: 'Asociados, brigadistas y público general mayores de 18 años.', certificado: 'Certificado de 30 horas académicas', precio: { asociado: 230, publico: 350 } },
+  { id: 'nutricion-enfermedades-cronicas', titulo: 'Nutrición para enfermedades crónicas', cat: 'Nutrición', tipo: 'pago', modalidad: 'Virtual', horas: 24, inicio: '2026-12-01',
+    horario: 'Martes y jueves del 1 al 17 de diciembre, 6:30 a 9:30 p. m.', vacantes: 60, docente: 'Nutricionista clínica (CNP)',
+    resumen: 'Planes de alimentación para diabetes, hipertensión, colesterol alto y enfermedad renal.',
+    temario: ['Evaluación nutricional básica', 'Alimentación en diabetes e hipertensión', 'Colesterol, triglicéridos e hígado graso', 'Cuidados nutricionales en la enfermedad renal', 'Diseño de menús y lista de compras'],
+    dirigido: 'Asociados, cuidadores y público general.', certificado: 'Certificado de 24 horas académicas', precio: { asociado: 180, publico: 280 } }
+];
+const byId = id => COURSES.find(c => c.id === id);
+const toDate = iso => { const p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+const fmtShort = iso => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(toDate(iso)).replace('.', '');
+const fmtLong = iso => new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(toDate(iso));
+const soles = n => 'S/ ' + n.toLocaleString('es-PE');
+const sortByDate = list => list.slice().sort((a, b) => a.inicio.localeCompare(b.inicio));
+
+function priceHTML(c) {
+  if (c.tipo === 'gratis') return '<div class="price is-free"><strong>Gratis</strong><span>para asociados y familiares</span></div>';
+  return '<div class="price"><strong>' + soles(c.precio.asociado) + '</strong><span>asociado · público ' + soles(c.precio.publico) + '</span></div>';
+}
+function courseCard(c) {
+  const cat = CATS[c.cat];
+  const free = c.tipo === 'gratis';
+  return '<article class="course" style="--tint:' + cat.tint + '">' +
+    '<div class="course-art"><span class="course-pattern">' + icon(cat.icon) + '</span>' +
+    '<span class="badge ' + (free ? 'badge-free' : 'badge-paid') + '">' + (free ? 'Gratuito' : 'De pago') + '</span>' +
+    '<span class="course-icon">' + icon(cat.icon) + '</span></div>' +
+    '<div class="course-body"><p class="course-cat">' + esc(c.cat) + '</p>' +
+    '<h3 class="course-title">' + esc(c.titulo) + '</h3>' +
+    '<p class="course-sum">' + esc(c.resumen) + '</p>' +
+    '<ul class="course-meta"><li>' + icon('calendar') + 'Inicia ' + fmtShort(c.inicio) + '</li><li>' + icon('clock') + c.horas + ' h acad.</li><li>' + icon(MODS[c.modalidad]) + c.modalidad + '</li></ul>' +
+    '<div class="course-foot">' + priceHTML(c) + '<button class="btn btn-soft btn-sm" type="button" data-course="' + c.id + '">Ver detalle</button></div>' +
+    '</div></article>';
+}
+
+/* ---------- Contadores ---------- */
+const counts = { todos: COURSES.length, gratis: COURSES.filter(c => c.tipo === 'gratis').length, pago: COURSES.filter(c => c.tipo === 'pago').length };
+$$('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count]; });
+$$('[data-count-label]').forEach(el => { const n = counts[el.dataset.countLabel]; el.textContent = n + (n === 1 ? ' curso disponible' : ' cursos disponibles'); });
+
+/* ---------- Inicio: próximos inicios ---------- */
+let homeTipo = 'todos';
+function renderHome() {
+  const list = sortByDate(COURSES.filter(c => homeTipo === 'todos' || c.tipo === homeTipo)).slice(0, 6);
+  $('#home-grid').innerHTML = list.map(courseCard).join('');
+  $$('#home-tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tipo === homeTipo)));
+}
+$('#home-tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tipo]'); if (!b) return; homeTipo = b.dataset.tipo; renderHome(); });
+
+/* ---------- Cursos: filtros ---------- */
+const filters = { tipo: 'todos', cat: 'todas', mod: 'todas', q: '' };
+$('#chips-cat').innerHTML = '<button class="chip" type="button" data-cat="todas" aria-pressed="true">Todas las áreas</button>' +
+  Object.keys(CATS).map(k => '<button class="chip" type="button" data-cat="' + esc(k) + '" aria-pressed="false">' + icon(CATS[k].icon) + esc(k) + '</button>').join('');
+function renderCourses() {
+  const q = norm(filters.q.trim());
+  const list = sortByDate(COURSES.filter(c =>
+    (filters.tipo === 'todos' || c.tipo === filters.tipo) &&
+    (filters.cat === 'todas' || c.cat === filters.cat) &&
+    (filters.mod === 'todas' || c.modalidad === filters.mod) &&
+    (!q || norm(c.titulo + ' ' + c.resumen + ' ' + c.cat + ' ' + c.temario.join(' ')).includes(q))
+  ));
+  $('#course-grid').innerHTML = list.map(courseCard).join('');
+  $('#empty').hidden = list.length > 0;
+  $$('#seg-tipo button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tipo === filters.tipo)));
+  $$('#chips-cat .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cat === filters.cat)));
+  $('#note-gratis').hidden = filters.tipo !== 'gratis';
+  $('#note-pago').hidden = filters.tipo !== 'pago';
+  const kind = filters.tipo === 'gratis' ? (list.length === 1 ? ' gratuito' : ' gratuitos') : filters.tipo === 'pago' ? ' de pago' : '';
+  $('#results-line').textContent = list.length ? 'Mostrando ' + list.length + (list.length === 1 ? ' curso' : ' cursos') + kind + ', ordenados por fecha de inicio.' : '';
+  const label = filters.tipo === 'gratis' ? 'Cursos gratuitos' : filters.tipo === 'pago' ? 'Cursos de pago' : 'Cursos';
+  $('#t-cursos').textContent = label;
+  $('#crumb-cursos').textContent = label;
+}
+function setTipo(t) { filters.tipo = t; renderCourses(); }
+$('#seg-tipo').addEventListener('click', e => { const b = e.target.closest('button[data-tipo]'); if (b) setTipo(b.dataset.tipo); });
+$('#chips-cat').addEventListener('click', e => { const b = e.target.closest('button[data-cat]'); if (!b) return; filters.cat = b.dataset.cat; renderCourses(); });
+$('#f-modalidad').addEventListener('change', e => { filters.mod = e.target.value; renderCourses(); });
+$('#f-buscar').addEventListener('input', e => { filters.q = e.target.value; renderCourses(); });
+$('#clear-filters').addEventListener('click', () => {
+  filters.cat = 'todas'; filters.mod = 'todas'; filters.q = '';
+  $('#f-modalidad').value = 'todas'; $('#f-buscar').value = '';
+  renderCourses();
+});
+
+/* ---------- Detalle de curso ---------- */
+const dlgC = $('#dlg-curso');
+function fact(ic, label, value) { return '<div class="fact">' + icon(ic) + '<div><dt>' + label + '</dt><dd>' + esc(value) + '</dd></div></div>'; }
+function openCourse(id) {
+  const c = byId(id);
+  if (!c) return;
+  const cat = CATS[c.cat];
+  const free = c.tipo === 'gratis';
+  const waText = encodeURIComponent('Hola, quiero información del curso "' + c.titulo + '".');
+  const price = free
+    ? '<div class="cd-price"><strong style="color:var(--free)">Gratis</strong><span>Sin costo para asociados y familiares directos</span></div>'
+    : '<div class="cd-price"><strong>' + soles(c.precio.asociado) + '</strong><span>Tarifa de asociado · Familiares y público: ' + soles(c.precio.publico) + '</span></div>';
+  dlgC.style.setProperty('--tint', cat.tint);
+  dlgC.innerHTML =
+    '<div class="cd-hero"><button class="icon-btn cd-close" type="button" data-close aria-label="Cerrar">' + icon('close') + '</button>' +
+    '<div class="cd-tags"><span class="badge ' + (free ? 'badge-free' : 'badge-paid') + '">' + (free ? 'Gratuito' : 'De pago') + '</span><span class="cd-cat">' + icon(cat.icon) + esc(c.cat) + '</span></div>' +
+    '<h2 id="cd-title">' + esc(c.titulo) + '</h2><p>' + esc(c.resumen) + '</p></div>' +
+    '<div class="dlg-body"><div class="cd-grid"><div class="cd-main">' +
+    '<h3>' + icon('clipboard') + 'Qué aprenderás</h3><ul class="temario">' + c.temario.map(t => '<li>' + icon('check') + '<span>' + esc(t) + '</span></li>').join('') + '</ul>' +
+    '<h3>' + icon('users') + 'Dirigido a</h3><p>' + esc(c.dirigido) + '</p></div>' +
+    '<dl class="cd-facts">' +
+    fact('calendar', 'Inicio', fmtLong(c.inicio)) + fact('clock', 'Horario', c.horario) +
+    fact('book', 'Duración', c.horas + ' horas académicas') + fact(MODS[c.modalidad], 'Modalidad', c.modalidad) +
+    fact('ticket', 'Vacantes', c.vacantes + ' por grupo') + fact('stethoscope', 'Docente', c.docente) +
+    fact('award', 'Certificación', c.certificado) + price + '</dl></div></div>' +
+    '<div class="dlg-foot"><a class="btn btn-line" href="' + esc(CONFIG.whatsappLink) + '?text=' + waText + '" target="_blank" rel="noopener">' + icon('whatsapp') + 'Consultar por WhatsApp</a>' +
+    '<button class="btn btn-accent" type="button" data-enroll="' + c.id + '">Inscribirme</button></div>';
+  dlgC.showModal();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-course]');
+  if (b) openCourse(b.dataset.course);
+});
+dlgC.addEventListener('click', e => {
+  if (e.target === dlgC || e.target.closest('[data-close]')) { dlgC.close(); return; }
+  const en = e.target.closest('[data-enroll]');
+  if (en) {
+    const c = byId(en.dataset.enroll);
+    dlgC.close();
+    $('#f-curso').value = c.id;
+    navigate('contacto');
+    setTimeout(() => { $('#f-nombres').focus({ preventScroll: true }); }, 60);
+    toast('Completa tus datos para inscribirte en "' + c.titulo + '".', 'check');
+  }
+});
+
+/* ---------- Navegación entre páginas ---------- */
+const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-pago': 'cursos', contacto: 'contacto' };
+let currentPage = null;
+function route(h) {
+  if (h == null) h = decodeURIComponent(location.hash.slice(1));
+  const page = ALIAS[h];
+  if (!page) return;
+  if (page === 'cursos') setTipo(h === 'cursos-gratuitos' ? 'gratis' : h === 'cursos-pago' ? 'pago' : 'todos');
+  $$('.page').forEach(p => { p.hidden = p.dataset.page !== page; });
+  currentPage = page;
+  document.body.classList.toggle('on-contacto', page === 'contacto');
+  $$('[data-nav]').forEach(a => { if (a.dataset.nav === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  closeMenu();
+  closeSub(true);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function navigate(h) {
+  try { if (location.hash.slice(1) !== h) history.pushState(null, '', '#' + h); } catch (e) { /* sin historial */ }
+  route(h);
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  const h = a.getAttribute('href').slice(1);
+  if (!(h in ALIAS)) return;
+  e.preventDefault();
+  navigate(h);
+});
+window.addEventListener('popstate', () => route());
+window.addEventListener('hashchange', () => route());
+$('#skip-link').addEventListener('click', e => { e.preventDefault(); $('#main').focus(); });
+
+/* Submenú de cursos */
+const navSub = $('#nav-sub');
+const subToggle = $('#sub-toggle');
+function closeSub(suppress) {
+  navSub.classList.remove('is-open');
+  subToggle.setAttribute('aria-expanded', 'false');
+  if (suppress && (navSub.matches(':hover') || navSub.contains(document.activeElement))) {
+    navSub.classList.add('suppress');
+    if (navSub.contains(document.activeElement)) document.activeElement.blur();
+  }
+}
+subToggle.addEventListener('click', () => {
+  const open = !navSub.classList.contains('is-open');
+  navSub.classList.remove('suppress');
+  navSub.classList.toggle('is-open', open);
+  subToggle.setAttribute('aria-expanded', String(open));
+});
+navSub.addEventListener('mouseleave', () => navSub.classList.remove('suppress'));
+navSub.addEventListener('focusin', () => navSub.classList.remove('suppress'));
+document.addEventListener('click', e => { if (!navSub.contains(e.target)) closeSub(false); });
+
+/* Menú móvil */
+const drawer = $('#drawer');
+const menuBtn = $('#menu-btn');
+function openMenu() { document.body.classList.add('menu-open'); drawer.inert = false; menuBtn.setAttribute('aria-expanded', 'true'); setTimeout(() => { const f = $('.drawer-panel [data-close-menu]'); if (f) f.focus(); }, 50); }
+function closeMenu() { if (!document.body.classList.contains('menu-open')) return; document.body.classList.remove('menu-open'); drawer.inert = true; menuBtn.setAttribute('aria-expanded', 'false'); }
+menuBtn.addEventListener('click', openMenu);
+drawer.addEventListener('click', e => { if (e.target.closest('[data-close-menu]')) closeMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenu(); closeSub(false); } });
+
+/* ---------- Avisos ---------- */
+function toast(msg, ic) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = icon(ic || 'info') + '<span></span>';
+  t.querySelector('span').textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), 4800);
+}
+
+/* ---------- Portada (carrusel) ---------- */
+const ARTS = {
+  prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['gift', 'Sin costo para asociados']] },
+  cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
+  comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
+};
+const LINKS = [['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-pago', 'Cursos de pago'], ['#nosotros', 'Nosotros'], ['#contacto', 'Contáctanos']];
+const POS = { centro: '50% 50%', izquierda: '15% 50%', derecha: '85% 50%', arriba: '50% 15%', abajo: '50% 85%' };
+const POS_LABEL = { centro: 'Centro', izquierda: 'Izquierda', derecha: 'Derecha', arriba: 'Arriba', abajo: 'Abajo' };
+const DEFAULT_SLIDES = [
+  { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
+  { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
+  { id: 'ejemplo-3', eyebrow: 'Somos una mutual', title: 'Formación que nace de la ayuda mutua', text: 'Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.', cta: 'Conócenos', href: '#nosotros', art: 'comunidad', img: null, pos: 'centro' }
+];
+const MAX_SLIDES = 8;
+const LS_KEY = 'instituto-mutualista-portada';
+const safeHref = h => LINKS.some(l => l[0] === h) ? h : '#cursos';
+const safeSrc = s => (typeof s === 'string' && (/^portada\/[\w.-]+\.(jpe?g|png|webp)$/i.test(s) || /^data:image\/(jpeg|png|webp);base64,/i.test(s) || /^blob:/i.test(s))) ? s : null;
+function normSlide(s) {
+  s = s || {};
+  return {
+    id: (String(s.id || '').replace(/[^\w-]/g, '').slice(0, 40)) || uid(),
+    eyebrow: str(s.eyebrow, 80), title: str(s.title, 120), text: str(s.text, 260),
+    cta: str(s.cta, 40), href: safeHref(s.href), art: ARTS[s.art] ? s.art : null,
+    img: safeSrc(s.img), pos: POS[s.pos] ? s.pos : 'centro'
+  };
+}
+let slides = DEFAULT_SLIDES.map(normSlide);
+let persisted = new Set();
+let cur = 0;
+const hero = $('#hero');
+const track = $('#hero-track');
+const dotsEl = $('#hero-dots');
+let paused = reduceMotion;
+
+function artHTML(key) {
+  const a = ARTS[key] || ARTS.prevencion;
+  return '<div class="slide-art" aria-hidden="true"><div class="ring r1"></div><div class="ring r2"></div>' +
+    '<svg class="art-pulse" viewBox="0 0 600 90" preserveAspectRatio="none"><path d="M0 45h190l16-30 22 62 20-50 14 18h338"/></svg>' +
+    '<div class="orb">' + icon(a.icon) + '</div>' +
+    a.chips.map((c, i) => '<div class="art-chip c' + (i + 1) + '"><span class="chip-ico">' + icon(c[0]) + '</span>' + esc(c[1]) + '</div>').join('') + '</div>';
+}
+function slideHTML(s, i, n) {
+  const src = s.imgUrl || s.img;
+  const hasCopy = !!(s.eyebrow || s.title || s.text);
+  const cls = ['slide', src ? 'has-photo' : 'has-art', hasCopy ? '' : 'no-copy'].join(' ');
+  return '<article class="' + cls + '" role="group" aria-roledescription="diapositiva" aria-label="' + (i + 1) + ' de ' + n + '">' +
+    (src ? '<div class="slide-media"><img src="' + esc(src) + '" alt="" style="object-position:' + POS[s.pos] + '"' + '></div>' : '') +
+    '<div class="wrap slide-inner"><div class="slide-copy">' +
+    (s.eyebrow ? '<p class="slide-eyebrow">' + esc(s.eyebrow) + '</p>' : '') +
+    (s.title ? '<h2 class="slide-title">' + esc(s.title) + '</h2>' : '') +
+    (s.text ? '<p class="slide-text">' + esc(s.text) + '</p>' : '') +
+    (s.cta ? '<div class="slide-actions"><a class="btn btn-accent" href="' + esc(s.href) + '">' + esc(s.cta) + '</a><a class="btn btn-ghost-light" href="#contacto">Solicitar información</a></div>' : '') +
+    '</div>' + (src ? '' : artHTML(s.art)) + '</div></article>';
+}
+function renderHero() {
+  const n = slides.length;
+  track.innerHTML = slides.map((s, i) => slideHTML(s, i, n)).join('');
+  dotsEl.innerHTML = slides.map((s, i) => '<button class="hero-dot" type="button" aria-label="Ir a la diapositiva ' + (i + 1) + '"><span class="pip"><span class="fill"></span></span></button>').join('');
+  hero.classList.toggle('hero-single', n < 2);
+  go(Math.min(cur, n - 1));
+}
+function go(i) {
+  const n = slides.length;
+  cur = ((i % n) + n) % n;
+  $$('.slide', track).forEach((el, k) => { el.classList.toggle('is-active', k === cur); el.setAttribute('aria-hidden', String(k !== cur)); });
+  const dots = $$('.hero-dot', dotsEl);
+  dots.forEach(d => { d.classList.remove('is-active'); d.removeAttribute('aria-current'); });
+  void dotsEl.offsetWidth;
+  if (dots[cur]) { dots[cur].classList.add('is-active'); dots[cur].setAttribute('aria-current', 'true'); }
+}
+function setPaused(p) {
+  paused = p;
+  hero.classList.toggle('is-paused', p);
+  const b = $('#hero-pause');
+  b.setAttribute('aria-label', p ? 'Reproducir carrusel' : 'Pausar carrusel');
+  b.innerHTML = icon(p ? 'play' : 'pause');
+}
+dotsEl.addEventListener('animationend', e => { if (e.target.classList.contains('fill') && slides.length > 1) go(cur + 1); });
+dotsEl.addEventListener('click', e => { const d = e.target.closest('.hero-dot'); if (d) go($$('.hero-dot', dotsEl).indexOf(d)); });
+$('#hero-prev').addEventListener('click', () => go(cur - 1));
+$('#hero-next').addEventListener('click', () => go(cur + 1));
+$('#hero-pause').addEventListener('click', () => setPaused(!paused));
+hero.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return;
+  if (e.key === 'ArrowLeft') go(cur - 1);
+  if (e.key === 'ArrowRight') go(cur + 1);
+});
+let swipeX = null;
+track.addEventListener('pointerdown', e => { swipeX = e.clientX; });
+track.addEventListener('pointerup', e => {
+  if (swipeX == null) return;
+  const dx = e.clientX - swipeX; swipeX = null;
+  if (Math.abs(dx) > 50) go(cur + (dx < 0 ? 1 : -1));
+});
+track.addEventListener('pointercancel', () => { swipeX = null; });
+
+/* Persistencia de la portada:
+   - Publicada en Claude: se guarda como archivos de la propia página (portada.json + fotos) y la ven todos.
+   - Archivo abierto localmente: se guarda en este navegador.
+   - Sin permiso de edición: los cambios solo se ven en la pantalla actual. */
+const inViewer = !!(window.claude && typeof window.claude.use === 'function');
+const artifactP = inViewer ? new Promise(r => r(window.claude.use('artifact'))).catch(() => null) : Promise.resolve(null);
+let readOnly = false;
+
+async function loadPortada() {
+  try {
+    const r = await fetch('portada.json', { cache: 'no-store' });
+    if (r.ok) {
+      const data = await r.json();
+      if (data && Array.isArray(data.slides) && data.slides.length) {
+        slides = data.slides.slice(0, MAX_SLIDES).map(normSlide);
+        persisted = new Set(slides.map(s => s.img).filter(p => p && p.startsWith('portada/')));
+        cur = 0; renderHero();
+      }
+    }
+  } catch (e) { /* sin portada publicada: se usa la de ejemplo */ }
+  if (!inViewer) {
+    const local = store.get(LS_KEY);
+    if (local && Array.isArray(local.slides) && local.slides.length) {
+      slides = local.slides.slice(0, MAX_SLIDES).map(normSlide);
+      cur = 0; renderHero();
+    }
+  }
+}
+
+/* ---------- Editor de portada ---------- */
+const dlgP = $('#dlg-portada');
+const edList = $('#ed-list');
+let draft = [];
+let resetArmed = false;
+
+function setStatus(msg, isError) {
+  $('#ed-status-text').textContent = msg;
+  $('#ed-status').classList.toggle('is-error', !!isError);
+}
+async function describeMode() {
+  if (!inViewer) { setStatus('Vista local: la portada se guarda en este navegador. Para que la vean todos, el sitio final necesita un servidor o gestor de contenidos.'); return; }
+  const art = await artifactP;
+  if (art && !readOnly) setStatus('Al guardar, la portada se actualiza para todas las personas que abren esta página (requiere permiso de edición).');
+  else setStatus('Esta vista es de solo lectura: puedes probar el editor, pero los cambios se verán solo en tu pantalla.');
+}
+function edRow(s, i, n) {
+  const src = s.imgUrl || s.img;
+  const opt = (val, label, sel) => '<option value="' + esc(val) + '"' + (val === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+  return '<li class="ed-row" data-i="' + i + '">' +
+    '<div class="ed-thumb"><div class="ed-ph"><span class="ed-num">' + (i + 1) + '</span>' +
+    (src ? '<img src="' + esc(src) + '" alt="" style="object-position:' + POS[s.pos] + '">' : icon((ARTS[s.art] || ARTS.prevencion).icon)) + '</div>' +
+    (s.warn ? '<span class="ed-warn">' + esc(s.warn) + '</span>' : '') +
+    '<label class="btn btn-line btn-xs ed-change">' + icon('upload') + '<span>' + (src ? 'Cambiar foto' : 'Poner foto') + '</span><input type="file" accept="image/jpeg,image/png,image/webp" data-act="replace" aria-label="Elegir foto para la diapositiva ' + (i + 1) + '"></label>' +
+    (src && s.art ? '<button class="btn btn-line btn-xs" type="button" data-act="unphoto">Usar ilustración</button>' : '') +
+    '</div>' +
+    '<div class="ed-fields">' +
+    '<label class="ed-f"><span>Antetítulo</span><input id="ed-eyebrow-' + s.id + '" data-f="eyebrow" maxlength="80" value="' + esc(s.eyebrow) + '" placeholder="Ej.: Nuevo curso"></label>' +
+    '<label class="ed-f"><span>Texto del botón</span><input id="ed-cta-' + s.id + '" data-f="cta" maxlength="40" value="' + esc(s.cta) + '" placeholder="Vacío = sin botón"></label>' +
+    '<label class="ed-f ed-wide"><span>Título</span><input id="ed-title-' + s.id + '" data-f="title" maxlength="120" value="' + esc(s.title) + '" placeholder="Vacío = solo la foto"></label>' +
+    '<label class="ed-f ed-wide"><span>Texto</span><textarea id="ed-text-' + s.id + '" data-f="text" rows="2" maxlength="260" placeholder="Una o dos líneas">' + esc(s.text) + '</textarea></label>' +
+    '<label class="ed-f"><span>El botón lleva a</span><select id="ed-href-' + s.id + '" data-f="href">' + LINKS.map(l => opt(l[0], l[1], s.href)).join('') + '</select></label>' +
+    '<label class="ed-f"><span>Encuadre de la foto</span><select id="ed-pos-' + s.id + '" data-f="pos"' + (src ? '' : ' disabled') + '>' + Object.keys(POS).map(k => opt(k, POS_LABEL[k], s.pos)).join('') + '</select></label>' +
+    '</div>' +
+    '<div class="ed-actions">' +
+    (s.confirm
+      ? '<div class="ed-confirm">¿Quitar esta diapositiva?<div><button class="btn btn-line btn-xs" type="button" data-act="del-yes">Sí, quitar</button><button class="btn btn-line btn-xs" type="button" data-act="del-no">No</button></div></div>'
+      : '<button class="icon-btn" type="button" data-act="up" aria-label="Subir diapositiva ' + (i + 1) + '"' + (i === 0 ? ' disabled' : '') + '>' + icon('up') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="down" aria-label="Bajar diapositiva ' + (i + 1) + '"' + (i === n - 1 ? ' disabled' : '') + '>' + icon('down') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="del" aria-label="Quitar diapositiva ' + (i + 1) + '"' + (n === 1 ? ' disabled' : '') + '>' + icon('trash') + '</button>') +
+    '</div></li>';
+}
+function renderEditor() {
+  edList.innerHTML = draft.map((s, i) => edRow(s, i, draft.length)).join('');
+  $('#ed-drop').hidden = draft.length >= MAX_SLIDES;
+}
+function renderResetBtn() {
+  $('#ed-reset-wrap').innerHTML = resetArmed
+    ? '¿Volver a la portada de ejemplo?<button class="btn btn-line btn-xs" type="button" id="ed-reset-yes">Sí</button><button class="btn btn-line btn-xs" type="button" id="ed-reset-no">No</button>'
+    : '<button class="btn btn-line btn-sm" type="button" id="ed-reset">' + icon('refresh') + 'Restaurar ejemplo</button>';
+}
+function openEditor() {
+  draft = slides.map(s => Object.assign({}, s, { confirm: false }));
+  resetArmed = false;
+  renderResetBtn();
+  renderEditor();
+  setStatus('Comprobando dónde se guardarán los cambios…');
+  describeMode();
+  dlgP.showModal();
+}
+$('#hero-edit').addEventListener('click', openEditor);
+dlgP.addEventListener('click', e => { if (e.target === dlgP || e.target.closest('[data-close]')) dlgP.close(); });
+
+async function compress(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const w0 = img.naturalWidth, h0 = img.naturalHeight;
+    const scale = Math.min(1, 1920 / Math.max(w0, h0));
+    const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.84));
+    if (!blob) throw new Error('canvas');
+    let warn = '';
+    if (h0 > w0) warn = 'Foto vertical: se recortará arriba y abajo.';
+    else if (w0 < 1200) warn = 'Foto pequeña (' + w0 + ' px de ancho): puede verse borrosa.';
+    return { blob: blob, imgUrl: URL.createObjectURL(blob), warn: warn };
+  } finally { URL.revokeObjectURL(url); }
+}
+async function addFiles(files) {
+  const list = Array.from(files || []).filter(f => /^image\/(jpeg|png|webp)$/.test(f.type));
+  if (!list.length) { setStatus('Elige imágenes JPG, PNG o WebP.', true); return; }
+  const room = MAX_SLIDES - draft.length;
+  if (room <= 0) { setStatus('La portada admite hasta ' + MAX_SLIDES + ' diapositivas. Quita alguna para agregar otra.', true); return; }
+  setStatus('Optimizando ' + Math.min(room, list.length) + (list.length === 1 ? ' imagen…' : ' imágenes…'));
+  for (const f of list.slice(0, room)) {
+    try {
+      const r = await compress(f);
+      draft.push({ id: uid(), eyebrow: '', title: '', text: '', cta: 'Ver cursos', href: '#cursos', art: null, img: null, pos: 'centro', blob: r.blob, imgUrl: r.imgUrl, warn: r.warn, confirm: false });
+    } catch (e) { setStatus('No se pudo leer "' + f.name + '". Prueba con otra imagen.', true); }
+  }
+  renderEditor();
+  if (list.length > room) setStatus('Se agregaron ' + room + ' imágenes. El máximo es ' + MAX_SLIDES + ' diapositivas.', true);
+  else describeMode();
+}
+$('#ed-files').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+const drop = $('#ed-drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('is-over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('is-over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer && e.dataTransfer.files));
+
+edList.addEventListener('input', e => {
+  const row = e.target.closest('.ed-row'); const f = e.target.dataset.f;
+  if (!row || !f) return;
+  draft[+row.dataset.i][f] = e.target.value;
+  if (f === 'pos') { const im = $('.ed-ph img', row); if (im) im.style.objectPosition = POS[e.target.value]; }
+});
+edList.addEventListener('change', async e => {
+  if (e.target.dataset.act !== 'replace') return;
+  const row = e.target.closest('.ed-row'); const s = draft[+row.dataset.i];
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    const r = await compress(file);
+    s.blob = r.blob; s.imgUrl = r.imgUrl; s.warn = r.warn; s.img = null;
+    renderEditor();
+  } catch (err) { setStatus('No se pudo leer esa imagen. Prueba con un JPG o PNG.', true); }
+});
+edList.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const i = +b.closest('.ed-row').dataset.i;
+  const act = b.dataset.act;
+  if (act === 'up' && i > 0) { const t = draft[i - 1]; draft[i - 1] = draft[i]; draft[i] = t; }
+  else if (act === 'down' && i < draft.length - 1) { const t = draft[i + 1]; draft[i + 1] = draft[i]; draft[i] = t; }
+  else if (act === 'del') { draft.forEach(s => { s.confirm = false; }); draft[i].confirm = true; }
+  else if (act === 'del-no') { draft[i].confirm = false; }
+  else if (act === 'del-yes') { draft.splice(i, 1); }
+  else if (act === 'unphoto') { const s = draft[i]; s.img = null; s.imgUrl = null; s.blob = null; s.warn = ''; }
+  renderEditor();
+});
+$('#ed-reset-wrap').addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.id === 'ed-reset') resetArmed = true;
+  else if (t.id === 'ed-reset-no') resetArmed = false;
+  else if (t.id === 'ed-reset-yes') { resetArmed = false; draft = DEFAULT_SLIDES.map(s => Object.assign(normSlide(s), { confirm: false })); renderEditor(); }
+  renderResetBtn();
+});
+
+const blobToDataURL = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+function commit(next) {
+  slides = next.map(s => { const o = Object.assign({}, s); delete o.confirm; delete o.warn; return o; });
+  cur = 0;
+  renderHero();
+}
+async function publishWithRetry(art, files) {
+  try { return await art.publish(files); }
+  catch (err) {
+    if (err && (err.code === 'upstream_error' || !err.code)) {
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 900));
+      return art.publish(files);
+    }
+    throw err;
+  }
+}
+$('#ed-save').addEventListener('click', async () => {
+  const btn = $('#ed-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const art = await artifactP;
+    if (art && !readOnly) {
+      const files = {}; const keep = new Set(); const meta = [];
+      for (const s of draft) {
+        let img = s.img && s.img.startsWith('portada/') ? s.img : null;
+        if (s.blob) { img = 'portada/' + s.id + '.jpg'; files[img] = s.blob; }
+        if (img) keep.add(img);
+        meta.push({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
+      }
+      persisted.forEach(p => { if (!keep.has(p)) files[p] = null; });
+      files['portada.json'] = JSON.stringify({ version: 1, actualizado: new Date().toISOString(), slides: meta }, null, 2);
+      try {
+        await publishWithRetry(art, files);
+        persisted = keep;
+        draft.forEach((s, k) => { s.img = meta[k].img; s.blob = null; });
+        commit(draft);
+        dlgP.close();
+        toast('Portada guardada. Todos los visitantes verán estos cambios.', 'check');
+        return;
+      } catch (err) {
+        const code = err && err.code;
+        if (code === 'conflict') { setStatus('Otra persona guardó la portada hace un momento. La página se actualizará con su versión; vuelve a intentarlo después.', true); return; }
+        if (code === 'rate_limited') { setStatus('Se guardó varias veces seguidas. Espera un minuto y vuelve a guardar.', true); return; }
+        if (code === 'too_large') { setStatus('Las imágenes pesan demasiado en conjunto. Quita alguna y vuelve a guardar.', true); return; }
+        if (code === 'invalid_content' || code === 'transform_error') { setStatus('Una de las imágenes no se pudo guardar. Prueba con JPG o PNG.', true); return; }
+        if (code === 'upstream_error' || !code) { setStatus('No se pudo guardar por un problema del servicio. Intenta de nuevo en unos minutos.', true); return; }
+        readOnly = true;
+        commit(draft);
+        dlgP.close();
+        toast('Esta vista es de solo lectura: la nueva portada se ve solo en tu pantalla.', 'info');
+        return;
+      }
+    }
+    if (!inViewer) {
+      const meta = [];
+      for (const s of draft) {
+        let img = s.img;
+        if (s.blob) img = await blobToDataURL(s.blob);
+        meta.push({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
+      }
+      const ok = store.set(LS_KEY, { slides: meta });
+      commit(draft);
+      dlgP.close();
+      toast(ok ? 'Portada guardada en este navegador.' : 'La portada se ve en esta sesión, pero no cabe en el almacenamiento del navegador. Usa menos fotos.', ok ? 'check' : 'info');
+      return;
+    }
+    commit(draft);
+    dlgP.close();
+    toast('Esta vista es de solo lectura: la nueva portada se ve solo en tu pantalla.', 'info');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar portada';
+  }
+});
+
+/* ---------- Contacto ---------- */
+const sel = $('#f-curso');
+sel.innerHTML = '<option value="">Aún no lo sé, quiero orientación</option>' +
+  '<optgroup label="Cursos gratuitos">' + sortByDate(COURSES.filter(c => c.tipo === 'gratis')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>' +
+  '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + ' · ' + soles(c.precio.asociado) + '</option>').join('') + '</optgroup>';
+
+const form = $('#contact-form');
+const RULES = {
+  'f-nombres': v => v.trim().length >= 2 || 'Ingresa tus nombres.',
+  'f-apellidos': v => v.trim().length >= 2 || 'Ingresa tus apellidos.',
+  'f-dni': v => /^\d{8}$/.test(v.trim()) || 'El DNI tiene 8 dígitos.',
+  'f-celular': v => /^9\d{8}$/.test(v.replace(/\D/g, '')) || 'El celular tiene 9 dígitos y empieza con 9.',
+  'f-correo': v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) || 'Revisa el correo: falta la @ o el dominio.'
+};
+function checkField(id) {
+  const input = $('#' + id); const field = input.closest('.field'); const err = $('.err', field);
+  const res = RULES[id](input.value);
+  const ok = res === true;
+  field.classList.toggle('invalid', !ok);
+  input.setAttribute('aria-invalid', String(!ok));
+  err.hidden = ok; err.textContent = ok ? '' : res;
+  return ok;
+}
+Object.keys(RULES).forEach(id => {
+  const input = $('#' + id);
+  input.addEventListener('blur', () => { if (input.value) checkField(id); });
+  input.addEventListener('input', () => { if (input.closest('.field').classList.contains('invalid')) checkField(id); });
+});
+$('#f-dni').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); });
+$('#f-datos').addEventListener('change', e => { $('#check-datos').classList.toggle('invalid', !e.target.checked); });
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const results = Object.keys(RULES).map(checkField);
+  const datos = $('#f-datos').checked;
+  $('#check-datos').classList.toggle('invalid', !datos);
+  if (results.includes(false) || !datos) {
+    const firstBad = Object.keys(RULES).find((id, k) => !results[k]);
+    if (firstBad) $('#' + firstBad).focus(); else $('#f-datos').focus();
+    return;
+  }
+  const nombre = $('#f-nombres').value.trim().split(/\s+/)[0];
+  const c = byId(sel.value);
+  $('#ok-title').textContent = '¡Gracias, ' + nombre + '!';
+  $('#ok-text').textContent = c
+    ? 'Recibimos tu solicitud para "' + c.titulo + '". Te escribiremos al ' + $('#f-celular').value.trim() + ' para confirmar tu vacante.'
+    : 'Recibimos tu consulta. Un asesor te escribirá al ' + $('#f-celular').value.trim() + ' para orientarte.';
+  $('#form-wrap').hidden = true;
+  $('#form-ok').hidden = false;
+  form.reset();
+});
+$('#form-again').addEventListener('click', () => { $('#form-ok').hidden = true; $('#form-wrap').hidden = false; $('#f-nombres').focus(); });
+
+/* Copiar datos de contacto */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const text = CONFIG[b.dataset.copy];
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copiado: ' + text, 'check');
+  } catch (err) {
+    const span = b.parentElement.querySelector('.c-val');
+    const range = document.createRange(); range.selectNodeContents(span);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(range);
+    toast('Texto seleccionado. Cópialo con Ctrl+C o mantén presionado.', 'info');
+  }
+});
+
+/* ---------- Inicio ---------- */
+$$('[data-cfg]').forEach(el => { const v = CONFIG[el.dataset.cfg]; if (v) el.textContent = v; });
+$$('[data-cfg-href]').forEach(el => { const v = CONFIG[el.dataset.cfgHref]; if (v) el.href = v; });
+hydrateIcons();
+renderHome();
+renderCourses();
+renderHero();
+setPaused(paused);
+route(decodeURIComponent(location.hash.slice(1)) in ALIAS ? null : '');
+loadPortada();
+})();
+</script>
+</body></html>

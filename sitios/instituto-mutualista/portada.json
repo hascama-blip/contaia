@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "slides": [
+    { "id": "ejemplo-1", "eyebrow": "Cursos preventivos gratuitos", "title": "Cuida tu salud y la de tu familia", "text": "Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.", "cta": "Ver cursos gratuitos", "href": "#cursos-gratuitos", "art": "prevencion", "img": null, "pos": "centro" },
+    { "id": "ejemplo-2", "eyebrow": "Cursos con certificado", "title": "Formación práctica con respaldo profesional", "text": "RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.", "cta": "Ver cursos de pago", "href": "#cursos-pago", "art": "cursos", "img": null, "pos": "centro" },
+    { "id": "ejemplo-3", "eyebrow": "Somos una mutual", "title": "Formación que nace de la ayuda mutua", "text": "Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.", "cta": "Conócenos", "href": "#nosotros", "art": "comunidad", "img": null, "pos": "centro" }
+  ]
+}
