@@ -11,7 +11,9 @@ export function conectarArchivos() {
 }
 
 export function urlArchivo(id) {
-  return id ? `/_blob/${id}` : null;
+  if (!id) return null;
+  // En la versión de un solo archivo HTML los archivos viven en el navegador.
+  return window.claude?.urlArchivo?.(id) || `/_blob/${id}`;
 }
 
 /** Reduce fotos grandes del celular (máx. 1400 px) antes de subirlas. */
