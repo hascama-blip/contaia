@@ -273,6 +273,8 @@ body.menu-open .drawer-panel{transform:none}
 .price strong{display:block;font:700 21px/1.1 var(--font-display);font-variant-numeric:tabular-nums}
 .price span{display:block;font-size:13px;color:var(--ink-soft);margin-top:3px}
 .price.is-free strong{color:var(--free)}
+.price.is-cert strong{color:var(--paid)}
+.price strong{font-size:18px}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font:700 12.5px/1 var(--font-body);letter-spacing:.02em}
 .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .badge-free{background:var(--free-bg);color:var(--free)}
@@ -690,14 +692,14 @@ body.on-contacto .fab-info{display:none}
           <div class="sub-card">
             <a class="sub-item" href="#cursos-gratuitos"><span class="sub-ico free" data-icon="gift"></span><span><strong>Cursos gratuitos</strong><small>Prevención y autocuidado sin costo para asociados · <span data-count="gratis">6</span> cursos</small></span></a>
             <a class="sub-item" href="#cursos-videos" data-needs-videos><span class="sub-ico free" data-icon="video"></span><span><strong>Videos de 30 segundos</strong><small>Vistas previas para conocer cada curso · <span data-count="video">3</span> videos</small></span></a>
-            <a class="sub-item" href="#cursos-pago"><span class="sub-ico paid" data-icon="award"></span><span><strong>Cursos de pago</strong><small>Con certificado y tarifa preferencial de asociado · <span data-count="pago">6</span> cursos</small></span></a>
+            <a class="sub-item" href="#cursos-pago"><span class="sub-ico paid" data-icon="award"></span><span><strong>Cursos de pago</strong><small>Con certificado de horas académicas · <span data-count="pago">6</span> cursos</small></span></a>
             <a class="sub-item" href="#cursos"><span class="sub-ico all" data-icon="book"></span><span><strong>Todos los cursos</strong><small>Calendario completo de inicios</small></span></a>
           </div>
         </div>
       </div>
       <a class="nav-link" href="#contacto" data-nav="contacto">Contáctanos</a>
     </nav>
-    <a class="btn btn-accent btn-sm header-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Inscríbete</span></a>
+    <a class="btn btn-accent btn-sm header-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="drawer"><span data-icon="menu"></span></button>
   </div>
 </header>
@@ -718,7 +720,7 @@ body.on-contacto .fab-info{display:none}
       <a href="#cursos-pago"><span data-icon="award"></span>Cursos de pago</a>
     </div>
     <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
-    <a class="btn btn-accent d-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Inscríbete</span></a>
+    <a class="btn btn-accent d-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
     <div class="d-info">
       <span data-item="telefono"><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></span>
       <span data-item="correo"><span data-icon="mail"></span><span data-cfg="correo">informes@institutomutualista.pe</span></span>
@@ -755,7 +757,7 @@ body.on-contacto .fab-info{display:none}
       </a>
       <a class="quick-card" href="#cursos-pago">
         <span class="quick-ico qi-paid" data-icon="award"></span>
-        <div><h3>Cursos con certificado</h3><p>Formación práctica con horas académicas y tarifa preferencial de asociado.</p><span class="more">Ver cursos de pago<span data-icon="arrowRight"></span></span></div>
+        <div><h3>Cursos con certificado</h3><p>Formación práctica con certificado de horas académicas, exclusiva para asociados.</p><span class="more">Ver cursos de pago<span data-icon="arrowRight"></span></span></div>
       </a>
       <a class="quick-card" href="#contacto">
         <span class="quick-ico qi-brand" data-icon="whatsapp"></span>
@@ -809,7 +811,7 @@ body.on-contacto .fab-info{display:none}
         <div class="benefit"><span class="benefit-ico" data-icon="stethoscope"></span><h3>Docentes colegiados</h3><p>Médicos, enfermeras, nutricionistas y psicólogos con experiencia clínica y docente.</p></div>
         <div class="benefit"><span class="benefit-ico" data-icon="calendar"></span><h3>Horarios para quien trabaja</h3><p>Clases virtuales por la noche y talleres presenciales los sábados por la mañana.</p></div>
         <div class="benefit"><span class="benefit-ico" data-icon="award"></span><h3>Certificado con horas académicas</h3><p>Respaldo formal para tu desarrollo personal y laboral. Una hora académica son 45 minutos.</p></div>
-        <div class="benefit"><span class="benefit-ico" data-icon="handHeart"></span><h3>Beneficio mutual</h3><p>Cursos preventivos gratuitos y hasta 40 % de descuento en cursos con certificado.</p></div>
+        <div class="benefit"><span class="benefit-ico" data-icon="handHeart"></span><h3>Beneficio mutual</h3><p>Formación exclusiva para asociados y sus familias, con acceso desde tu propia cuenta.</p></div>
       </div>
     </div>
   </div>
@@ -817,14 +819,14 @@ body.on-contacto .fab-info{display:none}
   <div class="section">
     <div class="wrap">
       <div class="section-head center">
-        <span class="eyebrow">Inscripción</span>
-        <h2>Cómo inscribirte en tres pasos</h2>
+        <span class="eyebrow">Acceso</span>
+        <h2>Cómo entrar a tus cursos</h2>
         <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
       </div>
       <ol class="steps">
-        <li class="step"><span class="step-num">1</span><h3>Elige tu curso</h3><p>Revisa los cursos gratuitos y de pago, sus fechas, horarios y modalidad.</p></li>
-        <li class="step"><span class="step-num">2</span><h3>Envía tu solicitud</h3><p>Completa el formulario con tu DNI o escríbenos por WhatsApp.</p></li>
-        <li class="step"><span class="step-num">3</span><h3>Confirma tu vacante</h3><p>Validamos tu condición de asociado y te enviamos el enlace o la dirección de la clase.</p></li>
+        <li class="step"><span class="step-num">1</span><h3>Elige tu curso</h3><p>Revisa el detalle: temario, fechas, horario, modalidad y docente.</p></li>
+        <li class="step"><span class="step-num">2</span><h3>Pulsa “Ingresar”</h3><p>Te llevamos a la plataforma de cursos del instituto.</p></li>
+        <li class="step"><span class="step-num">3</span><h3>Entra con tu usuario</h3><p>Usa el usuario y la contraseña que te dio el instituto. ¿Aún no los tienes? Escríbenos.</p></li>
       </ol>
     </div>
   </div>
@@ -860,13 +862,13 @@ body.on-contacto .fab-info{display:none}
         <span class="eyebrow">Quiénes somos</span>
         <h2 data-txt="quienesTitulo">Un instituto creado por y para los asociados</h2>
         <p class="lead" data-txt="quienesLead">El Instituto Mutualista nace dentro de nuestra mutual con una idea sencilla: si nos apoyamos entre todos, también podemos aprender juntos a cuidar la salud.</p>
-        <p data-txt="quienesTexto1">Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado a una tarifa preferencial para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
+        <p data-txt="quienesTexto1">Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
         <p data-txt="quienesTexto2">Trabajamos con horarios pensados para quien trabaja: clases virtuales por la noche, talleres presenciales los sábados y grupos reducidos para las prácticas.</p>
       </div>
       <aside class="model-card" aria-label="Nuestro modelo">
         <h3>Nuestro modelo</h3>
         <div class="model-item"><span class="quick-ico qi-free" data-icon="gift"></span><div><h4>Cursos gratuitos</h4><p>Prevención y autocuidado sin costo para el asociado y su familia directa.</p></div></div>
-        <div class="model-item"><span class="quick-ico qi-paid" data-icon="tag"></span><div><h4>Tarifa de asociado</h4><p>Hasta 40 % menos que el precio regular en los cursos con certificado.</p></div></div>
+        <div class="model-item"><span class="quick-ico qi-paid" data-icon="login"></span><div><h4>Plataforma de cursos</h4><p>Con tu usuario entras a las clases, materiales y certificados desde cualquier dispositivo.</p></div></div>
         <div class="model-item"><span class="quick-ico qi-brand" data-icon="award"></span><div><h4>Certificación</h4><p>Constancia en cursos gratuitos y certificado con horas académicas en cursos de pago.</p></div></div>
       </aside>
     </div>
@@ -928,7 +930,7 @@ body.on-contacto .fab-info{display:none}
       <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span id="crumb-cursos">Cursos</span></nav>
       <h1 id="t-cursos">Cursos</h1>
       <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p data-txt="cursosIntro">Elige entre cursos preventivos gratuitos y cursos con certificado a tarifa preferencial para asociados.</p>
+      <p data-txt="cursosIntro">Cursos preventivos gratuitos y cursos con certificado, exclusivos para asociados. Revisa el detalle y entra con tu usuario.</p>
     </div>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
@@ -958,7 +960,7 @@ body.on-contacto .fab-info{display:none}
       </div>
       <div class="type-note free" id="note-gratis" hidden><span data-icon="gift"></span><p><strong>Cursos gratuitos:</strong> se financian con el fondo solidario de la mutual. Las vacantes se asignan por orden de inscripción y el asociado puede inscribir a sus familiares directos.</p></div>
       <div class="type-note free" id="note-video" hidden><span data-icon="video"></span><p><strong>Videos de vista previa:</strong> 30 segundos para conocer cada curso antes de inscribirte. Desde cada video puedes abrir el detalle del curso e inscribirte.</p></div>
-      <div class="type-note paid" id="note-pago" hidden><span data-icon="tag"></span><p><strong>Cursos de pago:</strong> los asociados pagan la tarifa preferencial. Familiares y público general pagan el precio regular. Incluyen certificado con horas académicas.</p></div>
+      <div class="type-note paid" id="note-pago" hidden><span data-icon="tag"></span><p><strong>Cursos de pago:</strong> incluyen certificado con horas académicas. Entras con tu usuario de la plataforma de cursos; si tienes dudas sobre las condiciones, escríbenos.</p></div>
       <p class="results-line" id="results-line" aria-live="polite"></p>
       <div class="course-grid" id="course-grid"></div>
       <div class="empty" id="empty" hidden><span data-icon="search"></span><h3>No hay cursos con esos filtros</h3><p>Prueba con otra área o modalidad, o escríbenos y te avisamos cuando abramos uno.</p><button class="btn btn-soft btn-sm" type="button" id="clear-filters">Quitar filtros</button></div>
@@ -1041,10 +1043,10 @@ body.on-contacto .fab-info{display:none}
         <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
       </div>
       <div class="faq">
-        <details><summary>¿Quiénes pueden inscribirse?<span data-icon="chevDown"></span></summary><p>Los asociados activos y sus familiares directos (cónyuge, hijos y padres). Los cursos de pago también están abiertos al público general con el precio regular.</p></details>
+        <details><summary>¿Quiénes pueden inscribirse?<span data-icon="chevDown"></span></summary><p>Los asociados activos y sus familiares directos (cónyuge, hijos y padres).</p></details>
         <details><summary>¿Los cursos gratuitos dan certificado?<span data-icon="chevDown"></span></summary><p>Entregan una constancia de participación. Los cursos de pago otorgan un certificado con horas académicas (una hora académica equivale a 45 minutos).</p></details>
         <details><summary>¿Cómo acredito que soy asociado?<span data-icon="chevDown"></span></summary><p>Solo necesitas tu DNI. Al recibir tu solicitud validamos tu condición en el padrón de la mutual.</p></details>
-        <details><summary>¿Puedo pagar en cuotas?<span data-icon="chevDown"></span></summary><p>Sí. Los cursos de 20 horas académicas a más se pueden pagar en dos cuotas: la primera al inscribirte y la segunda a mitad del curso.</p></details>
+        <details><summary>¿Cómo ingreso a los cursos?<span data-icon="chevDown"></span></summary><p>En el detalle de cada curso pulsa “Ingresar”: te llevamos a la plataforma de cursos, donde entras con tu usuario y contraseña. Si aún no tienes acceso, escríbenos y te lo enviamos.</p></details>
         <details><summary>¿Qué pasa si falto a una clase?<span data-icon="chevDown"></span></summary><p>Las clases virtuales quedan grabadas durante 15 días. Para obtener el certificado necesitas asistir al menos al 80 % de las sesiones.</p></details>
       </div>
     </div>
@@ -1235,6 +1237,7 @@ const I = {
   type: '<path d="M5 7V4.5h14V7M12 4.5v15M9 19.5h6"/>',
   share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
   logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>',
+  login: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M9 17l5-5-5-5M14 12H3"/>',
   send: '<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>',
   keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
   pointer: '<path d="M8 3v12l3-3 2.5 6 2.5-1-2.5-6H18z"/>'
@@ -1278,7 +1281,7 @@ const SOCIALS = [
   { k: 'messenger', label: 'Messenger', icon: 'messenger', ph: 'm.me/tuinstituto' }
 ];
 const BTN_TIPOS = [
-  ['pagina', 'Una página del sitio', null], ['whatsapp', 'WhatsApp', 'whatsapp'], ['telefono', 'Llamar al teléfono', 'phone'],
+  ['pagina', 'Una página del sitio', null], ['plataforma', 'Plataforma de cursos', 'login'], ['whatsapp', 'WhatsApp', 'whatsapp'], ['telefono', 'Llamar al teléfono', 'phone'],
   ['correo', 'Escribir un correo', 'mail'], ['messenger', 'Messenger', 'messenger'], ['facebook', 'Facebook', 'facebook'],
   ['instagram', 'Instagram', 'instagram'], ['tiktok', 'TikTok', 'tiktok'], ['youtube', 'YouTube', 'youtube'], ['url', 'Otro enlace', 'link']
 ];
@@ -1289,7 +1292,7 @@ const BTN_DEFS = [
   { k: 'franja1', nombre: 'Franja final del inicio · botón principal', donde: 'Bloque turquesa al final de la página de inicio.' },
   { k: 'franja2', nombre: 'Franja final del inicio · botón secundario', donde: 'Al lado del botón principal de esa franja.' },
   { k: 'asesor', nombre: 'Botón de Contáctanos', donde: 'Debajo de los datos de contacto en la página Contáctanos.' },
-  { k: 'curso', nombre: 'Botón de la ficha de cada curso', donde: 'Al abrir el detalle de un curso. Con WhatsApp, el mensaje incluye el nombre del curso.' }
+  { k: 'curso', nombre: 'Botón secundario de la ficha de cada curso', donde: 'Al abrir el detalle de un curso, junto a “Ingresar”. Con WhatsApp, el mensaje incluye el nombre del curso.' }
 ];
 const TEXT_GROUPS = [
   ['Barra superior', [['avisoBarra', 'Aviso de la barra superior']]],
@@ -1300,7 +1303,7 @@ const TEXT_GROUPS = [
   ['Pie de página', [['pieTexto', 'Descripción del pie de página', true]]]
 ];
 const FORM_DEST = [
-  ['whatsapp', 'Enviar por WhatsApp', 'Al enviar, el visitante pulsa un botón que abre WhatsApp con sus datos ya escritos hacia tu número. Funciona sin servidor.'],
+  ['whatsapp', 'Enviar por WhatsApp', 'Al enviar, la persona pulsa un botón que abre WhatsApp con sus datos ya escritos hacia tu número. Funciona sin servidor.'],
   ['correo', 'Enviar por correo', 'Abre el programa de correo del visitante con sus datos hacia tu correo. Depende de que tenga un correo configurado.'],
   ['endpoint', 'Servicio externo', 'Envía los datos a la dirección de un servicio de formularios (Formspree, Google Apps Script, Make o Zapier). Funciona cuando el sitio está publicado en tu propio dominio.'],
   ['ninguno', 'Solo demostración', 'Muestra la confirmación sin enviar los datos a ningún lado.']
@@ -1316,7 +1319,7 @@ const DEFAULT_SITE = {
   },
   redes: { facebook: '', instagram: '', tiktok: '', youtube: '', linkedin: '', messenger: '' },
   botones: {
-    cabecera: { texto: 'Inscríbete', tipo: 'pagina', valor: '#contacto' },
+    cabecera: { texto: 'Ingresar', tipo: 'plataforma', valor: '' },
     flotante: { texto: 'Solicitar información', tipo: 'pagina', valor: '#contacto', visible: true },
     franja1: { texto: 'Solicitar información', tipo: 'pagina', valor: '#contacto' },
     franja2: { texto: 'WhatsApp', tipo: 'whatsapp', valor: '' },
@@ -1327,6 +1330,7 @@ const DEFAULT_SITE = {
   },
   textos: {},
   conectores: { formDestino: 'whatsapp', formEndpoint: '' },
+  plataforma: { url: '', texto: 'Ingresar', cursos: {} },
   seguridad: { pinHash: '' },
   logo: null,
   videos: [
@@ -1336,7 +1340,7 @@ const DEFAULT_SITE = {
   ],
   slides: [
     { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
-    { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
+    { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con certificado de horas académicas.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
     { id: 'ejemplo-3', eyebrow: 'Somos una mutual', title: 'Formación que nace de la ayuda mutua', text: 'Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.', cta: 'Conócenos', href: '#nosotros', art: 'comunidad', img: null, pos: 'centro' }
   ]
 };
@@ -1398,6 +1402,14 @@ function mergeSite(raw) {
     if (typeof raw.conectores.formEndpoint === 'string') d.conectores.formEndpoint = raw.conectores.formEndpoint.slice(0, 500);
   }
   if (raw.seguridad && typeof raw.seguridad.pinHash === 'string') d.seguridad.pinHash = raw.seguridad.pinHash.slice(0, 40);
+  if (raw.plataforma && typeof raw.plataforma === 'object') {
+    if (typeof raw.plataforma.url === 'string') d.plataforma.url = raw.plataforma.url.trim().slice(0, 500);
+    if (typeof raw.plataforma.texto === 'string') d.plataforma.texto = raw.plataforma.texto.slice(0, 30);
+    if (raw.plataforma.cursos && typeof raw.plataforma.cursos === 'object') Object.keys(raw.plataforma.cursos).forEach(id => {
+      const u = raw.plataforma.cursos[id];
+      if (/^[\w-]{1,60}$/.test(id) && typeof u === 'string' && u.trim()) d.plataforma.cursos[id] = u.trim().slice(0, 500);
+    });
+  }
   d.logo = safeSrc(raw.logo);
   if (Array.isArray(raw.slides) && raw.slides.length) d.slides = raw.slides.slice(0, MAX_SLIDES).map(normSlide);
   else d.slides = d.slides.map(normSlide);
@@ -1408,6 +1420,7 @@ function cloneSite(s) {
     version: 2,
     contacto: Object.assign({}, s.contacto), redes: Object.assign({}, s.redes), textos: Object.assign({}, s.textos),
     conectores: Object.assign({}, s.conectores), seguridad: Object.assign({}, s.seguridad),
+    plataforma: { url: s.plataforma.url, texto: s.plataforma.texto, cursos: Object.assign({}, s.plataforma.cursos) },
     botones: Object.fromEntries(Object.entries(s.botones).map(e => [e[0], Object.assign({}, e[1])])),
     logo: s.logo, logoUrl: s.logoUrl || null, logoBlob: s.logoBlob || null,
     slides: s.slides.map(x => Object.assign({}, x, { confirm: false })),
@@ -1438,11 +1451,24 @@ const digits = v => String(v || '').replace(/\D/g, '');
 function waNumber(s) { const d = digits((s || site).contacto.whatsapp); if (d.length === 9 && d[0] === '9') return '51' + d; return d.length >= 8 ? d : ''; }
 function waLink(msg, s) { const n = waNumber(s); return n ? 'https://wa.me/' + n + (msg ? '?text=' + encodeURIComponent(msg) : '') : null; }
 function mapLink(s) { s = s || site; return safeUrl(s.contacto.mapa) || (s.contacto.direccion ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.contacto.direccion) : null); }
+// "Ingresar": enlace del curso en la plataforma, o el enlace general de la plataforma.
+function ingresoLink(courseId, s) {
+  s = s || site;
+  return safeUrl((courseId && s.plataforma.cursos[courseId]) || '') || safeUrl(s.plataforma.url);
+}
+const textoIngresar = () => site.plataforma.texto || 'Ingresar';
+function ingresarBtnHTML(courseId) {
+  const u = ingresoLink(courseId);
+  return u
+    ? '<a class="btn btn-accent" href="' + esc(u) + '" target="_blank" rel="noopener">' + icon('login') + esc(textoIngresar()) + '</a>'
+    : '<a class="btn btn-accent" href="#contacto" data-sin-acceso>' + icon('login') + esc(textoIngresar()) + '</a>';
+}
 function resolveBtn(b, extra, s) {
   s = s || site;
   const c = s.contacto;
   switch (b.tipo) {
     case 'pagina': return { href: safePage(b.valor), ext: false };
+    case 'plataforma': { const u = ingresoLink(null, s); return u ? { href: u, ext: true } : { href: '#contacto', ext: false }; }
     case 'whatsapp': {
       let msg = b.valor || c.whatsappMensaje;
       if (extra && extra.curso) msg = b.valor ? b.valor + ' Curso: ' + extra.curso.titulo : 'Hola, quiero información del curso "' + extra.curso.titulo + '".';
@@ -1458,6 +1484,7 @@ function applyBtn(el, key) {
   const b = site.botones[key];
   if (!b) return;
   const r = resolveBtn(b);
+  el.toggleAttribute('data-sin-acceso', b.tipo === 'plataforma' && !ingresoLink(null));
   el.hidden = !r.href || (b.visible === false);
   if (!r.href) return;
   el.href = r.href;
@@ -1503,43 +1530,43 @@ const COURSES = [
     horario: 'Sábados 31 de octubre y 7 de noviembre, 8:30 a. m. a 1:00 p. m.', vacantes: 20, docente: 'Médico emergenciólogo (CMP)',
     resumen: 'Reanimación cardiopulmonar en adultos, niños y lactantes, con práctica en maniquí y uso del DEA.',
     temario: ['Cadena de supervivencia y seguridad de la escena', 'RCP de alta calidad en adultos, niños y lactantes', 'Uso del desfibrilador externo automático (DEA)', 'Obstrucción de la vía aérea', 'Práctica en maniquí y evaluación final'],
-    dirigido: 'Asociados, familiares y público general mayores de 16 años.', certificado: 'Certificado de 12 horas académicas', precio: { asociado: 120, publico: 180 } },
+    dirigido: 'Asociados y familiares mayores de 16 años.', certificado: 'Certificado de 12 horas académicas' },
   { id: 'cuidado-adulto-mayor', titulo: 'Cuidado del adulto mayor en casa', cat: 'Cuidados', tipo: 'pago', modalidad: 'Semipresencial', horas: 24, inicio: '2026-11-07',
     horario: 'Del 7 al 28 de noviembre: teoría virtual los martes y práctica presencial los sábados', vacantes: 25, docente: 'Licenciada en enfermería geriátrica (CEP)',
     resumen: 'Higiene, movilización, alimentación y prevención de caídas para cuidar con seguridad a un adulto mayor.',
     temario: ['Cambios propios del envejecimiento', 'Higiene y confort de la persona dependiente', 'Movilización y traslado sin lesionarse', 'Prevención de caídas y úlceras por presión', 'Manejo de medicamentos y señales de alarma', 'Cuidar al cuidador'],
-    dirigido: 'Familiares cuidadores y público general.', certificado: 'Certificado de 24 horas académicas', precio: { asociado: 150, publico: 240 } },
+    dirigido: 'Asociados y familiares que cuidan a un adulto mayor.', certificado: 'Certificado de 24 horas académicas' },
   { id: 'funciones-vitales-inyectables', titulo: 'Funciones vitales e inyectables', cat: 'Cuidados', tipo: 'pago', modalidad: 'Presencial', horas: 20, inicio: '2026-11-14',
     horario: 'Sábados 14, 21 y 28 de noviembre y 5 de diciembre, 9:00 a. m. a 12:45 p. m.', vacantes: 18, docente: 'Licenciado en enfermería (CEP)',
     resumen: 'Medición de presión arterial, pulso, temperatura, saturación y glucosa, y técnica segura de inyectables.',
     temario: ['Presión arterial: técnica y valores normales', 'Pulso, respiración, temperatura y saturación', 'Control de glucosa capilar', 'Vías de administración de medicamentos', 'Inyección intramuscular y subcutánea', 'Bioseguridad y manejo de residuos'],
-    dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Certificado de 20 horas académicas', precio: { asociado: 140, publico: 220 } },
+    dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Certificado de 20 horas académicas' },
   { id: 'uso-seguro-medicamentos', titulo: 'Uso seguro de medicamentos', cat: 'Farmacología', tipo: 'pago', modalidad: 'Virtual', horas: 16, inicio: '2026-10-20',
     horario: 'Martes y jueves del 20 de octubre al 12 de noviembre, 7:00 a 8:30 p. m.', vacantes: 80, docente: 'Químico farmacéutico (CQFP)',
     resumen: 'Cómo leer una receta, evitar la automedicación y guardar correctamente los medicamentos en casa.',
     temario: ['Cómo leer una receta y el prospecto', 'Riesgos de la automedicación y del mal uso de antibióticos', 'Interacciones con alimentos y otros medicamentos', 'Medicamentos genéricos y de marca', 'Almacenamiento y desecho seguro en casa'],
-    dirigido: 'Asociados, cuidadores y público general.', certificado: 'Certificado de 16 horas académicas', precio: { asociado: 90, publico: 150 } },
+    dirigido: 'Asociados, familiares y cuidadores.', certificado: 'Certificado de 16 horas académicas' },
   { id: 'emergencias-prehospitalarias', titulo: 'Atención prehospitalaria de emergencias', cat: 'Primeros auxilios', tipo: 'pago', modalidad: 'Presencial', horas: 30, inicio: '2026-11-21',
     horario: 'Sábados del 21 de noviembre al 19 de diciembre, 8:30 a. m. a 1:00 p. m.', vacantes: 18, docente: 'Médico emergenciólogo (CMP) y equipo paramédico',
     resumen: 'Evaluación inicial, inmovilización y traslado de pacientes en accidentes y emergencias frecuentes.',
     temario: ['Evaluación primaria y secundaria (ABCDE)', 'Control de hemorragias y manejo del shock', 'Inmovilización y traslado de lesionados', 'Emergencias médicas: infarto, ACV y convulsiones', 'Atención de múltiples víctimas', 'Simulacro final'],
-    dirigido: 'Asociados, brigadistas y público general mayores de 18 años.', certificado: 'Certificado de 30 horas académicas', precio: { asociado: 230, publico: 350 } },
+    dirigido: 'Asociados, familiares y brigadistas mayores de 18 años.', certificado: 'Certificado de 30 horas académicas' },
   { id: 'nutricion-enfermedades-cronicas', titulo: 'Nutrición para enfermedades crónicas', cat: 'Nutrición', tipo: 'pago', modalidad: 'Virtual', horas: 24, inicio: '2026-12-01',
     horario: 'Martes y jueves del 1 al 17 de diciembre, 6:30 a 9:30 p. m.', vacantes: 60, docente: 'Nutricionista clínica (CNP)',
     resumen: 'Planes de alimentación para diabetes, hipertensión, colesterol alto y enfermedad renal.',
     temario: ['Evaluación nutricional básica', 'Alimentación en diabetes e hipertensión', 'Colesterol, triglicéridos e hígado graso', 'Cuidados nutricionales en la enfermedad renal', 'Diseño de menús y lista de compras'],
-    dirigido: 'Asociados, cuidadores y público general.', certificado: 'Certificado de 24 horas académicas', precio: { asociado: 180, publico: 280 } }
+    dirigido: 'Asociados, familiares y cuidadores.', certificado: 'Certificado de 24 horas académicas' }
 ];
 const byId = id => COURSES.find(c => c.id === id);
 const toDate = iso => { const p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
 const fmtShort = iso => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(toDate(iso)).replace('.', '');
 const fmtLong = iso => new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(toDate(iso));
-const soles = n => 'S/ ' + n.toLocaleString('es-PE');
 const sortByDate = list => list.slice().sort((a, b) => a.inicio.localeCompare(b.inicio));
 
-function priceHTML(c) {
-  if (c.tipo === 'gratis') return '<div class="price is-free"><strong>Gratis</strong><span>para asociados y familiares</span></div>';
-  return '<div class="price"><strong>' + soles(c.precio.asociado) + '</strong><span>asociado · público ' + soles(c.precio.publico) + '</span></div>';
+function accessHTML(c) {
+  return c.tipo === 'gratis'
+    ? '<div class="price is-free"><strong>Gratuito</strong><span>para asociados</span></div>'
+    : '<div class="price is-cert"><strong>Con certificado</strong><span>para asociados</span></div>';
 }
 function courseCard(c) {
   const cat = CATS[c.cat];
@@ -1553,7 +1580,7 @@ function courseCard(c) {
     '<h3 class="course-title">' + esc(c.titulo) + '</h3>' +
     '<p class="course-sum">' + esc(c.resumen) + '</p>' +
     '<ul class="course-meta"><li>' + icon('calendar') + 'Inicia ' + fmtShort(c.inicio) + '</li><li>' + icon('clock') + c.horas + ' h acad.</li><li>' + icon(MODS[c.modalidad]) + c.modalidad + '</li></ul>' +
-    '<div class="course-foot">' + priceHTML(c) + '<button class="btn btn-soft btn-sm" type="button" data-course="' + c.id + '">Ver detalle</button></div>' +
+    '<div class="course-foot">' + accessHTML(c) + '<button class="btn btn-soft btn-sm" type="button" data-course="' + c.id + '">Ver detalle</button></div>' +
     '</div></article>';
 }
 
@@ -1587,7 +1614,7 @@ function videoCard(v) {
   const k = videoInfo(v);
   const src = v.portadaUrl || v.portada;
   const file = videoSrc(v);
-  const foot = k.c ? priceHTML(k.c)
+  const foot = k.c ? accessHTML(k.c)
     : safeUrl(v.completo) ? '<div class="price is-free"><strong>Gratis</strong><span>curso completo en video</span></div>'
     : '<div class="price"><strong>' + secLabel(v) + '</strong><span>de vista previa</span></div>';
   const meta = '<li>' + icon('video') + 'Video de ' + secLabel(v) + '</li>' +
@@ -1642,10 +1669,10 @@ function openVideo(id) {
   const c = k.c;
   const full = safeUrl(v.completo);
   const meta = c
-    ? '<span>' + icon('calendar') + 'Inicia ' + fmtLong(c.inicio) + '</span><span>' + icon(MODS[c.modalidad]) + c.modalidad + '</span><span>' + icon('tag') + (c.tipo === 'gratis' ? 'Gratis' : soles(c.precio.asociado) + ' asociado') + '</span>'
+    ? '<span>' + icon('calendar') + 'Inicia ' + fmtLong(c.inicio) + '</span><span>' + icon(MODS[c.modalidad]) + c.modalidad + '</span><span>' + icon(c.tipo === 'gratis' ? 'gift' : 'award') + (c.tipo === 'gratis' ? 'Gratuito' : 'Con certificado') + '</span>'
     : (v.docente ? '<span>' + icon('stethoscope') + esc(v.docente) + '</span>' : '');
   const actions = c
-    ? '<button class="btn btn-line" type="button" data-open-course="' + c.id + '">Ver detalle del curso</button><button class="btn btn-accent" type="button" data-enroll-course="' + c.id + '">Inscribirme</button>'
+    ? '<button class="btn btn-line" type="button" data-open-course="' + c.id + '">Ver detalle del curso</button>' + ingresarBtnHTML(c.id)
     : full ? '<a class="btn btn-accent" href="' + esc(full) + '" target="_blank" rel="noopener">' + icon('play') + 'Ver curso completo</a>'
     : '<a class="btn btn-accent" href="#contacto" data-close>Solicitar información</a>';
   dlgV.innerHTML = '<div class="player">' + playerHTML(v, true) + '<button class="icon-btn vd-close" type="button" data-close aria-label="Cerrar">' + icon('close') + '</button></div>' +
@@ -1658,20 +1685,21 @@ function openVideo(id) {
   const vid = $('video', dlgV);
   if (vid) { const pr = vid.play(); if (pr && pr.catch) pr.catch(() => {}); }
 }
-function enroll(id) {
-  const c = byId(id);
-  if (!c) return;
-  $('#f-curso').value = c.id;
-  navigate('contacto');
-  setTimeout(() => { $('#f-nombres').focus({ preventScroll: true }); }, 60);
-  toast('Completa tus datos para inscribirte en "' + c.titulo + '".', 'check');
+// Si aún no se configuró la plataforma, "Ingresar" lleva a Contáctanos para pedir el acceso.
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-sin-acceso]')) return;
+  if (dlgC.open) dlgC.close();
+  if (dlgV.open) dlgV.close();
+  sinAcceso();
+});
+function sinAcceso() {
+  setTimeout(() => { const m = $('#f-mensaje'); if (m && !m.value) m.value = 'Quiero recibir mi usuario para la plataforma de cursos.'; }, 60);
+  toast('El acceso a la plataforma de cursos estará disponible pronto. Escríbenos para recibir tu usuario.', 'info');
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-video]'); if (b) openVideo(b.dataset.video); });
 dlgV.addEventListener('click', e => {
   const oc = e.target.closest('[data-open-course]');
   if (oc) { dlgV.close(); openCourse(oc.dataset.openCourse); return; }
-  const en = e.target.closest('[data-enroll-course]');
-  if (en) { dlgV.close(); enroll(en.dataset.enrollCourse); return; }
   if (e.target === dlgV || e.target.closest('[data-close]')) dlgV.close();
 });
 dlgV.addEventListener('close', () => { dlgV.innerHTML = ''; });
@@ -1745,9 +1773,7 @@ function openCourse(id) {
   const previewBlock = !pvw ? ''
     : videoSrc(pvw) ? '<div class="cd-preview"><div class="player">' + playerHTML(pvw, false) + '</div><p class="cd-preview-cap">' + icon('video') + 'Vista previa del curso · ' + secLabel(pvw) + '</p></div>'
     : '<p><button class="btn btn-soft btn-sm" type="button" data-open-video="' + esc(pvw.id) + '"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>Ver vista previa (' + secLabel(pvw) + ')</button></p>';
-  const price = free
-    ? '<div class="cd-price"><strong style="color:var(--free)">Gratis</strong><span>Sin costo para asociados y familiares directos</span></div>'
-    : '<div class="cd-price"><strong>' + soles(c.precio.asociado) + '</strong><span>Tarifa de asociado · Familiares y público: ' + soles(c.precio.publico) + '</span></div>';
+  const price = '<div class="cd-price"><strong style="color:var(' + (free ? '--free' : '--paid') + ')">' + (free ? 'Gratuito' : 'Con certificado') + '</strong><span>Exclusivo para asociados. Entras con tu usuario de la plataforma de cursos.</span></div>';
   dlgC.style.setProperty('--tint', cat.tint);
   dlgC.innerHTML =
     '<div class="cd-hero"><button class="icon-btn cd-close" type="button" data-close aria-label="Cerrar">' + icon('close') + '</button>' +
@@ -1761,7 +1787,7 @@ function openCourse(id) {
     fact('book', 'Duración', c.horas + ' horas académicas') + fact(MODS[c.modalidad], 'Modalidad', c.modalidad) +
     fact('ticket', 'Vacantes', c.vacantes + ' por grupo') + fact('stethoscope', 'Docente', c.docente) +
     fact('award', 'Certificación', c.certificado) + price + '</dl></div></div>' +
-    '<div class="dlg-foot">' + contactBtn + '<button class="btn btn-accent" type="button" data-enroll="' + c.id + '">Inscribirme</button></div>';
+    '<div class="dlg-foot">' + contactBtn + ingresarBtnHTML(c.id) + '</div>';
   dlgC.showModal();
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-course]'); if (b) openCourse(b.dataset.course); });
@@ -1769,8 +1795,6 @@ dlgC.addEventListener('click', e => {
   if (e.target === dlgC || e.target.closest('[data-close]')) { dlgC.close(); return; }
   const ov = e.target.closest('[data-open-video]');
   if (ov) { dlgC.close(); openVideo(ov.dataset.openVideo); return; }
-  const en = e.target.closest('[data-enroll]');
-  if (en) { dlgC.close(); enroll(en.dataset.enroll); }
 });
 dlgC.addEventListener('close', () => { $$('video', dlgC).forEach(x => x.pause()); });
 
@@ -2237,7 +2261,7 @@ function panelRedes() {
 function btnPreview(b) {
   const r = resolveBtn(b, null, draft);
   if (!r.href) {
-    const why = b.tipo === 'whatsapp' ? 'falta el número de WhatsApp en Contacto' : b.tipo === 'telefono' ? 'falta el teléfono en Contacto' : b.tipo === 'correo' ? 'falta el correo en Contacto' : b.tipo === 'url' ? 'escribe un enlace válido' : 'falta el enlace en Redes sociales';
+    const why = b.tipo === 'plataforma' ? 'falta el enlace de la plataforma en Conectores' : b.tipo === 'whatsapp' ? 'falta el número de WhatsApp en Contacto' : b.tipo === 'telefono' ? 'falta el teléfono en Contacto' : b.tipo === 'correo' ? 'falta el correo en Contacto' : b.tipo === 'url' ? 'escribe un enlace válido' : 'falta el enlace en Redes sociales';
     return '<span class="adm-hint bad">' + icon('info') + 'Oculto: ' + why + '.</span>';
   }
   let shown = r.href;
@@ -2251,7 +2275,7 @@ function bcardHTML(d) {
   if (b.tipo === 'pagina') valor = '<label class="ed-f"><span>Página</span><select id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor">' + PAGES_OPT.map(p => optHTML(p[0], p[1], safePage(b.valor))).join('') + '</select></label>';
   else if (b.tipo === 'whatsapp') valor = '<label class="ed-f"><span>Mensaje (opcional)</span><input id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor" maxlength="300" value="' + esc(b.valor) + '" placeholder="Vacío = mensaje inicial de Contacto"></label>';
   else if (b.tipo === 'url') valor = '<label class="ed-f"><span>Enlace</span><input id="btn-' + d.k + '-valor" data-path="botones.' + d.k + '.valor" inputmode="url" maxlength="500" value="' + esc(b.valor) + '" placeholder="https://…"></label>';
-  else valor = '<div class="ed-f"><span>Dato que usa</span><small class="adm-hint">' + (b.tipo === 'telefono' ? 'El teléfono de la pestaña Contacto.' : b.tipo === 'correo' ? 'El correo de la pestaña Contacto.' : 'El enlace de ' + (SOCIALS.find(s => s.k === b.tipo) || { label: '' }).label + ' en Redes sociales.') + '</small></div>';
+  else valor = '<div class="ed-f"><span>Dato que usa</span><small class="adm-hint">' + (b.tipo === 'plataforma' ? 'El enlace de la plataforma de cursos (pestaña Conectores). Sin enlace, lleva a Contáctanos.' : b.tipo === 'telefono' ? 'El teléfono de la pestaña Contacto.' : b.tipo === 'correo' ? 'El correo de la pestaña Contacto.' : 'El enlace de ' + (SOCIALS.find(s => s.k === b.tipo) || { label: '' }).label + ' en Redes sociales.') + '</small></div>';
   return '<div class="bcard" data-bkey="' + d.k + '"><div class="bcard-head"><div><strong>' + esc(d.nombre) + '</strong><small>' + esc(d.donde) + '</small></div>' +
     (d.visible ? '<label class="switch"><input type="checkbox" id="btn-' + d.k + '-vis" data-bool="botones.' + d.k + '.visible"' + (b.visible ? ' checked' : '') + '>Mostrar</label>' : '') + '</div>' +
     '<div class="bcard-grid">' +
@@ -2270,9 +2294,27 @@ function panelTextos() {
   return '<h3>Textos del sitio</h3><p class="adm-intro">Edita los textos principales de cada página. Si dejas un texto vacío, ese bloque se oculta.</p>' +
     TEXT_GROUPS.map(g => '<h4>' + esc(g[0]) + '</h4><div class="adm-grid">' + g[1].map(f => fieldHTML('textos.' + f[0], f[1], { area: !!f[2], rows: 3, wide: !!f[2], max: 600 })).join('') + '</div>').join('');
 }
+function platHint() {
+  const v = draft.plataforma.url;
+  if (!String(v || '').trim()) return { t: 'Vacío: “Ingresar” lleva a Contáctanos para pedir el acceso.', c: '' };
+  const u = safeUrl(v);
+  return u ? { t: 'Se abrirá: ' + u, c: 'good' } : { t: 'Revisa el enlace: debe ser una dirección web, por ejemplo aula.tuinstituto.pe.', c: 'bad' };
+}
 function panelConectores() {
   const dest = draft.conectores.formDestino;
-  return '<h3>Formulario de contacto</h3><p class="adm-intro">Elige a dónde llegan las solicitudes que envían los visitantes desde Contáctanos o desde el botón “Inscribirme” de cada curso.</p>' +
+  const h = platHint();
+  const row = c => {
+    const v = draft.plataforma.cursos[c.id] || '';
+    return '<label class="ed-f"><span class="lab">' + icon(CATS[c.cat].icon) + esc(c.titulo) + '</span><input id="plat-' + c.id + '" data-path="plataforma.cursos.' + c.id + '" inputmode="url" maxlength="500" value="' + esc(v) + '" placeholder="Vacío = enlace general" autocomplete="off"></label>';
+  };
+  return '<h3>Plataforma de cursos</h3><p class="adm-intro">El botón “Ingresar” de cada curso lleva a esta plataforma, donde las personas entran con su usuario y contraseña.</p>' +
+    '<div class="adm-grid">' +
+    fieldHTML('plataforma.url', 'Enlace de la plataforma', { icon: 'login', mode: 'url', max: 500, ph: 'https://aula.tuinstituto.pe', hint: h.t }).replace('class="adm-hint"', 'class="adm-hint ' + h.c + '"') +
+    fieldHTML('plataforma.texto', 'Texto del botón', { icon: 'type', max: 30, ph: 'Ingresar' }) +
+    '</div>' +
+    '<h4>Enlace de cada curso (opcional)</h4><p class="adm-intro">Si cada curso tiene su propia página en la plataforma, pega aquí su enlace. Si lo dejas vacío, se usa el enlace general.</p>' +
+    '<div class="adm-grid">' + sortByDate(COURSES).map(row).join('') + '</div>' +
+    '<h3>Formulario de contacto</h3><p class="adm-intro">Elige a dónde llegan las solicitudes que envían las personas desde Contáctanos.</p>' +
     '<div class="radio-cards">' + FORM_DEST.map(f => '<label class="radio-card"><input type="radio" name="adm-dest" value="' + f[0] + '"' + (f[0] === dest ? ' checked' : '') + '><div><strong>' + esc(f[1]) + '</strong><span>' + esc(f[2]) + '</span></div></label>').join('') + '</div>' +
     '<div id="endpoint-box" style="margin-top:14px"' + (dest === 'endpoint' ? '' : ' hidden') + '>' +
     fieldHTML('conectores.formEndpoint', 'Dirección del servicio de formularios', { icon: 'plug', mode: 'url', max: 500, ph: 'https://formspree.io/f/xxxxxxx', hint: 'Recibe los datos en formato JSON por POST.' }) + '</div>' +
@@ -2307,6 +2349,7 @@ admPanel.addEventListener('input', e => {
     const hint = document.getElementById(t.id + '-hint');
     if (t.dataset.path === 'contacto.whatsapp' && hint) hint.textContent = waHint();
     if (t.dataset.path === 'contacto.mapa' && hint) hint.textContent = mapHint();
+    if (t.dataset.path === 'plataforma.url' && hint) { const h = platHint(); hint.textContent = h.t; hint.className = 'adm-hint ' + h.c; }
     if (t.dataset.path.startsWith('redes.') && hint) { const h = urlHint(t.value); hint.textContent = h.t; hint.className = 'adm-hint ' + h.c; }
     const card = t.closest('[data-bkey]');
     if (card && !t.hasAttribute('data-rerender')) { const k = card.dataset.bkey; $('#btn-' + k + '-prev').innerHTML = btnPreview(draft.botones[k]); }
@@ -2489,7 +2532,9 @@ const blobToDataURL = blob => new Promise((res, rej) => { const r = new FileRead
 const slideMeta = (s, img) => ({ id: s.id, eyebrow: s.eyebrow, title: s.title, text: s.text, cta: s.cta, href: s.href, art: s.art, img: img, pos: s.pos });
 const videoMeta = (v, portada, archivo) => ({ id: v.id, titulo: v.titulo, descripcion: v.descripcion, cat: v.cat, curso: v.curso, archivo: archivo, segundos: archivo || v.url ? v.segundos : null, url: String(v.url || '').trim(), completo: String(v.completo || '').trim(), portada: portada, docente: v.docente });
 function serialize(d, slides, logo, videos) {
-  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
+  const cursos = {};
+  Object.keys(d.plataforma.cursos).forEach(id => { const u = String(d.plataforma.cursos[id] || '').trim(); if (u) cursos[id] = u; });
+  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, plataforma: { url: d.plataforma.url.trim(), texto: d.plataforma.texto, cursos: cursos }, seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
 }
 function commitDraft() {
   const keepSession = session.get('im-admin') === currentPinHash();
@@ -2583,7 +2628,7 @@ $('#adm-save').addEventListener('click', async () => {
 const sel = $('#f-curso');
 sel.innerHTML = '<option value="">Aún no lo sé, quiero orientación</option>' +
   '<optgroup label="Cursos gratuitos">' + sortByDate(COURSES.filter(c => c.tipo === 'gratis')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>' +
-  '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + ' · ' + soles(c.precio.asociado) + '</option>').join('') + '</optgroup>';
+  '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>';
 const form = $('#contact-form');
 const RULES = {
   'f-nombres': v => v.trim().length >= 2 || 'Ingresa tus nombres.',

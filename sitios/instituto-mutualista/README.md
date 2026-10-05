@@ -10,7 +10,11 @@ mutualista que ofrece cursos de salud preventivos y de especialización a sus as
 - **Nosotros**: quiénes somos, modelo (gratuito / tarifa asociado / certificación), misión,
   visión, valores y equipo.
 - **Cursos** (con submenú *Gratuitos* / *Videos* / *De pago*): filtros por tipo, área,
-  modalidad y búsqueda; ficha de cada curso con temario, horario, docente y precios.
+  modalidad y búsqueda; ficha de cada curso con temario, horario, modalidad y docente. **No se
+  muestran precios**: el sitio es para asociados y sirve para publicar los cursos y llevar a la
+  plataforma de cursos. El botón **"Ingresar"** de cada ficha abre esa plataforma (enlace general
+  o uno por curso), donde la persona entra con su usuario y contraseña. Si aún no hay enlace,
+  "Ingresar" lleva a Contáctanos con el mensaje "Quiero recibir mi usuario…".
 - **Videos de vista previa (30 s)**: clips cortos que muestran de qué trata cada curso. Se ven en
   Inicio ("Conoce nuestros cursos en 30 segundos", los 3 primeros), en Cursos → Videos
   (`#cursos-videos`), como botón "Vista previa" en la tarjeta del curso y dentro de su ficha.
@@ -35,7 +39,7 @@ Pide un **PIN** (por defecto `2026`; se cambia en la pestaña *Seguridad*). Pest
 | Redes sociales | Facebook, Instagram, TikTok, YouTube, LinkedIn, Messenger (vacío = no se muestra) |
 | Botones | Texto y destino de cada botón de contacto (página, WhatsApp, llamada, correo, red social u otro enlace) y burbujas flotantes de WhatsApp / Messenger |
 | Textos | Textos principales de cada página (vacío = se oculta el bloque) |
-| Conectores | A dónde llega el formulario: WhatsApp, correo, servicio externo (Formspree, Google Apps Script, Make, Zapier) o solo demostración |
+| Conectores | **Plataforma de cursos** (enlace general, texto del botón "Ingresar" y enlace por curso) y a dónde llega el formulario: WhatsApp, correo, servicio externo (Formspree, Google Apps Script, Make, Zapier) o solo demostración |
 | Seguridad | Cambiar PIN y ver cómo entrar al panel |
 
 El PIN solo evita que un visitante entre por accidente (el código es público). En un sitio en
@@ -62,6 +66,6 @@ python3 -m http.server -d sitios/instituto-mutualista   # luego abrir http://loc
 ```
 
 ## Qué más personalizar en el código
-- `COURSES` (en el `<script>`): lista de cursos (tipo `gratis` / `pago`, precios
-  asociado/público, fechas, temario).
+- `COURSES` (en el `<script>`): lista de cursos (tipo `gratis` / `pago`, fechas, horario,
+  modalidad, docente, temario).
 - Colores: variables CSS en `:root` (tema claro) y en los bloques de tema oscuro.

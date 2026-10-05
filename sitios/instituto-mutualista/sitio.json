@@ -21,9 +21,9 @@
   },
   "botones": {
     "cabecera": {
-      "texto": "Inscríbete",
-      "tipo": "pagina",
-      "valor": "#contacto"
+      "texto": "Ingresar",
+      "tipo": "plataforma",
+      "valor": ""
     },
     "flotante": {
       "texto": "Solicitar información",
@@ -100,5 +100,10 @@
       "img": null,
       "pos": "centro"
     }
-  ]
+  ],
+  "plataforma": {
+    "url": "",
+    "texto": "Ingresar",
+    "cursos": {}
+  }
 }
