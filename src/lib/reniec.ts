@@ -6,6 +6,13 @@
 //   GET https://apidni.com/api/v2/dni/{dni}
 //   Authorization: Bearer {APIDNI_TOKEN}
 //   Respuesta OK  → { respuesta: "Solicitud exitosa", data: {...}, codigo: >0 }
+//   Plan ORO: `data` trae además la FOTO del DNI en base64 (soporte de apidni,
+//   05/10/2026). El nombre exacto del campo no está en el manual: se aceptan
+//   foto / foto_base64 / imagen / photo. Se devuelve como `fotoBase64` (JPG).
+//
+// Caché: cada DNI consultado se guarda en DATA_DIR/reniec-cache.json durante
+// RENIEC_CACHE_DIAS (365). Así una segunda búsqueda del mismo DNI no gasta
+// consulta del plan ni necesita la membresía activa.
 //   Respuesta mal → { respuesta: "<motivo>", data: {}, codigo: 0 }
 //     motivos: longitud inválida, "Error en la consulta" (no existe),
 //     token expirado, consultas del plan agotadas, límite diario.
@@ -13,6 +20,10 @@
 // El token vive SOLO en el servidor (Render → Environment → APIDNI_TOKEN).
 // Sin token la consulta devuelve datos SIMULADOS (fuente "simulado") para
 // poder probar la pantalla sin gastar consultas.
+
+import fs from "fs/promises";
+import path from "path";
+import { DATA_DIR } from "./db";
 
 export interface PersonaReniec {
   dni: string;
@@ -27,7 +38,9 @@ export interface PersonaReniec {
   distrito: string;
   provincia: string;
   departamento: string;
-  fuente: "apidni" | "simulado";
+  /** Foto del DNI (JPG en base64, sin prefijo data:). Solo planes que la incluyen. */
+  fotoBase64?: string;
+  fuente: "apidni" | "simulado" | "cache";
   consultadoAt: string;
 }
 
@@ -48,7 +61,39 @@ function getConfig() {
     url: process.env.APIDNI_URL ?? "https://apidni.com/api/v2/dni",
     forceMock: process.env.RENIEC_FORCE_MOCK === "true",
     timeoutMs: Number(process.env.APIDNI_TIMEOUT_MS ?? 12_000),
+    cacheDias: Number(process.env.RENIEC_CACHE_DIAS ?? 365),
   };
+}
+
+// ---- Caché en disco (DATA_DIR/reniec-cache.json) ------------------------------
+const CACHE_PATH = path.join(DATA_DIR, "reniec-cache.json");
+let cache: Record<string, PersonaReniec> | null = null;
+
+async function leerCache(): Promise<Record<string, PersonaReniec>> {
+  if (cache) return cache;
+  try {
+    cache = JSON.parse(await fs.readFile(CACHE_PATH, "utf8"));
+  } catch {
+    cache = {};
+  }
+  return cache!;
+}
+
+async function guardarEnCache(p: PersonaReniec): Promise<void> {
+  const c = await leerCache();
+  c[p.dni] = p;
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(CACHE_PATH, JSON.stringify(c));
+  } catch {
+    /* sin disco: queda solo en memoria */
+  }
+}
+
+/** "data:image/jpeg;base64,/9j/..." o "/9j/..." → base64 limpio ("" si no parece imagen). */
+function fotoLimpia(v: unknown): string {
+  const s = String(v ?? "").trim().replace(/^data:image\/\w+;base64,/, "").replace(/\s+/g, "");
+  return s.length > 100 && /^[A-Za-z0-9+/=]+$/.test(s) ? s : "";
 }
 
 export function dniValido(dni: string): boolean {
@@ -121,6 +166,7 @@ async function consultarApidni(dni: string): Promise<PersonaReniec> {
     distrito: txt(d.distrito),
     provincia: txt(d.provincia),
     departamento: txt(d.departamento),
+    ...(fotoLimpia(d.foto ?? d.foto_base64 ?? d.imagen ?? d.photo) ? { fotoBase64: fotoLimpia(d.foto ?? d.foto_base64 ?? d.imagen ?? d.photo) } : {}),
     fuente: "apidni",
     consultadoAt: new Date().toISOString(),
   };
@@ -154,8 +200,22 @@ export function reniecReal(): boolean {
   return Boolean(cfg.token) && !cfg.forceMock;
 }
 
-/** Consulta un DNI. Lanza ErrorReniec si el DNI no existe o el servicio falla. */
-export async function consultarDni(dni: string): Promise<PersonaReniec> {
+/**
+ * Consulta un DNI. Primero mira la caché (no gasta consulta); si no está o
+ * venció, va a apidni y guarda. Lanza ErrorReniec si el DNI no existe o el
+ * servicio falla. `forzar` salta la caché.
+ */
+export async function consultarDni(dni: string, { forzar = false } = {}): Promise<PersonaReniec> {
   if (!dniValido(dni)) throw new ErrorReniec("El DNI debe tener 8 dígitos.", 400);
-  return reniecReal() ? consultarApidni(dni) : consultarMock(dni);
+  if (!reniecReal()) return consultarMock(dni);
+  const cfg = getConfig();
+  if (!forzar) {
+    const guardado = (await leerCache())[dni];
+    if (guardado && Date.now() - Date.parse(guardado.consultadoAt) < cfg.cacheDias * 86_400_000) {
+      return { ...guardado, fuente: "cache" };
+    }
+  }
+  const persona = await consultarApidni(dni);
+  await guardarEnCache(persona);
+  return persona;
 }

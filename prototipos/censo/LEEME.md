@@ -75,7 +75,9 @@ los documentos en una carpeta fuera del repo (los datos personales no se version
 ## Consulta de DNI (RENIEC)
 
 Botón «Buscar en RENIEC» junto al DNI (Nueva ficha y Registrar venta → persona
-nueva): llena nombres, apellidos, fecha de nacimiento, dirección y distrito.
+nueva): llena nombres, apellidos, fecha de nacimiento, dirección y distrito, y
+si el plan trae la foto del DNI (base64) la sube como "Fotografía tipo carné"
+(`fotoComoArchivo`; en la venta se sube apenas se crea la ficha del comprador).
 La consulta la hace Radar (`/api/reniec/{dni}`, token de apidni.com en Render);
 aquí solo va `CONSULTA_DNI = { url, clave }` en `src/config.js` (`clave` =
 `RENIEC_API_KEY` de Radar; solo sirve para consultar DNI). Con `clave: ""` el

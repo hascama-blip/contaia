@@ -9,6 +9,7 @@ import { hoy, fecha } from "../lib/formato.js";
 import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
 import { cadenaPropietarios, ordinal } from "../lib/propietarios.js";
 import { transferirStand } from "../api/stands.js";
+import { adjuntarArchivo } from "../api/asociados.js";
 import { BotonReniec } from "./BotonReniec.js";
 
 /** Línea de tiempo: 1.er propietario → … → propietario actual. */
@@ -46,6 +47,7 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
   });
   const [errores, setErrores] = useState({});
   const [ocupado, setOcupado] = useState(false);
+  const [fotoReniec, setFotoReniec] = useState(null); // se sube cuando la persona ya tiene ficha
   const cambia = (k) => (v) => setT((x) => ({ ...x, [k]: v }));
   const cambiaNueva = (k) => (v) => setT((x) => ({ ...x, nueva: { ...x.nueva, [k]: v } }));
 
@@ -65,6 +67,7 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
     setOcupado(true);
     try {
       const id = await transferirStand(stand.codigo, t, { asociados: datos.asociados, stands: datos.stands, mapaStands: derivados.mapaStands, por: usuario?.id });
+      if (t.modo === "nueva" && fotoReniec) await adjuntarArchivo(id, "foto", fotoReniec).catch(() => avisar("La ficha se creó, pero no se pudo guardar la foto del DNI.", "error"));
       avisar(`Stand ${stand.codigo}: ahora figura a nombre de ${nombreNuevo.trim() || "el nuevo propietario"}. El anterior quedó en el historial.`);
       onCerrar();
       if (onListo) onListo(id);
@@ -106,7 +109,8 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
           <${Campo} id="t-dni" etiqueta="DNI" req error=${errores.dni}>
             <div className="con-boton">
               <${Entrada} id="t-dni" valor=${t.nueva.dni} onCambio=${cambiaNueva("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
-              <${BotonReniec} dni=${t.nueva.dni} onDatos=${(campos) => setT((x) => ({ ...x, nueva: { ...x.nueva, nombres: campos.nombres, apellidoPaterno: campos.apellidoPaterno, apellidoMaterno: campos.apellidoMaterno } }))} />
+              <${BotonReniec} dni=${t.nueva.dni} onDatos=${(campos) => setT((x) => ({ ...x, nueva: { ...x.nueva, nombres: campos.nombres, apellidoPaterno: campos.apellidoPaterno, apellidoMaterno: campos.apellidoMaterno } }))}
+                onFoto=${async (f) => setFotoReniec(f)} />
             </div>
           <//>
           <${Campo} id="t-nombres" etiqueta="Nombres" req error=${errores.nombres}><${Entrada} id="t-nombres" valor=${t.nueva.nombres} onCambio=${cambiaNueva("nombres")} error=${errores.nombres} /><//>

@@ -115,7 +115,7 @@ export function NuevaFicha({ stand }) {
       ${hayErrores && html`<div className="aviso aviso-peligro" role="alert">Faltan datos o hay campos por corregir (marcados en rojo).</div>`}
 
       <section className="card card-pad">
-        <${FichaForm} ficha=${ficha} setFicha=${setFicha} errores=${errores} slotArchivos=${archivos}
+        <${FichaForm} ficha=${ficha} setFicha=${setFicha} errores=${errores} slotArchivos=${archivos} onFotoReniec=${puedeSubir ? subir("foto") : null}
           secciones=${["identificacion", "personales", "contacto", "vinculo", "conyuge", "hijos", "familiares", "stand", "archivos", "compromiso"]} />
       </section>
 

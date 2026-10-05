@@ -113,7 +113,7 @@ export function Ficha({ id }) {
   const deudaTotal = stands.reduce((s, st) => s + deudaStand(registrosDe(derivados.indicePagos, st.codigo, derivados.h.anio), derivados.h.anio, derivados.h).monto, 0);
 
   const contenido = {
-    datos: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false}
+    datos: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false} onFotoReniec=${puedeSubir ? subir("foto") : null}
       bloqueado=${!editable} secciones=${["identificacion", "personales", "contacto", "vinculo", "compromiso"]} />`,
     familia: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false}
       bloqueado=${!editable} secciones=${["conyuge", "hijos", "familiares"]} />`,

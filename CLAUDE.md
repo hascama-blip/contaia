@@ -106,7 +106,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`GET https://apidni.com/api/v2/dni/{dni}`, `Authorization: Bearer APIDNI_TOKEN`;
   OK → `codigo > 0` y `data{dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento
   dd-mm-aaaa, genero, direccion, ubigeo, distrito, provincia, departamento}`; error → `codigo 0`
-  y el motivo en `respuesta`). Sin token → datos **simulados** (`fuente: "simulado"`).
+  y el motivo en `respuesta`). Plan ORO: `data` trae la **foto del DNI en base64** (campo
+  `foto`/`foto_base64`/`imagen`; se devuelve como `fotoBase64`, JPG). Sin token → datos
+  **simulados** (`fuente: "simulado"`). **Caché** en `DATA_DIR/reniec-cache.json`
+  (`RENIEC_CACHE_DIAS`, 365): la 2.ª consulta del mismo DNI no gasta plan (`fuente: "cache"`);
+  `?forzar=1` la salta.
 - La ruta la usa también el **portal del C.C. Inmaculada Concepción** (otro dominio, sin
   sesión): cabecera `x-api-key` = `RENIEC_API_KEY`, CORS por `RENIEC_CORS_ORIGENES`
   (`null` = HTML abierto en local), tope `RENIEC_LIMITE_MINUTO` por IP. El middleware deja

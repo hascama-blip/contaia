@@ -29,7 +29,7 @@ export const SECCIONES = {
   compromiso: "Observaciones y compromiso",
 };
 
-export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = true, slotArchivos = null, bloqueado = false }) {
+export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = true, slotArchivos = null, bloqueado = false, onFotoReniec = null }) {
   const c = (ruta) => ({
     id: `f-${ruta.replace(/\./g, "-")}`,
     valor: leer(ficha, ruta),
@@ -66,7 +66,7 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
         <${Campo} id="f-dni" etiqueta="DNI" req error=${errores.dni} ayuda="8 dígitos. Con «Buscar en RENIEC» se llenan nombres y apellidos.">
           <div className="con-boton">
             <${Entrada} ...${c("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
-            <${BotonReniec} dni=${ficha.dni} disabled=${bloqueado} onDatos=${(campos) => setFicha((f) => ({ ...f, ...campos }))} />
+            <${BotonReniec} dni=${ficha.dni} disabled=${bloqueado} onDatos=${(campos) => setFicha((f) => ({ ...f, ...campos }))} onFoto=${onFotoReniec} />
           </div>
         <//>
         <${Campo} id="f-fechaNacimiento" etiqueta="Fecha de nacimiento">

@@ -33,6 +33,15 @@ export function capitalizar(s) {
   return String(s || "").toLowerCase().replace(/(^|[\s\-])(\p{L})/gu, (m, sep, l) => sep + l.toUpperCase());
 }
 
+/** Foto del DNI (base64 JPG) → archivo listo para subir a la ficha. */
+export function fotoComoArchivo(persona) {
+  if (!persona?.fotoBase64) return null;
+  const bin = atob(persona.fotoBase64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], `dni-${persona.dni}.jpg`, { type: "image/jpeg" });
+}
+
 /** Campos de la ficha que se llenan con lo que devuelve RENIEC. */
 export function fichaDesdeReniec(p) {
   return {

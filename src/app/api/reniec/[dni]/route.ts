@@ -69,7 +69,8 @@ export async function GET(req: NextRequest, { params }: { params: { dni: string 
   if (!dniValido(dni)) return responder({ error: "El DNI debe tener 8 dígitos numéricos." }, 400);
 
   try {
-    const persona = await consultarDni(dni);
+    // ?forzar=1 vuelve a consultar aunque esté en caché (p. ej. cambió el plan y ahora trae foto).
+    const persona = await consultarDni(dni, { forzar: req.nextUrl.searchParams.get("forzar") === "1" });
     return responder({ persona, simulado: !reniecReal() });
   } catch (err: any) {
     if (err instanceof ErrorReniec) return responder({ error: err.message }, err.status);
