@@ -50,12 +50,11 @@ if [[ -n "$DOMINIO" ]]; then echo "$DOMINIO $CORREO" > /var/censo/dominio.txt; f
 install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo.service /etc/systemd/system/censo.service
 install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo-dominio.path /etc/systemd/system/
 install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo-dominio.service /etc/systemd/system/
-/opt/censo/prototipos/censo/servidor/despliegue/configurar-dominio.sh
 
 echo "== Servicios =="
 systemctl daemon-reload
 systemctl enable --now censo censo-dominio.path
-systemctl restart caddy
+/opt/censo/prototipos/censo/servidor/despliegue/configurar-dominio.sh || { echo "AVISO: Caddy no tomó la configuración; revisa: journalctl -u caddy -n 30"; }
 ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 
 echo

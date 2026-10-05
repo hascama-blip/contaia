@@ -5,7 +5,10 @@
 #   sudo configurar-dominio.sh midominio.pe correo@midominio.pe
 set -euo pipefail
 PLANTILLAS=/opt/censo/prototipos/censo/servidor/despliegue
-if [[ $# -ge 1 ]]; then DOMINIO="$1"; CORREO="${2:-}"; else read -r DOMINIO CORREO < <(cat /var/censo/dominio.txt 2>/dev/null || echo ""); fi
+if [[ $# -ge 1 ]]; then DOMINIO="$1"; CORREO="${2:-}"; else
+  DOMINIO="$(awk 'NR==1{print $1}' /var/censo/dominio.txt 2>/dev/null || true)"
+  CORREO="$(awk 'NR==1{print $2}' /var/censo/dominio.txt 2>/dev/null || true)"
+fi
 if [[ -z "${DOMINIO:-}" ]]; then
   cp "$PLANTILLAS/Caddyfile.ip" /etc/caddy/Caddyfile
 else
