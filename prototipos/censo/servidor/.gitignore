@@ -1,2 +1,3 @@
 datos/
 *.log
+despliegue/arranque.*.generado.sh

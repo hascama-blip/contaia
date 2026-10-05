@@ -106,6 +106,10 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
 - `lib/almacen.js` (JSON por colección, escritura atómica), `lib/sesiones.js` (scrypt +
   cookie firmada, roles admin/edicion/lectura), `lib/reniec.js` (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- Primera configuración sin SSH: con cero usuarios, `login.html` pide el **código de instalación**
+  (`CENSO_CODIGO_INSTALACION`) y crea el admin (`POST /api/instalacion`). `publico/admin.html`
+  (solo admin): usuarios, dominio (`dominio.txt` → `censo-dominio.path` regenera Caddy), respaldo
+  (`/api/exportar`) e importación (`/api/importar`, semilla o respaldo).
 - `despliegue/`: `instalar.sh` (Ubuntu 24.04: Node, Caddy HTTPS, systemd, ufw),
   `Caddyfile`, `censo.service`, `censo.env.ejemplo`, `actualizar.sh`, `respaldo.sh`.
 - Probar en local: `DATOS=/tmp/censo node servidor/servidor.js` → `http://localhost:3000`.

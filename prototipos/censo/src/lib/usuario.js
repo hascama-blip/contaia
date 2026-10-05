@@ -13,8 +13,8 @@ export function conectarUsuario() {
 export async function usuarioActual() {
   const u = await conectarUsuario();
   if (!u) return { id: null, nombre: "", puedeEscribir: null };
-  const [yo, puede] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null)]);
-  return { id: yo?.id ?? null, nombre: yo?.name || "", puedeEscribir: puede };
+  const [yo, puede, admin] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null), u.isOwner ? u.isOwner().catch(() => false) : false]);
+  return { id: yo?.id ?? null, nombre: yo?.name || "", puedeEscribir: puede, esAdmin: Boolean(admin) };
 }
 
 export async function nombresDe(ids) {

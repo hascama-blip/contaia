@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración · Portal Inmaculada Concepción</title>
+<link rel="icon" href="/img/logo.jpg"><link rel="stylesheet" href="/estilos/tokens.css"><link rel="stylesheet" href="/estilos/app.css">
+<style>
+  body { margin: 0; padding: 24px 16px 60px; }
+  main { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; }
+  .card-cuerpo { display: grid; gap: 12px; }
+  h1 { font-size: var(--t-xl); margin: 0 0 4px; } h2 { font-size: var(--t-lg); margin: 0; }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; } .fila .campo { flex: 1 1 160px; margin: 0; }
+  table { width: 100%; border-collapse: collapse; } td, th { padding: 8px 6px; border-bottom: 1px solid var(--borde); text-align: left; font-size: var(--t-sm); }
+  .ok { color: var(--exito, green); } .mal { color: var(--peligro, #b00020); }
+  code { background: var(--fondo-2, #f3f3f3); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <div><a href="/">← Volver al portal</a><h1>Administración</h1><p class="ayuda" style="margin:0">Solo para la cuenta administradora. Usuarios de la directiva, dominio, respaldo e importación.</p></div>
+
+  <section class="card"><div class="card-cuerpo">
+    <h2>Usuarios</h2>
+    <table><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th></th></tr></thead><tbody id="usuarios"></tbody></table>
+    <form id="f-usuario" class="fila" autocomplete="off">
+      <div class="campo"><label class="label">Usuario</label><input class="input" name="usuario" required autocapitalize="none" placeholder="tesorera"></div>
+      <div class="campo"><label class="label">Nombre y apellido</label><input class="input" name="nombre" required></div>
+      <div class="campo"><label class="label">Clave (mín. 8)</label><input class="input" name="clave" type="text" required minlength="8"></div>
+      <div class="campo" style="flex:0 0 150px"><label class="label">Rol</label><select class="input" name="rol"><option value="edicion">Edición</option><option value="lectura">Solo lectura</option><option value="admin">Administración</option></select></div>
+      <button class="btn btn-primary" type="submit">Crear usuario</button>
+    </form>
+    <p class="ayuda" style="margin:0">Edición: registra y modifica. Lectura: solo consulta. Administración: todo, incluida esta página.</p>
+  </div></section>
+
+  <section class="card"><div class="card-cuerpo">
+    <h2>Dominio</h2>
+    <p class="ayuda" style="margin:0">Antes de guardar, en GoDaddy los registros <code>A</code> de <code>@</code> y <code>www</code> deben apuntar a la IP de este servidor. Al guardar, el servidor obtiene el certificado HTTPS solo (tarda 1 o 2 minutos) y el portal pasa a abrirse en <code>https://tu-dominio</code>.</p>
+    <form id="f-dominio" class="fila">
+      <div class="campo"><label class="label">Dominio</label><input class="input" name="dominio" placeholder="inmaculadaconcepcion.pe"></div>
+      <div class="campo"><label class="label">Correo (avisos del certificado)</label><input class="input" name="correo" type="email" placeholder="directiva@..."></div>
+      <button class="btn btn-primary" type="submit">Guardar dominio</button>
+    </form>
+    <div id="dominio-estado" class="ayuda"></div>
+  </div></section>
+
+  <section class="card"><div class="card-cuerpo">
+    <h2>Respaldo e importación</h2>
+    <div class="fila">
+      <a class="btn btn-ghost" href="/api/exportar" download>Descargar respaldo (JSON)</a>
+      <label class="btn btn-ghost" style="cursor:pointer">Importar semilla o respaldo… <input id="importar" type="file" accept="application/json,.json" class="sr"></label>
+    </div>
+    <p class="ayuda" style="margin:0">El respaldo incluye padrón, stands, pagos e incidencias (las fotos y documentos se respaldan con las instantáneas de Lightsail). Importar <b>reemplaza</b> las fichas con el mismo id y conserva el resto.</p>
+    <div id="importar-estado" class="ayuda"></div>
+  </div></section>
+</main>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const pedir = async (m, u, cuerpo) => { const r = await fetch(u, { method: m, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined }); const j = await r.json().catch(() => ({})); if (r.status === 401) location.href = "/login.html?vencida=1"; if (!r.ok) throw new Error(j.error || "Error"); return j; };
+  async function cargarUsuarios() {
+    const { usuarios } = await pedir("GET", "/api/usuarios");
+    $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${u.usuario}</b></td><td>${u.nombre}</td><td>${u.rol}</td><td style="text-align:right;white-space:nowrap">
+      <button class="btn btn-ghost" data-clave="${u.id}">Cambiar clave</button> <button class="btn btn-ghost" data-borrar="${u.id}" data-n="${u.usuario}">Borrar</button></td></tr>`).join("");
+  }
+  $("#usuarios").onclick = async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    try {
+      if (b.dataset.clave) { const c = prompt("Clave nueva (mínimo 8 caracteres):"); if (c) { await pedir("PATCH", `/api/usuarios/${b.dataset.clave}`, { clave: c }); alert("Clave cambiada."); } }
+      if (b.dataset.borrar && confirm(`¿Borrar al usuario ${b.dataset.n}?`)) { await pedir("DELETE", `/api/usuarios/${b.dataset.borrar}`); await cargarUsuarios(); }
+    } catch (err) { alert(err.message); }
+  };
+  $("#f-usuario").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { await pedir("POST", "/api/usuarios", { usuario: f.usuario.value, nombre: f.nombre.value, clave: f.clave.value, rol: f.rol.value }); f.reset(); await cargarUsuarios(); } catch (err) { alert(err.message); } };
+  $("#f-dominio").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { const j = await pedir("POST", "/api/dominio", { dominio: f.dominio.value, correo: f.correo.value }); $("#dominio-estado").innerHTML = `<span class="ok">${j.aviso}</span>`; } catch (err) { $("#dominio-estado").innerHTML = `<span class="mal">${err.message}</span>`; } };
+  $("#importar").onchange = async (e) => {
+    const a = e.target.files[0]; if (!a) return;
+    $("#importar-estado").textContent = "Importando…";
+    try { const j = await pedir("POST", "/api/importar", JSON.parse(await a.text())); $("#importar-estado").innerHTML = `<span class="ok">Importado: ${Object.entries(j.importado).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>`; }
+    catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${err.message}</span>`; }
+    e.target.value = "";
+  };
+  cargarUsuarios().catch((e) => alert(e.message));
+  pedir("GET", "/api/dominio").then((j) => { if (j.dominio) { $("#f-dominio").dominio.value = j.dominio; $("#dominio-estado").textContent = `Dominio actual: ${j.dominio}`; } }).catch(() => {});
+</script>
+</body>
+</html>

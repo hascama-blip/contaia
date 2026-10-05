@@ -20,7 +20,8 @@ Qué se necesita: cuenta de AWS, el dominio comprado en GoDaddy y unos 30 minuto
 
 ## 2. Servidor en Lightsail
 1. https://lightsail.aws.amazon.com → *Create instance*.
-2. Región: **South America (São Paulo)** es la más cercana a Lima.
+2. Región: **US East (N. Virginia, us-east-1)**. La organización de AWS de la cuenta solo
+   permite Virginia y Ohio (São Paulo está bloqueado por política); desde Lima va bien.
 3. Plataforma *Linux/Unix* → *OS Only* → **Ubuntu 24.04 LTS**.
 4. Plan: **$7/mes (1 GB RAM, 40 GB SSD)** es suficiente (el padrón, fotos y
    documentos ocupan poco). Nombre: `portal-inmaculada`.
@@ -40,7 +41,20 @@ En GoDaddy: *Mis productos → Dominio → DNS → Administrar*. Crear o editar:
 Borrar cualquier otro registro `A` o `CNAME` de `@` y `www` (el "Parked" de GoDaddy).
 Tarda entre 10 minutos y 1 hora en propagarse. Comprobar: `nslookup TU-DOMINIO.com`.
 
-## 4. Instalar el portal
+## 4. Instalar el portal (automático al crear la instancia)
+Si la instancia se creó con el script de arranque `despliegue/arranque.sh` (lo hace Claude con
+`aws lightsail create-instances --user-data`), **no hay que entrar por SSH**: a los 3‑5 minutos
+el portal responde en `http://IP-ESTATICA/` y muestra la pantalla de **primera configuración**.
+1. Abrir `http://IP-ESTATICA/`, escribir el **código de instalación** (te lo entrega quien creó
+   la instancia; también está en `/etc/censo.env`), tu nombre, un usuario y una clave → se crea
+   la cuenta administradora y entras.
+2. Arriba a la derecha → **Administración**: crear los usuarios de la directiva, **importar** el
+   `semilla.json` del padrón (o un respaldo) y, cuando los registros A de GoDaddy ya apunten a la
+   IP, escribir el **dominio** y guardar: el servidor pide el certificado HTTPS solo.
+3. El token de apidni sí requiere SSH una vez: `sudo nano /etc/censo.env` → `APIDNI_TOKEN=...`
+   → `sudo systemctl restart censo`.
+
+## 4b. Instalar a mano (si no se usó el script de arranque)
 1. En Lightsail, botón **Connect using SSH** (terminal en el navegador).
 2. Pegar, cambiando dominio y correo:
    ```bash
@@ -65,7 +79,8 @@ Tarda entre 10 minutos y 1 hora en propagarse. Comprobar: `nslookup TU-DOMINIO.c
 
 ## 5. Usuarios de la directiva
 Roles: **admin** (todo y manejar usuarios), **edicion** (registrar y modificar),
-**lectura** (solo consultar). Desde el SSH:
+**lectura** (solo consultar). Lo normal es manejarlos desde **Administración** en el portal
+(`/admin.html`, solo admin). También desde el SSH:
 ```bash
 cd /opt/censo/prototipos/censo/servidor
 sudo -u censo DATOS=/var/censo node usuarios.js crear tesorera "Nombre Apellido" 'Clave' edicion

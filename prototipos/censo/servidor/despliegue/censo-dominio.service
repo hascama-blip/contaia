@@ -1,0 +1,6 @@
+[Unit]
+Description=Aplica el dominio del portal a Caddy
+
+[Service]
+Type=oneshot
+ExecStart=/opt/censo/prototipos/censo/servidor/despliegue/configurar-dominio.sh

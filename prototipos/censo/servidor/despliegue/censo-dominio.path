@@ -1,0 +1,9 @@
+[Unit]
+Description=Vigila el dominio del portal (dominio.txt)
+
+[Path]
+PathChanged=/var/censo/dominio.txt
+Unit=censo-dominio.service
+
+[Install]
+WantedBy=multi-user.target

@@ -3,8 +3,9 @@
 # Uso (como root o con sudo):  bash instalar.sh TU-DOMINIO.com correo@dominio.com
 # Luego: sudo -u censo node /opt/censo/prototipos/censo/servidor/usuarios.js crear ...  (ver GUIA-AWS.md)
 set -euo pipefail
-DOMINIO="${1:?Falta el dominio, ej. inmaculadaconcepcion.pe}"
-CORREO="${2:?Falta el correo para los certificados}"
+DOMINIO="${1:-}"            # opcional: sin dominio el portal responde por IP (http); se puede poner luego desde Administración
+CORREO="${2:-}"
+CODIGO="${CODIGO:-$(openssl rand -hex 6 2>/dev/null || date +%s)}"   # código de instalación para crear el primer admin
 REPO="${REPO:-https://github.com/hascama-blip/contaia.git}"
 RAMA="${RAMA:-main}"
 
@@ -41,21 +42,26 @@ chown -R censo:censo /opt/censo
 echo "== Configuración =="
 if [[ ! -f /etc/censo.env ]]; then
   sed "s|CAMBIAR-POR-UNA-CADENA-LARGA-AL-AZAR|$(openssl rand -hex 32)|" /opt/censo/prototipos/censo/servidor/despliegue/censo.env.ejemplo > /etc/censo.env
+  echo "CENSO_CODIGO_INSTALACION=$CODIGO" >> /etc/censo.env
   chmod 600 /etc/censo.env
 fi
-sed -e "s|TU-DOMINIO.com|$DOMINIO|g" -e "s|directiva@$DOMINIO|$CORREO|" /opt/censo/prototipos/censo/servidor/despliegue/Caddyfile > /etc/caddy/Caddyfile
+touch /var/censo/dominio.txt && chown censo:censo /var/censo/dominio.txt
+if [[ -n "$DOMINIO" ]]; then echo "$DOMINIO $CORREO" > /var/censo/dominio.txt; fi
 install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo.service /etc/systemd/system/censo.service
+install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo-dominio.path /etc/systemd/system/
+install -m 644 /opt/censo/prototipos/censo/servidor/despliegue/censo-dominio.service /etc/systemd/system/
+/opt/censo/prototipos/censo/servidor/despliegue/configurar-dominio.sh
 
 echo "== Servicios =="
 systemctl daemon-reload
-systemctl enable --now censo
+systemctl enable --now censo censo-dominio.path
 systemctl restart caddy
 ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 
 echo
 echo "Listo. Comprueba: systemctl status censo caddy"
-echo "Crea el primer usuario (administrador):"
-echo "  sudo -u censo DATOS=/var/censo node /opt/censo/prototipos/censo/servidor/usuarios.js crear admin \"Nombre Apellido\" 'UnaClaveLarga' admin"
+echo "Código de instalación (para crear la cuenta administradora desde la pantalla de entrada): $CODIGO"
+echo "Lo encuentras también en /etc/censo.env (CENSO_CODIGO_INSTALACION)."
 echo "Carga el padrón (semilla.json generado con herramientas/importar_padron.py):"
 echo "  sudo -u censo DATOS=/var/censo node /opt/censo/prototipos/censo/servidor/importar.js /ruta/semilla.json"
 echo "Para el token de apidni: edita /etc/censo.env y luego  systemctl restart censo"

@@ -18,6 +18,13 @@ TU-DOMINIO.com {
 	}
 }
 
+# Por IP sigue respondiendo en http (útil mientras el DNS propaga).
+:80 {
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+}
+
 www.TU-DOMINIO.com {
 	redir https://TU-DOMINIO.com{uri} permanent
 }

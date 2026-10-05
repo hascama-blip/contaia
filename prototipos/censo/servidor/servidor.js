@@ -15,7 +15,10 @@
 //   GET  /api/usuarios · POST · PATCH/DELETE /api/usuarios/:id   (admin)
 //   GET  /api/usuarios/perfiles?ids=a,b                nombres para "registrado por"
 //   GET  /api/reniec/:dni                              consulta DNI (token en el servidor)
+//   POST /api/instalacion                              primer admin (código CENSO_CODIGO_INSTALACION, solo sin usuarios)
+//   GET  /admin.html · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
 import http from "node:http";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +59,12 @@ function intentoPermitido(ip) {
   return ++v.n <= 10;
 }
 
+const codigoInstalacionValido = (c) => {
+  const esperado = String(process.env.CENSO_CODIGO_INSTALACION || "").trim();
+  const dado = String(c || "").trim();
+  return esperado.length >= 8 && dado.length === esperado.length && crypto.timingSafeEqual(Buffer.from(dado), Buffer.from(esperado));
+};
+const leerDominio = () => { try { return fs.readFileSync(path.join(DATOS, "dominio.txt"), "utf8").trim().split(/\s+/)[0] || ""; } catch { return ""; } };
 const ipDe = (req) => (TRAS_PROXY && req.headers["x-forwarded-for"]) ? String(req.headers["x-forwarded-for"]).split(",")[0].trim() : req.socket.remoteAddress;
 const seguro = (req) => TRAS_PROXY ? req.headers["x-forwarded-proto"] === "https" : false;
 
@@ -76,6 +85,16 @@ async function manejar(req, res) {
     if (ruta === "/login.html" && yo) return redirigir(res, "/");
     return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
   }
+  if (ruta === "/api/instalacion" && metodo === "POST") {
+    // Primera configuración: solo mientras no exista ningún usuario y con el código de instalación.
+    if (usuarios.lista.length) return json(res, 409, { error: "El portal ya tiene usuarios. Entra con tu cuenta." });
+    if (!intentoPermitido(ipDe(req))) return json(res, 429, { error: "Demasiados intentos. Espera 15 minutos." });
+    const { codigo, usuario, nombre, clave } = await leerJSON(req, 4096);
+    if (!codigoInstalacionValido(codigo)) return json(res, 401, { error: "Código de instalación incorrecto." });
+    const creado = usuarios.crear({ usuario, nombre, clave, rol: "admin" });
+    intentos.delete(ipDe(req));
+    return json(res, 200, { usuario: creado }, { "Set-Cookie": usuarios.emitirCookie(usuarios.porId(creado.id), seguro(req)) });
+  }
   if (ruta === "/api/sesion") {
     if (metodo === "POST") {
       if (!intentoPermitido(ipDe(req))) return json(res, 429, { error: "Demasiados intentos. Espera 15 minutos." });
@@ -86,7 +105,7 @@ async function manejar(req, res) {
       return json(res, 200, { usuario: usuarios.publico(u) }, { "Set-Cookie": usuarios.emitirCookie(u, seguro(req)) });
     }
     if (metodo === "DELETE") return json(res, 200, { ok: true }, { "Set-Cookie": usuarios.cookieSalida() });
-    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado" });
+    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
   }
   // Estáticos públicos que la página de entrada necesita (logo, estilos).
   if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/")) {
@@ -162,6 +181,36 @@ async function manejar(req, res) {
       return json(res, 200, { ok: true });
     }
     if (m && metodo === "DELETE") { usuarios.borrar(m[1]); return json(res, 200, { ok: true }); }
+  }
+
+  // ---- Administración (solo admin): respaldo, importación, dominio ----
+  if (ruta === "/admin.html" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio") {
+    if (!esAdmin(yo)) return ruta === "/admin.html" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
+    if (ruta === "/admin.html") return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
+    if (ruta === "/api/exportar" && metodo === "GET") {
+      const colecciones = Object.fromEntries(COLECCIONES.map((c) => [c, almacen.listar(c)]));
+      return json(res, 200, { exportadoAt: new Date().toISOString(), colecciones }, { "Content-Disposition": `attachment; filename="censo-respaldo-${new Date().toISOString().slice(0, 10)}.json"` });
+    }
+    if (ruta === "/api/importar" && metodo === "POST") {
+      const cuerpo = await leerJSON(req, 64 * 1048576);
+      const conteo = Object.fromEntries(COLECCIONES.map((c) => [c, 0]));
+      if (Array.isArray(cuerpo)) { // semilla.json: [{ path:"col/id", data }]
+        for (const { path: ruta2, data } of cuerpo) { const [col, id] = String(ruta2 || "").split("/"); if (COLECCIONES.includes(col) && id && data) { almacen.establecer(col, id, data); conteo[col]++; } }
+      } else if (cuerpo && cuerpo.colecciones) { // respaldo de /api/exportar
+        for (const col of COLECCIONES) for (const d of cuerpo.colecciones[col] || []) if (d && d.id && d.data) { almacen.establecer(col, d.id, d.data); conteo[col]++; }
+      } else return json(res, 400, { error: "Formato no reconocido: se espera semilla.json o un respaldo del portal." });
+      almacen.vaciar();
+      return json(res, 200, { importado: conteo });
+    }
+    if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
+    if (ruta === "/api/dominio" && metodo === "POST") {
+      const { dominio, correo } = await leerJSON(req, 4096);
+      const d = String(dominio || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      if (d && !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(d)) return json(res, 400, { error: "Dominio inválido. Ejemplo: inmaculadaconcepcion.pe" });
+      // Lo lee censo-dominio.path (systemd, root), que regenera el Caddyfile y recarga Caddy.
+      fs.writeFileSync(path.join(DATOS, "dominio.txt"), d ? `${d} ${String(correo || "").trim()}\n` : "");
+      return json(res, 200, { dominio: d, aviso: d ? "En 1 o 2 minutos el servidor pedirá el certificado HTTPS. Antes, los registros A de GoDaddy deben apuntar a esta IP." : "Dominio quitado; el portal queda solo por IP." });
+    }
   }
 
   // ---- RENIEC ----

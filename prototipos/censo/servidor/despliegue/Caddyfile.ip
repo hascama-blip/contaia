@@ -1,0 +1,7 @@
+# Sin dominio todavía: el portal responde por http en la IP del servidor.
+:80 {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+}
