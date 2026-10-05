@@ -13,9 +13,6 @@ TU-DOMINIO.com {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 	}
-	log {
-		output file /var/log/caddy/portal.log
-	}
 }
 
 # Por IP sigue respondiendo en http (útil mientras el DNS propaga).

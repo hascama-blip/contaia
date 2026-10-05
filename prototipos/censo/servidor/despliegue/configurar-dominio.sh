@@ -16,4 +16,5 @@ else
 fi
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 systemctl reload caddy || systemctl restart caddy
+sleep 2; systemctl is-active caddy >/dev/null || { echo "ERROR: Caddy no arrancó. journalctl -u caddy -n 20"; exit 1; }
 echo "Caddy configurado para: ${DOMINIO:-solo IP (http)}"
