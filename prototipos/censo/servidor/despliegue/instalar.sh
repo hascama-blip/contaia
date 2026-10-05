@@ -36,7 +36,8 @@ if [[ ! -d /opt/censo/.git ]]; then
   git clone --depth 1 --branch "$RAMA" --filter=blob:none --sparse "$REPO" /opt/censo
   git -C /opt/censo sparse-checkout set prototipos/censo
 fi
-git -C /opt/censo pull --ff-only || true
+git config --global --add safe.directory /opt/censo >/dev/null 2>&1 || true
+git -C /opt/censo pull --ff-only || echo "AVISO: no se pudo actualizar el código (se sigue con el que hay)."
 chown -R censo:censo /opt/censo
 
 echo "== Configuración =="
@@ -59,7 +60,8 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 
 echo
 echo "Listo. Comprueba: systemctl status censo caddy"
-echo "Código de instalación (para crear la cuenta administradora desde la pantalla de entrada): $CODIGO"
+CODIGO_REAL="$(grep -oP '^CENSO_CODIGO_INSTALACION=\K.*' /etc/censo.env 2>/dev/null || echo "$CODIGO")"
+echo "Código de instalación (para crear la cuenta administradora desde la pantalla de entrada): $CODIGO_REAL"
 echo "Lo encuentras también en /etc/censo.env (CENSO_CODIGO_INSTALACION)."
 echo "Carga el padrón (semilla.json generado con herramientas/importar_padron.py):"
 echo "  sudo -u censo DATOS=/var/censo node /opt/censo/prototipos/censo/servidor/importar.js /ruta/semilla.json"
