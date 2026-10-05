@@ -8,7 +8,7 @@
 //
 // Rutas:
 //   GET  /, /index.html, /src/*, /estilos/*, /img/*   la web (con sesión)
-//   GET  /login.html, POST/GET/DELETE /api/sesion      entrar / quién soy / salir
+//   GET  /entrar, POST/GET/DELETE /api/sesion      entrar / quién soy / salir
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
 //   GET  /api/eventos                                  SSE: {col} cuando algo cambia
 //   POST /api/archivos · GET /_blob/:id · DELETE /api/archivos/:id
@@ -16,7 +16,7 @@
 //   GET  /api/usuarios/perfiles?ids=a,b                nombres para "registrado por"
 //   GET  /api/reniec/:dni                              consulta DNI (token en el servidor)
 //   POST /api/instalacion                              primer admin (código CENSO_CODIGO_INSTALACION, solo sin usuarios)
-//   GET  /admin.html · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
+//   GET  /administracion · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
 import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -81,10 +81,9 @@ async function manejar(req, res) {
   const yo = usuarios.deCookie(cookies(req)[COOKIE]);
 
   // ---- Público: entrar ----
-  if (ruta === "/login.html" || ruta === "/adaptador.js" || ruta === "/estilos.login.css") {
-    if (ruta === "/login.html" && yo) return redirigir(res, "/");
-    return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
-  }
+  if (ruta === "/login.html") return redirigir(res, "/entrar" + (url.search || ""));
+  if (ruta === "/entrar") { if (yo) return redirigir(res, "/"); return servirArchivo(res, PUBLICO, "/login.html"); }
+  if (ruta === "/adaptador.js") return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
   if (ruta === "/api/instalacion" && metodo === "POST") {
     // Primera configuración: solo mientras no exista ningún usuario y con el código de instalación.
     if (usuarios.lista.length) return json(res, 409, { error: "El portal ya tiene usuarios. Entra con tu cuenta." });
@@ -115,7 +114,7 @@ async function manejar(req, res) {
   // ---- Todo lo demás exige sesión ----
   if (!yo) {
     if (ruta.startsWith("/api/") || ruta.startsWith("/_blob/")) return json(res, 401, { error: "No autenticado", code: "revoked" });
-    return redirigir(res, "/login.html");
+    return redirigir(res, "/entrar");
   }
   const escribe = puedeEscribir(yo);
   const soloLectura = () => json(res, 403, { error: "Tu usuario es de solo lectura.", code: "invalid_argument" });
@@ -184,9 +183,10 @@ async function manejar(req, res) {
   }
 
   // ---- Administración (solo admin): respaldo, importación, dominio ----
-  if (ruta === "/admin.html" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio") {
-    if (!esAdmin(yo)) return ruta === "/admin.html" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
-    if (ruta === "/admin.html") return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
+  if (ruta === "/admin.html") return redirigir(res, "/administracion");
+  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio") {
+    if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
+    if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
     if (ruta === "/api/exportar" && metodo === "GET") {
       const colecciones = Object.fromEntries(COLECCIONES.map((c) => [c, almacen.listar(c)]));
       return json(res, 200, { exportadoAt: new Date().toISOString(), colecciones }, { "Content-Disposition": `attachment; filename="censo-respaldo-${new Date().toISOString().slice(0, 10)}.json"` });

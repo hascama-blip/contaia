@@ -55,7 +55,7 @@
 </main>
 <script>
   const $ = (s) => document.querySelector(s);
-  const pedir = async (m, u, cuerpo) => { const r = await fetch(u, { method: m, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined }); const j = await r.json().catch(() => ({})); if (r.status === 401) location.href = "/login.html?vencida=1"; if (!r.ok) throw new Error(j.error || "Error"); return j; };
+  const pedir = async (m, u, cuerpo) => { const r = await fetch(u, { method: m, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined }); const j = await r.json().catch(() => ({})); if (r.status === 401) location.href = "/entrar?vencida=1"; if (!r.ok) throw new Error(j.error || "Error"); return j; };
   async function cargarUsuarios() {
     const { usuarios } = await pedir("GET", "/api/usuarios");
     $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${u.usuario}</b></td><td>${u.nombre}</td><td>${u.rol}</td><td style="text-align:right;white-space:nowrap">

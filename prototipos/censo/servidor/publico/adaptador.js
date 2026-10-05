@@ -6,7 +6,7 @@
   const pedir = async (metodo, ruta, cuerpo, cabeceras = {}) => {
     const r = await fetch(ruta, { method: metodo, headers: { ...(cuerpo !== undefined && !(cuerpo instanceof Blob) ? { "Content-Type": "application/json" } : {}), ...cabeceras },
       body: cuerpo instanceof Blob ? cuerpo : cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined });
-    if (r.status === 401) { location.href = "/login.html?vencida=1"; throw { code: "revoked", message: "La sesión venció." }; }
+    if (r.status === 401) { location.href = "/entrar?vencida=1"; throw { code: "revoked", message: "La sesión venció." }; }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw { code: j.code || `http_${r.status}`, message: j.error || "Error del servidor." };
     return j;
@@ -79,5 +79,5 @@
   };
 
   window.claude = { use: (nombre) => Promise.resolve({ db, user, assets, downloads }[nombre] || null) };
-  window.cerrarSesion = () => pedir("DELETE", "/api/sesion").then(() => (location.href = "/login.html"));
+  window.cerrarSesion = () => pedir("DELETE", "/api/sesion").then(() => (location.href = "/entrar"));
 })();
