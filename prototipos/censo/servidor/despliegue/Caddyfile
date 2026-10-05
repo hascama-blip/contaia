@@ -1,0 +1,23 @@
+# Caddy: HTTPS automático (Let's Encrypt) y proxy al portal en el puerto 3000.
+# Cambia el dominio por el tuyo (el de GoDaddy). "www" redirige al principal.
+{
+	email directiva@TU-DOMINIO.com
+}
+
+TU-DOMINIO.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+	}
+	log {
+		output file /var/log/caddy/portal.log
+	}
+}
+
+www.TU-DOMINIO.com {
+	redir https://TU-DOMINIO.com{uri} permanent
+}

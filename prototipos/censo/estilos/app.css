@@ -614,3 +614,6 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 .con-boton .input { flex: 1 1 120px; min-width: 0; }
 .con-boton .btn { white-space: nowrap; }
 @media (max-width: 480px) { .con-boton { flex-wrap: wrap; } .con-boton .btn { flex: 1 1 100%; } }
+
+/* Botón "Salir" (solo en el servidor propio, con usuario y clave) */
+.btn-salir { padding: 4px 10px; font-size: var(--t-sm); margin-left: 6px; }

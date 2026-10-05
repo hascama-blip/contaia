@@ -1,0 +1,83 @@
+// Adaptador para el servidor propio: da a la web el mismo window.claude que
+// tiene en claude.ai (db, assets, user, downloads), pero contra /api/*.
+// Avisos en vivo por SSE (/api/eventos): cuando otra persona cambia algo,
+// la colección se vuelve a leer.
+(function () {
+  const pedir = async (metodo, ruta, cuerpo, cabeceras = {}) => {
+    const r = await fetch(ruta, { method: metodo, headers: { ...(cuerpo !== undefined && !(cuerpo instanceof Blob) ? { "Content-Type": "application/json" } : {}), ...cabeceras },
+      body: cuerpo instanceof Blob ? cuerpo : cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined });
+    if (r.status === 401) { location.href = "/login.html?vencida=1"; throw { code: "revoked", message: "La sesión venció." }; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw { code: j.code || `http_${r.status}`, message: j.error || "Error del servidor." };
+    return j;
+  };
+
+  // ---- db ----
+  const oyentes = new Map(); // col → Set(fn)
+  let fuente = null;
+  function conectarEventos() {
+    if (fuente) return;
+    fuente = new EventSource("/api/eventos");
+    fuente.onmessage = (e) => { try { const { col } = JSON.parse(e.data); refrescar(col); } catch { /* latido */ } };
+    fuente.onerror = () => { fuente.close(); fuente = null; setTimeout(conectarEventos, 3000); };
+  }
+  const foto = (docs) => ({ docs: docs.map((d) => ({ id: d.id, exists: true, data: () => d.data, metadata: {} })) });
+  async function refrescar(col) {
+    const fns = oyentes.get(col);
+    if (!fns || !fns.size) return;
+    try { const { docs } = await pedir("GET", `/api/db/${col}`); for (const fn of fns) fn(foto(docs)); } catch (e) { for (const fn of fns) fn.error?.(e); }
+  }
+  const doc = (path) => ({
+    id: path.split("/")[1], path,
+    get: async () => { const r = await fetch(`/api/db/${path}`); if (r.status === 404) return { id: path.split("/")[1], exists: false, data: () => undefined }; const d = await r.json(); return { id: d.id, exists: true, data: () => d.data }; },
+    set: (d) => pedir("PUT", `/api/db/${path}`, d),
+    update: (d) => pedir("PATCH", `/api/db/${path}`, d),
+    delete: () => pedir("DELETE", `/api/db/${path}`),
+  });
+  const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const db = {
+    doc,
+    collection: (col) => ({
+      doc: (id) => doc(`${col}/${id || nuevoId()}`),
+      onSnapshot: (next, error) => {
+        if (!oyentes.has(col)) oyentes.set(col, new Set());
+        next.error = error; oyentes.get(col).add(next);
+        conectarEventos();
+        pedir("GET", `/api/db/${col}`).then(({ docs }) => next(foto(docs))).catch((e) => error?.(e));
+        return () => oyentes.get(col).delete(next);
+      },
+    }),
+  };
+
+  // ---- user ----
+  let sesion = null;
+  const miSesion = async () => (sesion ||= pedir("GET", "/api/sesion"));
+  const user = {
+    me: async () => { const s = await miSesion(); return { id: s.usuario.id, name: s.usuario.nombre }; },
+    id: async () => (await miSesion()).usuario.id,
+    can: async (q) => { const s = await miSesion(); return q === "data.write" ? s.puedeEscribir : s.esAdmin; },
+    canEdit: async () => (await miSesion()).esAdmin,
+    isOwner: async () => (await miSesion()).esAdmin,
+    profiles: async (ids) => { const lista = [].concat(ids).filter(Boolean); return lista.length ? pedir("GET", `/api/usuarios/perfiles?ids=${lista.map(encodeURIComponent).join(",")}`) : {}; },
+  };
+
+  // ---- assets ----
+  const assets = {
+    upload: (blob, op) => pedir("POST", "/api/archivos", blob, { "Content-Type": (op && op.type) || blob.type || "application/octet-stream", "X-Nombre": encodeURIComponent(blob.name || "") }),
+    delete: (id) => pedir("DELETE", `/api/archivos/${id}`),
+    list: async () => ({ assets: [], usage: {} }),
+  };
+
+  // ---- downloads ----
+  const downloads = {
+    save: async ({ filename, data }) => {
+      const blob = data instanceof Blob ? data : new Blob([data]);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      return { status: "saved" };
+    },
+  };
+
+  window.claude = { use: (nombre) => Promise.resolve({ db, user, assets, downloads }[nombre] || null) };
+  window.cerrarSesion = () => pedir("DELETE", "/api/sesion").then(() => (location.href = "/login.html"));
+})();

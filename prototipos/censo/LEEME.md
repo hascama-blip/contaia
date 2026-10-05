@@ -94,3 +94,18 @@ Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el du
 
 React 18 + htm (plantillas `html\`…\`` sin compilación), cargados desde CDN.
 PDF de la ficha con jsPDF (se carga al pedir el PDF).
+
+## Servidor propio en AWS (dominio de GoDaddy)
+Carpeta `servidor/`: servidor Node 22 **sin dependencias** que reemplaza lo que da
+claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el portal en
+**AWS Lightsail** con **usuario y clave** para la directiva. Pasos completos en
+`servidor/GUIA-AWS.md`.
+- `servidor.js` — rutas `/api/db/:col`, `/api/archivos` + `/_blob/:id`, `/api/sesion`,
+  `/api/usuarios`, `/api/eventos` (SSE) y `/api/reniec/:dni` (token en el servidor).
+  Sirve `index.html` inyectando `publico/adaptador.js` (mismo `window.claude`).
+- `lib/almacen.js` (JSON por colección, escritura atómica), `lib/sesiones.js` (scrypt +
+  cookie firmada, roles admin/edicion/lectura), `lib/reniec.js` (apidni con caché).
+- `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- `despliegue/`: `instalar.sh` (Ubuntu 24.04: Node, Caddy HTTPS, systemd, ufw),
+  `Caddyfile`, `censo.service`, `censo.env.ejemplo`, `actualizar.sh`, `respaldo.sh`.
+- Probar en local: `DATOS=/tmp/censo node servidor/servidor.js` → `http://localhost:3000`.

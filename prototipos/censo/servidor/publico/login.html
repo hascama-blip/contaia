@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · Portal Inmaculada Concepción</title>
+<link rel="icon" href="/img/logo.jpg">
+<link rel="stylesheet" href="/estilos/tokens.css">
+<link rel="stylesheet" href="/estilos/app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+  .entrar { width: min(420px, 100%); }
+  .entrar .card-cuerpo { display: flex; flex-direction: column; gap: 16px; }
+  .marca-login { display: flex; align-items: center; gap: 14px; }
+  .marca-login img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
+  .marca-login h1 { margin: 0; font-size: var(--t-lg); }
+  .marca-login p { margin: 2px 0 0; color: var(--texto-3); font-size: var(--t-sm); }
+</style>
+</head>
+<body>
+<form class="card entrar" id="f" autocomplete="on">
+  <div class="card-cuerpo">
+    <div class="marca-login">
+      <img src="/img/logo.jpg" alt="">
+      <div><h1>C.C. “Inmaculada Concepción”</h1><p>Gestión de propietarios · Solo directiva autorizada</p></div>
+    </div>
+    <div id="aviso" class="aviso aviso-alerta" hidden><span id="aviso-txt"></span></div>
+    <div class="campo"><label class="label" for="u">Usuario</label><input class="input" id="u" name="username" autocomplete="username" autocapitalize="none" required autofocus></div>
+    <div class="campo"><label class="label" for="c">Clave</label><input class="input" id="c" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn btn-primary btn-bloque" id="b" type="submit">Entrar</button>
+    <p class="ayuda" style="text-align:center;margin:0">¿Olvidaste tu clave? Pídele a la persona administradora que te la cambie.</p>
+  </div>
+</form>
+<script>
+  const f = document.getElementById("f"), aviso = document.getElementById("aviso"), txt = document.getElementById("aviso-txt"), b = document.getElementById("b");
+  if (new URLSearchParams(location.search).get("vencida")) { txt.textContent = "Tu sesión venció. Vuelve a entrar."; aviso.hidden = false; }
+  f.onsubmit = async (e) => {
+    e.preventDefault(); b.disabled = true; b.textContent = "Entrando…"; aviso.hidden = true;
+    try {
+      const r = await fetch("/api/sesion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ usuario: f.u.value, clave: f.c.value }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "No se pudo entrar.");
+      location.href = "/";
+    } catch (err) { txt.textContent = err.message; aviso.hidden = false; b.disabled = false; b.textContent = "Entrar"; }
+  };
+</script>
+</body>
+</html>

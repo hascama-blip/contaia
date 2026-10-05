@@ -1,7 +1,9 @@
 // Consulta de DNI en RENIEC a través del servidor de Radar (función pura de red).
 import { CONSULTA_DNI } from "../config.js";
 
-export const reniecActivo = () => Boolean(CONSULTA_DNI.url && CONSULTA_DNI.clave);
+// En el servidor propio la configuración la inyecta el servidor (misma sesión, sin clave aparte).
+const cfg = () => window.__CONSULTA_DNI__ || CONSULTA_DNI;
+export const reniecActivo = () => Boolean(cfg().url && cfg().clave);
 
 const MENSAJES = {
   401: "El servidor rechazó la clave de consulta. Revisa CONSULTA_DNI.clave y RENIEC_API_KEY.",
@@ -19,7 +21,7 @@ export async function consultarDni(dni) {
   if (!reniecActivo()) throw { code: "sin_reniec", message: "La consulta a RENIEC no está configurada." };
   let res;
   try {
-    res = await fetch(`${CONSULTA_DNI.url.replace(/\/$/, "")}/${numero}`, { headers: { "x-api-key": CONSULTA_DNI.clave } });
+    res = await fetch(`${cfg().url.replace(/\/$/, "")}/${numero}`, { headers: cfg().clave === "sesion" ? {} : { "x-api-key": cfg().clave } });
   } catch {
     throw { code: "red", message: `No se pudo conectar con el servidor de consultas (${location.origin} debe estar permitido en RENIEC_CORS_ORIGENES).` };
   }

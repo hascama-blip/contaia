@@ -37,6 +37,7 @@ export function Cabecera({ seccion, usuario, hayEjemplos, puedeEscribir }) {
         <div className="usuario" title=${nombre}>
           <span className="avatar" aria-hidden="true">${iniciales(nombre)}</span>
           <span className="usuario-nombre">${nombre}</span>
+          ${typeof window.cerrarSesion === "function" && html`<button type="button" className="btn btn-fantasma btn-salir" title="Cerrar sesión" onClick=${() => window.cerrarSesion()}>Salir</button>`}
         </div>
         <button className="hamburguesa" aria-label="Menú" aria-expanded=${abierto} onClick=${() => setAbierto((v) => !v)}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

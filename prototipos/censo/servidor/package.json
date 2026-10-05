@@ -1,0 +1,12 @@
+{
+  "name": "portal-inmaculada-concepcion",
+  "private": true,
+  "type": "module",
+  "description": "Servidor del Portal del C.C. Inmaculada Concepción (sin dependencias).",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node servidor.js",
+    "usuarios": "node usuarios.js",
+    "importar": "node importar.js"
+  }
+}

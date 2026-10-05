@@ -1,0 +1,20 @@
+[Unit]
+Description=Portal C.C. Inmaculada Concepcion
+After=network.target
+
+[Service]
+Type=simple
+User=censo
+WorkingDirectory=/opt/censo/prototipos/censo/servidor
+EnvironmentFile=/etc/censo.env
+Environment=DATOS=/var/censo PUERTO=3000 TRAS_PROXY=true
+ExecStart=/usr/bin/node servidor.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/censo
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
