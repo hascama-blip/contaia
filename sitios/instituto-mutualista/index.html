@@ -118,7 +118,8 @@ a{color:var(--brand-strong)}
 .sub-item strong{display:block;font:600 15px/1.25 var(--font-display)}
 .sub-item small{display:block;color:var(--ink-soft);font-size:13px;line-height:1.4}
 .menu-btn{display:none}
-@media (max-width:980px){.nav,.header-cta{display:none!important}.menu-btn{display:inline-grid}}
+@media (max-width:1120px){.nav{display:none!important}.menu-btn{display:inline-grid}}
+@media (max-width:560px){.header-cta{display:none!important}}
 
 /* Menú móvil */
 .drawer{position:fixed;inset:0;z-index:60;display:grid;grid-template-columns:1fr min(360px,88vw);visibility:hidden;transition:visibility 0s .3s}
@@ -228,7 +229,7 @@ body.menu-open .drawer-panel{transform:none}
 .dashes span:nth-child(2){width:48px;background:var(--accent)}
 
 /* Accesos rápidos */
-.quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
 .quick-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:border-color .2s,box-shadow .2s,transform .2s}
 .quick-card:hover{border-color:var(--brand);box-shadow:var(--shadow);transform:translateY(-2px)}
 .quick-ico{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
@@ -279,6 +280,9 @@ body.menu-open .drawer-panel{transform:none}
 .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .badge-free{background:var(--free-bg);color:var(--free)}
 .badge-paid{background:var(--paid-bg);color:var(--paid)}
+.badge-cert{background:var(--brand-soft);color:var(--brand-strong)}
+.who{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:var(--ink-soft)}
+.who .ic{width:18px;height:18px;color:var(--brand-bright)}
 
 /* Beneficios y pasos */
 .benefits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px}
@@ -466,6 +470,46 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .faq summary .ic{color:var(--brand);transition:transform .2s}
 .faq details[open] summary .ic{transform:rotate(180deg)}
 .faq details p{padding:0 0 16px;color:var(--ink-soft)}
+
+/* Preguntas frecuentes: pensadas para personas mayores (letra grande, botones amplios, alto contraste) */
+.faq-wrap{--fs:1;max-width:920px}
+.faq-tools{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.faq-search{position:relative;flex:1 1 320px}
+.faq-search .ic{position:absolute;left:18px;top:50%;transform:translateY(-50%);width:22px;height:22px;color:var(--ink-soft);pointer-events:none}
+.faq-search input{width:100%;height:58px;border-radius:999px;border:2px solid var(--line);background:var(--bg);padding:0 22px 0 52px;font-size:calc(18px * var(--fs));color:var(--ink)}
+.faq-search input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.faq-size{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:700;color:var(--ink-soft)}
+.faq-size span{margin-right:4px}
+.faq-size button{min-width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:700 16px/1 var(--font-display)}
+.faq-size button:nth-of-type(2){font-size:19px}
+.faq-size button:nth-of-type(3){font-size:22px}
+.faq-size button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-strong)}
+.faq-count{color:var(--ink-soft);font-size:calc(15.5px * var(--fs));margin-bottom:14px}
+.faq-big{max-width:none;gap:12px}
+.faq-big details{border-width:2px;border-radius:18px;padding:0 22px;transition:border-color .2s,box-shadow .2s}
+.faq-big details[open]{border-color:var(--brand);box-shadow:var(--shadow)}
+.faq-big summary{font-size:calc(19px * var(--fs));line-height:1.35;padding:20px 0;min-height:66px;color:var(--ink)}
+.faq-big summary:hover{color:var(--brand-strong)}
+.faq-big summary .ic{width:28px;height:28px}
+.faq-big .faq-a{padding:0 0 22px;display:grid;gap:16px;justify-items:start}
+.faq-big .faq-a p{padding:0;font-size:calc(17.5px * var(--fs));line-height:1.7;color:var(--ink);white-space:pre-line;max-width:68ch}
+.faq-big .faq-a .btn{min-height:54px;padding:0 26px;font-size:calc(16px * var(--fs))}
+.faq-help{margin-top:30px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px 20px;align-items:center;padding:26px;border-radius:22px;background:var(--surface-2)}
+.faq-help-ico{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;background:var(--wa);color:var(--on-wa)}
+.faq-help-ico .ic{width:30px;height:30px}
+.faq-help h2{font-size:calc(22px * var(--fs))}
+.faq-help p{color:var(--ink-soft);font-size:calc(17px * var(--fs));margin-top:4px}
+.faq-help .cta-actions{grid-column:1/-1}
+.faq-help .btn{min-height:56px;font-size:calc(16px * var(--fs));padding:0 26px}
+.faq-phone{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:calc(17px * var(--fs));color:var(--ink)}
+.faq-phone .ic{width:22px;height:22px;color:var(--brand)}
+.faq-link-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center;padding:24px;border-radius:20px;background:var(--surface);border:1px solid var(--line)}
+.faq-link-card h2{font-size:22px}
+.faq-link-card p{color:var(--ink-soft);margin-top:4px}
+@media (max-width:700px){.faq-link-card{grid-template-columns:minmax(0,1fr)}.faq-help{grid-template-columns:minmax(0,1fr)}}
+.faq-row{grid-template-columns:40px minmax(0,1fr) auto}
+.faq-num{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong);font:700 15px/1 var(--font-display)}
+@media (max-width:820px){.faq-row{grid-template-columns:minmax(0,1fr)}}
 
 /* Pie de página */
 .site-footer{background:var(--deep);color:var(--on-hero-soft)}
@@ -690,13 +734,13 @@ body.on-contacto .fab-info{display:none}
         <button class="sub-toggle" id="sub-toggle" type="button" aria-expanded="false" aria-controls="sub-panel" aria-label="Ver tipos de cursos"><span data-icon="chevDown"></span></button>
         <div class="sub-panel" id="sub-panel">
           <div class="sub-card">
-            <a class="sub-item" href="#cursos-gratuitos"><span class="sub-ico free" data-icon="gift"></span><span><strong>Cursos gratuitos</strong><small>Prevención y autocuidado sin costo para asociados · <span data-count="gratis">6</span> cursos</small></span></a>
+            <a class="sub-item" href="#cursos"><span class="sub-ico all" data-icon="book"></span><span><strong>Todos los cursos</strong><small>Para asociados y familiares · <span data-count="todos">12</span> cursos</small></span></a>
             <a class="sub-item" href="#cursos-videos" data-needs-videos><span class="sub-ico free" data-icon="video"></span><span><strong>Videos de 30 segundos</strong><small>Vistas previas para conocer cada curso · <span data-count="video">3</span> videos</small></span></a>
-            <a class="sub-item" href="#cursos-pago"><span class="sub-ico paid" data-icon="award"></span><span><strong>Cursos de pago</strong><small>Con certificado de horas académicas · <span data-count="pago">6</span> cursos</small></span></a>
-            <a class="sub-item" href="#cursos"><span class="sub-ico all" data-icon="book"></span><span><strong>Todos los cursos</strong><small>Calendario completo de inicios</small></span></a>
+
           </div>
         </div>
       </div>
+      <a class="nav-link" href="#preguntas" data-nav="preguntas">Preguntas frecuentes</a>
       <a class="nav-link" href="#contacto" data-nav="contacto">Contáctanos</a>
     </nav>
     <a class="btn btn-accent btn-sm header-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
@@ -715,10 +759,9 @@ body.on-contacto .fab-info{display:none}
     <a class="d-link" href="#nosotros" data-nav="nosotros">Nosotros</a>
     <a class="d-link" href="#cursos" data-nav="cursos">Cursos</a>
     <div class="d-sub">
-      <a href="#cursos-gratuitos"><span data-icon="gift"></span>Cursos gratuitos</a>
       <a href="#cursos-videos" data-needs-videos><span data-icon="video"></span>Videos de los cursos</a>
-      <a href="#cursos-pago"><span data-icon="award"></span>Cursos de pago</a>
     </div>
+    <a class="d-link" href="#preguntas" data-nav="preguntas">Preguntas frecuentes</a>
     <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
     <a class="btn btn-accent d-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
     <div class="d-info">
@@ -751,17 +794,17 @@ body.on-contacto .fab-info{display:none}
 
   <div class="section tight">
     <div class="wrap quick-grid">
-      <a class="quick-card" href="#cursos-gratuitos">
-        <span class="quick-ico qi-free" data-icon="gift"></span>
-        <div><h3>Cursos gratuitos</h3><p>Prevención, primeros auxilios y autocuidado sin costo para ti y tu familia.</p><span class="more"><span data-count-label="gratis">6 cursos disponibles</span><span data-icon="arrowRight"></span></span></div>
+      <a class="quick-card" href="#cursos">
+        <span class="quick-ico qi-brand" data-icon="book"></span>
+        <div><h3>Nuestros cursos</h3><p>Prevención, primeros auxilios, cuidados en casa y más, para asociados y sus familias.</p><span class="more"><span data-count-label="todos">12 cursos disponibles</span><span data-icon="arrowRight"></span></span></div>
       </a>
-      <a class="quick-card" href="#cursos-pago">
-        <span class="quick-ico qi-paid" data-icon="award"></span>
-        <div><h3>Cursos con certificado</h3><p>Formación práctica con certificado de horas académicas, exclusiva para asociados.</p><span class="more">Ver cursos de pago<span data-icon="arrowRight"></span></span></div>
+      <a class="quick-card" href="#cursos-videos" data-needs-videos>
+        <span class="quick-ico qi-paid" data-icon="video"></span>
+        <div><h3>Videos de 30 segundos</h3><p>Mira de qué trata cada curso antes de entrar.</p><span class="more">Ver los videos<span data-icon="arrowRight"></span></span></div>
       </a>
-      <a class="quick-card" href="#contacto">
-        <span class="quick-ico qi-brand" data-icon="whatsapp"></span>
-        <div><h3>¿Necesitas orientación?</h3><p>Te ayudamos a elegir el curso adecuado según tu edad, trabajo y familia.</p><span class="more">Contáctanos<span data-icon="arrowRight"></span></span></div>
+      <a class="quick-card" href="#preguntas">
+        <span class="quick-ico qi-free" data-icon="help"></span>
+        <div><h3>Preguntas frecuentes</h3><p>¿Dónde ingresar? ¿Qué necesito para participar? Respuestas claras y paso a paso.</p><span class="more">Ver preguntas<span data-icon="arrowRight"></span></span></div>
       </a>
     </div>
   </div>
@@ -773,7 +816,7 @@ body.on-contacto .fab-info{display:none}
           <span class="eyebrow">Vistas previas</span>
           <h2>Conoce nuestros cursos en 30 segundos</h2>
           <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-          <p>Mira de qué trata cada curso antes de inscribirte.</p>
+          <p>Mira de qué trata cada curso antes de entrar.</p>
         </div>
         <a class="btn btn-line" href="#cursos-videos">Ver todos los videos<span data-icon="arrowRight"></span></a>
       </div>
@@ -788,11 +831,6 @@ body.on-contacto .fab-info{display:none}
           <span class="eyebrow">Calendario</span>
           <h2>Próximos inicios</h2>
           <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-        </div>
-        <div class="seg" id="home-tabs" role="group" aria-label="Tipo de curso">
-          <button type="button" data-tipo="todos" aria-pressed="true">Todos</button>
-          <button type="button" data-tipo="gratis" aria-pressed="false">Gratuitos</button>
-          <button type="button" data-tipo="pago" aria-pressed="false">De pago</button>
         </div>
       </div>
       <div class="course-grid" id="home-grid"></div>
@@ -862,14 +900,14 @@ body.on-contacto .fab-info{display:none}
         <span class="eyebrow">Quiénes somos</span>
         <h2 data-txt="quienesTitulo">Un instituto creado por y para los asociados</h2>
         <p class="lead" data-txt="quienesLead">El Instituto Mutualista nace dentro de nuestra mutual con una idea sencilla: si nos apoyamos entre todos, también podemos aprender juntos a cuidar la salud.</p>
-        <p data-txt="quienesTexto1">Ofrecemos cursos preventivos gratuitos, financiados con el fondo solidario de la mutual, y cursos de especialización con certificado para asociados. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
+        <p data-txt="quienesTexto1">Ofrecemos cursos preventivos y de especialización para los asociados y sus familias, financiados con el fondo solidario de la mutual. Todos los contenidos los diseñan y dictan profesionales de la salud colegiados.</p>
         <p data-txt="quienesTexto2">Trabajamos con horarios pensados para quien trabaja: clases virtuales por la noche, talleres presenciales los sábados y grupos reducidos para las prácticas.</p>
       </div>
       <aside class="model-card" aria-label="Nuestro modelo">
         <h3>Nuestro modelo</h3>
-        <div class="model-item"><span class="quick-ico qi-free" data-icon="gift"></span><div><h4>Cursos gratuitos</h4><p>Prevención y autocuidado sin costo para el asociado y su familia directa.</p></div></div>
+        <div class="model-item"><span class="quick-ico qi-free" data-icon="users"></span><div><h4>Para asociados y familias</h4><p>Todos los cursos están abiertos al asociado y a su familia directa.</p></div></div>
         <div class="model-item"><span class="quick-ico qi-paid" data-icon="login"></span><div><h4>Plataforma de cursos</h4><p>Con tu usuario entras a las clases, materiales y certificados desde cualquier dispositivo.</p></div></div>
-        <div class="model-item"><span class="quick-ico qi-brand" data-icon="award"></span><div><h4>Certificación</h4><p>Constancia en cursos gratuitos y certificado con horas académicas en cursos de pago.</p></div></div>
+        <div class="model-item"><span class="quick-ico qi-brand" data-icon="award"></span><div><h4>Certificación</h4><p>Constancia de participación o certificado con horas académicas, según el curso.</p></div></div>
       </aside>
     </div>
   </div>
@@ -889,7 +927,7 @@ body.on-contacto .fab-info{display:none}
         <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
       </div>
       <div class="values">
-        <div class="value"><span class="quick-ico qi-brand" data-icon="handHeart"></span><h3>Solidaridad</h3><p>Los aportes de todos sostienen los cursos gratuitos de cada uno.</p></div>
+        <div class="value"><span class="quick-ico qi-brand" data-icon="handHeart"></span><h3>Solidaridad</h3><p>Los aportes de todos sostienen los cursos de cada uno.</p></div>
         <div class="value"><span class="quick-ico qi-free" data-icon="shield"></span><h3>Prevención</h3><p>Enseñamos a actuar antes de que aparezca la enfermedad.</p></div>
         <div class="value"><span class="quick-ico qi-paid" data-icon="stethoscope"></span><h3>Rigor profesional</h3><p>Cada curso lo diseña y dicta un profesional de la salud colegiado.</p></div>
         <div class="value"><span class="quick-ico qi-brand" data-icon="users"></span><h3>Cercanía</h3><p>Horarios, formatos y lenguaje pensados para el asociado.</p></div>
@@ -916,8 +954,8 @@ body.on-contacto .fab-info{display:none}
   <div class="section">
     <div class="wrap">
       <div class="cta-band">
-        <div><h2>Empieza por un curso gratuito</h2><p>Los cursos preventivos están abiertos a todos los asociados y sus familiares directos.</p></div>
-        <div class="cta-actions"><a class="btn btn-accent" href="#cursos-gratuitos">Ver cursos gratuitos</a><a class="btn btn-ghost-light" href="#contacto">Contáctanos</a></div>
+        <div><h2>Empieza hoy</h2><p>Todos los cursos están abiertos a los asociados y sus familiares directos.</p></div>
+        <div class="cta-actions"><a class="btn btn-accent" href="#cursos">Ver los cursos</a><a class="btn btn-ghost-light" href="#preguntas">Preguntas frecuentes</a></div>
       </div>
     </div>
   </div>
@@ -930,7 +968,7 @@ body.on-contacto .fab-info{display:none}
       <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span id="crumb-cursos">Cursos</span></nav>
       <h1 id="t-cursos">Cursos</h1>
       <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p data-txt="cursosIntro">Cursos preventivos gratuitos y cursos con certificado, exclusivos para asociados. Revisa el detalle y entra con tu usuario.</p>
+      <p data-txt="cursosIntro">Cursos para asociados y sus familias. Revisa el detalle y entra con tu usuario.</p>
     </div>
     <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
   </div>
@@ -940,10 +978,8 @@ body.on-contacto .fab-info{display:none}
       <div class="filters">
         <div class="filter-row">
           <div class="seg" id="seg-tipo" role="group" aria-label="Tipo de curso">
-            <button type="button" data-tipo="todos" aria-pressed="true">Todos <span class="count" data-count="todos">12</span></button>
-            <button type="button" data-tipo="gratis" aria-pressed="false">Gratuitos <span class="count" data-count="gratis">6</span></button>
-            <button type="button" data-tipo="video" aria-pressed="false" data-needs-videos>Videos <span class="count" data-count="video">3</span></button>
-            <button type="button" data-tipo="pago" aria-pressed="false">De pago <span class="count" data-count="pago">6</span></button>
+            <button type="button" data-tipo="todos" aria-pressed="true">Cursos <span class="count" data-count="todos">12</span></button>
+            <button type="button" data-tipo="video" aria-pressed="false" data-needs-videos>Videos de 30 s <span class="count" data-count="video">3</span></button>
           </div>
           <div class="tools">
             <label class="search"><span class="sr-only">Buscar curso</span><span data-icon="search"></span><input class="input-pill" id="f-buscar" type="search" placeholder="Buscar: RCP, nutrición, estrés…" autocomplete="off"></label>
@@ -958,12 +994,41 @@ body.on-contacto .fab-info{display:none}
         </div>
         <div class="chips" id="chips-cat" role="group" aria-label="Área"></div>
       </div>
-      <div class="type-note free" id="note-gratis" hidden><span data-icon="gift"></span><p><strong>Cursos gratuitos:</strong> se financian con el fondo solidario de la mutual. Las vacantes se asignan por orden de inscripción y el asociado puede inscribir a sus familiares directos.</p></div>
-      <div class="type-note free" id="note-video" hidden><span data-icon="video"></span><p><strong>Videos de vista previa:</strong> 30 segundos para conocer cada curso antes de inscribirte. Desde cada video puedes abrir el detalle del curso e inscribirte.</p></div>
-      <div class="type-note paid" id="note-pago" hidden><span data-icon="tag"></span><p><strong>Cursos de pago:</strong> incluyen certificado con horas académicas. Entras con tu usuario de la plataforma de cursos; si tienes dudas sobre las condiciones, escríbenos.</p></div>
+      <div class="type-note free" id="note-video" hidden><span data-icon="video"></span><p><strong>Videos de vista previa:</strong> 30 segundos para conocer cada curso. Desde cada video puedes abrir el detalle del curso e ingresar.</p></div>
       <p class="results-line" id="results-line" aria-live="polite"></p>
       <div class="course-grid" id="course-grid"></div>
       <div class="empty" id="empty" hidden><span data-icon="search"></span><h3>No hay cursos con esos filtros</h3><p>Prueba con otra área o modalidad, o escríbenos y te avisamos cuando abramos uno.</p><button class="btn btn-soft btn-sm" type="button" id="clear-filters">Quitar filtros</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PREGUNTAS FRECUENTES ============ -->
+<section class="page" data-page="preguntas" aria-labelledby="t-preguntas" hidden>
+  <div class="page-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Preguntas frecuentes</span></nav>
+      <h1 id="t-preguntas">Preguntas frecuentes</h1>
+      <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p data-txt="faqIntro">Respuestas cortas y claras para que puedas participar sin complicaciones. Toca una pregunta para ver la respuesta.</p>
+    </div>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section near-top">
+    <div class="wrap faq-wrap" id="faq-wrap">
+      <div class="faq-tools">
+        <label class="faq-search"><span class="sr-only">Buscar una pregunta</span><span data-icon="search"></span><input id="faq-buscar" type="search" placeholder="Escribe tu duda" autocomplete="off"></label>
+        <div class="faq-size" role="group" aria-label="Tamaño de letra"><span>Tamaño de letra</span><button type="button" data-fs="1" aria-pressed="true" aria-label="Letra normal">A</button><button type="button" data-fs="1.15" aria-pressed="false" aria-label="Letra grande">A+</button><button type="button" data-fs="1.3" aria-pressed="false" aria-label="Letra muy grande">A++</button></div>
+      </div>
+      <p class="faq-count" id="faq-count" aria-live="polite"></p>
+      <div class="faq faq-big" id="faq-list"></div>
+      <div class="empty" id="faq-empty" hidden><span data-icon="search"></span><h3>No encontramos esa pregunta</h3><p>Prueba con otra palabra o escríbenos: te respondemos.</p></div>
+      <div class="faq-help">
+        <span class="faq-help-ico" data-icon="whatsapp"></span>
+        <div><h2>¿No encontraste tu respuesta?</h2><p data-txt="faqAyuda">Escríbenos por WhatsApp o llámanos. Te ayudamos paso a paso.</p></div>
+        <p class="faq-phone" data-item="telefono"><span data-icon="phone"></span><span>Teléfono: <strong data-cfg="telefono">(01) 000 0000</strong></span></p>
+        <div class="cta-actions"><a class="btn btn-wa" id="faq-wa" href="https://wa.me/" target="_blank" rel="noopener"><span data-icon="whatsapp"></span>Escribir por WhatsApp</a><a class="btn btn-line" href="#contacto">Ir a Contáctanos</a></div>
+      </div>
     </div>
   </div>
 </section>
@@ -1037,17 +1102,10 @@ body.on-contacto .fab-info{display:none}
 
   <div class="section band">
     <div class="wrap">
-      <div class="section-head center">
-        <span class="eyebrow">Preguntas frecuentes</span>
-        <h2>Antes de inscribirte</h2>
-        <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
-      </div>
-      <div class="faq">
-        <details><summary>¿Quiénes pueden inscribirse?<span data-icon="chevDown"></span></summary><p>Los asociados activos y sus familiares directos (cónyuge, hijos y padres).</p></details>
-        <details><summary>¿Los cursos gratuitos dan certificado?<span data-icon="chevDown"></span></summary><p>Entregan una constancia de participación. Los cursos de pago otorgan un certificado con horas académicas (una hora académica equivale a 45 minutos).</p></details>
-        <details><summary>¿Cómo acredito que soy asociado?<span data-icon="chevDown"></span></summary><p>Solo necesitas tu DNI. Al recibir tu solicitud validamos tu condición en el padrón de la mutual.</p></details>
-        <details><summary>¿Cómo ingreso a los cursos?<span data-icon="chevDown"></span></summary><p>En el detalle de cada curso pulsa “Ingresar”: te llevamos a la plataforma de cursos, donde entras con tu usuario y contraseña. Si aún no tienes acceso, escríbenos y te lo enviamos.</p></details>
-        <details><summary>¿Qué pasa si falto a una clase?<span data-icon="chevDown"></span></summary><p>Las clases virtuales quedan grabadas durante 15 días. Para obtener el certificado necesitas asistir al menos al 80 % de las sesiones.</p></details>
+      <div class="faq-link-card">
+        <span class="quick-ico qi-brand" data-icon="help"></span>
+        <div><h2>¿Tienes una duda rápida?</h2><p>Revisa las preguntas frecuentes: dónde ingresar, qué necesitas para participar y más.</p></div>
+        <a class="btn btn-brand" href="#preguntas">Ver preguntas frecuentes<span data-icon="arrowRight"></span></a>
       </div>
     </div>
   </div>
@@ -1071,16 +1129,16 @@ body.on-contacto .fab-info{display:none}
         <li><a href="#inicio">Inicio</a></li>
         <li><a href="#nosotros">Nosotros</a></li>
         <li><a href="#cursos">Cursos</a></li>
+        <li><a href="#preguntas">Preguntas frecuentes</a></li>
         <li><a href="#contacto">Contáctanos</a></li>
       </ul>
     </div>
     <div>
       <h4>Cursos</h4>
       <ul class="footer-links">
-        <li><a href="#cursos-gratuitos">Cursos gratuitos</a></li>
+        <li><a href="#cursos">Todos los cursos</a></li>
         <li data-needs-videos><a href="#cursos-videos">Videos de los cursos</a></li>
-        <li><a href="#cursos-pago">Cursos de pago</a></li>
-        <li><a href="#cursos">Calendario de inicios</a></li>
+        <li><a href="#preguntas">¿Cómo ingreso?</a></li>
       </ul>
     </div>
     <div>
@@ -1237,6 +1295,8 @@ const I = {
   type: '<path d="M5 7V4.5h14V7M12 4.5v15M9 19.5h6"/>',
   share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
   logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.2-2.4 3.8M12 17h.01"/>',
   login: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M9 17l5-5-5-5M14 12H3"/>',
   send: '<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>',
   keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
@@ -1261,11 +1321,13 @@ const MODS = { Presencial: 'building', Virtual: 'monitor', Semipresencial: 'laye
 
 /* ---------- Contenido editable del sitio (valores de ejemplo) ---------- */
 const ARTS = {
-  prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['gift', 'Sin costo para asociados']] },
+  prevencion: { icon: 'shield', chips: [['heartPulse', 'Chequeo preventivo'], ['users', 'Para asociados y familias']] },
   cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
   comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
 };
-const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Todos los cursos'], ['#cursos-gratuitos', 'Cursos gratuitos'], ['#cursos-videos', 'Videos de los cursos'], ['#cursos-pago', 'Cursos de pago'], ['#contacto', 'Contáctanos']];
+const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Cursos'], ['#cursos-videos', 'Videos de los cursos'], ['#preguntas', 'Preguntas frecuentes'], ['#contacto', 'Contáctanos']];
+// Enlaces de versiones anteriores (había cursos gratuitos y de pago).
+const LEGACY_PAGES = { '#cursos-gratuitos': '#cursos', '#cursos-pago': '#cursos' };
 const MAX_VIDEOS = 40;
 const MAX_SECONDS = 30;
 const MAX_VIDEO_MB = 15;
@@ -1300,8 +1362,11 @@ const TEXT_GROUPS = [
   ['Nosotros', [['nosotrosIntro', 'Introducción bajo el título', true], ['quienesTitulo', 'Quiénes somos: título'], ['quienesLead', 'Quiénes somos: párrafo destacado', true], ['quienesTexto1', 'Quiénes somos: segundo párrafo', true], ['quienesTexto2', 'Quiénes somos: tercer párrafo', true], ['mision', 'Misión', true], ['vision', 'Visión', true]]],
   ['Cursos', [['cursosIntro', 'Introducción bajo el título', true]]],
   ['Contáctanos', [['contactoIntro', 'Introducción bajo el título', true], ['contactoTitulo', 'Título junto a los datos'], ['contactoTexto', 'Texto junto a los datos', true], ['formTitulo', 'Título del formulario'], ['formRespuesta', 'Texto bajo el título del formulario']]],
+  ['Preguntas frecuentes', [['faqIntro', 'Introducción bajo el título', true], ['faqAyuda', 'Texto del recuadro de ayuda', true]]],
   ['Pie de página', [['pieTexto', 'Descripción del pie de página', true]]]
 ];
+const FAQ_ACCIONES = [['', 'Sin botón'], ['ingresar', 'Botón “Ingresar” (plataforma de cursos)'], ['cursos', 'Ver los cursos'], ['videos', 'Ver los videos'], ['whatsapp', 'Escribir por WhatsApp'], ['contacto', 'Ir a Contáctanos']];
+const MAX_FAQ = 60;
 const FORM_DEST = [
   ['whatsapp', 'Enviar por WhatsApp', 'Al enviar, la persona pulsa un botón que abre WhatsApp con sus datos ya escritos hacia tu número. Funciona sin servidor.'],
   ['correo', 'Enviar por correo', 'Abre el programa de correo del visitante con sus datos hacia tu correo. Depende de que tenga un correo configurado.'],
@@ -1331,6 +1396,18 @@ const DEFAULT_SITE = {
   textos: {},
   conectores: { formDestino: 'whatsapp', formEndpoint: '' },
   plataforma: { url: '', texto: 'Ingresar', cursos: {} },
+  faq: [
+    { id: 'faq-ingresar', pregunta: '¿Dónde puedo ingresar a los cursos?', respuesta: 'Entra a la pestaña Cursos, elige el curso y pulsa “Ver detalle”. Luego pulsa el botón naranja “Ingresar”: se abrirá la plataforma de cursos, donde escribes tu usuario y tu contraseña.', accion: 'ingresar' },
+    { id: 'faq-requisitos', pregunta: '¿Qué necesito para participar?', respuesta: 'Ser asociado activo o familiar directo de un asociado (cónyuge, hijos o padres).\nPara los cursos virtuales: tu usuario de la plataforma y un celular, tablet o computadora con internet.\nPara los cursos presenciales: llegar a la sede con tu DNI.', accion: 'contacto' },
+    { id: 'faq-tipos', pregunta: '¿Qué tipo de cursos hay?', respuesta: 'Hay cursos de prevención, primeros auxilios, cuidados en casa, salud mental, nutrición y uso seguro de medicamentos. Pueden ser presenciales, virtuales o semipresenciales. También hay videos cortos de 30 segundos para conocer cada curso.', accion: 'cursos' },
+    { id: 'faq-pago', pregunta: '¿Debo hacer algún pago?', respuesta: 'No. Los cursos son para los asociados y sus familiares, sin costo.', accion: '' },
+    { id: 'faq-quienes', pregunta: '¿Quiénes pueden participar?', respuesta: 'Los asociados activos y sus familiares directos: cónyuge, hijos y padres.', accion: '' },
+    { id: 'faq-usuario', pregunta: '¿Cómo consigo mi usuario y contraseña?', respuesta: 'Escríbenos por WhatsApp con tu nombre completo y tu DNI. Revisamos que seas asociado o familiar y te enviamos tus datos para entrar.', accion: 'whatsapp' },
+    { id: 'faq-clave', pregunta: 'Olvidé mi contraseña, ¿qué hago?', respuesta: 'En la plataforma de cursos usa la opción para recuperar tu contraseña. Si no puedes, escríbenos por WhatsApp y te ayudamos.', accion: 'whatsapp' },
+    { id: 'faq-certificado', pregunta: '¿Los cursos dan certificado?', respuesta: 'Sí. Según el curso, recibes una constancia de participación o un certificado con horas académicas (una hora académica equivale a 45 minutos).', accion: '' },
+    { id: 'faq-falta', pregunta: '¿Qué pasa si falto a una clase?', respuesta: 'Las clases virtuales quedan grabadas durante 15 días. Para recibir el certificado necesitas asistir al menos al 80 % de las sesiones.', accion: '' },
+    { id: 'faq-asociado', pregunta: '¿Cómo acredito que soy asociado?', respuesta: 'Solo necesitas tu DNI. Con él revisamos tu condición en el padrón de la mutual.', accion: '' }
+  ],
   seguridad: { pinHash: '' },
   logo: null,
   videos: [
@@ -1339,8 +1416,8 @@ const DEFAULT_SITE = {
     { id: 'preview-primeros-auxilios', titulo: 'Primeros auxilios en el hogar en 30 segundos', descripcion: 'Lo que aprenderás para actuar ante atragantamientos, cortes y quemaduras.', cat: 'Primeros auxilios', curso: 'primeros-auxilios-hogar', archivo: null, segundos: null, url: '', completo: '', portada: null, docente: 'Licenciada en enfermería (CEP)' }
   ],
   slides: [
-    { id: 'ejemplo-1', eyebrow: 'Cursos preventivos gratuitos', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.', cta: 'Ver cursos gratuitos', href: '#cursos-gratuitos', art: 'prevencion', img: null, pos: 'centro' },
-    { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con certificado de horas académicas.', cta: 'Ver cursos de pago', href: '#cursos-pago', art: 'cursos', img: null, pos: 'centro' },
+    { id: 'ejemplo-1', eyebrow: 'Cursos para asociados y familias', title: 'Cuida tu salud y la de tu familia', text: 'Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud.', cta: 'Ver cursos', href: '#cursos', art: 'prevencion', img: null, pos: 'centro' },
+    { id: 'ejemplo-2', eyebrow: 'Cursos con certificado', title: 'Formación práctica con respaldo profesional', text: 'RCP, cuidado del adulto mayor, funciones vitales y más, con certificado de horas académicas.', cta: 'Ver videos de 30 s', href: '#cursos-videos', art: 'cursos', img: null, pos: 'centro' },
     { id: 'ejemplo-3', eyebrow: 'Somos una mutual', title: 'Formación que nace de la ayuda mutua', text: 'Un instituto creado por y para los asociados: aprendemos juntos a prevenir y a cuidar.', cta: 'Conócenos', href: '#nosotros', art: 'comunidad', img: null, pos: 'centro' }
   ]
 };
@@ -1349,7 +1426,7 @@ $$('[data-txt]').forEach(el => { if (!(el.dataset.txt in DEFAULT_SITE.textos)) D
 
 const isPath = p => typeof p === 'string' && /^(portada|imagenes)\/[\w.-]+\.(jpe?g|png|webp)$/i.test(p);
 const safeSrc = s => (isPath(s) || (typeof s === 'string' && (/^data:image\/(jpeg|png|webp);base64,/i.test(s) || /^blob:/i.test(s)))) ? s : null;
-const safePage = h => PAGES_OPT.some(p => p[0] === h) ? h : '#contacto';
+const safePage = h => { h = LEGACY_PAGES[h] || h; return PAGES_OPT.some(p => p[0] === h) ? h : '#contacto'; };
 function safeUrl(v) {
   v = String(v || '').trim();
   if (!v || /\s/.test(v)) return null;
@@ -1383,9 +1460,18 @@ function normVideo(v) {
     portada: safeSrc(v.portada), docente: str(v.docente, 120)
   };
 }
+function normFaq(f) {
+  f = f || {};
+  return {
+    id: (String(f.id || '').replace(/[^\w-]/g, '').slice(0, 50)) || 'faq-' + uid(),
+    pregunta: str(f.pregunta, 200), respuesta: str(f.respuesta, 1500),
+    accion: FAQ_ACCIONES.some(a => a[0] === f.accion) ? f.accion : ''
+  };
+}
 function mergeSite(raw) {
   const d = JSON.parse(JSON.stringify(DEFAULT_SITE));
-  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); d.videos = d.videos.map(normVideo); return d; }
+  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); d.videos = d.videos.map(normVideo); d.faq = d.faq.map(normFaq); return d; }
+  d.faq = (Array.isArray(raw.faq) ? raw.faq.slice(0, MAX_FAQ) : d.faq).map(normFaq);
   d.videos = (Array.isArray(raw.videos) ? raw.videos.slice(0, MAX_VIDEOS) : d.videos).map(normVideo);
   ['contacto', 'redes', 'textos'].forEach(sec => {
     if (raw[sec] && typeof raw[sec] === 'object') Object.keys(d[sec]).forEach(k => { if (typeof raw[sec][k] === 'string') d[sec][k] = raw[sec][k].slice(0, 600); });
@@ -1424,7 +1510,8 @@ function cloneSite(s) {
     botones: Object.fromEntries(Object.entries(s.botones).map(e => [e[0], Object.assign({}, e[1])])),
     logo: s.logo, logoUrl: s.logoUrl || null, logoBlob: s.logoBlob || null,
     slides: s.slides.map(x => Object.assign({}, x, { confirm: false })),
-    videos: s.videos.map(x => Object.assign({}, x, { confirm: false }))
+    videos: s.videos.map(x => Object.assign({}, x, { confirm: false })),
+    faq: s.faq.map(x => Object.assign({}, x, { confirm: false }))
   };
 }
 let site = mergeSite(null);
@@ -1496,62 +1583,62 @@ function applyBtn(el, key) {
 /* ---------- Datos de cursos ---------- */
 
 const COURSES = [
-  { id: 'primeros-auxilios-hogar', titulo: 'Primeros auxilios en el hogar', cat: 'Primeros auxilios', tipo: 'gratis', modalidad: 'Presencial', horas: 8, inicio: '2026-10-17',
+  { id: 'primeros-auxilios-hogar', titulo: 'Primeros auxilios en el hogar', cat: 'Primeros auxilios', modalidad: 'Presencial', horas: 8, inicio: '2026-10-17',
     horario: 'Sábados 17 y 24 de octubre, 9:00 a. m. a 12:00 m.', vacantes: 30, docente: 'Licenciada en enfermería (CEP)',
     resumen: 'Qué hacer ante atragantamientos, quemaduras, cortes y caídas en casa mientras llega la ayuda.',
     temario: ['Cómo evaluar una emergencia y a quién llamar: SAMU 106 y Bomberos 116', 'Atragantamiento en adultos, niños y lactantes', 'Heridas, sangrado y quemaduras', 'Golpes, caídas y posibles fracturas', 'Cómo armar el botiquín del hogar'],
     dirigido: 'Asociados y familiares directos mayores de 14 años.', certificado: 'Constancia de participación' },
-  { id: 'diabetes-hipertension', titulo: 'Prevención de diabetes e hipertensión', cat: 'Prevención', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-10-08',
+  { id: 'diabetes-hipertension', titulo: 'Prevención de diabetes e hipertensión', cat: 'Prevención', modalidad: 'Virtual', horas: 6, inicio: '2026-10-08',
     horario: 'Jueves 8, 15 y 22 de octubre, 7:00 a 8:30 p. m.', vacantes: 100, docente: 'Médico internista (CMP)',
     resumen: 'Factores de riesgo, señales de alerta y hábitos que reducen la probabilidad de enfermar.',
     temario: ['Qué son la diabetes tipo 2 y la hipertensión', 'Factores de riesgo que sí puedes cambiar', 'Cómo leer tu presión arterial y tu glucosa', 'Alimentación y actividad física en la vida diaria', 'Cuándo acudir al médico'],
     dirigido: 'Asociados y familiares, en especial mayores de 35 años.', certificado: 'Constancia de participación' },
-  { id: 'salud-mental-estres', titulo: 'Salud mental y manejo del estrés', cat: 'Salud mental', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-10-14',
+  { id: 'salud-mental-estres', titulo: 'Salud mental y manejo del estrés', cat: 'Salud mental', modalidad: 'Virtual', horas: 6, inicio: '2026-10-14',
     horario: 'Miércoles 14, 21 y 28 de octubre, 7:00 a 8:30 p. m.', vacantes: 60, docente: 'Psicóloga clínica (CPsP)',
     resumen: 'Herramientas prácticas para reconocer el estrés, regular las emociones y pedir ayuda a tiempo.',
     temario: ['Estrés, ansiedad y agotamiento: cómo diferenciarlos', 'Técnicas de respiración y relajación', 'Sueño y descanso reparador', 'Cómo acompañar a un familiar que atraviesa una crisis', 'Dónde pedir ayuda profesional'],
     dirigido: 'Asociados y familiares mayores de 16 años.', certificado: 'Constancia de participación' },
-  { id: 'alimentacion-familia', titulo: 'Alimentación saludable en familia', cat: 'Nutrición', tipo: 'gratis', modalidad: 'Virtual', horas: 6, inicio: '2026-11-05',
+  { id: 'alimentacion-familia', titulo: 'Alimentación saludable en familia', cat: 'Nutrición', modalidad: 'Virtual', horas: 6, inicio: '2026-11-05',
     horario: 'Jueves 5, 12 y 19 de noviembre, 7:00 a 8:30 p. m.', vacantes: 100, docente: 'Nutricionista (CNP)',
     resumen: 'Cómo planificar comidas balanceadas y económicas para niños, adultos y adultos mayores.',
     temario: ['El plato saludable y las porciones', 'Cómo leer los octógonos y el etiquetado', 'Loncheras saludables para escolares', 'Alimentación del adulto mayor', 'Menú semanal con presupuesto ajustado'],
     dirigido: 'Asociados y familiares.', certificado: 'Constancia de participación' },
-  { id: 'deteccion-cancer', titulo: 'Detección temprana del cáncer', cat: 'Prevención', tipo: 'gratis', modalidad: 'Presencial', horas: 3, inicio: '2026-10-24',
+  { id: 'deteccion-cancer', titulo: 'Detección temprana del cáncer', cat: 'Prevención', modalidad: 'Presencial', horas: 3, inicio: '2026-10-24',
     horario: 'Sábado 24 de octubre, 10:00 a. m. a 12:15 p. m.', vacantes: 80, docente: 'Médico oncólogo (CMP)',
     resumen: 'Signos de alarma y chequeos recomendados según tu edad para detectar el cáncer a tiempo.',
     temario: ['Signos de alarma que no debes ignorar', 'Chequeos preventivos según edad y sexo', 'Cáncer de mama, cuello uterino, próstata y colon', 'Mitos frecuentes sobre el cáncer', 'Cómo acceder a los tamizajes'],
     dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Constancia de participación' },
-  { id: 'pausas-activas', titulo: 'Pausas activas y ergonomía', cat: 'Prevención', tipo: 'gratis', modalidad: 'Semipresencial', horas: 4, inicio: '2026-11-12',
+  { id: 'pausas-activas', titulo: 'Pausas activas y ergonomía', cat: 'Prevención', modalidad: 'Semipresencial', horas: 4, inicio: '2026-11-12',
     horario: 'Jueves 12 de noviembre (virtual) y sábado 14 (práctica presencial)', vacantes: 40, docente: 'Tecnólogo médico en terapia física (CTMP)',
     resumen: 'Ejercicios breves y ajustes de postura para prevenir dolores de espalda, cuello y muñecas.',
     temario: ['Posturas que generan dolor y cómo corregirlas', 'Cómo ajustar silla, mesa y pantalla', 'Rutina de pausas activas de 5 minutos', 'Prevención del dolor lumbar', 'Práctica guiada en grupo'],
     dirigido: 'Asociados que pasan muchas horas sentados o de pie.', certificado: 'Constancia de participación' },
-  { id: 'rcp-soporte-vital', titulo: 'RCP y soporte vital básico', cat: 'Primeros auxilios', tipo: 'pago', modalidad: 'Presencial', horas: 12, inicio: '2026-10-31',
+  { id: 'rcp-soporte-vital', titulo: 'RCP y soporte vital básico', cat: 'Primeros auxilios', modalidad: 'Presencial', horas: 12, inicio: '2026-10-31',
     horario: 'Sábados 31 de octubre y 7 de noviembre, 8:30 a. m. a 1:00 p. m.', vacantes: 20, docente: 'Médico emergenciólogo (CMP)',
     resumen: 'Reanimación cardiopulmonar en adultos, niños y lactantes, con práctica en maniquí y uso del DEA.',
     temario: ['Cadena de supervivencia y seguridad de la escena', 'RCP de alta calidad en adultos, niños y lactantes', 'Uso del desfibrilador externo automático (DEA)', 'Obstrucción de la vía aérea', 'Práctica en maniquí y evaluación final'],
     dirigido: 'Asociados y familiares mayores de 16 años.', certificado: 'Certificado de 12 horas académicas' },
-  { id: 'cuidado-adulto-mayor', titulo: 'Cuidado del adulto mayor en casa', cat: 'Cuidados', tipo: 'pago', modalidad: 'Semipresencial', horas: 24, inicio: '2026-11-07',
+  { id: 'cuidado-adulto-mayor', titulo: 'Cuidado del adulto mayor en casa', cat: 'Cuidados', modalidad: 'Semipresencial', horas: 24, inicio: '2026-11-07',
     horario: 'Del 7 al 28 de noviembre: teoría virtual los martes y práctica presencial los sábados', vacantes: 25, docente: 'Licenciada en enfermería geriátrica (CEP)',
     resumen: 'Higiene, movilización, alimentación y prevención de caídas para cuidar con seguridad a un adulto mayor.',
     temario: ['Cambios propios del envejecimiento', 'Higiene y confort de la persona dependiente', 'Movilización y traslado sin lesionarse', 'Prevención de caídas y úlceras por presión', 'Manejo de medicamentos y señales de alarma', 'Cuidar al cuidador'],
     dirigido: 'Asociados y familiares que cuidan a un adulto mayor.', certificado: 'Certificado de 24 horas académicas' },
-  { id: 'funciones-vitales-inyectables', titulo: 'Funciones vitales e inyectables', cat: 'Cuidados', tipo: 'pago', modalidad: 'Presencial', horas: 20, inicio: '2026-11-14',
+  { id: 'funciones-vitales-inyectables', titulo: 'Funciones vitales e inyectables', cat: 'Cuidados', modalidad: 'Presencial', horas: 20, inicio: '2026-11-14',
     horario: 'Sábados 14, 21 y 28 de noviembre y 5 de diciembre, 9:00 a. m. a 12:45 p. m.', vacantes: 18, docente: 'Licenciado en enfermería (CEP)',
     resumen: 'Medición de presión arterial, pulso, temperatura, saturación y glucosa, y técnica segura de inyectables.',
     temario: ['Presión arterial: técnica y valores normales', 'Pulso, respiración, temperatura y saturación', 'Control de glucosa capilar', 'Vías de administración de medicamentos', 'Inyección intramuscular y subcutánea', 'Bioseguridad y manejo de residuos'],
     dirigido: 'Asociados y familiares mayores de 18 años.', certificado: 'Certificado de 20 horas académicas' },
-  { id: 'uso-seguro-medicamentos', titulo: 'Uso seguro de medicamentos', cat: 'Farmacología', tipo: 'pago', modalidad: 'Virtual', horas: 16, inicio: '2026-10-20',
+  { id: 'uso-seguro-medicamentos', titulo: 'Uso seguro de medicamentos', cat: 'Farmacología', modalidad: 'Virtual', horas: 16, inicio: '2026-10-20',
     horario: 'Martes y jueves del 20 de octubre al 12 de noviembre, 7:00 a 8:30 p. m.', vacantes: 80, docente: 'Químico farmacéutico (CQFP)',
     resumen: 'Cómo leer una receta, evitar la automedicación y guardar correctamente los medicamentos en casa.',
     temario: ['Cómo leer una receta y el prospecto', 'Riesgos de la automedicación y del mal uso de antibióticos', 'Interacciones con alimentos y otros medicamentos', 'Medicamentos genéricos y de marca', 'Almacenamiento y desecho seguro en casa'],
     dirigido: 'Asociados, familiares y cuidadores.', certificado: 'Certificado de 16 horas académicas' },
-  { id: 'emergencias-prehospitalarias', titulo: 'Atención prehospitalaria de emergencias', cat: 'Primeros auxilios', tipo: 'pago', modalidad: 'Presencial', horas: 30, inicio: '2026-11-21',
+  { id: 'emergencias-prehospitalarias', titulo: 'Atención prehospitalaria de emergencias', cat: 'Primeros auxilios', modalidad: 'Presencial', horas: 30, inicio: '2026-11-21',
     horario: 'Sábados del 21 de noviembre al 19 de diciembre, 8:30 a. m. a 1:00 p. m.', vacantes: 18, docente: 'Médico emergenciólogo (CMP) y equipo paramédico',
     resumen: 'Evaluación inicial, inmovilización y traslado de pacientes en accidentes y emergencias frecuentes.',
     temario: ['Evaluación primaria y secundaria (ABCDE)', 'Control de hemorragias y manejo del shock', 'Inmovilización y traslado de lesionados', 'Emergencias médicas: infarto, ACV y convulsiones', 'Atención de múltiples víctimas', 'Simulacro final'],
     dirigido: 'Asociados, familiares y brigadistas mayores de 18 años.', certificado: 'Certificado de 30 horas académicas' },
-  { id: 'nutricion-enfermedades-cronicas', titulo: 'Nutrición para enfermedades crónicas', cat: 'Nutrición', tipo: 'pago', modalidad: 'Virtual', horas: 24, inicio: '2026-12-01',
+  { id: 'nutricion-enfermedades-cronicas', titulo: 'Nutrición para enfermedades crónicas', cat: 'Nutrición', modalidad: 'Virtual', horas: 24, inicio: '2026-12-01',
     horario: 'Martes y jueves del 1 al 17 de diciembre, 6:30 a 9:30 p. m.', vacantes: 60, docente: 'Nutricionista clínica (CNP)',
     resumen: 'Planes de alimentación para diabetes, hipertensión, colesterol alto y enfermedad renal.',
     temario: ['Evaluación nutricional básica', 'Alimentación en diabetes e hipertensión', 'Colesterol, triglicéridos e hígado graso', 'Cuidados nutricionales en la enfermedad renal', 'Diseño de menús y lista de compras'],
@@ -1562,18 +1649,15 @@ const toDate = iso => { const p = iso.split('-').map(Number); return new Date(p[
 const fmtShort = iso => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(toDate(iso)).replace('.', '');
 const fmtLong = iso => new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(toDate(iso));
 const sortByDate = list => list.slice().sort((a, b) => a.inicio.localeCompare(b.inicio));
+const coursesByArea = opt => Object.keys(CATS).map(cat => { const l = sortByDate(COURSES.filter(c => c.cat === cat)); return l.length ? '<optgroup label="' + esc(cat) + '">' + l.map(opt).join('') + '</optgroup>' : ''; }).join('');
 
-function accessHTML(c) {
-  return c.tipo === 'gratis'
-    ? '<div class="price is-free"><strong>Gratuito</strong><span>para asociados</span></div>'
-    : '<div class="price is-cert"><strong>Con certificado</strong><span>para asociados</span></div>';
-}
+const hasCert = c => /^Certificado/i.test(c.certificado);
+function accessHTML() { return '<span class="who">' + icon('users') + 'Asociados y familiares</span>'; }
 function courseCard(c) {
   const cat = CATS[c.cat];
-  const free = c.tipo === 'gratis';
   return '<article class="course" style="--tint:' + cat.tint + '">' +
     '<div class="course-art"><span class="course-pattern">' + icon(cat.icon) + '</span>' +
-    '<span class="badge ' + (free ? 'badge-free' : 'badge-paid') + '">' + (free ? 'Gratuito' : 'De pago') + '</span>' +
+    '<span class="badge badge-cert">' + (hasCert(c) ? 'Certificado' : 'Constancia') + '</span>' +
     '<span class="course-icon">' + icon(cat.icon) + '</span>' +
     (previewFor(c.id) ? '<button class="preview-chip" type="button" data-video="' + esc(previewFor(c.id).id) + '" aria-label="Ver vista previa de ' + esc(c.titulo) + '">' + PLAY_SVG + 'Vista previa</button>' : '') + '</div>' +
     '<div class="course-body"><p class="course-cat">' + esc(c.cat) + '</p>' +
@@ -1586,7 +1670,7 @@ function courseCard(c) {
 
 function updateCounts() {
   const v = site.videos.length;
-  const counts = { todos: COURSES.length, gratis: COURSES.filter(c => c.tipo === 'gratis').length, pago: COURSES.filter(c => c.tipo === 'pago').length, video: v };
+  const counts = { todos: COURSES.length, video: v };
   $$('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count]; });
   $$('[data-count-label]').forEach(el => { const n = counts[el.dataset.countLabel]; el.textContent = n + (n === 1 ? ' curso disponible' : ' cursos disponibles'); });
   $$('[data-needs-videos]').forEach(el => { el.hidden = !v; });
@@ -1669,7 +1753,7 @@ function openVideo(id) {
   const c = k.c;
   const full = safeUrl(v.completo);
   const meta = c
-    ? '<span>' + icon('calendar') + 'Inicia ' + fmtLong(c.inicio) + '</span><span>' + icon(MODS[c.modalidad]) + c.modalidad + '</span><span>' + icon(c.tipo === 'gratis' ? 'gift' : 'award') + (c.tipo === 'gratis' ? 'Gratuito' : 'Con certificado') + '</span>'
+    ? '<span>' + icon('calendar') + 'Inicia ' + fmtLong(c.inicio) + '</span><span>' + icon(MODS[c.modalidad]) + c.modalidad + '</span><span>' + icon('award') + (hasCert(c) ? 'Certificado' : 'Constancia') + '</span>'
     : (v.docente ? '<span>' + icon('stethoscope') + esc(v.docente) + '</span>' : '');
   const actions = c
     ? '<button class="btn btn-line" type="button" data-open-course="' + c.id + '">Ver detalle del curso</button>' + ingresarBtnHTML(c.id)
@@ -1705,13 +1789,7 @@ dlgV.addEventListener('click', e => {
 dlgV.addEventListener('close', () => { dlgV.innerHTML = ''; });
 
 /* ---------- Inicio: próximos inicios ---------- */
-let homeTipo = 'todos';
-function renderHome() {
-  const list = sortByDate(COURSES.filter(c => homeTipo === 'todos' || c.tipo === homeTipo)).slice(0, 6);
-  $('#home-grid').innerHTML = list.map(courseCard).join('');
-  $$('#home-tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tipo === homeTipo)));
-}
-$('#home-tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tipo]'); if (!b) return; homeTipo = b.dataset.tipo; renderHome(); });
+function renderHome() { $('#home-grid').innerHTML = sortByDate(COURSES).slice(0, 6).map(courseCard).join(''); }
 
 /* ---------- Cursos: filtros ---------- */
 const filters = { tipo: 'todos', cat: 'todas', mod: 'todas', q: '' };
@@ -1725,7 +1803,6 @@ function renderCourses() {
     return (filters.cat === 'todas' || k.catName === filters.cat) && (!q || norm(k.titulo + ' ' + v.descripcion + ' ' + k.catName).includes(q));
   }) : [];
   const list = isVid ? [] : sortByDate(COURSES.filter(c =>
-    (filters.tipo === 'todos' || c.tipo === filters.tipo) &&
     (filters.cat === 'todas' || c.cat === filters.cat) &&
     (filters.mod === 'todas' || c.modalidad === filters.mod) &&
     (!q || norm(c.titulo + ' ' + c.resumen + ' ' + c.cat + ' ' + c.temario.join(' ')).includes(q))
@@ -1735,15 +1812,12 @@ function renderCourses() {
   $('#empty').hidden = vids.length + list.length > 0;
   $$('#seg-tipo button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tipo === filters.tipo)));
   $$('#chips-cat .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cat === filters.cat)));
-  $('#note-gratis').hidden = filters.tipo !== 'gratis';
-  $('#note-pago').hidden = filters.tipo !== 'pago';
   $('#note-video').hidden = filters.tipo !== 'video';
-  const kind = filters.tipo === 'gratis' ? (list.length === 1 ? ' gratuito' : ' gratuitos') : filters.tipo === 'pago' ? ' de pago' : '';
   const parts = [];
   if (vids.length) parts.push(vids.length + (vids.length === 1 ? ' video de vista previa' : ' videos de vista previa'));
-  if (list.length) parts.push(list.length + (list.length === 1 ? ' curso' : ' cursos') + kind + ', ordenados por fecha de inicio');
+  if (list.length) parts.push(list.length + (list.length === 1 ? ' curso' : ' cursos') + ', ordenados por fecha de inicio');
   $('#results-line').textContent = parts.length ? 'Mostrando ' + parts.join(' y ') + '.' : '';
-  const label = filters.tipo === 'gratis' ? 'Cursos gratuitos' : filters.tipo === 'pago' ? 'Cursos de pago' : filters.tipo === 'video' ? 'Videos de los cursos' : 'Cursos';
+  const label = filters.tipo === 'video' ? 'Videos de los cursos' : 'Cursos';
   $('#t-cursos').textContent = label;
   $('#crumb-cursos').textContent = label;
 }
@@ -1765,7 +1839,6 @@ function openCourse(id) {
   const c = byId(id);
   if (!c) return;
   const cat = CATS[c.cat];
-  const free = c.tipo === 'gratis';
   const bc = site.botones.curso;
   const r = resolveBtn(bc, { curso: c });
   const contactBtn = r.href ? '<a class="btn btn-line" href="' + esc(r.href) + '"' + (r.ext ? ' target="_blank" rel="noopener"' : '') + '>' + (TIPO_ICON[bc.tipo] ? icon(TIPO_ICON[bc.tipo]) : '') + esc(bc.texto || 'Consultar') + '</a>' : '';
@@ -1773,11 +1846,11 @@ function openCourse(id) {
   const previewBlock = !pvw ? ''
     : videoSrc(pvw) ? '<div class="cd-preview"><div class="player">' + playerHTML(pvw, false) + '</div><p class="cd-preview-cap">' + icon('video') + 'Vista previa del curso · ' + secLabel(pvw) + '</p></div>'
     : '<p><button class="btn btn-soft btn-sm" type="button" data-open-video="' + esc(pvw.id) + '"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>Ver vista previa (' + secLabel(pvw) + ')</button></p>';
-  const price = '<div class="cd-price"><strong style="color:var(' + (free ? '--free' : '--paid') + ')">' + (free ? 'Gratuito' : 'Con certificado') + '</strong><span>Exclusivo para asociados. Entras con tu usuario de la plataforma de cursos.</span></div>';
+  const price = '<div class="cd-price"><strong style="color:var(--brand-strong);font-size:19px">Asociados y familiares</strong><span>Entras con tu usuario de la plataforma de cursos.</span></div>';
   dlgC.style.setProperty('--tint', cat.tint);
   dlgC.innerHTML =
     '<div class="cd-hero"><button class="icon-btn cd-close" type="button" data-close aria-label="Cerrar">' + icon('close') + '</button>' +
-    '<div class="cd-tags"><span class="badge ' + (free ? 'badge-free' : 'badge-paid') + '">' + (free ? 'Gratuito' : 'De pago') + '</span><span class="cd-cat">' + icon(cat.icon) + esc(c.cat) + '</span></div>' +
+    '<div class="cd-tags"><span class="badge badge-cert">' + (hasCert(c) ? 'Certificado' : 'Constancia') + '</span><span class="cd-cat">' + icon(cat.icon) + esc(c.cat) + '</span></div>' +
     '<h2 id="cd-title">' + esc(c.titulo) + '</h2><p>' + esc(c.resumen) + '</p></div>' +
     '<div class="dlg-body"><div class="cd-grid"><div class="cd-main">' + previewBlock +
     '<h3>' + icon('clipboard') + 'Qué aprenderás</h3><ul class="temario">' + c.temario.map(t => '<li>' + icon('check') + '<span>' + esc(t) + '</span></li>').join('') + '</ul>' +
@@ -1799,13 +1872,13 @@ dlgC.addEventListener('click', e => {
 dlgC.addEventListener('close', () => { $$('video', dlgC).forEach(x => x.pause()); });
 
 /* ---------- Navegación entre páginas ---------- */
-const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-videos': 'cursos', 'cursos-pago': 'cursos', contacto: 'contacto' };
+const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-videos': 'cursos', 'cursos-pago': 'cursos', preguntas: 'preguntas', contacto: 'contacto' };
 let currentPage = null;
 function route(h) {
   if (h == null) h = decodeURIComponent(location.hash.slice(1));
   const page = ALIAS[h];
   if (!page) return;
-  if (page === 'cursos') setTipo(h === 'cursos-gratuitos' ? 'gratis' : h === 'cursos-pago' ? 'pago' : h === 'cursos-videos' ? 'video' : 'todos');
+  if (page === 'cursos') setTipo(h === 'cursos-videos' ? 'video' : 'todos');
   $$('.page').forEach(p => { p.hidden = p.dataset.page !== page; });
   currentPage = page;
   document.body.classList.toggle('on-contacto', page === 'contacto');
@@ -1870,6 +1943,38 @@ function toast(msg, ic) {
   setTimeout(() => t.remove(), 4800);
 }
 
+/* ---------- Preguntas frecuentes ---------- */
+let faqQuery = '';
+function faqActionHTML(a) {
+  if (a === 'ingresar') return ingresarBtnHTML(null);
+  if (a === 'cursos') return '<a class="btn btn-brand" href="#cursos">' + icon('book') + 'Ver los cursos</a>';
+  if (a === 'videos') return site.videos.length ? '<a class="btn btn-brand" href="#cursos-videos">' + icon('video') + 'Ver los videos</a>' : '';
+  if (a === 'whatsapp') { const h = waLink(site.contacto.whatsappMensaje); return h ? '<a class="btn btn-wa" href="' + esc(h) + '" target="_blank" rel="noopener">' + icon('whatsapp') + 'Escribir por WhatsApp</a>' : ''; }
+  if (a === 'contacto') return '<a class="btn btn-brand" href="#contacto">' + icon('mail') + 'Ir a Contáctanos</a>';
+  return '';
+}
+function renderFaq() {
+  const q = norm(faqQuery.trim());
+  const all = site.faq.filter(f => f.pregunta);
+  const items = all.filter(f => !q || norm(f.pregunta + ' ' + f.respuesta).includes(q));
+  $('#faq-list').innerHTML = items.map(f => '<details' + (q && items.length <= 3 ? ' open' : '') + '><summary>' + esc(f.pregunta) + icon('chevDown') + '</summary><div class="faq-a">' + (f.respuesta ? '<p>' + esc(f.respuesta) + '</p>' : '') + faqActionHTML(f.accion) + '</div></details>').join('');
+  $('#faq-empty').hidden = items.length > 0;
+  $('#faq-count').textContent = q
+    ? (items.length ? items.length + (items.length === 1 ? ' pregunta encontrada.' : ' preguntas encontradas.') : '')
+    : all.length + (all.length === 1 ? ' pregunta.' : ' preguntas.') + ' Toca una para ver la respuesta.';
+  const wa = waLink(site.contacto.whatsappMensaje);
+  const a = $('#faq-wa'); a.hidden = !wa; if (wa) a.href = wa;
+}
+$('#faq-buscar').addEventListener('input', e => { faqQuery = e.target.value; renderFaq(); });
+// Tamaño de letra de las preguntas (se recuerda en este navegador).
+function setFaqSize(v) {
+  $('#faq-wrap').style.setProperty('--fs', v);
+  $$('.faq-size button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fs === v)));
+  store.set('instituto-faq-letra', v);
+}
+$('.faq-size').addEventListener('click', e => { const b = e.target.closest('button[data-fs]'); if (b) setFaqSize(b.dataset.fs); });
+{ const fs = store.get('instituto-faq-letra'); if (['1', '1.15', '1.3'].includes(fs)) setFaqSize(fs); }
+
 /* ---------- Aplicar contenido editable a la página ---------- */
 function applySite() {
   const c = site.contacto;
@@ -1895,6 +2000,7 @@ function applySite() {
   renderHomeVideos();
   renderHome();
   renderCourses();
+  renderFaq();
   document.title = c.nombre || 'Instituto Mutualista';
   $('#t-inicio').textContent = (c.nombre || 'Instituto') + ': cursos de salud para asociados';
 }
@@ -1992,7 +2098,7 @@ async function loadSite() {
 
 /* ---------- Panel de administración (oculto) ---------- */
 const dlgA = $('#dlg-admin');
-const TABS = [['portada', 'Portada', 'image'], ['videos', 'Videos (30 s)', 'video'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
+const TABS = [['portada', 'Portada', 'image'], ['videos', 'Videos (30 s)', 'video'], ['preguntas', 'Preguntas frecuentes', 'help'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
 let admTab = 'portada';
 let draft = null;
 let dirty = false;
@@ -2137,8 +2243,7 @@ function vidStatus(v) {
 function courseOptions(sel) {
   const o = (c) => '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.titulo) + '</option>';
   return '<option value=""' + (sel ? '' : ' selected') + '>Ninguno</option>' +
-    '<optgroup label="Cursos gratuitos">' + sortByDate(COURSES.filter(c => c.tipo === 'gratis')).map(o).join('') + '</optgroup>' +
-    '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(o).join('') + '</optgroup>';
+    coursesByArea(o);
 }
 function vidRow(v, i, n) {
   const k = videoInfo(v);
@@ -2227,6 +2332,29 @@ function readVideo(file) {
     };
     vid.src = url;
   });
+}
+function faqRow(f, i, n) {
+  const opt = (val, label, sel) => '<option value="' + esc(val) + '"' + (val === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+  return '<li class="ed-row faq-row" data-q="' + i + '"><span class="faq-num">' + (i + 1) + '</span>' +
+    '<div class="ed-fields">' +
+    '<label class="ed-f ed-wide"><span>Pregunta</span><input id="faq-p-' + f.id + '" data-ff="pregunta" maxlength="200" value="' + esc(f.pregunta) + '" placeholder="Ej.: ¿A qué hora son las clases?"></label>' +
+    '<label class="ed-f ed-wide"><span>Respuesta</span><textarea id="faq-r-' + f.id + '" data-ff="respuesta" rows="3" maxlength="1500" placeholder="Respuesta corta y clara. Puedes usar varias líneas.">' + esc(f.respuesta) + '</textarea></label>' +
+    '<label class="ed-f"><span>Botón debajo de la respuesta</span><select id="faq-a-' + f.id + '" data-ff="accion">' + FAQ_ACCIONES.map(a => opt(a[0], a[1], f.accion)).join('') + '</select></label>' +
+    '</div>' +
+    '<div class="ed-actions">' +
+    (f.confirm
+      ? '<div class="ed-confirm">¿Quitar esta pregunta?<div><button class="btn btn-line btn-xs" type="button" data-act="faq-del-yes">Sí, quitar</button><button class="btn btn-line btn-xs" type="button" data-act="faq-del-no">No</button></div></div>'
+      : '<button class="icon-btn" type="button" data-act="faq-up" aria-label="Subir pregunta ' + (i + 1) + '"' + (i === 0 ? ' disabled' : '') + '>' + icon('up') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="faq-down" aria-label="Bajar pregunta ' + (i + 1) + '"' + (i === n - 1 ? ' disabled' : '') + '>' + icon('down') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="faq-del" aria-label="Quitar pregunta ' + (i + 1) + '">' + icon('trash') + '</button>') +
+    '</div></li>';
+}
+function panelFaq() {
+  return '<h3>Preguntas frecuentes</h3><p class="adm-intro">Se muestran en la pestaña Preguntas frecuentes, en este orden. Escríbelas como las haría un asociado y responde con frases cortas. Puedes poner un botón debajo de la respuesta, por ejemplo “Ingresar” o “Escribir por WhatsApp”.</p>' +
+    (draft.faq.length
+      ? '<ol class="ed-list">' + draft.faq.map((f, i) => faqRow(f, i, draft.faq.length)).join('') + '</ol>'
+      : '<div class="empty">' + icon('help') + '<h3>Aún no hay preguntas</h3><p>Pulsa “Agregar pregunta” para crear la primera.</p></div>') +
+    '<p style="margin-top:16px"><button class="btn btn-brand btn-sm" type="button" data-act="faq-add"' + (draft.faq.length >= MAX_FAQ ? ' disabled' : '') + '>' + icon('plus') + 'Agregar pregunta</button></p>';
 }
 function waHint() { const n = waNumber(draft); return n ? 'Enlace que se usará: wa.me/' + n : 'Escribe el número con código de país, por ejemplo +51 987 654 321.'; }
 function mapHint() { return safeUrl(draft.contacto.mapa) ? 'Se usará este enlace.' : 'Vacío: se buscará la dirección en Google Maps.'; }
@@ -2334,7 +2462,7 @@ function panelSeguridad() {
     '<li><span class="quick-ico qi-brand">' + icon('pointer') + '</span><span>Haz clic 5 veces seguidas en el símbolo <code>©</code> del pie de página.</span></li></ul>' +
     '<p class="adm-note">' + icon('info') + '<span>El PIN evita que un visitante entre por accidente. La protección real está en el guardado: solo las personas con permiso de edición de esta página pueden publicar cambios. En el sitio final, el panel debe ir detrás de un inicio de sesión en el servidor.</span></p>';
 }
-const PANELS = { portada: panelPortada, videos: panelVideos, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
+const PANELS = { portada: panelPortada, videos: panelVideos, preguntas: panelFaq, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
 function renderPanel(focusId) {
   $('#adm-panel').innerHTML = PANELS[admTab]();
   if (focusId) { const f = document.getElementById(focusId); if (f) f.focus(); }
@@ -2355,6 +2483,8 @@ admPanel.addEventListener('input', e => {
     if (card && !t.hasAttribute('data-rerender')) { const k = card.dataset.bkey; $('#btn-' + k + '-prev').innerHTML = btnPreview(draft.botones[k]); }
     return;
   }
+  const frow = t.closest('.faq-row');
+  if (frow && t.dataset.ff) { draft.faq[+frow.dataset.q][t.dataset.ff] = t.value; markDirty(); return; }
   const vrow = t.closest('.vid-row');
   if (vrow && t.dataset.vf) {
     const v = draft.videos[+vrow.dataset.v];
@@ -2430,6 +2560,19 @@ admPanel.addEventListener('click', e => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   const act = b.dataset.act;
+  if (act.startsWith('faq-')) {
+    const fr = b.closest('.faq-row');
+    const j = fr ? +fr.dataset.q : -1;
+    const fl = draft.faq;
+    if (act === 'faq-add') { if (fl.length < MAX_FAQ) { fl.push({ id: 'faq-' + uid(), pregunta: '', respuesta: '', accion: '', confirm: false }); markDirty(); renderPanel('faq-p-' + fl[fl.length - 1].id); } return; }
+    if (act === 'faq-up' && j > 0) { const t = fl[j - 1]; fl[j - 1] = fl[j]; fl[j] = t; markDirty(); }
+    else if (act === 'faq-down' && j < fl.length - 1) { const t = fl[j + 1]; fl[j + 1] = fl[j]; fl[j] = t; markDirty(); }
+    else if (act === 'faq-del') { fl.forEach(f => { f.confirm = false; }); fl[j].confirm = true; }
+    else if (act === 'faq-del-no') { fl[j].confirm = false; }
+    else if (act === 'faq-del-yes') { fl.splice(j, 1); markDirty(); }
+    renderPanel();
+    return;
+  }
   if (act.startsWith('vid-')) {
     const vr = b.closest('.vid-row');
     const j = vr ? +vr.dataset.v : -1;
@@ -2534,13 +2677,14 @@ const videoMeta = (v, portada, archivo) => ({ id: v.id, titulo: v.titulo, descri
 function serialize(d, slides, logo, videos) {
   const cursos = {};
   Object.keys(d.plataforma.cursos).forEach(id => { const u = String(d.plataforma.cursos[id] || '').trim(); if (u) cursos[id] = u; });
-  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, plataforma: { url: d.plataforma.url.trim(), texto: d.plataforma.texto, cursos: cursos }, seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
+  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, plataforma: { url: d.plataforma.url.trim(), texto: d.plataforma.texto, cursos: cursos }, faq: d.faq.map(f => ({ id: f.id, pregunta: f.pregunta, respuesta: f.respuesta, accion: f.accion })), seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
 }
 function commitDraft() {
   const keepSession = session.get('im-admin') === currentPinHash();
   site = cloneSite(draft);
   site.slides.forEach(s => { delete s.confirm; delete s.warn; });
   site.videos.forEach(v => { delete v.confirm; });
+  site.faq.forEach(f => { delete f.confirm; });
   if (keepSession) session.set('im-admin', currentPinHash());
   dirty = false;
   applySite(); cur = 0; renderHero();
@@ -2627,8 +2771,7 @@ $('#adm-save').addEventListener('click', async () => {
 /* ---------- Formulario de contacto ---------- */
 const sel = $('#f-curso');
 sel.innerHTML = '<option value="">Aún no lo sé, quiero orientación</option>' +
-  '<optgroup label="Cursos gratuitos">' + sortByDate(COURSES.filter(c => c.tipo === 'gratis')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>' +
-  '<optgroup label="Cursos de pago">' + sortByDate(COURSES.filter(c => c.tipo === 'pago')).map(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>').join('') + '</optgroup>';
+  coursesByArea(c => '<option value="' + c.id + '">' + esc(c.titulo) + '</option>');
 const form = $('#contact-form');
 const RULES = {
   'f-nombres': v => v.trim().length >= 2 || 'Ingresa tus nombres.',

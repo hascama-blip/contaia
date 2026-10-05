@@ -69,11 +69,11 @@
   "slides": [
     {
       "id": "ejemplo-1",
-      "eyebrow": "Cursos preventivos gratuitos",
+      "eyebrow": "Cursos para asociados y familias",
       "title": "Cuida tu salud y la de tu familia",
-      "text": "Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud. Sin costo para asociados.",
-      "cta": "Ver cursos gratuitos",
-      "href": "#cursos-gratuitos",
+      "text": "Aprende a prevenir enfermedades y a actuar ante una emergencia con profesionales de la salud.",
+      "cta": "Ver cursos",
+      "href": "#cursos",
       "art": "prevencion",
       "img": null,
       "pos": "centro"
@@ -82,9 +82,9 @@
       "id": "ejemplo-2",
       "eyebrow": "Cursos con certificado",
       "title": "Formación práctica con respaldo profesional",
-      "text": "RCP, cuidado del adulto mayor, funciones vitales y más, con tarifa preferencial de asociado.",
-      "cta": "Ver cursos de pago",
-      "href": "#cursos-pago",
+      "text": "RCP, cuidado del adulto mayor, funciones vitales y más, con certificado de horas académicas.",
+      "cta": "Ver videos de 30 s",
+      "href": "#cursos-videos",
       "art": "cursos",
       "img": null,
       "pos": "centro"
