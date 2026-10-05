@@ -9,12 +9,14 @@ mutualista que ofrece cursos de salud preventivos y de especialización a sus as
   pasos de inscripción.
 - **Nosotros**: quiénes somos, modelo (gratuito / tarifa asociado / certificación), misión,
   visión, valores y equipo.
-- **Cursos** (con submenú *Gratuitos* / *En video* / *De pago*): filtros por tipo, área,
+- **Cursos** (con submenú *Gratuitos* / *Videos* / *De pago*): filtros por tipo, área,
   modalidad y búsqueda; ficha de cada curso con temario, horario, docente y precios.
-- **Cursos en video** (gratis, de 20 a 30 min): sección en Inicio (los 3 primeros) y en Cursos
-  (`#cursos-videos`). Se reproducen dentro de la página con YouTube, Vimeo, Google Drive o un
-  archivo MP4/WebM. Dentro del visor de Claude los reproductores externos están bloqueados, así
-  que ahí el video se abre en una pestaña nueva.
+- **Videos de vista previa (30 s)**: clips cortos que muestran de qué trata cada curso. Se ven en
+  Inicio ("Conoce nuestros cursos en 30 segundos", los 3 primeros), en Cursos → Videos
+  (`#cursos-videos`), como botón "Vista previa" en la tarjeta del curso y dentro de su ficha.
+  En computadora se reproducen en silencio al pasar el mouse. Se suben como archivo MP4 (H.264)
+  o WebM de hasta 30 s y 15 MB; el panel rechaza los más largos y saca la portada del video.
+  Alternativa: enlace de YouTube, del que solo se muestran los primeros 30 s.
 - **Contáctanos**: datos de contacto, formulario con validación (DNI, celular, Ley 29733),
   redes sociales, mapa y preguntas frecuentes.
 
@@ -28,7 +30,7 @@ Pide un **PIN** (por defecto `2026`; se cambia en la pestaña *Seguridad*). Pest
 | Pestaña | Qué se edita |
 | --- | --- |
 | Portada | Fotos del carrusel (subir, cambiar, quitar, encuadre, orden), antetítulo, título, texto y botón de cada diapositiva |
-| Cursos en video | Agregar, ordenar y quitar videos gratuitos: título, enlace (YouTube no listado, Vimeo o Google Drive), duración, área, expositor, descripción y portada |
+| Videos (30 s) | Subir clips de vista previa (máx. 30 s), elegir de qué curso son, título, descripción, expositor, portada, enlace al curso completo y orden |
 | Contacto | Nombre, lema, logo, WhatsApp, mensaje inicial de WhatsApp, teléfono, correo, horario, dirección, enlace de Google Maps |
 | Redes sociales | Facebook, Instagram, TikTok, YouTube, LinkedIn, Messenger (vacío = no se muestra) |
 | Botones | Texto y destino de cada botón de contacto (página, WhatsApp, llamada, correo, red social u otro enlace) y burbujas flotantes de WhatsApp / Messenger |
@@ -39,8 +41,13 @@ Pide un **PIN** (por defecto `2026`; se cambia en la pestaña *Seguridad*). Pest
 El PIN solo evita que un visitante entre por accidente (el código es público). En un sitio en
 producción el panel debe ir detrás de un inicio de sesión en servidor.
 
+## Colores
+La paleta sale del logo de la AMSP: azul `#0B6296` (principal), azul medio `#2C78A4` y gris
+azulado claro `#E8F0F0`, sobre fondo blanco. El naranja `#FF9F1C` queda solo para los botones
+principales. Los tokens están en `:root`.
+
 ## Dónde se guardan los cambios
-Todo el contenido editable vive en `sitio.json` (+ imágenes en `imagenes/`).
+Todo el contenido editable vive en `sitio.json` (+ imágenes en `imagenes/` y videos en `videos/`).
 El logo de la Asociación Mutualista Sanitaria del Perú (AMSP) está en `imagenes/logo-amsp.png`
 (recortado en círculo con fondo transparente) y `sitio.json` lo usa como logo del sitio.
 - **Publicado como Artifact de Claude**: al guardar se publican `sitio.json` y las fotos como
