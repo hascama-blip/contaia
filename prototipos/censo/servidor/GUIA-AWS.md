@@ -18,6 +18,12 @@ Qué se necesita: cuenta de AWS, el dominio comprado en GoDaddy y unos 30 minuto
    configuración del entorno de Claude Code (variables `AWS_ACCESS_KEY_ID` y
    `AWS_SECRET_ACCESS_KEY`), **nunca en el chat**. Se pueden borrar al terminar.
 
+> **Nota (oct. 2026):** en esta cuenta la organización de AWS **bloquea Lightsail** (crear
+> instancias, IPs y buckets). El servidor se crea entonces en **EC2** con
+> `despliegue/crear-ec2.sh` (instancia `t4g.micro` Ubuntu 24.04, IP elástica, disco de 20 GB,
+> ≈ US$ 11/mes con la IP pública). El resto de la guía aplica igual; donde dice Lightsail,
+> léase EC2. El usuario IAM necesita la política `AmazonEC2FullAccess`.
+
 ## 2. Servidor en Lightsail
 1. https://lightsail.aws.amazon.com → *Create instance*.
 2. Región: **US East (N. Virginia, us-east-1)**. La organización de AWS de la cuenta solo
