@@ -41,6 +41,8 @@ producción el panel debe ir detrás de un inicio de sesión en servidor.
 
 ## Dónde se guardan los cambios
 Todo el contenido editable vive en `sitio.json` (+ imágenes en `imagenes/`).
+El logo de la Asociación Mutualista Sanitaria del Perú (AMSP) está en `imagenes/logo-amsp.png`
+(recortado en círculo con fondo transparente) y `sitio.json` lo usa como logo del sitio.
 - **Publicado como Artifact de Claude**: al guardar se publican `sitio.json` y las fotos como
   archivos de la página; lo ven todos los visitantes. Solo quien tiene permiso de edición
   puede guardar.
