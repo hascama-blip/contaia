@@ -101,6 +101,17 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Endpoints de propuesta/ticket (legacy, ya no usados por defecto): `/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta`,
   estado `consultaestadotickets?perIni=&perFin=&numTicket=`, descarga `archivoreporte`.
 
+### DNI / RENIEC (apidni.com)
+- `src/lib/reniec.ts` + ruta `GET /api/reniec/{dni}`. Proveedor https://apidni.com
+  (`GET https://apidni.com/api/v2/dni/{dni}`, `Authorization: Bearer APIDNI_TOKEN`;
+  OK → `codigo > 0` y `data{dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento
+  dd-mm-aaaa, genero, direccion, ubigeo, distrito, provincia, departamento}`; error → `codigo 0`
+  y el motivo en `respuesta`). Sin token → datos **simulados** (`fuente: "simulado"`).
+- La ruta la usa también el **portal del C.C. Inmaculada Concepción** (otro dominio, sin
+  sesión): cabecera `x-api-key` = `RENIEC_API_KEY`, CORS por `RENIEC_CORS_ORIGENES`
+  (`null` = HTML abierto en local), tope `RENIEC_LIMITE_MINUTO` por IP. El middleware deja
+  pasar `/api/reniec/`; la ruta valida clave o cookie.
+
 ### Buzón electrónico (NO tiene API pública → Playwright)
 - `playwright-core` + `@sparticuz/chromium` (corre en Render Node sin Docker).
 - Flujo en `consultarBuzon`: login SOL (`e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm`,

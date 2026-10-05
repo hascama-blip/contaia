@@ -608,3 +608,9 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 .historial-cab h3 { margin: 0; font-size: var(--t-base); }
 .celda-sub { display: block; margin-top: 3px; font-size: var(--t-xs); color: var(--texto-3); }
 .subtitulo-ficha { margin: 28px 0 14px; font-size: var(--t-lg); padding-top: 20px; border-top: 1px solid var(--borde); }
+
+/* Campo con botón al costado (DNI + Buscar en RENIEC) */
+.con-boton { display: flex; gap: 8px; align-items: stretch; }
+.con-boton .input { flex: 1 1 120px; min-width: 0; }
+.con-boton .btn { white-space: nowrap; }
+@media (max-width: 480px) { .con-boton { flex-wrap: wrap; } .con-boton .btn { flex: 1 1 100%; } }

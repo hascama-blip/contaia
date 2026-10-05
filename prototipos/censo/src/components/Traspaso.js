@@ -9,6 +9,7 @@ import { hoy, fecha } from "../lib/formato.js";
 import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
 import { cadenaPropietarios, ordinal } from "../lib/propietarios.js";
 import { transferirStand } from "../api/stands.js";
+import { BotonReniec } from "./BotonReniec.js";
 
 /** Línea de tiempo: 1.er propietario → … → propietario actual. */
 export function HistorialPropietarios({ stand, compacto = false }) {
@@ -102,7 +103,12 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
           <//>`
         : html`
           <p className="ayuda" style=${{ marginTop: -6 }}>Con estos datos entra al padrón; el resto de su ficha se completa después.</p>
-          <${Campo} id="t-dni" etiqueta="DNI" req error=${errores.dni}><${Entrada} id="t-dni" valor=${t.nueva.dni} onCambio=${cambiaNueva("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} /><//>
+          <${Campo} id="t-dni" etiqueta="DNI" req error=${errores.dni}>
+            <div className="con-boton">
+              <${Entrada} id="t-dni" valor=${t.nueva.dni} onCambio=${cambiaNueva("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
+              <${BotonReniec} dni=${t.nueva.dni} onDatos=${(campos) => setT((x) => ({ ...x, nueva: { ...x.nueva, nombres: campos.nombres, apellidoPaterno: campos.apellidoPaterno, apellidoMaterno: campos.apellidoMaterno } }))} />
+            </div>
+          <//>
           <${Campo} id="t-nombres" etiqueta="Nombres" req error=${errores.nombres}><${Entrada} id="t-nombres" valor=${t.nueva.nombres} onCambio=${cambiaNueva("nombres")} error=${errores.nombres} /><//>
           <${Campo} id="t-ap" etiqueta="Apellido paterno" req error=${errores.apellidoPaterno}><${Entrada} id="t-ap" valor=${t.nueva.apellidoPaterno} onCambio=${cambiaNueva("apellidoPaterno")} error=${errores.apellidoPaterno} /><//>
           <${Campo} id="t-am" etiqueta="Apellido materno"><${Entrada} id="t-am" valor=${t.nueva.apellidoMaterno} onCambio=${cambiaNueva("apellidoMaterno")} /><//>

@@ -72,6 +72,16 @@ los documentos en una carpeta fuera del repo (los datos personales no se version
 - Pagos: `COBRANZA_DESDE` (config.js) marca desde qué mes se registran; lo
   anterior no cuenta como deuda.
 
+## Consulta de DNI (RENIEC)
+
+Botón «Buscar en RENIEC» junto al DNI (Nueva ficha y Registrar venta → persona
+nueva): llena nombres, apellidos, fecha de nacimiento, dirección y distrito.
+La consulta la hace Radar (`/api/reniec/{dni}`, token de apidni.com en Render);
+aquí solo va `CONSULTA_DNI = { url, clave }` en `src/config.js` (`clave` =
+`RENIEC_API_KEY` de Radar; solo sirve para consultar DNI). Con `clave: ""` el
+botón no aparece. `lib/reniec.js` hace la llamada; `components/BotonReniec.js`
+es el botón.
+
 ## Datos
 
 Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el dueño está en

@@ -4,6 +4,7 @@ import { html } from "./html.js";
 import { Campo, Entrada, Selector, Texto } from "./ui.js";
 import { LISTAS } from "../config.js";
 import { ESTADOS_ASOCIADO, ESTADOS_STAND } from "../lib/types.js";
+import { BotonReniec } from "./BotonReniec.js";
 
 // Lectura/escritura inmutable por ruta: "nacimiento.distrito", "hijos.0.nombre"
 function leer(obj, ruta) {
@@ -62,8 +63,11 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
         <${Campo} id="f-apellidoMaterno" etiqueta="Apellido materno">
           <${Entrada} ...${c("apellidoMaterno")} />
         <//>
-        <${Campo} id="f-dni" etiqueta="DNI" req error=${errores.dni} ayuda="8 dígitos">
-          <${Entrada} ...${c("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
+        <${Campo} id="f-dni" etiqueta="DNI" req error=${errores.dni} ayuda="8 dígitos. Con «Buscar en RENIEC» se llenan nombres y apellidos.">
+          <div className="con-boton">
+            <${Entrada} ...${c("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
+            <${BotonReniec} dni=${ficha.dni} disabled=${bloqueado} onDatos=${(campos) => setFicha((f) => ({ ...f, ...campos }))} />
+          </div>
         <//>
         <${Campo} id="f-fechaNacimiento" etiqueta="Fecha de nacimiento">
           <${Entrada} ...${c("fechaNacimiento")} tipo="date" />

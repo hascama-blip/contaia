@@ -21,7 +21,10 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/api/asociacion") ||
     // Webhooks entrantes (correo de SUNAT para el RTT): los llama el proveedor
     // de correo, sin sesión; se protegen con su propio secreto compartido.
-    pathname.startsWith("/api/webhooks/")
+    pathname.startsWith("/api/webhooks/") ||
+    // Consulta de DNI: la usa también el portal del C.C. (otro dominio) sin
+    // sesión; la ruta valida por sí misma la cabecera x-api-key o la cookie.
+    pathname.startsWith("/api/reniec/")
   ) {
     return pasar();
   }

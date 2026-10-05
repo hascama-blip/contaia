@@ -65,3 +65,12 @@ export const LIMITE_INCIDENCIAS = 3;
 
 // Motivos de cambio de propietario de un stand (el anterior queda en el historial).
 export const MOTIVOS_TRASPASO = ["Compraventa", "Herencia (sucesión)", "Donación o anticipo de legítima", "Adjudicación judicial", "Otro"];
+
+// Consulta de DNI (RENIEC). La hace el servidor de Radar (ruta /api/reniec),
+// que guarda el token de apidni.com. `clave` = RENIEC_API_KEY de ese servidor
+// (solo permite consultar DNI; el token real nunca llega a esta página).
+// Déjalo en "" para desactivar el botón "Buscar en RENIEC".
+export const CONSULTA_DNI = {
+  url: "https://contaia.onrender.com/api/reniec",
+  clave: "",
+};
