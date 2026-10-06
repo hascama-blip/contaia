@@ -236,7 +236,7 @@ async function manejar(req, res) {
       if (token !== undefined) reniec.establecerToken(token);
       let prueba = null;
       if (probarDni) {
-        try { prueba = { ok: true, persona: await reniec.consultar(String(probarDni), { forzar: true }) }; }
+        try { prueba = { ok: true, persona: await reniec.consultar(String(probarDni)) }; }
         catch (e) { prueba = { ok: false, error: e.message || String(e) }; }
         if (reniec.ultimaCruda) prueba.cruda = reniec.ultimaCruda; // para calibrar si el proveedor responde distinto
       }
