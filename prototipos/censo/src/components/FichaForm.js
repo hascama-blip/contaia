@@ -140,9 +140,10 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
             <${Campo} id=${`f-hijos-${i}-nombre`} etiqueta="Nombre completo"><${Entrada} ...${c(`hijos.${i}.nombre`)} /><//>
             <${Campo} id=${`f-hijos-${i}-edad`} etiqueta="Edad"><${Entrada} ...${c(`hijos.${i}.edad`)} inputMode="numeric" /><//>
             <${Campo} id=${`f-hijos-${i}-estudios`} etiqueta="Estudios"><${Selector} ...${c(`hijos.${i}.estudios`)} opciones=${LISTAS.estudios} /><//>
+            <${Campo} id=${`f-hijos-${i}-dni`} etiqueta="DNI"><${Entrada} ...${c(`hijos.${i}.dni`)} inputMode="numeric" maxLength="8" /><//>
           </div>
         </div>`)}
-      ${!bloqueado && html`<div><button type="button" className="btn btn-ghost" onClick=${() => agregar("hijos", { nombre: "", edad: "", estudios: "" })}>+ Agregar hijo(a)</button></div>`}`,
+      ${!bloqueado && html`<div><button type="button" className="btn btn-ghost" onClick=${() => agregar("hijos", { nombre: "", edad: "", estudios: "", dni: "" })}>+ Agregar hijo(a)</button></div>`}`,
     familiares: html`
       ${(ficha.familiares || []).map((x, i) => html`
         <div className="subtarjeta" key=${`fa${i}`}>
@@ -151,10 +152,11 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
           <div className="form-rejilla">
             <${Campo} id=${`f-familiares-${i}-nombre`} etiqueta="Nombre completo"><${Entrada} ...${c(`familiares.${i}.nombre`)} /><//>
             <${Campo} id=${`f-familiares-${i}-parentesco`} etiqueta="Parentesco"><${Selector} ...${c(`familiares.${i}.parentesco`)} opciones=${LISTAS.parentescos} /><//>
+            <${Campo} id=${`f-familiares-${i}-edad`} etiqueta="Edad"><${Entrada} ...${c(`familiares.${i}.edad`)} inputMode="numeric" /><//>
             <${Campo} id=${`f-familiares-${i}-estudios`} etiqueta="Estudios"><${Selector} ...${c(`familiares.${i}.estudios`)} opciones=${LISTAS.estudios} /><//>
           </div>
         </div>`)}
-      ${!bloqueado && html`<div><button type="button" className="btn btn-ghost" onClick=${() => agregar("familiares", { nombre: "", parentesco: "", estudios: "" })}>+ Agregar familiar</button></div>`}`,
+      ${!bloqueado && html`<div><button type="button" className="btn btn-ghost" onClick=${() => agregar("familiares", { nombre: "", parentesco: "", edad: "", estudios: "" })}>+ Agregar familiar</button></div>`}`,
     stand: html`
       <div className="form-rejilla">
         <${Campo} id="f-giro" etiqueta="Giro comercial">

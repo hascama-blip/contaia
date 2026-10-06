@@ -34,8 +34,8 @@
  * @property {EstadoAsociado} estado
  * @property {string} cuentaBancaria
  * @property {{nombre:string, dni:string, celular:string}|null} conyuge
- * @property {{nombre:string, edad:number|string, estudios:string}[]} hijos
- * @property {{nombre:string, parentesco:string, estudios:string}[]} familiares
+ * @property {{nombre:string, edad:number|string, estudios:string, dni?:string}[]} hijos
+ * @property {{nombre:string, parentesco:string, edad?:string, estudios:string}[]} familiares
  * @property {{estado:EstadoCenso, fecha:string|null, visita:string|null, por?:string}} censo
  * @property {string} observaciones        de la Junta Directiva
  * @property {Partial<Record<TipoArchivo,string>>} archivos   ids de archivos subidos
