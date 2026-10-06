@@ -117,7 +117,7 @@ export function Ficha({ id }) {
       const r = await actualizarDesdeReniec({ ...a, dni }, { por: usuario?.id, conFoto: puedeSubir });
       if (r.simulado) { avisar("El servidor no tiene token de RENIEC: no se cambió nada.", "error"); return; }
       setSucio(false);
-      avisar(`Ficha actualizada con RENIEC: ${r.persona.apellidoPaterno} ${r.persona.apellidoMaterno}, ${r.persona.nombres}.${r.foto ? " Foto del DNI guardada." : ""}`);
+      avisar(`Ficha actualizada con RENIEC: ${r.persona.apellidoPaterno} ${r.persona.apellidoMaterno}, ${r.persona.nombres}.${r.foto ? " Foto del DNI guardada." : r.persona.fotoGenerica ? " RENIEC no tiene foto de esta persona." : ""}`);
     } catch (e) { avisar(mensajeError(e), "error"); }
   }
   const estado = a.censo?.estado || "pendiente";

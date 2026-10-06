@@ -1,6 +1,7 @@
 // Consulta de DNI vía apidni.com (misma lógica que src/lib/reniec.ts de Radar),
 // con caché en disco para no gastar dos veces la misma consulta.
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 
 const txt = (v) => String(v ?? "").trim();
@@ -77,6 +78,9 @@ export class Reniec {
     this.token = token || c.apidniToken || "";
     this.url = c.apidniUrl || url;
     this.modoAuth = c.apidniAuth || "bearer";
+    // Fotos "genéricas" del proveedor (la misma imagen para personas distintas = "No hay foto disponible").
+    this.fotosVistas = c.fotosVistas || {};      // hash → primer DNI con esa foto
+    this.fotosGenericas = new Set(c.fotosGenericas || []);
     this.ultimaCruda = null; // última respuesta del proveedor (para calibrar desde Administración)
     this.ruta = path.join(dir, "reniec-cache.json");
     try { this.cache = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.cache = {}; }
@@ -107,6 +111,21 @@ export class Reniec {
     return {};
   }
 
+  /** Quita la foto si es la imagen genérica del proveedor (misma imagen en DNI distintos). */
+  #filtrarFotoGenerica(p) {
+    if (!p.fotoBase64) return p;
+    const h = crypto.createHash("sha1").update(p.fotoBase64).digest("hex");
+    if (this.fotosGenericas.has(h)) { const { fotoBase64, ...sin } = p; return { ...sin, fotoGenerica: true }; }
+    const primero = this.fotosVistas[h];
+    if (primero && primero !== p.dni) {
+      this.fotosGenericas.add(h);
+      this.#guardarConfig({ fotosGenericas: [...this.fotosGenericas] });
+      const { fotoBase64, ...sin } = p; return { ...sin, fotoGenerica: true };
+    }
+    if (!primero) { this.fotosVistas[h] = p.dni; this.#guardarConfig({ fotosVistas: this.fotosVistas }); }
+    return p;
+  }
+
   #guardarConfig(cambios) {
     const c = { ...this.#leerConfig(), ...cambios };
     fs.writeFileSync(this.configRuta, JSON.stringify(c, null, 1), { mode: 0o600 });
@@ -130,7 +149,7 @@ export class Reniec {
     if (!/^\d{8}$/.test(dni)) throw { status: 400, message: "El DNI debe tener 8 dígitos." };
     if (!this.real) return this.simulado(dni);
     const g = this.cache[dni];
-    if (!forzar && g && Date.now() - Date.parse(g.consultadoAt) < this.cacheDias * 86_400_000) return { ...g, fuente: "cache" };
+    if (!forzar && g && Date.now() - Date.parse(g.consultadoAt) < this.cacheDias * 86_400_000) return this.#filtrarFotoGenerica({ ...g, fuente: "cache" });
 
     // Formas de enviar el token según el proveedor: cabecera Bearer (apidni.com), parámetro en la URL
     // (token_api / token / api_token) o cabecera simple. Se prueba la recordada primero y se guarda la que funcione.
@@ -165,6 +184,6 @@ export class Reniec {
     }
     this.cache[dni] = p;
     this.#guardar();
-    return p;
+    return this.#filtrarFotoGenerica(p);
   }
 }

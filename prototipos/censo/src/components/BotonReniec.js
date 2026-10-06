@@ -24,7 +24,7 @@ export function BotonReniec({ dni, onDatos, onFoto, disabled, accion, etiqueta =
       const foto = onFoto ? fotoComoArchivo(persona) : null;
       if (foto) await onFoto(foto);
       avisar(simulado ? "Datos de PRUEBA (el servidor no tiene token de RENIEC)."
-        : `RENIEC: ${persona.apellidoPaterno} ${persona.apellidoMaterno}, ${persona.nombres}.${foto ? " Foto del DNI guardada." : ""}`, simulado ? "error" : "ok");
+        : `RENIEC: ${persona.apellidoPaterno} ${persona.apellidoMaterno}, ${persona.nombres}.${foto ? " Foto del DNI guardada." : persona.fotoGenerica ? " RENIEC no tiene foto de esta persona." : ""}`, simulado ? "error" : "ok");
     } catch (e) {
       avisar(mensajeError(e), "error");
     } finally {
