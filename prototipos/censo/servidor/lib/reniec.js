@@ -75,6 +75,7 @@ export class Reniec {
     const c = this.#leerConfig();
     this.token = token || c.apidniToken || "";
     this.url = c.apidniUrl || url;
+    this.modoAuth = c.apidniAuth || "bearer";
     this.ultimaCruda = null; // última respuesta del proveedor (para calibrar desde Administración)
     this.ruta = path.join(dir, "reniec-cache.json");
     try { this.cache = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.cache = {}; }
@@ -85,13 +86,24 @@ export class Reniec {
   #leerConfig() { try { return JSON.parse(fs.readFileSync(this.configRuta, "utf8")); } catch { return {}; } }
 
   /** Guarda el token (vacío = quitarlo). Aplica al instante. */
-  establecerToken(token) { this.token = String(token || "").trim(); this.#guardarConfig({ apidniToken: this.token }); }
+  establecerToken(token) { this.token = String(token || "").trim(); this.modoAuth = "bearer"; this.#guardarConfig({ apidniToken: this.token, apidniAuth: "bearer" }); }
 
   /** Guarda la URL del servicio (sin el /{dni} final). Vacía = la de apidni.com. */
   establecerUrl(url) {
     let u = String(url || "").trim().replace(/\/+$/, "").replace(/\/(?:[\[{(](?:num_doc|dni|numero|nro)[\]})]|num_doc)$/i, "").replace(/\/+$/, "");
     this.url = u || "https://apidni.com/api/v2/dni";
     this.#guardarConfig({ apidniUrl: u });
+  }
+
+  #urlCon(dni, modo) {
+    const base = `${this.url}/${dni}`;
+    if (!modo.startsWith("q:")) return base;
+    return `${base}${base.includes("?") ? "&" : "?"}${modo.slice(2)}=${encodeURIComponent(this.token)}`;
+  }
+  #cabeceras(modo) {
+    if (modo === "bearer") return { Authorization: `Bearer ${this.token}` };
+    if (modo.startsWith("h:")) return { [modo.slice(2)]: this.token };
+    return {};
   }
 
   #guardarConfig(cambios) {
@@ -119,20 +131,31 @@ export class Reniec {
     const g = this.cache[dni];
     if (!forzar && g && Date.now() - Date.parse(g.consultadoAt) < this.cacheDias * 86_400_000) return { ...g, fuente: "cache" };
 
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12_000);
-    let res;
-    try {
-      res = await fetch(`${this.url}/${dni}`, { headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" }, signal: ctrl.signal });
-    } catch (e) {
-      throw { status: 502, message: e?.name === "AbortError" ? "RENIEC no respondió a tiempo. Intenta de nuevo." : "No se pudo conectar con el servicio de DNI." };
-    } finally { clearTimeout(t); }
-    if (res.status === 401 || res.status === 403) { this.ultimaCruda = { status: res.status, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 401, message: "El token del servicio de DNI no es válido o venció." }; }
-    if (res.status === 404) { this.ultimaCruda = { status: 404, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 404, message: "El DNI no figura en RENIEC. Verifica el número." }; }
-    if (!res.ok) { this.ultimaCruda = { status: res.status, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` }; }
-    const texto = await res.text();
-    let j; try { j = JSON.parse(texto); } catch { j = { _texto: texto.slice(0, 500) }; }
-    this.ultimaCruda = { status: res.status, cuerpo: texto.slice(0, 1500) };
+    // Formas de enviar el token según el proveedor: cabecera Bearer (apidni.com), parámetro en la URL
+    // (token_api / token / api_token) o cabecera simple. Se prueba la recordada primero y se guarda la que funcione.
+    const MODOS = ["bearer", "q:token_api", "q:token", "q:api_token", "h:token", "h:x-api-key", "h:api-key"];
+    const orden = [this.modoAuth, ...MODOS.filter((m) => m !== this.modoAuth)].filter(Boolean);
+    let res, texto, j, ultimoError = null;
+    for (const modo of orden) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12_000);
+      try {
+        res = await fetch(this.#urlCon(dni, modo), { headers: { Accept: "application/json", ...this.#cabeceras(modo) }, signal: ctrl.signal });
+      } catch (e) {
+        throw { status: 502, message: e?.name === "AbortError" ? "RENIEC no respondió a tiempo. Intenta de nuevo." : "No se pudo conectar con el servicio de DNI." };
+      } finally { clearTimeout(t); }
+      texto = await res.text();
+      try { j = JSON.parse(texto); } catch { j = { _texto: texto.slice(0, 500) }; }
+      this.ultimaCruda = { status: res.status, modo, cuerpo: texto.slice(0, 1500) };
+      const motivo = txt(j?.respuesta ?? j?.message ?? j?.mensaje ?? j?.error ?? j?.msg);
+      const tokenRechazado = res.status === 401 || res.status === 403 || /token|autoriz|api ?key|credencial/i.test(motivo);
+      if (!tokenRechazado) { if (this.modoAuth !== modo) { this.modoAuth = modo; this.#guardarConfig({ apidniAuth: modo }); } break; }
+      ultimoError = motivo || `HTTP ${res.status}`;
+      res = null;
+    }
+    if (!res) throw { status: 401, message: `El servicio de DNI rechazó el token (${ultimoError}). Revisa el token en Administración.` };
+    if (res.status === 404) throw { status: 404, message: "El DNI no figura en RENIEC. Verifica el número." };
+    if (!res.ok) throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` };
     const p = normalizar(j, dni);
     if (!p) {
       const motivo = txt(j.respuesta ?? j.message ?? j.mensaje ?? j.error ?? j.msg) || "Error en la consulta";
