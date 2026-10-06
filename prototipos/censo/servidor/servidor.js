@@ -107,7 +107,7 @@ async function manejar(req, res) {
     if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
   }
   // Estáticos públicos que la página de entrada necesita (logo, estilos).
-  if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/")) {
+  if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/") || ruta === "/manifest.webmanifest") {
     return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=3600" }) || json(res, 404, { error: "No existe." });
   }
 
