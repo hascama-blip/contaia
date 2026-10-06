@@ -183,7 +183,9 @@ export class Reniec {
       try { j = JSON.parse(texto); } catch { j = { _texto: texto.slice(0, 500) }; }
       this.ultimaCruda = { status: res.status, modo, cuerpo: texto.slice(0, 1500) };
       const motivo = txt(j?.respuesta ?? j?.message ?? j?.mensaje ?? j?.error ?? j?.msg);
-      const tokenRechazado = res.status === 401 || res.status === 403 || /token|autoriz|api ?key|credencial/i.test(motivo);
+      // Límite del plan o token expirado: el token SÍ fue reconocido; no tiene sentido probar otras formas de enviarlo.
+      const esLimiteOExpirado = /super[oó]|l[ií]mite|consultas del plan|expirad/i.test(motivo);
+      const tokenRechazado = !esLimiteOExpirado && (res.status === 401 || res.status === 403 || /token.*(no es v[aá]lido|inv[aá]lid)|invalid token|unauthori|no autorizado|api ?key|credencial/i.test(motivo));
       if (!tokenRechazado) { if (this.modoAuth !== modo) { this.modoAuth = modo; this.#guardarConfig({ apidniAuth: modo }); } break; }
       ultimoError = motivo || `HTTP ${res.status}`;
       res = null;

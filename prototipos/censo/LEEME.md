@@ -123,3 +123,11 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   válido (omite los ya verificados salvo que se marque la casilla), 2 consultas a la vez, barra de
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
+
+## Verificación automática de DNI (servidor)
+`servidor/lib/verificacion.js`: cada madrugada (hora de Lima, por defecto 00:30, `CENSO_VERIFICACION_HORA`)
+recorre las fichas con DNI válido y sin `reniec.verificadoAt`, consulta al proveedor y guarda datos
+(`camposDesdePersona`) y la foto del DNI solo si la ficha no tiene foto. Se detiene con 429 (límite del
+proveedor) o 401 (token) y retoma al día siguiente; un DNI que "no figura" se anota (`reniec.intentos`) y
+tras 3 intentos deja de probarse. Estado e historial en `DATOS/verificacion.json`. Rutas admin
+`GET/POST /api/verificacion`, `POST /api/verificacion/ejecutar|detener`; panel en Administración.

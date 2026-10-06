@@ -8,6 +8,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#5460B4"><link rel="stylesheet" href="/estilos/tokens.css"><link rel="stylesheet" href="/estilos/app.css">
 <style>
+  [hidden] { display: none !important; }
   body { margin: 0; padding: 24px 16px 60px; }
   main { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; }
   .card-cuerpo { display: grid; gap: 12px; }
@@ -61,6 +62,20 @@
   </div></section>
 
   <section class="card"><div class="card-cuerpo">
+    <h2>Verificación automática de DNI</h2>
+    <p class="ayuda" style="margin:0">Cada madrugada el servidor consulta en RENIEC a los asociados que aún no están verificados y guarda sus datos y la foto del DNI (solo si la ficha no tiene foto). Se detiene sola cuando el proveedor avisa que se alcanzó el límite de consultas y continúa al día siguiente con los que falten.</p>
+    <div id="ver-estado" class="ayuda">Cargando…</div>
+    <form id="f-ver" class="fila">
+      <div class="campo" style="flex:0 0 140px"><label class="label">Hora (Lima)</label><input class="input" name="hora" placeholder="00:30" pattern="^([01]\d|2[0-3]):[0-5]\d$"></div>
+      <div class="campo" style="flex:0 0 170px"><label class="label">Estado</label><select class="input" name="activa"><option value="true">Activada</option><option value="false">Desactivada</option></select></div>
+      <button class="btn btn-ghost" type="submit">Guardar</button>
+      <button class="btn btn-primary" type="button" id="ver-ejecutar">Ejecutar ahora</button>
+      <button class="btn btn-ghost" type="button" id="ver-detener" hidden>Detener</button>
+    </form>
+    <details id="ver-hist"><summary>Últimas ejecuciones</summary><table><thead><tr><th>Inicio</th><th>Origen</th><th>Procesados</th><th>Verificados</th><th>Con foto</th><th>No figuran</th><th>Parada</th><th>Pendientes</th></tr></thead><tbody id="ver-filas"></tbody></table></details>
+  </div></section>
+
+  <section class="card"><div class="card-cuerpo">
     <h2>Respaldo e importación</h2>
     <div class="fila">
       <a class="btn btn-ghost" href="/api/exportar" download>Descargar respaldo (JSON)</a>
@@ -108,6 +123,24 @@
       else $("#dni-prueba").textContent = "Guardado.";
     } catch (err) { $("#dni-prueba").innerHTML = `<span class="mal">${err.message}</span>`; }
   };
+  const PARADAS = { completa: "sin pendientes", limite_proveedor: "límite del proveedor", token_rechazado: "token rechazado", sin_token: "sin token", sin_conexion: "sin conexión", detenida: "detenida a mano", maximo: "tope de la corrida" };
+  const fechaHora = (iso) => iso ? new Date(iso).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" }) : "—";
+  let verTimer = null;
+  const pintarVer = (j) => {
+    const u = j.ultima;
+    $("#ver-estado").innerHTML = `${j.activa ? `<span class="ok">Activada</span> · próxima: <b>${fechaHora(j.proxima)}</b>` : `<span class="mal">Desactivada</span>`} · <b>${j.pendientes}</b> pendientes · ${j.verificados} verificados${j.sinDni ? ` · ${j.sinDni} sin DNI válido` : ""}${j.agotados ? ` · ${j.agotados} sin resultado tras 3 intentos` : ""}`
+      + (j.corriendo ? ` · <b>ejecutando…</b>` : "")
+      + (u ? `<br>Última: ${fechaHora(u.inicio)} (${u.origen}) · ${u.verificados} verificados, ${u.conFoto} con foto, ${u.noFiguran} no figuran, ${u.errores} errores · parada: <b>${PARADAS[u.motivoParada] || u.motivoParada}</b>${u.mensajeProveedor ? ` («${u.mensajeProveedor}»)` : ""}` : "");
+    if (!$("#f-ver").hora.value) $("#f-ver").hora.value = j.hora; $("#f-ver").activa.value = String(j.activa);
+    $("#ver-ejecutar").disabled = j.corriendo; $("#ver-detener").hidden = !j.corriendo;
+    $("#ver-filas").innerHTML = (j.historial || []).map((h) => `<tr><td>${fechaHora(h.inicio)}</td><td>${h.origen}</td><td>${h.procesados}</td><td>${h.verificados}</td><td>${h.conFoto}</td><td>${h.noFiguran}</td><td>${PARADAS[h.motivoParada] || h.motivoParada}</td><td>${h.pendientesAlFinal}</td></tr>`).join("");
+    clearTimeout(verTimer); if (j.corriendo) verTimer = setTimeout(cargarVer, 3000);
+  };
+  const cargarVer = () => pedir("GET", "/api/verificacion").then(pintarVer).catch(() => {});
+  $("#f-ver").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { pintarVer(await pedir("POST", "/api/verificacion", { hora: f.hora.value, activa: f.activa.value === "true" })); } catch (err) { alert(err.message); } };
+  $("#ver-ejecutar").onclick = async () => { if (!confirm("Se consultarán en RENIEC los asociados pendientes hasta terminar o hasta que el proveedor avise el límite. ¿Continuar?")) return; try { pintarVer(await pedir("POST", "/api/verificacion/ejecutar", {})); } catch (err) { alert(err.message); } };
+  $("#ver-detener").onclick = async () => { try { pintarVer(await pedir("POST", "/api/verificacion/detener")); } catch (err) { alert(err.message); } };
+  cargarVer();
   cargarUsuarios().catch((e) => alert(e.message));
   pedir("GET", "/api/dominio").then((j) => { if (j.dominio) { $("#f-dominio").dominio.value = j.dominio; $("#dominio-estado").textContent = `Dominio actual: ${j.dominio}`; } }).catch(() => {});
 </script>

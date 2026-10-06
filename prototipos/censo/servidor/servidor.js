@@ -17,6 +17,7 @@
 //   GET  /api/reniec/:dni                              consulta DNI (token en el servidor)
 //   POST /api/instalacion                              primer admin (código CENSO_CODIGO_INSTALACION, solo sin usuarios)
 //   GET  /administracion · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
+//   GET/POST /api/verificacion · POST /api/verificacion/ejecutar · POST /api/verificacion/detener   (admin: DNI automático)
 import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -25,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { Almacen, nuevoId, COLECCIONES } from "./lib/almacen.js";
 import { Usuarios, COOKIE, puedeEscribir, esAdmin } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
+import { Verificacion } from "./lib/verificacion.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +46,16 @@ const metaArchivos = (() => {
   let m; try { m = JSON.parse(fs.readFileSync(ruta, "utf8")); } catch { m = {}; }
   return { get: (id) => m[id], set: (id, v) => { m[id] = v; fs.writeFileSync(ruta, JSON.stringify(m)); }, del: (id) => { delete m[id]; fs.writeFileSync(ruta, JSON.stringify(m)); } };
 })();
+/** Guarda un archivo en el almacén (lo usan la subida manual y la verificación automática). */
+function guardarArchivo(buffer, tipo, nombre, por = null) {
+  const id = nuevoId() + nuevoId();
+  fs.writeFileSync(path.join(DATOS, "archivos", id), buffer);
+  metaArchivos.set(id, { tipo, tamano: buffer.length, nombre, por, en: new Date().toISOString() });
+  return id;
+}
+// Verificación automática de DNI (cada madrugada, solo los pendientes)
+const verificacion = new Verificacion({ almacen, reniec, dir: DATOS, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, "automatico") });
+verificacion.programar();
 
 // ---- Avisos en vivo (SSE) ----
 const oyentes = new Set();
@@ -168,9 +180,7 @@ async function manejar(req, res) {
     const tipo = String(req.headers["content-type"] || "application/octet-stream").split(";")[0];
     if (!/^(image\/|application\/pdf|text\/|application\/json)/.test(tipo)) return json(res, 415, { error: "Tipo de archivo no permitido.", code: "unsupported_type" });
     const cuerpo = await leerCuerpo(req, MAX_ARCHIVO);
-    const id = nuevoId() + nuevoId();
-    fs.writeFileSync(path.join(DATOS, "archivos", id), cuerpo);
-    metaArchivos.set(id, { tipo, tamano: cuerpo.length, nombre: decodeURIComponent(String(req.headers["x-nombre"] || "")), por: yo.id, en: new Date().toISOString() });
+    const id = guardarArchivo(cuerpo, tipo, decodeURIComponent(String(req.headers["x-nombre"] || "")), yo.id);
     return json(res, 200, { id, url: `/_blob/${id}`, sizeBytes: cuerpo.length, contentType: tipo });
   }
   if ((m = ruta.match(/^\/api\/archivos\/([A-Za-z0-9]+)$/)) && metodo === "DELETE") {
@@ -207,7 +217,7 @@ async function manejar(req, res) {
 
   // ---- Administración (solo admin): respaldo, importación, dominio ----
   if (ruta === "/admin.html") return redirigir(res, "/administracion");
-  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio" || ruta === "/api/consulta-dni") {
+  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
     if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
     if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
     if (ruta === "/api/exportar" && metodo === "GET") {
@@ -242,6 +252,15 @@ async function manejar(req, res) {
       }
       return json(res, 200, { ...estadoDni(), prueba });
     }
+    if (ruta === "/api/verificacion" && metodo === "GET") return json(res, 200, verificacion.estado());
+    if (ruta === "/api/verificacion" && metodo === "POST") { verificacion.configurar(await leerJSON(req, 4096)); return json(res, 200, verificacion.estado()); }
+    if (ruta === "/api/verificacion/ejecutar" && metodo === "POST") {
+      if (verificacion.corriendo) return json(res, 409, { error: "Ya hay una verificación en curso." });
+      const { maximo } = await leerJSON(req, 4096).catch(() => ({}));
+      verificacion.ejecutar({ origen: `manual:${yo.usuario}`, maximo: Number(maximo) > 0 ? Number(maximo) : Infinity }).catch((e) => console.error("verificación:", e));
+      return json(res, 202, { iniciada: true, ...verificacion.estado() });
+    }
+    if (ruta === "/api/verificacion/detener" && metodo === "POST") { verificacion.pedirDetener(); return json(res, 200, verificacion.estado()); }
     if (ruta === "/api/dominio" && metodo === "POST") {
       const { dominio, correo } = await leerJSON(req, 4096);
       const d = String(dominio || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
