@@ -6,17 +6,22 @@ import { GALERIAS } from "../config.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
 import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero } from "../lib/padron.js";
 import { aCSV, descargar, COLUMNAS_PADRON } from "../lib/exportar.js";
+import { Paginador, usePaginacion } from "../components/Paginador.js";
+import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
+import { reniecActivo } from "../lib/reniec.js";
 import { hoy } from "../lib/formato.js";
 
 export function Padron() {
   const { datos, derivados, caps, ir, avisar, puedeEscribir } = useApp();
   const [filtro, setFiltro] = useState({ texto: "", galeria: "", censo: "" });
+  const [verificando, setVerificando] = useState(false);
   const lista = useMemo(
     () => ordenarPorNumero(filtrarPadron(datos.asociados, derivados.mapaStands, filtro)),
     [datos.asociados, derivados.mapaStands, filtro],
   );
   const cambia = (k) => (e) => setFiltro((f) => ({ ...f, [k]: e.target.value }));
 
+  const pag = usePaginacion(lista);
   async function exportar() {
     try {
       const csv = aCSV(COLUMNAS_PADRON(derivados.mapaStands, derivados.atraso), lista);
@@ -33,7 +38,9 @@ export function Padron() {
         sub=${`${datos.asociados.length} asociados registrados`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${exportar}>Exportar a Excel (CSV)</button>`}
+          ${puedeEscribir && reniecActivo() && html`<button className="btn btn-ghost" onClick=${() => setVerificando(true)}>Verificar DNI con RENIEC</button>`}
           ${puedeEscribir !== false && html`<a className="btn btn-primary" href="#nueva">+ Nueva ficha</a>`}`} />
+      ${verificando && html`<${VerificacionMasiva} asociados=${lista} onCerrar=${() => setVerificando(false)} />`}
 
       <section className="card">
         <div className="filtros">
@@ -56,7 +63,7 @@ export function Padron() {
           <table className="tabla">
             <thead><tr><th>N°</th><th>Asociado</th><th>DNI</th><th>Stands</th><th>Galería</th><th>Ficha</th><th>Pagos</th></tr></thead>
             <tbody>
-              ${lista.map((a) => {
+              ${pag.porcion.map((a) => {
                 const suyos = derivados.mapaStands.get(a.id) || [];
                 const vendidos = derivados.anteriores.get(a.id) || [];
                 const galerias = [...new Set(suyos.map((s) => nombreGaleria(s.galeria)))].join(", ");
@@ -64,7 +71,7 @@ export function Padron() {
                   <tr key=${a.id} className="clic" onClick=${() => ir(`ficha-${a.id}`)}>
                     <td className="num muted">${a.numero}</td>
                     <td className="fuerte"><a href=${`#ficha-${a.id}`} onClick=${(e) => e.stopPropagation()} style=${{ color: "inherit" }}>${nombreCompleto(a)}</a></td>
-                    <td className="num">${a.dni}</td>
+                    <td className="num">${a.dni}${a.reniec?.verificadoAt ? html` <span className="muted" title="Verificado en RENIEC">✓</span>` : ""}</td>
                     <td className="num">${suyos.map((s) => s.codigo).join(", ") || (vendidos.length ? html`<span className="muted">Vendió ${vendidos.join(", ")}</span>` : "—")}</td>
                     <td>${galerias || "—"}</td>
                     <td><${BadgeCenso} estado=${a.censo?.estado || "pendiente"} /></td>
@@ -75,7 +82,10 @@ export function Padron() {
           </table>
           ${!lista.length && html`<${Vacio}>Ningún asociado coincide con la búsqueda.<//>`}
         </div>
-        <div className="tabla-pie"><span>Mostrando ${lista.length} de ${datos.asociados.length} asociados</span><span>Toca una fila para abrir la ficha</span></div>
+        <div className="tabla-pie">
+          <span>Mostrando ${pag.desde}–${pag.hasta} de ${lista.length} asociados${lista.length !== datos.asociados.length ? ` (${datos.asociados.length} en total)` : ""}</span>
+          <${Paginador} pagina=${pag.pagina} total=${pag.total} onPagina=${pag.setPagina} />
+        </div>
       </section>
     </div>`;
 }

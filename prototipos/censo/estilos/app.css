@@ -617,3 +617,9 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 
 /* Botón "Salir" (solo en el servidor propio, con usuario y clave) */
 .btn-salir { padding: 4px 10px; font-size: var(--t-sm); margin-left: 6px; }
+
+/* Paginación */
+.paginador { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.paginador .btn { min-width: 32px; justify-content: center; }
+.paginador .btn-primary { color: var(--primario-texto); }
+.lista-simple { margin: 8px 0; padding-left: 18px; font-size: var(--t-sm); color: var(--texto-2); display: grid; gap: 4px; }

@@ -11,13 +11,14 @@ import { useApp } from "./contexto.js";
  * @param {(foto: File) => Promise<void>} [p.onFoto]  recibe la foto del DNI (planes que la incluyen)
  * @param {boolean} [p.disabled]
  */
-export function BotonReniec({ dni, onDatos, onFoto, disabled }) {
+export function BotonReniec({ dni, onDatos, onFoto, disabled, accion, etiqueta = "Buscar en RENIEC", titulo = "Trae nombres y apellidos desde RENIEC" }) {
   const { avisar } = useApp();
   const [ocupado, setOcupado] = useState(false);
   if (!reniecActivo()) return null;
   async function buscar() {
     setOcupado(true);
     try {
+      if (accion) { await accion(); return; } // la página decide qué hacer (p. ej. actualizar la ficha guardada)
       const { persona, simulado } = await consultarDni(dni);
       onDatos(fichaDesdeReniec(persona));
       const foto = onFoto ? fotoComoArchivo(persona) : null;
@@ -31,5 +32,5 @@ export function BotonReniec({ dni, onDatos, onFoto, disabled }) {
     }
   }
   return html`<button type="button" className="btn btn-ghost btn-sm" disabled=${disabled || ocupado || !/^\d{8}$/.test(String(dni || "").replace(/\D/g, ""))}
-    onClick=${buscar} title="Trae nombres y apellidos desde RENIEC">${ocupado ? "Buscando…" : "Buscar en RENIEC"}</button>`;
+    onClick=${buscar} title=${titulo}>${ocupado ? "Consultando…" : etiqueta}</button>`;
 }

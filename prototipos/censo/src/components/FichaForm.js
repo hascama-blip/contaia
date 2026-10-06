@@ -29,7 +29,7 @@ export const SECCIONES = {
   compromiso: "Observaciones y compromiso",
 };
 
-export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = true, slotArchivos = null, bloqueado = false, onFotoReniec = null }) {
+export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = true, slotArchivos = null, bloqueado = false, onFotoReniec = null, onActualizarReniec = null }) {
   const c = (ruta) => ({
     id: `f-${ruta.replace(/\./g, "-")}`,
     valor: leer(ficha, ruta),
@@ -63,10 +63,11 @@ export function FichaForm({ ficha, setFicha, errores = {}, secciones, numerar = 
         <${Campo} id="f-apellidoMaterno" etiqueta="Apellido materno">
           <${Entrada} ...${c("apellidoMaterno")} />
         <//>
-        <${Campo} id="f-dni" etiqueta="DNI" req error=${errores.dni} ayuda="8 dígitos. Con «Buscar en RENIEC» se llenan nombres y apellidos.">
+        <${Campo} id="f-dni" etiqueta="DNI" req error=${errores.dni} ayuda=${onActualizarReniec ? "8 dígitos. «Actualizar desde RENIEC» reemplaza nombres, apellidos, fecha de nacimiento y dirección, y guarda la foto del DNI." : "8 dígitos. Con «Buscar en RENIEC» se llenan nombres y apellidos."}>
           <div className="con-boton">
             <${Entrada} ...${c("dni")} inputMode="numeric" maxLength="8" error=${errores.dni} />
-            <${BotonReniec} dni=${ficha.dni} disabled=${bloqueado} onDatos=${(campos) => setFicha((f) => ({ ...f, ...campos }))} onFoto=${onFotoReniec} />
+            <${BotonReniec} dni=${ficha.dni} disabled=${bloqueado} onDatos=${(campos) => setFicha((f) => ({ ...f, ...campos }))} onFoto=${onFotoReniec}
+              accion=${onActualizarReniec} etiqueta=${onActualizarReniec ? "Actualizar desde RENIEC" : "Buscar en RENIEC"} titulo=${onActualizarReniec ? "Trae de RENIEC los datos y la foto del DNI y los guarda en la ficha" : "Trae nombres y apellidos desde RENIEC"} />
           </div>
         <//>
         <${Campo} id="f-fechaNacimiento" etiqueta="Fecha de nacimiento">

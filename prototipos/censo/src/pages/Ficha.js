@@ -1,6 +1,6 @@
 // Ficha del asociado: datos, familia, stands, pagos, incidencias y documentos.
 import { html, useState, useEffect, useMemo } from "../components/html.js";
-import { CabPagina, Tarjeta, BadgeAsociado, BadgeStand, BadgeGravedad, BadgeIncidencia, Vacio, mensajeError } from "../components/ui.js";
+import { CabPagina, Tarjeta, BadgeAsociado, BadgeStand, BadgeGravedad, BadgeIncidencia, Vacio, mensajeError, Badge } from "../components/ui.js";
 import { FichaForm } from "../components/FichaForm.js";
 import { FotoCampo, ArchivoCampo, FirmaCampo } from "../components/Archivos.js";
 import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
@@ -16,6 +16,7 @@ import { standsAnteriores } from "../lib/propietarios.js";
 import { fecha, soles } from "../lib/formato.js";
 import { nombresDe } from "../lib/usuario.js";
 import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo, marcarRevisada } from "../api/asociados.js";
+import { actualizarDesdeReniec } from "../api/reniec.js";
 import { pdfFicha, descargar } from "../lib/exportar.js";
 
 const PESTANAS = [
@@ -109,11 +110,22 @@ export function Ficha({ id }) {
 
   const subir = (tipo) => (archivo) => adjuntarArchivo(id, tipo, archivo).then(() => avisar("Archivo guardado en la ficha."));
   const puedeSubir = caps.archivos && editable;
+  async function actualizarReniec() {
+    if (sucio && !confirm("Hay cambios sin guardar en la ficha. ¿Actualizar desde RENIEC igual? Se perderán esos cambios.")) return;
+    const dni = String(ficha.dni || "").replace(/\D/g, "");
+    try {
+      const r = await actualizarDesdeReniec({ ...a, dni }, { por: usuario?.id, conFoto: puedeSubir });
+      if (r.simulado) { avisar("El servidor no tiene token de RENIEC: no se cambió nada.", "error"); return; }
+      setSucio(false);
+      avisar(`Ficha actualizada con RENIEC: ${r.persona.apellidoPaterno} ${r.persona.apellidoMaterno}, ${r.persona.nombres}.${r.foto ? " Foto del DNI guardada." : ""}`);
+    } catch (e) { avisar(mensajeError(e), "error"); }
+  }
   const estado = a.censo?.estado || "pendiente";
   const deudaTotal = stands.reduce((s, st) => s + deudaStand(registrosDe(derivados.indicePagos, st.codigo, derivados.h.anio), derivados.h.anio, derivados.h).monto, 0);
 
   const contenido = {
     datos: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false} onFotoReniec=${puedeSubir ? subir("foto") : null}
+      onActualizarReniec=${editable ? actualizarReniec : null}
       bloqueado=${!editable} secciones=${["identificacion", "personales", "contacto", "vinculo", "compromiso"]} />`,
     familia: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false}
       bloqueado=${!editable} secciones=${["conyuge", "hijos", "familiares"]} />`,
@@ -178,7 +190,7 @@ export function Ficha({ id }) {
   return html`
     <div className="pagina">
       <${CabPagina} miga=${{ href: "#padron", texto: "Padrón" }} titulo=${nombreCompleto(a)}
-        sub=${html`N° ${a.numero} · DNI ${a.dni} · ${stands.length > 1 ? "Stands" : "Stand"} ${standsTxt || "—"} · Ingreso ${fecha(a.fechaIngreso)} <${BadgeAsociado} estado=${a.estado} />`}
+        sub=${html`N° ${a.numero} · DNI ${a.dni} · ${stands.length > 1 ? "Stands" : "Stand"} ${standsTxt || "—"} · Ingreso ${fecha(a.fechaIngreso)} <${BadgeAsociado} estado=${a.estado} />${a.reniec?.verificadoAt && html` <span title=${`Datos tomados de RENIEC el ${fecha(a.reniec.verificadoAt.slice(0, 10))}`}><${Badge} tono="ok" punto>RENIEC</${Badge}></span>`}`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${bajarPDF}>Descargar ficha PDF</button>`}
           ${editable && html`<button className="btn btn-primary" disabled=${!sucio || ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : sucio ? "Guardar cambios" : "Sin cambios"}</button>`}`} />

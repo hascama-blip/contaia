@@ -113,3 +113,13 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
 - `despliegue/`: `instalar.sh` (Ubuntu 24.04: Node, Caddy HTTPS, systemd, ufw),
   `Caddyfile`, `censo.service`, `censo.env.ejemplo`, `actualizar.sh`, `respaldo.sh`.
 - Probar en local: `DATOS=/tmp/censo node servidor/servidor.js` → `http://localhost:3000`.
+
+## RENIEC en el padrón (actualizar y verificación masiva)
+- En una ficha existente el botón junto al DNI es **«Actualizar desde RENIEC»** (`api/reniec.js`
+  → `actualizarDesdeReniec`): guarda directo nombres, apellidos, fecha de nacimiento, dirección y
+  distrito, más la foto del DNI si el plan la trae; sella `asociado.reniec.verificadoAt` (insignia
+  "RENIEC" en la cabecera y ✓ en el padrón). Con datos simulados no cambia nada.
+- Padrón → **«Verificar DNI con RENIEC»** (`VerificacionMasiva.js`): recorre los asociados con DNI
+  válido (omite los ya verificados salvo que se marque la casilla), 2 consultas a la vez, barra de
+  avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
+- Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
