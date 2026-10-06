@@ -50,6 +50,7 @@
     <h2>Consulta de DNI (RENIEC)</h2>
     <p class="ayuda" style="margin:0">Pega la <b>URL API DNI</b> y el <b>Token API</b> que te entregó el proveedor (apidni.com, go.net.pe u otro con el mismo formato). La URL va sin el número final: <code>http://go.net.pe:3000/api/v2/dni</code>. Si el plan incluye la foto del DNI, también se guarda. Sin token, "Buscar en RENIEC" devuelve datos simulados.</p>
     <div id="dni-estado" class="ayuda">Estado: cargando…</div>
+    <div id="dni-consumo" class="ayuda"></div>
     <form id="f-dni" class="fila" autocomplete="off">
       <div class="campo"><label class="label">URL API DNI</label><input class="input" name="url" placeholder="http://go.net.pe:3000/api/v2/dni"></div>
       <div class="campo"><label class="label">Token API</label><input class="input" name="token" placeholder="pegar token nuevo (vacío = no cambiar)"></div>
@@ -93,7 +94,7 @@
     catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${err.message}</span>`; }
     e.target.value = "";
   };
-  const estadoDni = (j) => { $("#dni-estado").innerHTML = (j.configurado ? `Estado: <span class="ok">token configurado (${j.pista || "guardado"})</span>` : `Estado: <span class="mal">sin token, consultas simuladas</span>`) + ` · servicio: <code>${j.url || ""}</code>`; if (j.url && !$("#f-dni").url.value) $("#f-dni").url.value = j.url; };
+  const estadoDni = (j) => { if (j.consumo) $("#dni-consumo").innerHTML = `Consultas al proveedor: <b>${j.consumo.hoy}</b> hoy · <b>${j.consumo.esteMes}</b> este mes · ${j.consumo.total} en total (${j.consumo.exitosas} con datos, ${j.consumo.rechazadas} rechazadas) · ${j.consumo.enCache} DNI en caché (no vuelven a gastar).`; $("#dni-estado").innerHTML = (j.configurado ? `Estado: <span class="ok">token configurado (${j.pista || "guardado"})</span>` : `Estado: <span class="mal">sin token, consultas simuladas</span>`) + ` · servicio: <code>${j.url || ""}</code>`; if (j.url && !$("#f-dni").url.value) $("#f-dni").url.value = j.url; };
   pedir("GET", "/api/consulta-dni").then(estadoDni).catch(() => {});
   $("#f-dni").onsubmit = async (e) => {
     e.preventDefault(); const f = e.target; $("#dni-prueba").textContent = "Consultando…";

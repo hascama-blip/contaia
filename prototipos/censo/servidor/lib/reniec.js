@@ -81,6 +81,7 @@ export class Reniec {
     // Fotos "genéricas" del proveedor (la misma imagen para personas distintas = "No hay foto disponible").
     this.fotosVistas = c.fotosVistas || {};      // hash → primer DNI con esa foto
     this.fotosGenericas = new Set(c.fotosGenericas || []);
+    this.consumo = c.consumo || { total: 0, exitosas: 0, rechazadas: 0, porDia: {} }; // llamadas reales al proveedor
     this.ultimaCruda = null; // última respuesta del proveedor (para calibrar desde Administración)
     this.ruta = path.join(dir, "reniec-cache.json");
     try { this.cache = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.cache = {}; }
@@ -124,6 +125,20 @@ export class Reniec {
     }
     if (!primero) { this.fotosVistas[h] = p.dni; this.#guardarConfig({ fotosVistas: this.fotosVistas }); }
     return p;
+  }
+
+  #contar(exito) {
+    const dia = new Date().toISOString().slice(0, 10);
+    this.consumo.total++; this.consumo[exito ? "exitosas" : "rechazadas"]++;
+    this.consumo.porDia[dia] = (this.consumo.porDia[dia] || 0) + 1;
+    for (const k of Object.keys(this.consumo.porDia)) if (k < new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10)) delete this.consumo.porDia[k];
+    this.#guardarConfig({ consumo: this.consumo });
+  }
+
+  resumenConsumo() {
+    const hoy = new Date().toISOString().slice(0, 10), mes = hoy.slice(0, 7);
+    return { total: this.consumo.total, exitosas: this.consumo.exitosas, rechazadas: this.consumo.rechazadas, hoy: this.consumo.porDia[hoy] || 0,
+      esteMes: Object.entries(this.consumo.porDia).filter(([d]) => d.startsWith(mes)).reduce((a, [, n]) => a + n, 0), enCache: Object.keys(this.cache).length };
   }
 
   #guardarConfig(cambios) {
@@ -173,10 +188,11 @@ export class Reniec {
       ultimoError = motivo || `HTTP ${res.status}`;
       res = null;
     }
-    if (!res) throw { status: 401, message: `El servicio de DNI rechazó el token (${ultimoError}). Revisa el token en Administración.` };
+    if (!res) { this.#contar(false); throw { status: 401, message: `El servicio de DNI rechazó el token (${ultimoError}). Revisa el token en Administración.` }; }
     if (res.status === 404) throw { status: 404, message: "El DNI no figura en RENIEC. Verifica el número." };
     if (!res.ok) throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` };
     const p = normalizar(j, dni);
+    this.#contar(Boolean(p));
     if (!p) {
       const motivo = txt(j.respuesta ?? j.message ?? j.mensaje ?? j.error ?? j.msg) || "Error en la consulta";
       const status = clasificar(motivo);

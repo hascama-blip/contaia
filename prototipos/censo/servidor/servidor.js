@@ -228,7 +228,7 @@ async function manejar(req, res) {
       return json(res, 200, { importado: conteo });
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
-    const estadoDni = () => ({ configurado: reniec.real, url: reniec.url, pista: reniec.token ? reniec.token.slice(0, 3) + "…" + reniec.token.slice(-3) : "" });
+    const estadoDni = () => ({ configurado: reniec.real, url: reniec.url, pista: reniec.token ? reniec.token.slice(0, 3) + "…" + reniec.token.slice(-3) : "", consumo: reniec.resumenConsumo() });
     if (ruta === "/api/consulta-dni" && metodo === "GET") return json(res, 200, estadoDni());
     if (ruta === "/api/consulta-dni" && metodo === "POST") {
       const { token, url: urlServicio, probarDni } = await leerJSON(req, 8192);
