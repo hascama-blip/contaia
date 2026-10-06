@@ -80,7 +80,7 @@ export async function pdfFicha(a, { stands = [] } = {}) {
   const ANCHO = 210 - M * 2;
   let y = M;
 
-  const azul = [11, 138, 48]; // verde principal #0B8A30
+  const azul = [84, 96, 180]; // azul del escudo #5460B4
   const gris = [100, 116, 139];
   const linea = [226, 232, 240];
 

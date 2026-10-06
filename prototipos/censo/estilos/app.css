@@ -382,10 +382,10 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .pl-calle { fill: var(--acento); font-size: 26px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; letter-spacing: 0.04em; }
 .pl-pasaje { fill: var(--acento); fill-opacity: 0.85; font-size: 14px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
 .pl-texto-ambiente { fill: var(--texto-3); font-size: 13px; text-anchor: middle; dominant-baseline: middle; }
-.pl-salida { fill: #22c55e; fill-opacity: 0.85; stroke: #bbf7d0; stroke-width: 1; }
-.pl-texto-salida { fill: #052e16; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; }
+.pl-salida { fill: var(--verde-500); fill-opacity: 0.9; stroke: #c6f5c6; stroke-width: 1; }
+.pl-texto-salida { fill: #06240a; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; }
 .pl-galeria circle { fill: var(--acento); }
-.pl-galeria text { fill: var(--brand-900); font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.pl-galeria text { fill: #1f2552; font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .pl-stand { cursor: pointer; outline: none; }
 .pl-stand polygon { stroke-width: 1; stroke-linejoin: round; transition: opacity 0.15s; }
 .pl-stand:hover polygon, .pl-stand:focus-visible polygon, .pl-activo polygon { stroke-width: 3; stroke: #ffffff; }
@@ -407,7 +407,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .leyenda .ley-alerta { background: var(--alerta-fondo); border: 1px solid var(--alerta); }
 .leyenda .ley-peligro { background: var(--peligro-fondo); border: 1px solid var(--peligro); }
 .leyenda .ley-neutro { background: var(--neutro-fondo); border: 1px solid var(--texto-4); }
-.leyenda .ley-salida { background: #22c55e; }
+.leyenda .ley-salida { background: var(--verde-500); }
 .leyenda .ley-vacio { background: var(--superficie); border: 1px dashed var(--borde-fuerte); }
 .burbuja {
   position: absolute; z-index: 5; width: 340px;
@@ -480,19 +480,19 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .logro-escala span:last-child { transform: translateX(-100%); }
 .logro-escala span.hecho { color: var(--ok); font-weight: 700; }
 
-/* Cajas en azul marino (paleta oscura) sobre la página blanca: tarjetas,
+/* Cajas en azul marino (el azul del escudo, oscurecido) sobre la página blanca: tarjetas,
    paneles laterales y el plano. Los tokens se heredan a todo lo que contienen. */
 .card, .panel, .plano-azul {
-  --superficie: #0c3a22; --superficie-2: #104a2b; --borde: #1b5c37; --borde-fuerte: #2b744a;
-  --texto: #f1fbf4; --texto-2: #d2ecdc; --texto-3: #a3cdb3; --texto-4: #74a488;
-  --primario: #33BE5B; --primario-hover: #62DCB9; --primario-texto: #05301a; --enlace: #62DCB9;
-  --ok: #7ee39b; --ok-fondo: #0f5a2e; --alerta: #FFE3B3; --alerta-fondo: #4d3b17;
-  --peligro: #ffaaa3; --peligro-fondo: #54221f; --info: #62DCB9; --info-fondo: #0e4c40;
-  --neutro-fondo: #154d2e; --pasillo: #082c18; --anillo: #1d6b43; --brand-400: #62DCB9;
+  --superficie: #1c2459; --superficie-2: #232c6b; --borde: #30398a; --borde-fuerte: #4651a6;
+  --texto: #f3f5ff; --texto-2: #d6dbf5; --texto-3: #a9b2e3; --texto-4: #7e88c4;
+  --primario: var(--verde-500); --primario-hover: var(--verde-400); --primario-texto: #06240a; --enlace: #9fb0ff;
+  --ok: #7fe58a; --ok-fondo: #1b5a2b; --alerta: var(--accent-400); --alerta-fondo: #4e4100;
+  --peligro: #ff9e97; --peligro-fondo: #5e1f1f; --info: #9fb0ff; --info-fondo: #2a3680;
+  --neutro-fondo: #2a3376; --pasillo: #141a45; --anillo: #3d4a9e; --brand-400: #9fb0ff;
   color-scheme: dark; color: var(--texto);
 }
 .card, .panel { background: var(--superficie); }
-.plano-azul { background: #072a16; border-radius: var(--radio); padding: 14px; }
+.plano-azul { background: #121842; border-radius: var(--radio); padding: 14px; }
 .plano-azul .leyenda { color: var(--texto-3); }
 
 /* Tarjeta desplegable (cerrada por defecto) */
@@ -610,7 +610,9 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 .subtitulo-ficha { margin: 28px 0 14px; font-size: var(--t-lg); padding-top: 20px; border-top: 1px solid var(--borde); }
 
 /* Campo con botón al costado (DNI + Buscar en RENIEC) */
-.con-boton { display: flex; gap: 8px; align-items: stretch; }
+.con-boton { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.con-boton > .input, .con-boton > input { flex: 1 1 110px; min-width: 110px; }
+.con-boton > .btn { flex: 0 0 auto; white-space: nowrap; }
 .con-boton .input { flex: 1 1 120px; min-width: 0; }
 .con-boton .btn { white-space: nowrap; }
 @media (max-width: 480px) { .con-boton { flex-wrap: wrap; } .con-boton .btn { flex: 1 1 100%; } }

@@ -1,20 +1,24 @@
-/* Tokens de diseño — paleta verde del C.C.:
-   #0B8A30 (principal) · #33BE5B · #62DCB9 (menta) · #FFE3B3 (crema, acento). Cambia aquí y se aplica en toda la app.
-   Tema claro fijo: el fondo de la página es blanco. */
+/* Tokens de diseño — paleta del escudo del C.C. Inmaculada Concepción:
+   azul del óvalo #5460B4 (principal) · verde del laurel #2DBE2D (éxito) · dorado de la corona
+   #E4C000 (acento) · rojo de la cinta #E01B1B (peligro). Cambia aquí y se aplica en toda la app.
+   Tema claro fijo: el fondo de la página es blanco; las tarjetas van en azul marino. */
 :root { color-scheme: light; }
 :root {
-  --brand-50: #e7f7ec;
-  --brand-100: #c9eed4;
-  --brand-400: #33BE5B;
-  --brand-500: #0B8A30;
-  --brand-600: #0B8A30;
-  --brand-700: #09722a;
-  --brand-800: #075a21;
-  --brand-900: #053f17;
-  --accent-100: #fff4df;
-  --accent-400: #FFE3B3;
-  --accent-500: #ffd58c;
-  --accent-600: #a8650a;
+  --brand-50: #eef0fa;
+  --brand-100: #d9ddf3;
+  --brand-400: #7c86cf;
+  --brand-500: #5460B4;
+  --brand-600: #4a559f;
+  --brand-700: #3d4785;
+  --brand-800: #2e366a;
+  --brand-900: #1f2552;
+  --verde-400: #5fd45f;
+  --verde-500: #2DBE2D;
+  --verde-600: #1f9a2a;
+  --accent-100: #fdf6d6;
+  --accent-400: #F2CB1F;
+  --accent-500: #E4C000;
+  --accent-600: #8a6d00;
 
   /* Superficies y texto */
   --fondo: #ffffff;
@@ -26,25 +30,25 @@
   --texto-2: #475569;
   --texto-3: #64748b;
   --texto-4: #94a3b8;
-  --primario: var(--brand-600);
-  --primario-hover: var(--brand-700);
+  --primario: var(--brand-500);
+  --primario-hover: var(--brand-600);
   --primario-texto: #ffffff;
   --enlace: var(--brand-600);
   --acento: var(--accent-400);
-  --acento-texto: var(--brand-900);
+  --acento-texto: #3a2f00;
   --anillo: var(--brand-100);
 
   /* Semánticos (estado, no marca) */
-  --ok: #0B8A30;
-  --ok-fondo: #dcf5e3;
-  --alerta: #b45309;
-  --alerta-fondo: #fef3c7;
-  --peligro: #b91c1c;
-  --peligro-fondo: #fee2e2;
-  --info: #0c7a5f;
-  --info-fondo: #dff8f1;
+  --ok: var(--verde-600);
+  --ok-fondo: #dff7df;
+  --alerta: #8a6d00;
+  --alerta-fondo: #fdf3c4;
+  --peligro: #c71414;
+  --peligro-fondo: #fde2e2;
+  --info: var(--brand-600);
+  --info-fondo: #e6e9f8;
   --neutro-fondo: #f1f5f9;
-  --pasillo: #e3f3e8;
+  --pasillo: #e8ebf7;
 
   /* Franja principal (hero) */
   --hero-desde: var(--brand-900);
