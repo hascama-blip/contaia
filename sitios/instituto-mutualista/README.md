@@ -27,7 +27,14 @@ mutualista que ofrece cursos de salud preventivos y de especialización a sus as
   Ver los videos, WhatsApp o Contáctanos) y un recuadro de ayuda con WhatsApp y teléfono.
   Las preguntas se agregan, editan, ordenan y quitan en el panel.
 - **Contáctanos**: datos de contacto, formulario con validación (DNI, celular, Ley 29733),
-  redes sociales, mapa y enlace a las preguntas frecuentes.
+  redes sociales, mapa y enlace a las preguntas frecuentes. La casilla obligatoria dice "Acepto
+  los términos y condiciones y autorizo el tratamiento de mis datos…", con enlace a esa página.
+- **Términos y condiciones** (`#terminos`, en el menú como "Términos", en el menú del celular y en
+  el pie de página): fecha de última actualización, introducción y secciones numeradas con índice
+  (fijo al costado en computadora, plegable en celular), con el mismo control de tamaño de letra
+  que las preguntas frecuentes. Trae un **texto modelo** de 15 secciones (participantes, cursos
+  sin costo, usuario y contraseña, certificados, contenido de salud solo educativo, datos
+  personales según la Ley 29733, etc.). Debe revisarlo el área legal de la mutual antes de publicar.
 
 ## Administrador oculto
 No hay ningún botón visible ni dirección propia. Se abre de dos formas:
@@ -40,6 +47,7 @@ Pide un **PIN** (por defecto `2026`; se cambia en la pestaña *Seguridad*). Pest
 | --- | --- |
 | Portada | Fotos del carrusel (subir, cambiar, quitar, encuadre, orden), antetítulo, título, texto y botón de cada diapositiva |
 | Preguntas frecuentes | Agregar, editar, ordenar y quitar preguntas; respuesta y botón opcional debajo de cada una |
+| Términos | Fecha de actualización, introducción y secciones (agregar, editar, ordenar, quitar). Los marcadores `{nombre}`, `{correo}`, `{telefono}`, `{whatsapp}` y `{direccion}` se reemplazan por los datos de Contacto |
 | Videos (30 s) | Subir clips de vista previa (máx. 30 s), elegir de qué curso son, título, descripción, expositor, portada, enlace al curso completo y orden |
 | Contacto | Nombre, lema, logo, WhatsApp, mensaje inicial de WhatsApp, teléfono, correo, horario, dirección, enlace de Google Maps |
 | Redes sociales | Facebook, Instagram, TikTok, YouTube, LinkedIn, Messenger (vacío = no se muestra) |

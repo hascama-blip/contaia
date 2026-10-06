@@ -451,6 +451,7 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--ink-soft);line-height:1.45}
 .check input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand);flex:none}
 .check.invalid{color:var(--danger)}
+.check a{color:var(--brand-strong);font-weight:600}
 .req-note{font-size:13px;color:var(--ink-soft);margin-top:10px}
 .form-submit{width:100%}
 .form-error{margin-top:12px;padding:10px 14px;border-radius:12px;background:var(--danger-bg);color:var(--danger);font-size:14.5px;font-weight:600}
@@ -507,9 +508,35 @@ select.input-pill{flex:0 0 auto;width:auto;max-width:100%;padding-right:12px}
 .faq-link-card h2{font-size:22px}
 .faq-link-card p{color:var(--ink-soft);margin-top:4px}
 @media (max-width:700px){.faq-link-card{grid-template-columns:minmax(0,1fr)}.faq-help{grid-template-columns:minmax(0,1fr)}}
-.faq-row{grid-template-columns:40px minmax(0,1fr) auto}
+
+/* Términos y condiciones: lectura cómoda (índice fijo, letra grande, tamaño ajustable) */
+.terms-wrap{--fs:1;display:grid;grid-template-columns:270px minmax(0,1fr);gap:28px 48px;align-items:start}
+.terms-toc{position:sticky;top:104px;max-height:calc(100vh - 128px);overflow:auto;padding:8px 10px 12px;border-radius:18px;background:var(--surface-2)}
+.terms-toc summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 10px;cursor:pointer;list-style:none;font:700 16px/1.2 var(--font-display);color:var(--ink)}
+.terms-toc summary::-webkit-details-marker{display:none}
+.terms-toc summary .ic{color:var(--brand);transition:transform .2s}
+.terms-toc[open] summary .ic{transform:rotate(180deg)}
+.terms-toc ol{list-style:none;padding:0;margin:0;display:grid;gap:2px}
+.terms-toc a{display:flex;gap:10px;padding:9px 10px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:15px;line-height:1.35}
+.terms-toc a:hover,.terms-toc a:focus-visible{background:var(--surface);color:var(--brand-strong)}
+.terms-toc a .n{flex:none;min-width:2em;color:var(--brand);font-weight:700}
+.terms-wrap.no-toc{grid-template-columns:minmax(0,1fr)}
+.terms-body{max-width:780px;min-width:0}
+.terms-meta{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;margin-bottom:20px}
+.terms-date{display:inline-flex;gap:8px;align-items:center;color:var(--ink-soft);font-size:calc(15.5px * var(--fs))}
+.terms-date .ic{width:18px;height:18px;color:var(--brand)}
+.terms-intro{font-size:calc(18.5px * var(--fs));line-height:1.7;color:var(--ink);white-space:pre-line;margin-bottom:10px}
+.terms-sec{padding:26px 0 6px;border-top:1px solid var(--line);scroll-margin-top:104px}
+.terms-sec:first-of-type{border-top:0}
+.terms-sec h2{display:flex;gap:14px;align-items:center;font-size:calc(21px * var(--fs));line-height:1.3}
+.terms-sec h2 .n{flex:none;width:38px;height:38px;border-radius:50%;display:inline-grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong);font-size:16px}
+.terms-sec p{margin-top:10px;font-size:calc(17px * var(--fs));line-height:1.75;color:var(--ink);white-space:pre-line;max-width:70ch}
+.terms-body .faq-link-card{margin-top:30px}
+@media (max-width:900px){.terms-wrap{grid-template-columns:minmax(0,1fr)}.terms-toc{position:static;max-height:none}}
+.ed-row.faq-row{grid-template-columns:40px minmax(0,1fr) auto}
 .faq-num{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-strong);font:700 15px/1 var(--font-display)}
-@media (max-width:820px){.faq-row{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:820px){.ed-row.faq-row{grid-template-columns:minmax(0,1fr)}}
+.adm-note + .adm-grid{margin-top:16px}
 
 /* Pie de página */
 .site-footer{background:var(--deep);color:var(--on-hero-soft)}
@@ -605,7 +632,8 @@ body.on-contacto .fab-info{display:none}
 .pin-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
 .lock-err{color:var(--danger);font-weight:600;font-size:14px;min-height:1.4em}
 .adm-app{display:flex;flex-direction:column;flex:1;min-height:0}
-.adm-head-actions{display:flex;gap:8px;align-items:center}
+.adm-head-actions{display:flex;gap:8px;align-items:center;flex:none}
+@media (max-width:560px){.adm-logout-txt{display:none}}
 .adm-body{display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0}
 .adm-tabs{display:flex;flex-direction:column;gap:2px;padding:14px;border-right:1px solid var(--line);background:var(--bg);overflow-y:auto}
 .adm-tab{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;border:0;background:none;text-align:left;font:600 14.5px/1.2 var(--font-display);color:var(--ink-soft)}
@@ -742,6 +770,7 @@ body.on-contacto .fab-info{display:none}
       </div>
       <a class="nav-link" href="#preguntas" data-nav="preguntas">Preguntas frecuentes</a>
       <a class="nav-link" href="#contacto" data-nav="contacto">Contáctanos</a>
+      <a class="nav-link" href="#terminos" data-nav="terminos">Términos</a>
     </nav>
     <a class="btn btn-accent btn-sm header-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="drawer"><span data-icon="menu"></span></button>
@@ -763,6 +792,7 @@ body.on-contacto .fab-info{display:none}
     </div>
     <a class="d-link" href="#preguntas" data-nav="preguntas">Preguntas frecuentes</a>
     <a class="d-link" href="#contacto" data-nav="contacto">Contáctanos</a>
+    <a class="d-link" href="#terminos" data-nav="terminos">Términos y condiciones</a>
     <a class="btn btn-accent d-cta" data-btn="cabecera" href="#contacto"><span class="btn-text">Ingresar</span></a>
     <div class="d-info">
       <span data-item="telefono"><span data-icon="phone"></span><span data-cfg="telefono">(01) 000 0000</span></span>
@@ -1080,7 +1110,7 @@ body.on-contacto .fab-info{display:none}
               <div class="field full"><label for="f-mensaje">Mensaje</label><textarea id="f-mensaje" name="mensaje" rows="3" placeholder="Cuéntanos qué necesitas"></textarea></div>
             </div>
             <div class="checks">
-              <label class="check" id="check-datos"><input type="checkbox" id="f-datos" name="datos"><span>Autorizo el tratamiento de mis datos personales conforme a la Ley N.° 29733.*</span></label>
+              <label class="check" id="check-datos"><input type="checkbox" id="f-datos" name="datos"><span>Acepto los <a href="#terminos">términos y condiciones</a> y autorizo el tratamiento de mis datos personales conforme a la Ley N.° 29733.*</span></label>
               <label class="check"><input type="checkbox" id="f-wa" name="avisos"><span>Quiero recibir el calendario de cursos por WhatsApp.</span></label>
             </div>
             <button class="btn btn-accent form-submit" id="form-submit" type="submit">Enviar solicitud</button>
@@ -1111,6 +1141,40 @@ body.on-contacto .fab-info{display:none}
   </div>
 </section>
 
+<!-- ============ TÉRMINOS Y CONDICIONES ============ -->
+<section class="page" data-page="terminos" aria-labelledby="t-terminos" hidden>
+  <div class="page-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Ruta"><a href="#inicio">Inicio</a><span aria-hidden="true">/</span><span>Términos y condiciones</span></nav>
+      <h1 id="t-terminos">Términos y condiciones</h1>
+      <div class="dashes" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+    <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="M0 64C240 118 480 18 720 48s480 74 720 6V120H0z"/><path class="w2" d="M0 96c300-38 540 26 820-4s440-14 620 12V120H0z"/></svg>
+  </div>
+
+  <div class="section near-top">
+    <div class="wrap terms-wrap" id="terms-wrap">
+      <details class="terms-toc" id="terms-toc" open>
+        <summary>Contenido<span data-icon="chevDown"></span></summary>
+        <ol id="terms-index"></ol>
+      </details>
+      <div class="terms-body">
+        <div class="terms-meta">
+          <p class="terms-date" id="terms-date"><span data-icon="calendar"></span><span></span></p>
+          <div class="faq-size" role="group" aria-label="Tamaño de letra"><span>Tamaño de letra</span><button type="button" data-fs="1" aria-pressed="true" aria-label="Letra normal">A</button><button type="button" data-fs="1.15" aria-pressed="false" aria-label="Letra grande">A+</button><button type="button" data-fs="1.3" aria-pressed="false" aria-label="Letra muy grande">A++</button></div>
+        </div>
+        <p class="terms-intro" id="terms-intro"></p>
+        <div id="terms-list"></div>
+        <div class="faq-link-card">
+          <span class="quick-ico qi-brand" data-icon="help"></span>
+          <div><h2>¿Tienes dudas sobre estos términos?</h2><p>Escríbenos y te los explicamos con calma.</p></div>
+          <a class="btn btn-brand" href="#contacto">Ir a Contáctanos<span data-icon="arrowRight"></span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer class="site-footer">
@@ -1131,6 +1195,7 @@ body.on-contacto .fab-info{display:none}
         <li><a href="#cursos">Cursos</a></li>
         <li><a href="#preguntas">Preguntas frecuentes</a></li>
         <li><a href="#contacto">Contáctanos</a></li>
+        <li><a href="#terminos">Términos y condiciones</a></li>
       </ul>
     </div>
     <div>
@@ -1185,7 +1250,7 @@ body.on-contacto .fab-info{display:none}
     <div class="dlg-head">
       <h2>Administración del sitio</h2>
       <div class="adm-head-actions">
-        <button class="btn btn-line btn-xs" type="button" id="adm-logout"><span data-icon="logout"></span>Cerrar sesión</button>
+        <button class="btn btn-line btn-xs" type="button" id="adm-logout" aria-label="Cerrar sesión" title="Cerrar sesión"><span data-icon="logout"></span><span class="adm-logout-txt">Cerrar sesión</span></button>
         <button class="icon-btn" type="button" data-adm-close aria-label="Cerrar administración"><span data-icon="close"></span></button>
       </div>
     </div>
@@ -1325,7 +1390,7 @@ const ARTS = {
   cursos: { icon: 'stethoscope', chips: [['award', 'Certificado con horas académicas'], ['users', 'Grupos de máximo 20']] },
   comunidad: { icon: 'handHeart', chips: [['users', 'Por y para asociados'], ['heartPulse', 'Prevención en familia']] }
 };
-const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Cursos'], ['#cursos-videos', 'Videos de los cursos'], ['#preguntas', 'Preguntas frecuentes'], ['#contacto', 'Contáctanos']];
+const PAGES_OPT = [['#inicio', 'Inicio'], ['#nosotros', 'Nosotros'], ['#cursos', 'Cursos'], ['#cursos-videos', 'Videos de los cursos'], ['#preguntas', 'Preguntas frecuentes'], ['#contacto', 'Contáctanos'], ['#terminos', 'Términos y condiciones']];
 // Enlaces de versiones anteriores (había cursos gratuitos y de pago).
 const LEGACY_PAGES = { '#cursos-gratuitos': '#cursos', '#cursos-pago': '#cursos' };
 const MAX_VIDEOS = 40;
@@ -1367,6 +1432,9 @@ const TEXT_GROUPS = [
 ];
 const FAQ_ACCIONES = [['', 'Sin botón'], ['ingresar', 'Botón “Ingresar” (plataforma de cursos)'], ['cursos', 'Ver los cursos'], ['videos', 'Ver los videos'], ['whatsapp', 'Escribir por WhatsApp'], ['contacto', 'Ir a Contáctanos']];
 const MAX_FAQ = 60;
+const MAX_TERMS = 40;
+// Marcadores que el texto de los términos puede usar; se reemplazan con los datos de Contacto.
+const TERM_TOKENS = { nombre: 'el instituto', correo: '', telefono: '', whatsapp: '', direccion: '' };
 const FORM_DEST = [
   ['whatsapp', 'Enviar por WhatsApp', 'Al enviar, la persona pulsa un botón que abre WhatsApp con sus datos ya escritos hacia tu número. Funciona sin servidor.'],
   ['correo', 'Enviar por correo', 'Abre el programa de correo del visitante con sus datos hacia tu correo. Depende de que tenga un correo configurado.'],
@@ -1408,6 +1476,27 @@ const DEFAULT_SITE = {
     { id: 'faq-falta', pregunta: '¿Qué pasa si falto a una clase?', respuesta: 'Las clases virtuales quedan grabadas durante 15 días. Para recibir el certificado necesitas asistir al menos al 80 % de las sesiones.', accion: '' },
     { id: 'faq-asociado', pregunta: '¿Cómo acredito que soy asociado?', respuesta: 'Solo necesitas tu DNI. Con él revisamos tu condición en el padrón de la mutual.', accion: '' }
   ],
+  terminos: {
+    actualizado: 'Octubre de 2026',
+    intro: 'Estas reglas explican cómo usar este sitio y los cursos de {nombre}. Léelas con calma. Si tienes alguna duda, escríbenos y te ayudamos.',
+    secciones: [
+      { id: 'term-aceptacion', titulo: 'Aceptación', texto: 'Al navegar por este sitio, enviar el formulario de contacto o ingresar a los cursos, aceptas estos términos y condiciones. Si no estás de acuerdo con ellos, te pedimos no usar el sitio.' },
+      { id: 'term-sitio', titulo: 'Para qué sirve este sitio', texto: '{nombre} es el espacio de formación de la mutual. En este sitio informamos sobre los cursos, mostramos videos cortos de vista previa y te llevamos a la plataforma de cursos, donde se dictan las clases.' },
+      { id: 'term-participantes', titulo: 'Quiénes pueden participar', texto: 'Los cursos son para los asociados activos de la mutual y sus familiares directos: cónyuge, hijos y padres.\nPodemos pedirte tu DNI para revisar tu condición en el padrón de la mutual.' },
+      { id: 'term-costo', titulo: 'Los cursos no tienen costo', texto: 'Los cursos no tienen costo para los asociados y sus familiares.\nNadie del instituto te pedirá pagos, claves bancarias ni datos de tarjetas. Si alguien te lo pide en nombre del instituto, no respondas y avísanos.' },
+      { id: 'term-cuenta', titulo: 'Tu usuario y contraseña', texto: 'Para entrar a la plataforma de cursos usas un usuario y una contraseña personales. Son solo para ti: no los compartas con otras personas.\nSi crees que alguien más está usando tu cuenta, avísanos para cambiar tu contraseña.' },
+      { id: 'term-cambios-cursos', titulo: 'Vacantes, fechas y cambios', texto: 'Algunos cursos tienen vacantes limitadas, que se asignan por orden de inscripción.\nEl instituto puede cambiar las fechas, los horarios, los docentes o la modalidad de un curso, o reprogramarlo. Si eso pasa, te avisamos por los datos de contacto que nos diste.' },
+      { id: 'term-certificados', titulo: 'Constancias y certificados', texto: 'Según el curso, recibes una constancia de participación o un certificado con horas académicas.\nPara recibirlo debes asistir al menos al 80 % de las sesiones y cumplir las evaluaciones que pida cada curso. Las constancias y los certificados son personales.' },
+      { id: 'term-salud', titulo: 'Los contenidos de salud son educativos', texto: 'Los cursos y los videos tienen fines educativos y preventivos. No reemplazan la consulta, el diagnóstico ni el tratamiento de un profesional de la salud.\nAnte una emergencia, llama al 106 (SAMU) o acude al establecimiento de salud más cercano.' },
+      { id: 'term-conducta', titulo: 'Respeto en las clases', texto: 'En las clases y en la plataforma se espera un trato respetuoso hacia los docentes y los demás participantes.\nNo está permitido grabar ni difundir las clases sin autorización, publicar contenido ofensivo ni usar la cuenta de otra persona. Si esto ocurre, el instituto puede suspender el acceso.' },
+      { id: 'term-propiedad', titulo: 'Materiales y videos', texto: 'Los videos, materiales, textos, logos e imágenes del sitio y de los cursos pertenecen al instituto o a sus docentes. Puedes usarlos para tu aprendizaje personal.\nNo está permitido copiarlos, venderlos ni difundirlos sin autorización escrita del instituto.' },
+      { id: 'term-datos', titulo: 'Tus datos personales', texto: 'Tratamos tus datos personales conforme a la Ley N.° 29733, Ley de Protección de Datos Personales, y su reglamento.\nUsamos los datos que nos das en el formulario (nombres, DNI, celular y correo) solo para responder tu solicitud, revisar tu condición de asociado o familiar y avisarte sobre los cursos. No los vendemos ni los compartimos con otras empresas para fines comerciales.\nPuedes pedir el acceso, la corrección o la eliminación de tus datos escribiendo a {correo}.' },
+      { id: 'term-enlaces', titulo: 'Enlaces a otros servicios', texto: 'Este sitio tiene enlaces a la plataforma de cursos, WhatsApp, redes sociales y Google Maps. Esos servicios tienen sus propias condiciones y políticas de privacidad, que te recomendamos revisar.' },
+      { id: 'term-disponibilidad', titulo: 'Funcionamiento del sitio', texto: 'Hacemos lo posible para que el sitio y la plataforma de cursos funcionen siempre, pero pueden detenerse por mantenimiento o por fallas técnicas. Cuando ocurra, trabajaremos para restablecerlos lo antes posible.' },
+      { id: 'term-actualizacion', titulo: 'Cambios en estos términos', texto: 'Podemos actualizar estos términos cuando sea necesario. La fecha de la última actualización aparece al inicio de esta página.\nSi sigues usando el sitio después de un cambio, se entiende que aceptas la nueva versión.' },
+      { id: 'term-ley', titulo: 'Ley aplicable y contacto', texto: 'Estos términos se rigen por las leyes de la República del Perú.\nSi tienes dudas o algún reclamo, escríbenos a {correo} o llámanos al {telefono}.' }
+    ]
+  },
   seguridad: { pinHash: '' },
   logo: null,
   videos: [
@@ -1468,10 +1557,26 @@ function normFaq(f) {
     accion: FAQ_ACCIONES.some(a => a[0] === f.accion) ? f.accion : ''
   };
 }
+function normTerm(t) {
+  t = t || {};
+  return {
+    id: (String(t.id || '').replace(/[^\w-]/g, '').slice(0, 50)) || 'term-' + uid(),
+    titulo: str(t.titulo, 150), texto: str(t.texto, 4000)
+  };
+}
+function normTerminos(raw, def) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  return {
+    actualizado: typeof raw.actualizado === 'string' ? raw.actualizado.slice(0, 60) : def.actualizado,
+    intro: typeof raw.intro === 'string' ? raw.intro.slice(0, 1500) : def.intro,
+    secciones: (Array.isArray(raw.secciones) ? raw.secciones.slice(0, MAX_TERMS) : def.secciones).map(normTerm)
+  };
+}
 function mergeSite(raw) {
   const d = JSON.parse(JSON.stringify(DEFAULT_SITE));
-  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); d.videos = d.videos.map(normVideo); d.faq = d.faq.map(normFaq); return d; }
+  if (!raw || typeof raw !== 'object') { d.slides = d.slides.map(normSlide); d.videos = d.videos.map(normVideo); d.faq = d.faq.map(normFaq); d.terminos = normTerminos(null, d.terminos); return d; }
   d.faq = (Array.isArray(raw.faq) ? raw.faq.slice(0, MAX_FAQ) : d.faq).map(normFaq);
+  d.terminos = normTerminos(raw.terminos, d.terminos);
   d.videos = (Array.isArray(raw.videos) ? raw.videos.slice(0, MAX_VIDEOS) : d.videos).map(normVideo);
   ['contacto', 'redes', 'textos'].forEach(sec => {
     if (raw[sec] && typeof raw[sec] === 'object') Object.keys(d[sec]).forEach(k => { if (typeof raw[sec][k] === 'string') d[sec][k] = raw[sec][k].slice(0, 600); });
@@ -1511,7 +1616,8 @@ function cloneSite(s) {
     logo: s.logo, logoUrl: s.logoUrl || null, logoBlob: s.logoBlob || null,
     slides: s.slides.map(x => Object.assign({}, x, { confirm: false })),
     videos: s.videos.map(x => Object.assign({}, x, { confirm: false })),
-    faq: s.faq.map(x => Object.assign({}, x, { confirm: false }))
+    faq: s.faq.map(x => Object.assign({}, x, { confirm: false })),
+    terminos: { actualizado: s.terminos.actualizado, intro: s.terminos.intro, secciones: s.terminos.secciones.map(x => Object.assign({}, x, { confirm: false })) }
   };
 }
 let site = mergeSite(null);
@@ -1872,7 +1978,7 @@ dlgC.addEventListener('click', e => {
 dlgC.addEventListener('close', () => { $$('video', dlgC).forEach(x => x.pause()); });
 
 /* ---------- Navegación entre páginas ---------- */
-const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-videos': 'cursos', 'cursos-pago': 'cursos', preguntas: 'preguntas', contacto: 'contacto' };
+const ALIAS = { '': 'inicio', inicio: 'inicio', nosotros: 'nosotros', cursos: 'cursos', 'cursos-gratuitos': 'cursos', 'cursos-videos': 'cursos', 'cursos-pago': 'cursos', preguntas: 'preguntas', contacto: 'contacto', terminos: 'terminos' };
 let currentPage = null;
 function route(h) {
   if (h == null) h = decodeURIComponent(location.hash.slice(1));
@@ -1966,14 +2072,51 @@ function renderFaq() {
   const a = $('#faq-wa'); a.hidden = !wa; if (wa) a.href = wa;
 }
 $('#faq-buscar').addEventListener('input', e => { faqQuery = e.target.value; renderFaq(); });
-// Tamaño de letra de las preguntas (se recuerda en este navegador).
+// Tamaño de letra de las preguntas y de los términos (se recuerda en este navegador).
 function setFaqSize(v) {
-  $('#faq-wrap').style.setProperty('--fs', v);
+  ['#faq-wrap', '#terms-wrap'].forEach(s => $(s).style.setProperty('--fs', v));
   $$('.faq-size button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fs === v)));
   store.set('instituto-faq-letra', v);
 }
-$('.faq-size').addEventListener('click', e => { const b = e.target.closest('button[data-fs]'); if (b) setFaqSize(b.dataset.fs); });
+$$('.faq-size').forEach(g => g.addEventListener('click', e => { const b = e.target.closest('button[data-fs]'); if (b) setFaqSize(b.dataset.fs); }));
 { const fs = store.get('instituto-faq-letra'); if (['1', '1.15', '1.3'].includes(fs)) setFaqSize(fs); }
+
+/* ---------- Términos y condiciones ---------- */
+function termText(s) {
+  const c = site.contacto;
+  return String(s || '').replace(/\{(\w+)\}/g, (m, k) => {
+    if (!(k in TERM_TOKENS)) return m;
+    const v = String(c[k] || '').trim();
+    return v || TERM_TOKENS[k] || 'los medios de la página Contáctanos';
+  });
+}
+function renderTerms() {
+  const t = site.terminos;
+  const secs = t.secciones.filter(s => s.titulo || s.texto);
+  const date = $('#terms-date');
+  date.hidden = !t.actualizado.trim();
+  date.lastElementChild.textContent = 'Última actualización: ' + t.actualizado.trim();
+  const intro = $('#terms-intro');
+  intro.textContent = termText(t.intro); intro.hidden = !t.intro.trim();
+  const title = (s, i) => termText(s.titulo) || 'Sección ' + (i + 1);
+  $('#terms-index').innerHTML = secs.map((s, i) => '<li><a href="#tc-' + s.id + '" data-term="tc-' + s.id + '"><span class="n">' + (i + 1) + '.</span><span>' + esc(title(s, i)) + '</span></a></li>').join('');
+  const toc = secs.length > 1;
+  $('#terms-toc').hidden = !toc;
+  $('#terms-wrap').classList.toggle('no-toc', !toc);
+  $('#terms-list').innerHTML = secs.map((s, i) => '<section class="terms-sec" id="tc-' + s.id + '" aria-labelledby="tc-' + s.id + '-t"><h2 id="tc-' + s.id + '-t"><span class="n" aria-hidden="true">' + (i + 1) + '</span>' + esc(title(s, i)) + '</h2>' + (s.texto ? '<p>' + esc(termText(s.texto)) + '</p>' : '') + '</section>').join('');
+}
+// El índice baja a la sección sin cambiar la dirección (el # se usa para las páginas).
+$('#terms-index').addEventListener('click', e => {
+  const a = e.target.closest('a[data-term]');
+  if (!a) return;
+  e.preventDefault();
+  const sec = document.getElementById(a.dataset.term);
+  if (!sec) return;
+  // En celular el índice va encima del texto: se pliega antes de bajar para no mover el destino.
+  if (matchMedia('(max-width: 900px)').matches) $('#terms-toc').open = false;
+  requestAnimationFrame(() => sec.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
+});
+if (matchMedia('(max-width: 900px)').matches) $('#terms-toc').open = false;
 
 /* ---------- Aplicar contenido editable a la página ---------- */
 function applySite() {
@@ -2001,6 +2144,7 @@ function applySite() {
   renderHome();
   renderCourses();
   renderFaq();
+  renderTerms();
   document.title = c.nombre || 'Instituto Mutualista';
   $('#t-inicio').textContent = (c.nombre || 'Instituto') + ': cursos de salud para asociados';
 }
@@ -2098,7 +2242,7 @@ async function loadSite() {
 
 /* ---------- Panel de administración (oculto) ---------- */
 const dlgA = $('#dlg-admin');
-const TABS = [['portada', 'Portada', 'image'], ['videos', 'Videos (30 s)', 'video'], ['preguntas', 'Preguntas frecuentes', 'help'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
+const TABS = [['portada', 'Portada', 'image'], ['videos', 'Videos (30 s)', 'video'], ['preguntas', 'Preguntas frecuentes', 'help'], ['terminos', 'Términos', 'clipboard'], ['contacto', 'Contacto', 'phone'], ['redes', 'Redes sociales', 'share'], ['botones', 'Botones', 'link'], ['textos', 'Textos', 'type'], ['conectores', 'Conectores', 'plug'], ['seguridad', 'Seguridad', 'lock']];
 let admTab = 'portada';
 let draft = null;
 let dirty = false;
@@ -2356,6 +2500,34 @@ function panelFaq() {
       : '<div class="empty">' + icon('help') + '<h3>Aún no hay preguntas</h3><p>Pulsa “Agregar pregunta” para crear la primera.</p></div>') +
     '<p style="margin-top:16px"><button class="btn btn-brand btn-sm" type="button" data-act="faq-add"' + (draft.faq.length >= MAX_FAQ ? ' disabled' : '') + '>' + icon('plus') + 'Agregar pregunta</button></p>';
 }
+function termRow(s, i, n) {
+  return '<li class="ed-row faq-row term-row" data-t="' + i + '"><span class="faq-num">' + (i + 1) + '</span>' +
+    '<div class="ed-fields">' +
+    '<label class="ed-f ed-wide"><span>Título</span><input id="term-ti-' + s.id + '" data-tf="titulo" maxlength="150" value="' + esc(s.titulo) + '" placeholder="Ej.: Tus datos personales"></label>' +
+    '<label class="ed-f ed-wide"><span>Texto</span><textarea id="term-tx-' + s.id + '" data-tf="texto" rows="5" maxlength="4000" placeholder="Frases cortas y claras. Cada salto de línea se respeta.">' + esc(s.texto) + '</textarea></label>' +
+    '</div>' +
+    '<div class="ed-actions">' +
+    (s.confirm
+      ? '<div class="ed-confirm">¿Quitar esta sección?<div><button class="btn btn-line btn-xs" type="button" data-act="term-del-yes">Sí, quitar</button><button class="btn btn-line btn-xs" type="button" data-act="term-del-no">No</button></div></div>'
+      : '<button class="icon-btn" type="button" data-act="term-up" aria-label="Subir sección ' + (i + 1) + '"' + (i === 0 ? ' disabled' : '') + '>' + icon('up') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="term-down" aria-label="Bajar sección ' + (i + 1) + '"' + (i === n - 1 ? ' disabled' : '') + '>' + icon('down') + '</button>' +
+        '<button class="icon-btn" type="button" data-act="term-del" aria-label="Quitar sección ' + (i + 1) + '">' + icon('trash') + '</button>') +
+    '</div></li>';
+}
+function panelTerminos() {
+  const t = draft.terminos;
+  return '<h3>Términos y condiciones</h3><p class="adm-intro">Se muestran en la página Términos y condiciones (menú, pie de página y casilla del formulario de contacto), en este orden. Puedes escribir <code>{nombre}</code>, <code>{correo}</code>, <code>{telefono}</code>, <code>{whatsapp}</code> o <code>{direccion}</code>: se reemplazan por los datos de la pestaña Contacto.</p>' +
+    '<p class="adm-note">' + icon('info') + '<span>El texto incluido es un modelo. Pide al área legal de la mutual que lo revise antes de publicarlo y actualiza la fecha cada vez que lo cambies.</span></p>' +
+    '<div class="adm-grid">' +
+    fieldHTML('terminos.actualizado', 'Fecha de la última actualización', { icon: 'calendar', max: 60, ph: 'Ej.: Octubre de 2026', hint: 'Vacío: no se muestra la fecha.' }) +
+    fieldHTML('terminos.intro', 'Introducción', { icon: 'type', area: true, rows: 3, wide: true, max: 1500 }) +
+    '</div>' +
+    '<h4>Secciones</h4>' +
+    (t.secciones.length
+      ? '<ol class="ed-list">' + t.secciones.map((s, i) => termRow(s, i, t.secciones.length)).join('') + '</ol>'
+      : '<div class="empty">' + icon('clipboard') + '<h3>Aún no hay secciones</h3><p>Pulsa “Agregar sección” para escribir la primera.</p></div>') +
+    '<p style="margin-top:16px"><button class="btn btn-brand btn-sm" type="button" data-act="term-add"' + (t.secciones.length >= MAX_TERMS ? ' disabled' : '') + '>' + icon('plus') + 'Agregar sección</button></p>';
+}
 function waHint() { const n = waNumber(draft); return n ? 'Enlace que se usará: wa.me/' + n : 'Escribe el número con código de país, por ejemplo +51 987 654 321.'; }
 function mapHint() { return safeUrl(draft.contacto.mapa) ? 'Se usará este enlace.' : 'Vacío: se buscará la dirección en Google Maps.'; }
 function panelContacto() {
@@ -2462,7 +2634,7 @@ function panelSeguridad() {
     '<li><span class="quick-ico qi-brand">' + icon('pointer') + '</span><span>Haz clic 5 veces seguidas en el símbolo <code>©</code> del pie de página.</span></li></ul>' +
     '<p class="adm-note">' + icon('info') + '<span>El PIN evita que un visitante entre por accidente. La protección real está en el guardado: solo las personas con permiso de edición de esta página pueden publicar cambios. En el sitio final, el panel debe ir detrás de un inicio de sesión en el servidor.</span></p>';
 }
-const PANELS = { portada: panelPortada, videos: panelVideos, preguntas: panelFaq, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
+const PANELS = { portada: panelPortada, videos: panelVideos, preguntas: panelFaq, terminos: panelTerminos, contacto: panelContacto, redes: panelRedes, botones: panelBotones, textos: panelTextos, conectores: panelConectores, seguridad: panelSeguridad };
 function renderPanel(focusId) {
   $('#adm-panel').innerHTML = PANELS[admTab]();
   if (focusId) { const f = document.getElementById(focusId); if (f) f.focus(); }
@@ -2485,6 +2657,8 @@ admPanel.addEventListener('input', e => {
   }
   const frow = t.closest('.faq-row');
   if (frow && t.dataset.ff) { draft.faq[+frow.dataset.q][t.dataset.ff] = t.value; markDirty(); return; }
+  const trow = t.closest('.term-row');
+  if (trow && t.dataset.tf) { draft.terminos.secciones[+trow.dataset.t][t.dataset.tf] = t.value; markDirty(); return; }
   const vrow = t.closest('.vid-row');
   if (vrow && t.dataset.vf) {
     const v = draft.videos[+vrow.dataset.v];
@@ -2570,6 +2744,19 @@ admPanel.addEventListener('click', e => {
     else if (act === 'faq-del') { fl.forEach(f => { f.confirm = false; }); fl[j].confirm = true; }
     else if (act === 'faq-del-no') { fl[j].confirm = false; }
     else if (act === 'faq-del-yes') { fl.splice(j, 1); markDirty(); }
+    renderPanel();
+    return;
+  }
+  if (act.startsWith('term-')) {
+    const tr = b.closest('.term-row');
+    const j = tr ? +tr.dataset.t : -1;
+    const tl = draft.terminos.secciones;
+    if (act === 'term-add') { if (tl.length < MAX_TERMS) { tl.push({ id: 'term-' + uid(), titulo: '', texto: '', confirm: false }); markDirty(); renderPanel('term-ti-' + tl[tl.length - 1].id); } return; }
+    if (act === 'term-up' && j > 0) { const x = tl[j - 1]; tl[j - 1] = tl[j]; tl[j] = x; markDirty(); }
+    else if (act === 'term-down' && j < tl.length - 1) { const x = tl[j + 1]; tl[j + 1] = tl[j]; tl[j] = x; markDirty(); }
+    else if (act === 'term-del') { tl.forEach(s => { s.confirm = false; }); tl[j].confirm = true; }
+    else if (act === 'term-del-no') { tl[j].confirm = false; }
+    else if (act === 'term-del-yes') { tl.splice(j, 1); markDirty(); }
     renderPanel();
     return;
   }
@@ -2677,7 +2864,7 @@ const videoMeta = (v, portada, archivo) => ({ id: v.id, titulo: v.titulo, descri
 function serialize(d, slides, logo, videos) {
   const cursos = {};
   Object.keys(d.plataforma.cursos).forEach(id => { const u = String(d.plataforma.cursos[id] || '').trim(); if (u) cursos[id] = u; });
-  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, plataforma: { url: d.plataforma.url.trim(), texto: d.plataforma.texto, cursos: cursos }, faq: d.faq.map(f => ({ id: f.id, pregunta: f.pregunta, respuesta: f.respuesta, accion: f.accion })), seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
+  return { version: 2, actualizado: new Date().toISOString(), contacto: d.contacto, redes: d.redes, botones: d.botones, textos: d.textos, conectores: d.conectores, plataforma: { url: d.plataforma.url.trim(), texto: d.plataforma.texto, cursos: cursos }, faq: d.faq.map(f => ({ id: f.id, pregunta: f.pregunta, respuesta: f.respuesta, accion: f.accion })), terminos: { actualizado: d.terminos.actualizado, intro: d.terminos.intro, secciones: d.terminos.secciones.map(s => ({ id: s.id, titulo: s.titulo, texto: s.texto })) }, seguridad: d.seguridad, logo: logo, videos: videos, slides: slides };
 }
 function commitDraft() {
   const keepSession = session.get('im-admin') === currentPinHash();
@@ -2685,6 +2872,7 @@ function commitDraft() {
   site.slides.forEach(s => { delete s.confirm; delete s.warn; });
   site.videos.forEach(v => { delete v.confirm; });
   site.faq.forEach(f => { delete f.confirm; });
+  site.terminos.secciones.forEach(s => { delete s.confirm; });
   if (keepSession) session.set('im-admin', currentPinHash());
   dirty = false;
   applySite(); cur = 0; renderHero();
