@@ -5,8 +5,13 @@ import path from "node:path";
 
 const txt = (v) => String(v ?? "").trim();
 const fechaISO = (v) => {
-  const m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(txt(v));
-  return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
+  const t = txt(v);
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);             // AAAA-MM-DD (ISO)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);   // DD-MM-AAAA o DD/MM/AAAA
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  m = t.match(/^(\d{4})(\d{2})(\d{2})$/);                   // AAAAMMDD
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
 };
 const fotoLimpia = (v) => {
   const s = txt(v).replace(/^data:image\/\w+;base64,/, "").replace(/\s+/g, "");
@@ -21,12 +26,56 @@ function clasificar(mensaje) {
   return 502;
 }
 
+/** Busca la primera clave presente (insensible a mayúsculas, guiones y guiones bajos). */
+function campo(o, ...nombres) {
+  if (!o || typeof o !== "object") return undefined;
+  const plano = Object.fromEntries(Object.keys(o).map((k) => [k.toLowerCase().replace(/[_\-\s]/g, ""), o[k]]));
+  for (const n of nombres) { const v = plano[n.toLowerCase().replace(/[_\-\s]/g, "")]; if (v !== undefined && v !== null && v !== "") return v; }
+  return undefined;
+}
+
+/**
+ * Convierte la respuesta de distintos proveedores (apidni.com, go.net.pe y similares) a PersonaReniec.
+ * Acepta los datos en `data`, `result`, `resultado`, `persona` o en la raíz; nombres de campo en
+ * español/inglés, con o sin guion bajo. Devuelve null si no hay persona.
+ */
+export function normalizar(j, dniPedido) {
+  if (!j || typeof j !== "object") return null;
+  const d = campo(j, "data", "result", "resultado", "persona", "datos") ?? j;
+  if (!d || typeof d !== "object") return null;
+  const exito = campo(j, "success", "ok", "exito", "estado");
+  const codigo = campo(j, "codigo", "code");
+  if (exito === false || exito === "false" || exito === 0 || (codigo !== undefined && !(Number(codigo) > 0) && !campo(d, "nombres", "nombre", "first_name"))) return null;
+  const nombres = txt(campo(d, "nombres", "nombre", "first_name", "names", "prenombres"));
+  const dni = txt(campo(d, "dni", "numero", "num_doc", "numeroDocumento", "documento", "nro_dni")) || String(dniPedido);
+  let paterno = txt(campo(d, "apellido_paterno", "apellidoPaterno", "ap_paterno", "paterno", "apPaterno", "last_name_father", "primer_apellido"));
+  let materno = txt(campo(d, "apellido_materno", "apellidoMaterno", "ap_materno", "materno", "apMaterno", "last_name_mother", "segundo_apellido"));
+  if (!paterno && !materno) { // apellidos juntos
+    const ap = txt(campo(d, "apellidos", "last_name", "apellido"));
+    if (ap) { const partes = ap.split(/\s+/); paterno = partes[0] || ""; materno = partes.slice(1).join(" "); }
+  }
+  const completo = !nombres && !paterno ? txt(campo(d, "nombre_completo", "nombreCompleto", "full_name", "fullName")) : "";
+  let nom = nombres, pat = paterno, mat = materno;
+  if (completo) { const t = completo.split(/\s+/); pat = t[0] || ""; mat = t[1] || ""; nom = t.slice(2).join(" "); }
+  if (!nom && !pat) return null;
+  const foto = fotoLimpia(campo(d, "foto", "foto_base64", "imagen", "photo", "image", "fotografia", "picture"));
+  return { dni, nombres: nom, apellidoPaterno: pat, apellidoMaterno: mat,
+    fechaNacimiento: fechaISO(txt(campo(d, "fecha_nacimiento", "fechaNacimiento", "nacimiento", "birth_date", "birthdate", "fec_nacimiento"))),
+    genero: txt(campo(d, "genero", "sexo", "gender")), direccion: txt(campo(d, "direccion", "domicilio", "address")),
+    ubigeo: txt(campo(d, "ubigeo", "ubigeo_reniec", "codigo_ubigeo")), distrito: txt(campo(d, "distrito", "district")),
+    provincia: txt(campo(d, "provincia", "province")), departamento: txt(campo(d, "departamento", "department", "region")),
+    ...(foto ? { fotoBase64: foto } : {}), fuente: "apidni", consultadoAt: new Date().toISOString() };
+}
+
 export class Reniec {
   constructor(dir, { token = process.env.APIDNI_TOKEN || "", url = process.env.APIDNI_URL || "https://apidni.com/api/v2/dni", cacheDias = Number(process.env.RENIEC_CACHE_DIAS || 365) } = {}) {
-    this.url = url; this.cacheDias = cacheDias;
+    this.cacheDias = cacheDias;
     this.configRuta = path.join(dir, "configuracion.json");
-    // El token puede venir del entorno (APIDNI_TOKEN) o guardarse desde Administración.
-    this.token = token || this.#leerConfig().apidniToken || "";
+    // Token y URL pueden venir del entorno (APIDNI_TOKEN, APIDNI_URL) o guardarse desde Administración.
+    const c = this.#leerConfig();
+    this.token = token || c.apidniToken || "";
+    this.url = c.apidniUrl || url;
+    this.ultimaCruda = null; // última respuesta del proveedor (para calibrar desde Administración)
     this.ruta = path.join(dir, "reniec-cache.json");
     try { this.cache = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.cache = {}; }
   }
@@ -36,9 +85,17 @@ export class Reniec {
   #leerConfig() { try { return JSON.parse(fs.readFileSync(this.configRuta, "utf8")); } catch { return {}; } }
 
   /** Guarda el token (vacío = quitarlo). Aplica al instante. */
-  establecerToken(token) {
-    this.token = String(token || "").trim();
-    const c = this.#leerConfig(); c.apidniToken = this.token;
+  establecerToken(token) { this.token = String(token || "").trim(); this.#guardarConfig({ apidniToken: this.token }); }
+
+  /** Guarda la URL del servicio (sin el /{dni} final). Vacía = la de apidni.com. */
+  establecerUrl(url) {
+    let u = String(url || "").trim().replace(/\/+$/, "").replace(/\/(?:[\[{(](?:num_doc|dni|numero|nro)[\]})]|num_doc)$/i, "").replace(/\/+$/, "");
+    this.url = u || "https://apidni.com/api/v2/dni";
+    this.#guardarConfig({ apidniUrl: u });
+  }
+
+  #guardarConfig(cambios) {
+    const c = { ...this.#leerConfig(), ...cambios };
     fs.writeFileSync(this.configRuta, JSON.stringify(c, null, 1), { mode: 0o600 });
   }
 
@@ -70,20 +127,18 @@ export class Reniec {
     } catch (e) {
       throw { status: 502, message: e?.name === "AbortError" ? "RENIEC no respondió a tiempo. Intenta de nuevo." : "No se pudo conectar con el servicio de DNI." };
     } finally { clearTimeout(t); }
-    if (res.status === 401 || res.status === 403) throw { status: 401, message: "El token de apidni no es válido o venció." };
-    if (!res.ok) throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` };
-    const j = await res.json().catch(() => ({}));
-    const d = j.data || {};
-    if (!(Number(j.codigo) > 0) || !txt(d.dni)) {
-      const motivo = txt(j.respuesta) || "Error en la consulta";
+    if (res.status === 401 || res.status === 403) { this.ultimaCruda = { status: res.status, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 401, message: "El token del servicio de DNI no es válido o venció." }; }
+    if (res.status === 404) { this.ultimaCruda = { status: 404, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 404, message: "El DNI no figura en RENIEC. Verifica el número." }; }
+    if (!res.ok) { this.ultimaCruda = { status: res.status, cuerpo: (await res.text().catch(() => "")).slice(0, 500) }; throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` }; }
+    const texto = await res.text();
+    let j; try { j = JSON.parse(texto); } catch { j = { _texto: texto.slice(0, 500) }; }
+    this.ultimaCruda = { status: res.status, cuerpo: texto.slice(0, 1500) };
+    const p = normalizar(j, dni);
+    if (!p) {
+      const motivo = txt(j.respuesta ?? j.message ?? j.mensaje ?? j.error ?? j.msg) || "Error en la consulta";
       const status = clasificar(motivo);
       throw { status, message: status === 404 ? "El DNI no figura en RENIEC. Verifica el número." : motivo };
     }
-    const foto = fotoLimpia(d.foto ?? d.foto_base64 ?? d.imagen ?? d.photo);
-    const p = { dni: txt(d.dni), nombres: txt(d.nombres), apellidoPaterno: txt(d.apellido_paterno), apellidoMaterno: txt(d.apellido_materno),
-      fechaNacimiento: fechaISO(d.fecha_nacimiento), genero: txt(d.genero), direccion: txt(d.direccion), ubigeo: txt(d.ubigeo),
-      distrito: txt(d.distrito), provincia: txt(d.provincia), departamento: txt(d.departamento), ...(foto ? { fotoBase64: foto } : {}),
-      fuente: "apidni", consultadoAt: new Date().toISOString() };
     this.cache[dni] = p;
     this.#guardar();
     return p;

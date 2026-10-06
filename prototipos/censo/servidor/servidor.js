@@ -228,13 +228,19 @@ async function manejar(req, res) {
       return json(res, 200, { importado: conteo });
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
-    if (ruta === "/api/consulta-dni" && metodo === "GET") return json(res, 200, { configurado: reniec.real, pista: reniec.token ? reniec.token.slice(0, 4) + "…" + reniec.token.slice(-4) : "" });
+    const estadoDni = () => ({ configurado: reniec.real, url: reniec.url, pista: reniec.token ? reniec.token.slice(0, 3) + "…" + reniec.token.slice(-3) : "" });
+    if (ruta === "/api/consulta-dni" && metodo === "GET") return json(res, 200, estadoDni());
     if (ruta === "/api/consulta-dni" && metodo === "POST") {
-      const { token, probarDni } = await leerJSON(req, 8192);
+      const { token, url: urlServicio, probarDni } = await leerJSON(req, 8192);
+      if (urlServicio !== undefined) { if (urlServicio && !/^https?:\/\/[^\s]+$/.test(String(urlServicio).trim())) return json(res, 400, { error: "La URL debe empezar con http:// o https://" }); reniec.establecerUrl(urlServicio); }
       if (token !== undefined) reniec.establecerToken(token);
       let prueba = null;
-      if (probarDni) { try { prueba = { ok: true, persona: await reniec.consultar(String(probarDni), { forzar: true }) }; } catch (e) { prueba = { ok: false, error: e.message || String(e) }; } }
-      return json(res, 200, { configurado: reniec.real, prueba });
+      if (probarDni) {
+        try { prueba = { ok: true, persona: await reniec.consultar(String(probarDni), { forzar: true }) }; }
+        catch (e) { prueba = { ok: false, error: e.message || String(e) }; }
+        if (reniec.ultimaCruda) prueba.cruda = reniec.ultimaCruda; // para calibrar si el proveedor responde distinto
+      }
+      return json(res, 200, { ...estadoDni(), prueba });
     }
     if (ruta === "/api/dominio" && metodo === "POST") {
       const { dominio, correo } = await leerJSON(req, 4096);
