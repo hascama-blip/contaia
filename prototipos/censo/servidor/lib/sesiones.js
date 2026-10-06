@@ -13,8 +13,18 @@ export class Usuarios {
     this.ruta = path.join(dir, "usuarios.json");
     this.secretoRuta = path.join(dir, "secreto");
     fs.mkdirSync(dir, { recursive: true });
-    try { this.lista = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.lista = []; }
+    this.#leer();
     this.secreto = process.env.CENSO_SECRETO || this.#secretoEnDisco();
+  }
+
+  #leer() {
+    try { this.lista = JSON.parse(fs.readFileSync(this.ruta, "utf8")); this.mtime = fs.statSync(this.ruta).mtimeMs; } catch { this.lista = []; this.mtime = 0; }
+  }
+
+  /** Relee usuarios.json si lo cambió otro proceso (p. ej. usuarios.js desde la terminal). */
+  recargarSiCambio() {
+    let m = 0; try { m = fs.statSync(this.ruta).mtimeMs; } catch { /* no existe aún */ }
+    if (m !== this.mtime) this.#leer();
   }
 
   #secretoEnDisco() {
@@ -29,6 +39,7 @@ export class Usuarios {
     const tmp = this.ruta + ".tmp";
     fs.writeFileSync(tmp, JSON.stringify(this.lista, null, 1), { mode: 0o600 });
     fs.renameSync(tmp, this.ruta);
+    this.mtime = fs.statSync(this.ruta).mtimeMs;
   }
 
   static #hash(clave, sal) {
@@ -36,9 +47,10 @@ export class Usuarios {
   }
 
   porUsuario(usuario) {
+    this.recargarSiCambio();
     return this.lista.find((u) => u.usuario.toLowerCase() === String(usuario || "").trim().toLowerCase()) || null;
   }
-  porId(id) { return this.lista.find((u) => u.id === id) || null; }
+  porId(id) { this.recargarSiCambio(); return this.lista.find((u) => u.id === id) || null; }
 
   crear({ usuario, nombre, clave, rol = "edicion" }) {
     usuario = String(usuario || "").trim().toLowerCase();
