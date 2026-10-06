@@ -1,0 +1,6 @@
+[Unit]
+Description=Actualiza el portal desde GitHub si hay versión nueva
+
+[Service]
+Type=oneshot
+ExecStart=/opt/censo/prototipos/censo/servidor/despliegue/auto-actualizar.sh

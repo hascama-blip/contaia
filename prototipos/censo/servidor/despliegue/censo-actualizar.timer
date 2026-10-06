@@ -1,0 +1,10 @@
+[Unit]
+Description=Revisa cada 10 minutos si hay versión nueva del portal
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

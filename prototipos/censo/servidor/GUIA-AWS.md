@@ -97,7 +97,9 @@ sudo -u censo DATOS=/var/censo node usuarios.js borrar tesorera
 Las sesiones duran 12 horas; tras 10 claves equivocadas una IP espera 15 minutos.
 
 ## 6. Mantenimiento
-- **Actualizar el portal** (nueva versión del código): `sudo bash /opt/censo/prototipos/censo/servidor/despliegue/actualizar.sh`.
+- **Actualizar el portal**: es automático. Cada 10 minutos el servidor revisa GitHub
+  (`censo-actualizar.timer`) y, si hay versión nueva, la instala y reinicia el portal; si el
+  portal no arranca, vuelve a la versión anterior. A mano: `sudo bash /opt/censo/prototipos/censo/servidor/despliegue/actualizar.sh`.
 - **Respaldo**: `sudo /opt/censo/prototipos/censo/servidor/despliegue/respaldo.sh`
   deja un `.tgz` en `/var/censo-respaldos` (y las snapshots de Lightsail copian el disco entero).
   Descargar una copia al mes fuera del servidor.
