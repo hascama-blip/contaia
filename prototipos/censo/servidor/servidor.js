@@ -184,7 +184,7 @@ async function manejar(req, res) {
 
   // ---- Administración (solo admin): respaldo, importación, dominio ----
   if (ruta === "/admin.html") return redirigir(res, "/administracion");
-  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio") {
+  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio" || ruta === "/api/consulta-dni") {
     if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
     if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
     if (ruta === "/api/exportar" && metodo === "GET") {
@@ -203,6 +203,14 @@ async function manejar(req, res) {
       return json(res, 200, { importado: conteo });
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
+    if (ruta === "/api/consulta-dni" && metodo === "GET") return json(res, 200, { configurado: reniec.real, pista: reniec.token ? reniec.token.slice(0, 4) + "…" + reniec.token.slice(-4) : "" });
+    if (ruta === "/api/consulta-dni" && metodo === "POST") {
+      const { token, probarDni } = await leerJSON(req, 8192);
+      if (token !== undefined) reniec.establecerToken(token);
+      let prueba = null;
+      if (probarDni) { try { prueba = { ok: true, persona: await reniec.consultar(String(probarDni), { forzar: true }) }; } catch (e) { prueba = { ok: false, error: e.message || String(e) }; } }
+      return json(res, 200, { configurado: reniec.real, prueba });
+    }
     if (ruta === "/api/dominio" && metodo === "POST") {
       const { dominio, correo } = await leerJSON(req, 4096);
       const d = String(dominio || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");

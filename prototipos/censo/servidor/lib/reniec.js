@@ -23,12 +23,24 @@ function clasificar(mensaje) {
 
 export class Reniec {
   constructor(dir, { token = process.env.APIDNI_TOKEN || "", url = process.env.APIDNI_URL || "https://apidni.com/api/v2/dni", cacheDias = Number(process.env.RENIEC_CACHE_DIAS || 365) } = {}) {
-    this.token = token; this.url = url; this.cacheDias = cacheDias;
+    this.url = url; this.cacheDias = cacheDias;
+    this.configRuta = path.join(dir, "configuracion.json");
+    // El token puede venir del entorno (APIDNI_TOKEN) o guardarse desde Administración.
+    this.token = token || this.#leerConfig().apidniToken || "";
     this.ruta = path.join(dir, "reniec-cache.json");
     try { this.cache = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { this.cache = {}; }
   }
 
   get real() { return Boolean(this.token); }
+
+  #leerConfig() { try { return JSON.parse(fs.readFileSync(this.configRuta, "utf8")); } catch { return {}; } }
+
+  /** Guarda el token (vacío = quitarlo). Aplica al instante. */
+  establecerToken(token) {
+    this.token = String(token || "").trim();
+    const c = this.#leerConfig(); c.apidniToken = this.token;
+    fs.writeFileSync(this.configRuta, JSON.stringify(c, null, 1), { mode: 0o600 });
+  }
 
   #guardar() {
     try { fs.writeFileSync(this.ruta + ".tmp", JSON.stringify(this.cache)); fs.renameSync(this.ruta + ".tmp", this.ruta); } catch { /* sin disco */ }

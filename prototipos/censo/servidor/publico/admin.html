@@ -44,6 +44,18 @@
   </div></section>
 
   <section class="card"><div class="card-cuerpo">
+    <h2>Consulta de DNI (RENIEC vía apidni.com)</h2>
+    <p class="ayuda" style="margin:0">Pega aquí el <b>token</b> que te da apidni.com al contratar el plan. Con el plan ORO también llega la foto del DNI. Sin token, el botón "Buscar en RENIEC" devuelve datos simulados.</p>
+    <div id="dni-estado" class="ayuda">Estado: cargando…</div>
+    <form id="f-dni" class="fila" autocomplete="off">
+      <div class="campo"><label class="label">Token de apidni</label><input class="input" name="token" placeholder="pegar token nuevo (déjalo vacío para no cambiarlo)"></div>
+      <div class="campo" style="flex:0 0 170px"><label class="label">Probar con un DNI</label><input class="input" name="probarDni" inputmode="numeric" maxlength="8" placeholder="8 dígitos"></div>
+      <button class="btn btn-primary" type="submit">Guardar y probar</button>
+    </form>
+    <div id="dni-prueba" class="ayuda"></div>
+  </div></section>
+
+  <section class="card"><div class="card-cuerpo">
     <h2>Respaldo e importación</h2>
     <div class="fila">
       <a class="btn btn-ghost" href="/api/exportar" download>Descargar respaldo (JSON)</a>
@@ -76,6 +88,17 @@
     try { const j = await pedir("POST", "/api/importar", JSON.parse(await a.text())); $("#importar-estado").innerHTML = `<span class="ok">Importado: ${Object.entries(j.importado).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>`; }
     catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${err.message}</span>`; }
     e.target.value = "";
+  };
+  const estadoDni = (j) => { $("#dni-estado").innerHTML = j.configurado ? `Estado: <span class="ok">token configurado (${j.pista || "guardado"})</span>` : `Estado: <span class="mal">sin token, consultas simuladas</span>`; };
+  pedir("GET", "/api/consulta-dni").then(estadoDni).catch(() => {});
+  $("#f-dni").onsubmit = async (e) => {
+    e.preventDefault(); const f = e.target; $("#dni-prueba").textContent = "Consultando…";
+    try {
+      const cuerpo = {}; if (f.token.value.trim()) cuerpo.token = f.token.value.trim(); if (f.probarDni.value.trim()) cuerpo.probarDni = f.probarDni.value.trim();
+      const j = await pedir("POST", "/api/consulta-dni", cuerpo); estadoDni(j); f.token.value = "";
+      if (j.prueba) $("#dni-prueba").innerHTML = j.prueba.ok ? `<span class="ok">Respuesta: ${j.prueba.persona.nombres} ${j.prueba.persona.apellidoPaterno} ${j.prueba.persona.apellidoMaterno} · fuente ${j.prueba.persona.fuente}${j.prueba.persona.fotoBase64 ? " · con foto" : " · sin foto"}</span>` : `<span class="mal">Error: ${j.prueba.error}</span>`;
+      else $("#dni-prueba").textContent = "Guardado.";
+    } catch (err) { $("#dni-prueba").innerHTML = `<span class="mal">${err.message}</span>`; }
   };
   cargarUsuarios().catch((e) => alert(e.message));
   pedir("GET", "/api/dominio").then((j) => { if (j.dominio) { $("#f-dominio").dominio.value = j.dominio; $("#dominio-estado").textContent = `Dominio actual: ${j.dominio}`; } }).catch(() => {});
