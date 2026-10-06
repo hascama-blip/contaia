@@ -47,7 +47,7 @@ const metaArchivos = (() => {
 
 // ---- Avisos en vivo (SSE) ----
 const oyentes = new Set();
-almacen.on("cambio", (col) => { for (const res of oyentes) res.write(`data: ${JSON.stringify({ col })}\n\n`); });
+almacen.on("cambio", (col, id, data) => { const msj = `data: ${JSON.stringify(id ? { col, id, data } : { col })}\n\n`; for (const res of oyentes) res.write(msj); });
 setInterval(() => { for (const res of oyentes) res.write(": latido\n\n"); }, 25_000).unref();
 
 // ---- Tope de intentos de entrada (por IP) ----
@@ -68,10 +68,21 @@ const leerDominio = () => { try { return fs.readFileSync(path.join(DATOS, "domin
 const ipDe = (req) => (TRAS_PROXY && req.headers["x-forwarded-for"]) ? String(req.headers["x-forwarded-for"]).split(",")[0].trim() : req.socket.remoteAddress;
 const seguro = (req) => TRAS_PROXY ? req.headers["x-forwarded-proto"] === "https" : false;
 
+// Lista de módulos de la web para que el navegador los pida todos a la vez (modulepreload)
+// en vez de descubrirlos uno por uno siguiendo los import (cada nivel costaba un viaje al servidor).
+let modulosCache = { en: 0, html: "" };
+function modulosPreload() {
+  if (Date.now() - modulosCache.en < 60_000) return modulosCache.html;
+  const lista = [];
+  const andar = (dir) => { for (const e of fs.readdirSync(dir, { withFileTypes: true })) { const r = path.join(dir, e.name); if (e.isDirectory()) andar(r); else if (e.name.endsWith(".js")) lista.push("/" + path.relative(RAIZ_WEB, r).split(path.sep).join("/")); } };
+  try { andar(path.join(RAIZ_WEB, "src")); } catch { /* sin src */ }
+  modulosCache = { en: Date.now(), html: lista.map((m) => `<link rel="modulepreload" href="${m}">`).join("\n") };
+  return modulosCache.html;
+}
 function inyectarAdaptador(html) {
   // La web carga el adaptador antes de su código: así window.claude existe.
   return html.replace('<script type="module" src="src/main.js"></script>',
-    '<script>window.__CONSULTA_DNI__ = { url: "/api/reniec", clave: "sesion" };</script>\n<script src="/adaptador.js"></script>\n<script type="module" src="src/main.js"></script>');
+    modulosPreload() + '\n<script>window.__CONSULTA_DNI__ = { url: "/api/reniec", clave: "sesion" };</script>\n<script src="/adaptador.js"></script>\n<script type="module" src="src/main.js"></script>');
 }
 
 async function manejar(req, res) {
@@ -83,7 +94,7 @@ async function manejar(req, res) {
   // ---- Público: entrar ----
   if (ruta === "/login.html") return redirigir(res, "/entrar" + (url.search || ""));
   if (ruta === "/entrar") { if (yo) return redirigir(res, "/"); return servirArchivo(res, PUBLICO, "/login.html"); }
-  if (ruta === "/adaptador.js") return servirArchivo(res, PUBLICO, ruta) || json(res, 404, { error: "No existe." });
+  if (ruta === "/adaptador.js") return servirArchivo(res, PUBLICO, ruta, { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   if (ruta === "/api/instalacion" && metodo === "POST") {
     // Primera configuración: solo mientras no exista ningún usuario y con el código de instalación.
     if (usuarios.lista.length) return json(res, 409, { error: "El portal ya tiene usuarios. Entra con tu cuenta." });
@@ -108,7 +119,7 @@ async function manejar(req, res) {
   }
   // Estáticos públicos que la página de entrada necesita (logo, estilos).
   if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/") || ruta === "/manifest.webmanifest") {
-    return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=3600" }) || json(res, 404, { error: "No existe." });
+    return servirArchivo(res, RAIZ_WEB, ruta, { cache: ruta.startsWith("/img/") ? "public, max-age=86400" : "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   }
 
   // ---- Todo lo demás exige sesión ----
@@ -195,9 +206,11 @@ async function manejar(req, res) {
       const cuerpo = await leerJSON(req, 64 * 1048576);
       const conteo = Object.fromEntries(COLECCIONES.map((c) => [c, 0]));
       if (Array.isArray(cuerpo)) { // semilla.json: [{ path:"col/id", data }]
-        for (const { path: ruta2, data } of cuerpo) { const [col, id] = String(ruta2 || "").split("/"); if (COLECCIONES.includes(col) && id && data) { almacen.establecer(col, id, data); conteo[col]++; } }
+        const porCol = Object.fromEntries(COLECCIONES.map((c) => [c, []]));
+        for (const { path: ruta2, data } of cuerpo) { const [col, id] = String(ruta2 || "").split("/"); if (COLECCIONES.includes(col) && id && data) { porCol[col].push([id, data]); conteo[col]++; } }
+        for (const col of COLECCIONES) almacen.establecerVarios(col, porCol[col]);
       } else if (cuerpo && cuerpo.colecciones) { // respaldo de /api/exportar
-        for (const col of COLECCIONES) for (const d of cuerpo.colecciones[col] || []) if (d && d.id && d.data) { almacen.establecer(col, d.id, d.data); conteo[col]++; }
+        for (const col of COLECCIONES) { const pares = (cuerpo.colecciones[col] || []).filter((d) => d && d.id && d.data).map((d) => [d.id, d.data]); almacen.establecerVarios(col, pares); conteo[col] += pares.length; }
       } else return json(res, 400, { error: "Formato no reconocido: se espera semilla.json o un respaldo del portal." });
       almacen.vaciar();
       return json(res, 200, { importado: conteo });
@@ -229,8 +242,8 @@ async function manejar(req, res) {
   }
 
   // ---- La web ----
-  if (ruta === "/" || ruta === "/index.html") return servirArchivo(res, RAIZ_WEB, "/index.html", { transformar: inyectarAdaptador });
-  if (ruta.startsWith("/src/")) return servirArchivo(res, RAIZ_WEB, ruta) || json(res, 404, { error: "No existe." });
+  if (ruta === "/" || ruta === "/index.html") return servirArchivo(res, RAIZ_WEB, "/index.html", { transformar: inyectarAdaptador, req, cache: "no-cache" });
+  if (ruta.startsWith("/src/")) return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   return json(res, 404, { error: "No existe." });
 }
 

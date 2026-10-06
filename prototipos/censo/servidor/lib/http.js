@@ -45,8 +45,9 @@ export async function leerJSON(req, maxBytes = 2 * 1048576) {
   try { return JSON.parse(b.toString("utf8")); } catch { throw { status: 400, message: "JSON inválido." }; }
 }
 
-/** Sirve un archivo dentro de `raiz` (nunca fuera). Devuelve false si no existe. */
-export function servirArchivo(res, raiz, ruta, { cache = "no-cache", transformar = null } = {}) {
+/** Sirve un archivo dentro de `raiz` (nunca fuera). Devuelve false si no existe.
+ *  Con `req` responde 304 cuando el navegador ya tiene la misma versión (ETag). */
+export function servirArchivo(res, raiz, ruta, { cache = "no-cache", transformar = null, req = null } = {}) {
   const limpio = path.normalize(decodeURIComponent(ruta)).replace(/^(\.\.[/\\])+/, "");
   const abs = path.join(raiz, limpio);
   if (!abs.startsWith(raiz)) return false;
@@ -54,12 +55,15 @@ export function servirArchivo(res, raiz, ruta, { cache = "no-cache", transformar
   try { st = fs.statSync(abs); } catch { return false; }
   if (!st.isFile()) return false;
   const tipo = TIPOS[path.extname(abs).toLowerCase()] || "application/octet-stream";
+  const etag = `"${st.mtimeMs.toString(36)}-${st.size.toString(36)}${transformar ? "-t" : ""}"`;
+  const cab = { "Content-Type": tipo, "Cache-Control": cache, ETag: etag, "Last-Modified": st.mtime.toUTCString() };
+  if (req && req.headers["if-none-match"] === etag) { res.writeHead(304, cab); res.end(); return true; }
   if (transformar) {
     const b = Buffer.from(transformar(fs.readFileSync(abs, "utf8")));
-    res.writeHead(200, { "Content-Type": tipo, "Content-Length": b.length, "Cache-Control": cache });
+    res.writeHead(200, { ...cab, "Content-Length": b.length });
     res.end(b);
   } else {
-    res.writeHead(200, { "Content-Type": tipo, "Content-Length": st.size, "Cache-Control": cache });
+    res.writeHead(200, { ...cab, "Content-Length": st.size });
     fs.createReadStream(abs).pipe(res);
   }
   return true;

@@ -41,14 +41,14 @@ export class Almacen extends EventEmitter {
     fs.renameSync(tmp, this.#ruta(col));
   }
 
-  #programar(col) {
+  #programar(col, id = null, data = null) {
     this.pendientes.add(col);
     clearTimeout(this.t);
     this.t = setTimeout(() => {
       for (const c of this.pendientes) this.#guardar(c);
       this.pendientes.clear();
     }, 150);
-    this.emit("cambio", col);
+    this.emit("cambio", col, id, data); // id null = cambió toda la colección (importación)
   }
 
   coleccion(col) {
@@ -66,19 +66,27 @@ export class Almacen extends EventEmitter {
   }
 
   establecer(col, id, data) {
-    this.coleccion(col).set(id, JSON.parse(JSON.stringify(data)));
-    this.#programar(col);
+    const limpio = JSON.parse(JSON.stringify(data));
+    this.coleccion(col).set(id, limpio);
+    this.#programar(col, id, limpio);
   }
 
   actualizar(col, id, parcial) {
     const c = this.coleccion(col);
     if (!c.has(id)) throw { status: 404, message: "El registro ya no existe.", code: "not_found" };
     c.set(id, fusionar(c.get(id), JSON.parse(JSON.stringify(parcial))));
-    this.#programar(col);
+    this.#programar(col, id, c.get(id));
   }
 
   borrar(col, id) {
-    if (this.coleccion(col).delete(id)) this.#programar(col);
+    if (this.coleccion(col).delete(id)) this.#programar(col, id, null);
+  }
+
+  /** Importación: muchos registros de golpe y un solo aviso por colección. */
+  establecerVarios(col, pares) {
+    const c = this.coleccion(col);
+    for (const [id, data] of pares) c.set(id, JSON.parse(JSON.stringify(data)));
+    if (pares.length) this.#programar(col);
   }
 
   /** Fuerza la escritura pendiente (al apagar). */

@@ -14,18 +14,26 @@
 
   // ---- db ----
   const oyentes = new Map(); // col → Set(fn)
-  let fuente = null;
+  const cache = new Map();   // col → Map(id → data)  (copia local; el servidor avisa cada cambio)
+  let fuente = null, reconectando = false;
   function conectarEventos() {
     if (fuente) return;
     fuente = new EventSource("/api/eventos");
-    fuente.onmessage = (e) => { try { const { col } = JSON.parse(e.data); refrescar(col); } catch { /* latido */ } };
-    fuente.onerror = () => { fuente.close(); fuente = null; setTimeout(conectarEventos, 3000); };
+    fuente.onopen = () => { if (reconectando) { reconectando = false; for (const col of oyentes.keys()) refrescar(col); } }; // tras una caída, releer por si se perdió algo
+    fuente.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      const c = cache.get(m.col);
+      if (m.id && c) { if (m.data) c.set(m.id, m.data); else c.delete(m.id); avisarCol(m.col); } // parche local: sin volver a bajar todo
+      else refrescar(m.col);
+    };
+    fuente.onerror = () => { fuente.close(); fuente = null; reconectando = true; setTimeout(conectarEventos, 3000); };
   }
-  const foto = (docs) => ({ docs: docs.map((d) => ({ id: d.id, exists: true, data: () => d.data, metadata: {} })) });
+  const foto = (c) => ({ docs: [...c].map(([id, data]) => ({ id, exists: true, data: () => data, metadata: {} })) });
+  function avisarCol(col) { const fns = oyentes.get(col), c = cache.get(col); if (fns && c) for (const fn of fns) fn(foto(c)); }
   async function refrescar(col) {
-    const fns = oyentes.get(col);
-    if (!fns || !fns.size) return;
-    try { const { docs } = await pedir("GET", `/api/db/${col}`); for (const fn of fns) fn(foto(docs)); } catch (e) { for (const fn of fns) fn.error?.(e); }
+    if (!oyentes.get(col)?.size) return;
+    try { const { docs } = await pedir("GET", `/api/db/${col}`); cache.set(col, new Map(docs.map((d) => [d.id, d.data]))); avisarCol(col); }
+    catch (e) { for (const fn of oyentes.get(col) || []) fn.error?.(e); }
   }
   const doc = (path) => ({
     id: path.split("/")[1], path,
@@ -43,7 +51,7 @@
         if (!oyentes.has(col)) oyentes.set(col, new Set());
         next.error = error; oyentes.get(col).add(next);
         conectarEventos();
-        pedir("GET", `/api/db/${col}`).then(({ docs }) => next(foto(docs))).catch((e) => error?.(e));
+        if (cache.has(col)) next(foto(cache.get(col))); else refrescar(col);
         return () => oyentes.get(col).delete(next);
       },
     }),
