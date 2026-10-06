@@ -33,7 +33,9 @@ def texto(v):
     return re.sub(r"\s+", " ", str(v).strip()) if v is not None else ""
 
 def fecha_iso(v):
-    """'10/03/1966' o '24-11-1991' → '1966-03-10'. Si no se puede leer, ''."""
+    """'10/03/1966', '24-11-1991' o una fecha de Excel (datetime) → '1966-03-10'. Si no se puede leer, ''."""
+    if hasattr(v, "year") and hasattr(v, "month"):  # celda con formato de fecha
+        return f"{v.year:04d}-{v.month:02d}-{v.day:02d}" if 1900 <= v.year <= 2100 else ""
     m = re.fullmatch(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", texto(v))
     if not m:
         return ""
