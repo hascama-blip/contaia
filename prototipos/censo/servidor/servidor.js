@@ -79,10 +79,22 @@ function modulosPreload() {
   modulosCache = { en: Date.now(), html: lista.map((m) => `<link rel="modulepreload" href="${m}">`).join("\n") };
   return modulosCache.html;
 }
+function paqueteCompilado() {
+  // dist/manifest.json lo genera servidor/compilar (esbuild): un solo archivo con la web y sus librerías.
+  try { return JSON.parse(fs.readFileSync(path.join(RAIZ_WEB, "dist", "manifest.json"), "utf8")); } catch { return null; }
+}
 function inyectarAdaptador(html) {
   // La web carga el adaptador antes de su código: así window.claude existe.
+  const previo = '<script>window.__CONSULTA_DNI__ = { url: "/api/reniec", clave: "sesion" };</script>\n<script src="/adaptador.js"></script>\n';
+  const paquete = paqueteCompilado();
+  if (paquete?.app) {
+    // Paquete único: fuera los <script> de CDN (React, ReactDOM, htm van dentro) y los módulos sueltos.
+    return html
+      .replace(/<script src="https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)[^"]*"><\/script>\s*/g, "")
+      .replace('<script type="module" src="src/main.js"></script>', `${previo}<script type="module" src="${paquete.app}"></script>`);
+  }
   return html.replace('<script type="module" src="src/main.js"></script>',
-    modulosPreload() + '\n<script>window.__CONSULTA_DNI__ = { url: "/api/reniec", clave: "sesion" };</script>\n<script src="/adaptador.js"></script>\n<script type="module" src="src/main.js"></script>');
+    modulosPreload() + "\n" + previo + '<script type="module" src="src/main.js"></script>');
 }
 
 async function manejar(req, res) {
@@ -244,6 +256,7 @@ async function manejar(req, res) {
   // ---- La web ----
   if (ruta === "/" || ruta === "/index.html") return servirArchivo(res, RAIZ_WEB, "/index.html", { transformar: inyectarAdaptador, req, cache: "no-cache" });
   if (ruta.startsWith("/src/")) return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
+  if (ruta.startsWith("/dist/")) return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=31536000, immutable", req }) || json(res, 404, { error: "No existe." });
   return json(res, 404, { error: "No existe." });
 }
 

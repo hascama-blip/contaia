@@ -23,16 +23,20 @@
     fuente.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       const c = cache.get(m.col);
-      if (m.id && c) { if (m.data) c.set(m.id, m.data); else c.delete(m.id); avisarCol(m.col); } // parche local: sin volver a bajar todo
+      if (m.id && c) { if (m.data) c.set(m.id, m.data); else c.delete(m.id); avisarCol(m.col); guardarCopia(m.col); } // parche local: sin volver a bajar todo
       else refrescar(m.col);
     };
     fuente.onerror = () => { fuente.close(); fuente = null; reconectando = true; setTimeout(conectarEventos, 3000); };
   }
   const foto = (c) => ({ docs: [...c].map(([id, data]) => ({ id, exists: true, data: () => data, metadata: {} })) });
+  // Copia en el navegador: la pantalla aparece al instante con lo último visto y luego se sincroniza.
+  const LS = "censo_copia_";
+  const guardarCopia = (col) => { try { localStorage.setItem(LS + col, JSON.stringify([...cache.get(col)])); } catch { /* sin espacio o bloqueado */ } };
+  const leerCopia = (col) => { try { const v = localStorage.getItem(LS + col); return v ? new Map(JSON.parse(v)) : null; } catch { return null; } };
   function avisarCol(col) { const fns = oyentes.get(col), c = cache.get(col); if (fns && c) for (const fn of fns) fn(foto(c)); }
   async function refrescar(col) {
     if (!oyentes.get(col)?.size) return;
-    try { const { docs } = await pedir("GET", `/api/db/${col}`); cache.set(col, new Map(docs.map((d) => [d.id, d.data]))); avisarCol(col); }
+    try { const { docs } = await pedir("GET", `/api/db/${col}`); cache.set(col, new Map(docs.map((d) => [d.id, d.data]))); avisarCol(col); guardarCopia(col); }
     catch (e) { for (const fn of oyentes.get(col) || []) fn.error?.(e); }
   }
   const doc = (path) => ({
@@ -51,7 +55,8 @@
         if (!oyentes.has(col)) oyentes.set(col, new Set());
         next.error = error; oyentes.get(col).add(next);
         conectarEventos();
-        if (cache.has(col)) next(foto(cache.get(col))); else refrescar(col);
+        if (cache.has(col)) next(foto(cache.get(col)));
+        else { const copia = leerCopia(col); if (copia) next(foto(copia)); refrescar(col); }
         return () => oyentes.get(col).delete(next);
       },
     }),
@@ -87,5 +92,6 @@
   };
 
   window.claude = { use: (nombre) => Promise.resolve({ db, user, assets, downloads }[nombre] || null) };
-  window.cerrarSesion = () => pedir("DELETE", "/api/sesion").then(() => (location.href = "/entrar"));
+  const borrarCopias = () => { try { Object.keys(localStorage).filter((k) => k.startsWith(LS)).forEach((k) => localStorage.removeItem(k)); } catch { /* nada */ } };
+  window.cerrarSesion = () => pedir("DELETE", "/api/sesion").then(() => { borrarCopias(); location.href = "/entrar"; });
 })();

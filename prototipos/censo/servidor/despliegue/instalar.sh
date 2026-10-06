@@ -40,6 +40,15 @@ git config --global --add safe.directory /opt/censo >/dev/null 2>&1 || true
 git -C /opt/censo pull --ff-only || echo "AVISO: no se pudo actualizar el código (se sigue con el que hay)."
 chown -R censo:censo /opt/censo
 
+# Paquete único de la web (esbuild). Si falla, el portal sigue funcionando con los módulos sueltos.
+compilar_web() {
+  local C=/opt/censo/prototipos/censo/servidor/compilar
+  if command -v npm >/dev/null && [[ -f "$C/package.json" ]]; then
+    (cd "$C" && npm install --no-audit --no-fund --loglevel=error --omit=dev >/dev/null 2>&1 && node construir.mjs) && chown -R censo:censo /opt/censo/prototipos/censo/dist 2>/dev/null || echo "AVISO: no se pudo compilar la web; se sirven los módulos sueltos."
+  fi
+}
+compilar_web
+
 echo "== Configuración =="
 if [[ ! -f /etc/censo.env ]]; then
   sed "s|CAMBIAR-POR-UNA-CADENA-LARGA-AL-AZAR|$(openssl rand -hex 32)|" /opt/censo/prototipos/censo/servidor/despliegue/censo.env.ejemplo > /etc/censo.env
