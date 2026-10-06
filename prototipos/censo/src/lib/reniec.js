@@ -45,8 +45,11 @@ export function fotoComoArchivo(persona) {
 }
 
 /** Campos de la ficha que se llenan con lo que devuelve RENIEC. */
+const ESTADO_CIVIL = { SOLTERO: "Soltero(a)", SOLTERA: "Soltero(a)", CASADO: "Casado(a)", CASADA: "Casado(a)", CONVIVIENTE: "Conviviente", DIVORCIADO: "Divorciado(a)", DIVORCIADA: "Divorciado(a)", VIUDO: "Viudo(a)", VIUDA: "Viudo(a)" };
 export function fichaDesdeReniec(p) {
+  const civil = ESTADO_CIVIL[String(p.estadoCivil || "").trim().toUpperCase()];
   return {
+    ...(civil ? { estadoCivil: civil } : {}),
     nombres: capitalizar(p.nombres),
     apellidoPaterno: capitalizar(p.apellidoPaterno),
     apellidoMaterno: capitalizar(p.apellidoMaterno),

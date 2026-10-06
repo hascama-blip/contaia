@@ -64,6 +64,7 @@ export function normalizar(j, dniPedido) {
     genero: txt(campo(d, "genero", "sexo", "gender")), direccion: txt(campo(d, "direccion", "domicilio", "address")),
     ubigeo: txt(campo(d, "ubigeo", "ubigeo_reniec", "codigo_ubigeo")), distrito: txt(campo(d, "distrito", "district")),
     provincia: txt(campo(d, "provincia", "province")), departamento: txt(campo(d, "departamento", "department", "region")),
+    estadoCivil: txt(campo(d, "estado_civil", "estadoCivil", "civil_status")), restriccion: txt(campo(d, "restriccion", "restricciones")),
     ...(foto ? { fotoBase64: foto } : {}), fuente: "apidni", consultadoAt: new Date().toISOString() };
 }
 
