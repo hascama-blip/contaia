@@ -20,7 +20,7 @@ function useSubida(onArchivo) {
 }
 
 /** Foto tipo carné: en el celular, el botón abre la cámara. */
-export function FotoCampo({ id, valorId, onArchivo, habilitado = true }) {
+export function FotoCampo({ id, valorId, onArchivo, onQuitar = null, habilitado = true }) {
   const [estado, subir] = useSubida(onArchivo);
   const src = estado.vistaPrevia || urlArchivo(valorId);
   return html`
@@ -32,7 +32,8 @@ export function FotoCampo({ id, valorId, onArchivo, habilitado = true }) {
           ${estado.ocupado ? "Subiendo…" : src ? "Cambiar foto" : "Tomar o subir foto"}
         </label>
         <input id=${id} className="sr" type="file" accept="image/*" capture="user"
-          onChange=${(e) => subir(e.target.files?.[0])} />`}
+          onChange=${(e) => subir(e.target.files?.[0])} />
+        ${valorId && onQuitar && html`<button type="button" className="btn btn-ghost btn-sm" onClick=${() => confirm("¿Quitar la foto de esta ficha?") && onQuitar()}>Quitar foto</button>`}`}
       ${estado.error ? html`<span className="error-campo">${estado.error}</span>` : html`<span className="ayuda">De frente, fondo claro y buena luz.</span>`}
     </div>`;
 }

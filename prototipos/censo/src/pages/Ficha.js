@@ -15,7 +15,7 @@ import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
 import { fecha, soles } from "../lib/formato.js";
 import { nombresDe } from "../lib/usuario.js";
-import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo, marcarRevisada } from "../api/asociados.js";
+import { actualizarFicha, cambiarEstadoCenso, adjuntarArchivo, marcarRevisada, quitarArchivo } from "../api/asociados.js";
 import { actualizarDesdeReniec } from "../api/reniec.js";
 import { pdfFicha, descargar } from "../lib/exportar.js";
 
@@ -211,7 +211,8 @@ export function Ficha({ id }) {
 
         <div style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
           <${Tarjeta}>
-            <${FotoCampo} id="foto-ficha" valorId=${a.archivos?.foto} onArchivo=${subir("foto")} habilitado=${puedeSubir} />
+            <${FotoCampo} id="foto-ficha" valorId=${a.archivos?.foto} onArchivo=${subir("foto")} habilitado=${puedeSubir}
+              onQuitar=${puedeSubir ? () => quitarArchivo(id, "foto", a.archivos?.foto).then(() => avisar("Foto quitada."), (e) => avisar(mensajeError(e), "error")) : null} />
           <//>
           <${Tarjeta} titulo="Estado de la ficha">
             <div className="segmentos" role="group" aria-label="Estado de la ficha" style=${{ flexWrap: "wrap" }}>

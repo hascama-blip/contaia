@@ -5,7 +5,7 @@ import * as db from "../lib/db.js";
 import { validarFicha, soloDigitos } from "../lib/validar.js";
 import { leerCodigos, galeriaDeCodigo } from "../lib/padron.js";
 import { ahoraISO, hoy } from "../lib/formato.js";
-import { subirArchivo } from "../lib/archivos.js";
+import { subirArchivo, borrarArchivo } from "../lib/archivos.js";
 import { fichaVacia } from "../lib/types.js";
 import { tramoDeSalida } from "../lib/propietarios.js";
 
@@ -148,6 +148,12 @@ export async function adjuntarArchivo(id, tipo, archivo) {
   const { id: archivoId, url } = await subirArchivo(archivo);
   if (id) await db.actualizarAsociado(id, { archivos: { [tipo]: archivoId }, actualizadoAt: ahoraISO() });
   return { archivoId, url };
+}
+
+/** Quita de la ficha la foto/huella/firma/DNI (el archivo se borra del almacén). */
+export async function quitarArchivo(id, tipo, archivoId) {
+  await db.actualizarAsociado(id, { archivos: { [tipo]: null }, actualizadoAt: ahoraISO() });
+  if (archivoId) { try { await borrarArchivo(archivoId); } catch { /* ya no estaba */ } }
 }
 
 /**
