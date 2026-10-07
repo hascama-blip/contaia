@@ -112,6 +112,10 @@ export class Reniec {
     return {};
   }
 
+  /** Hash de una foto (para reconocer la imagen genérica del proveedor). */
+  hashFoto(b64) { return crypto.createHash("sha1").update(String(b64 || "")).digest("hex"); }
+  esFotoGenerica(hash) { return this.fotosGenericas.has(hash); }
+
   /** Quita la foto si es la imagen genérica del proveedor (misma imagen en DNI distintos). */
   #filtrarFotoGenerica(p) {
     if (!p.fotoBase64) return p;
@@ -192,7 +196,13 @@ export class Reniec {
     }
     if (!res) { this.#contar(false); throw { status: 401, message: `El servicio de DNI rechazó el token (${ultimoError}). Revisa el token en Administración.` }; }
     if (res.status === 404) throw { status: 404, message: "El DNI no figura en RENIEC. Verifica el número." };
-    if (!res.ok) throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` };
+    if (!res.ok) {
+      // Códigos HTTP de error: respetar lo que dice el cuerpo (límite del plan, token expirado) antes de darlo por caída.
+      const motivo = txt(j?.respuesta ?? j?.message ?? j?.mensaje ?? j?.error ?? j?.msg);
+      if (res.status === 429 || /super[oó]|l[ií]mite|consultas del plan|agotad/i.test(motivo)) { this.#contar(false); throw { status: 429, message: motivo || "El servicio de DNI alcanzó el límite de consultas." }; }
+      if (res.status === 401 || res.status === 403 || /expirad/i.test(motivo)) { this.#contar(false); throw { status: 401, message: motivo || "El token del servicio de DNI no es válido o venció." }; }
+      throw { status: 502, message: `El servicio de DNI respondió ${res.status}.` };
+    }
     const p = normalizar(j, dni);
     this.#contar(Boolean(p));
     if (!p) {

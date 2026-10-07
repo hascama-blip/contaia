@@ -55,7 +55,8 @@ function guardarArchivo(buffer, tipo, nombre, por = null) {
   return id;
 }
 // Verificación automática de DNI (cada madrugada, solo los pendientes)
-const verificacion = new Verificacion({ almacen, reniec, dir: DATOS, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, "automatico") });
+const verificacion = new Verificacion({ almacen, reniec, dir: DATOS, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, "automatico"),
+  borrarArchivo: (id) => { try { fs.unlinkSync(path.join(DATOS, "archivos", id)); } catch { /* ya no estaba */ } metaArchivos.del(id); } });
 verificacion.programar();
 
 // ---- Avisos en vivo (SSE) ----

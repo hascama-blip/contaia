@@ -65,8 +65,9 @@
     <h2>Verificación automática de DNI</h2>
     <p class="ayuda" style="margin:0">Cada madrugada el servidor consulta en RENIEC a los asociados que aún no están verificados y guarda sus datos y la foto del DNI (solo si la ficha no tiene foto). Se detiene sola cuando el proveedor avisa que se alcanzó el límite de consultas y continúa al día siguiente con los que falten.</p>
     <div id="ver-estado" class="ayuda">Cargando…</div>
+    <div id="ver-disc" class="ayuda"></div>
     <form id="f-ver" class="fila">
-      <div class="campo" style="flex:0 0 140px"><label class="label">Hora (Lima)</label><input class="input" name="hora" placeholder="00:30" pattern="^([01]\d|2[0-3]):[0-5]\d$"></div>
+      <div class="campo" style="flex:0 0 140px"><label class="label">Hora (Lima)</label><input class="input" name="hora" placeholder="00:30" required pattern="^([01]\d|2[0-3]):[0-5]\d$"></div>
       <div class="campo" style="flex:0 0 170px"><label class="label">Estado</label><select class="input" name="activa"><option value="true">Activada</option><option value="false">Desactivada</option></select></div>
       <button class="btn btn-ghost" type="submit">Guardar</button>
       <button class="btn btn-primary" type="button" id="ver-ejecutar">Ejecutar ahora</button>
@@ -88,11 +89,12 @@
 </main>
 <script>
   const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c]));
   const pedir = async (m, u, cuerpo) => { const r = await fetch(u, { method: m, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined }); const j = await r.json().catch(() => ({})); if (r.status === 401) location.href = "/entrar?vencida=1"; if (!r.ok) throw new Error(j.error || "Error"); return j; };
   async function cargarUsuarios() {
     const { usuarios } = await pedir("GET", "/api/usuarios");
-    $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${u.usuario}</b></td><td>${u.nombre}</td><td>${u.rol}</td><td style="text-align:right;white-space:nowrap">
-      <button class="btn btn-ghost" data-clave="${u.id}">Cambiar clave</button> <button class="btn btn-ghost" data-borrar="${u.id}" data-n="${u.usuario}">Borrar</button></td></tr>`).join("");
+    $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${esc(u.usuario)}</b></td><td>${esc(u.nombre)}</td><td>${esc(u.rol)}</td><td style="text-align:right;white-space:nowrap">
+      <button class="btn btn-ghost" data-clave="${esc(u.id)}">Cambiar clave</button> <button class="btn btn-ghost" data-borrar="${esc(u.id)}" data-n="${esc(u.usuario)}">Borrar</button></td></tr>`).join("");
   }
   $("#usuarios").onclick = async (e) => {
     const b = e.target.closest("button"); if (!b) return;
@@ -102,7 +104,7 @@
     } catch (err) { alert(err.message); }
   };
   $("#f-usuario").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { await pedir("POST", "/api/usuarios", { usuario: f.usuario.value, nombre: f.nombre.value, clave: f.clave.value, rol: f.rol.value }); f.reset(); await cargarUsuarios(); } catch (err) { alert(err.message); } };
-  $("#f-dominio").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { const j = await pedir("POST", "/api/dominio", { dominio: f.dominio.value, correo: f.correo.value }); $("#dominio-estado").innerHTML = `<span class="ok">${j.aviso}</span>`; } catch (err) { $("#dominio-estado").innerHTML = `<span class="mal">${err.message}</span>`; } };
+  $("#f-dominio").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { const j = await pedir("POST", "/api/dominio", { dominio: f.dominio.value, correo: f.correo.value }); $("#dominio-estado").innerHTML = `<span class="ok">${esc(j.aviso)}</span>`; } catch (err) { $("#dominio-estado").innerHTML = `<span class="mal">${esc(err.message)}</span>`; } };
   $("#importar").onchange = async (e) => {
     const a = e.target.files[0]; if (!a) return;
     $("#importar-estado").textContent = "Importando…";
@@ -114,10 +116,10 @@
       if (j.completado) { const c = j.completado; $("#importar-estado").innerHTML = `<span class="ok">Completado: ${c.asociadosActualizados} fichas con datos nuevos (${c.campos} campos, ${c.hijos} hijos, ${c.familiares} familiares) · ${c.asociadosNuevos} fichas nuevas · ${c.standsNuevos} stands nuevos${c.protegidos ? ` · ${c.protegidos} campos no tocados por estar verificados en RENIEC` : ""}</span>`; }
       else $("#importar-estado").innerHTML = `<span class="ok">Importado: ${Object.entries(j.importado).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>`;
     }
-    catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${err.message}</span>`; }
+    catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${esc(err.message)}</span>`; }
     e.target.value = "";
   };
-  const estadoDni = (j) => { if (j.consumo) $("#dni-consumo").innerHTML = `Consultas al proveedor: <b>${j.consumo.hoy}</b> hoy · <b>${j.consumo.esteMes}</b> este mes · ${j.consumo.total} en total (${j.consumo.exitosas} con datos, ${j.consumo.rechazadas} rechazadas) · ${j.consumo.enCache} DNI en caché (no vuelven a gastar).`; $("#dni-estado").innerHTML = (j.configurado ? `Estado: <span class="ok">token configurado (${j.pista || "guardado"})</span>` : `Estado: <span class="mal">sin token, consultas simuladas</span>`) + ` · servicio: <code>${j.url || ""}</code>`; if (j.url && !$("#f-dni").url.value) $("#f-dni").url.value = j.url; };
+  const estadoDni = (j) => { if (j.consumo) $("#dni-consumo").innerHTML = `Consultas al proveedor: <b>${j.consumo.hoy}</b> hoy · <b>${j.consumo.esteMes}</b> este mes · ${j.consumo.total} en total (${j.consumo.exitosas} con datos, ${j.consumo.rechazadas} rechazadas) · ${j.consumo.enCache} DNI en caché (no vuelven a gastar).`; $("#dni-estado").innerHTML = (j.configurado ? `Estado: <span class="ok">token configurado (${esc(j.pista || "guardado")})</span>` : `Estado: <span class="mal">sin token, consultas simuladas</span>`) + ` · servicio: <code>${esc(j.url || "")}</code>`; if (j.url && !$("#f-dni").url.value) $("#f-dni").url.value = j.url; };
   pedir("GET", "/api/consulta-dni").then(estadoDni).catch(() => {});
   $("#f-dni").onsubmit = async (e) => {
     e.preventDefault(); const f = e.target; $("#dni-prueba").textContent = "Consultando…";
@@ -126,22 +128,24 @@
       const j = await pedir("POST", "/api/consulta-dni", cuerpo); estadoDni(j); f.token.value = "";
       if (j.prueba) {
         const cruda = j.prueba.cruda ? `<details style="margin-top:6px"><summary>Respuesta cruda del proveedor (HTTP ${j.prueba.cruda.status})</summary><pre style="white-space:pre-wrap;font-size:11px;max-height:220px;overflow:auto">${String(j.prueba.cruda.cuerpo).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])).replace(/"(foto|foto_base64|imagen|photo)":"[^"]{80,}"/g, '"$1":"(base64 omitido)"')}</pre></details>` : "";
-        $("#dni-prueba").innerHTML = (j.prueba.ok ? `<span class="ok">Respuesta: ${j.prueba.persona.nombres} ${j.prueba.persona.apellidoPaterno} ${j.prueba.persona.apellidoMaterno} · nac. ${j.prueba.persona.fechaNacimiento || "—"} · ${j.prueba.persona.distrito || "—"} · fuente ${j.prueba.persona.fuente}${j.prueba.persona.fotoBase64 ? " · con foto" : " · sin foto"}</span>` : `<span class="mal">Error: ${j.prueba.error}</span>`) + cruda;
+        $("#dni-prueba").innerHTML = (j.prueba.ok ? `<span class="ok">Respuesta: ${esc(j.prueba.persona.nombres)} ${esc(j.prueba.persona.apellidoPaterno)} ${esc(j.prueba.persona.apellidoMaterno)} · nac. ${esc(j.prueba.persona.fechaNacimiento || "—")} · ${esc(j.prueba.persona.distrito || "—")} · fuente ${esc(j.prueba.persona.fuente)}${j.prueba.persona.fotoBase64 ? " · con foto" : " · sin foto"}</span>` : `<span class="mal">Error: ${esc(j.prueba.error)}</span>`) + cruda;
       }
       else $("#dni-prueba").textContent = "Guardado.";
-    } catch (err) { $("#dni-prueba").innerHTML = `<span class="mal">${err.message}</span>`; }
+    } catch (err) { $("#dni-prueba").innerHTML = `<span class="mal">${esc(err.message)}</span>`; }
   };
   const PARADAS = { completa: "sin pendientes", limite_proveedor: "límite del proveedor", token_rechazado: "token rechazado", sin_token: "sin token", sin_conexion: "sin conexión", detenida: "detenida a mano", maximo: "tope de la corrida" };
   const fechaHora = (iso) => iso ? new Date(iso).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" }) : "—";
   let verTimer = null;
   const pintarVer = (j) => {
     const u = j.ultima;
-    $("#ver-estado").innerHTML = `${j.activa ? `<span class="ok">Activada</span> · próxima: <b>${fechaHora(j.proxima)}</b>` : `<span class="mal">Desactivada</span>`} · <b>${j.pendientes}</b> pendientes · ${j.verificados} verificados${j.sinDni ? ` · ${j.sinDni} sin DNI válido` : ""}${j.agotados ? ` · ${j.agotados} sin resultado tras 3 intentos` : ""}`
+    $("#ver-estado").innerHTML = `${j.activa ? `<span class="ok">Activada</span> · próxima: <b>${esc(fechaHora(j.proxima))}</b>` : `<span class="mal">Desactivada</span>`} · <b>${Number(j.pendientes) || 0}</b> pendientes · ${Number(j.verificados) || 0} verificados${j.sinDni ? ` · ${Number(j.sinDni)} sin DNI válido` : ""}${j.agotados ? ` · ${Number(j.agotados)} sin resultado tras 3 intentos` : ""}`
       + (j.corriendo ? ` · <b>ejecutando…</b>` : "")
-      + (u ? `<br>Última: ${fechaHora(u.inicio)} (${u.origen}) · ${u.verificados} verificados, ${u.conFoto} con foto, ${u.noFiguran} no figuran, ${u.errores} errores · parada: <b>${PARADAS[u.motivoParada] || u.motivoParada}</b>${u.mensajeProveedor ? ` («${u.mensajeProveedor}»)` : ""}` : "");
+      + (u ? `<br>Última: ${esc(fechaHora(u.inicio))} (${esc(u.origen)}) · ${Number(u.verificados) || 0} verificados, ${Number(u.conFoto) || 0} con foto, ${Number(u.noFiguran) || 0} no figuran, ${Number(u.discrepancias) || 0} con otro apellido, ${Number(u.errores) || 0} errores · parada: <b>${esc(PARADAS[u.motivoParada] || u.motivoParada)}</b>${u.mensajeProveedor ? ` («${esc(u.mensajeProveedor)}»)` : ""}` : "");
+    const disc = j.discrepancias || [];
+    $("#ver-disc").innerHTML = disc.length ? `<details><summary><b>${disc.length}</b> ficha(s) cuyo DNI devuelve otro apellido en RENIEC (no se tocaron; revisar el DNI)</summary><ul class="lista-simple">${disc.map((d) => `<li><a href="/#ficha-${esc(d.id)}">N° ${esc(d.numero)} · DNI ${esc(d.dni)}</a> · ficha: ${esc(d.ficha)} · RENIEC: ${esc(d.reniec)}</li>`).join("")}</ul></details>` : "";
     if (!$("#f-ver").hora.value) $("#f-ver").hora.value = j.hora; $("#f-ver").activa.value = String(j.activa);
     $("#ver-ejecutar").disabled = j.corriendo; $("#ver-detener").hidden = !j.corriendo;
-    $("#ver-filas").innerHTML = (j.historial || []).map((h) => `<tr><td>${fechaHora(h.inicio)}</td><td>${h.origen}</td><td>${h.procesados}</td><td>${h.verificados}</td><td>${h.conFoto}</td><td>${h.noFiguran}</td><td>${PARADAS[h.motivoParada] || h.motivoParada}</td><td>${h.pendientesAlFinal}</td></tr>`).join("");
+    $("#ver-filas").innerHTML = (j.historial || []).map((h) => `<tr><td>${esc(fechaHora(h.inicio))}</td><td>${esc(h.origen)}</td><td>${Number(h.procesados) || 0}</td><td>${Number(h.verificados) || 0}</td><td>${Number(h.conFoto) || 0}</td><td>${Number(h.noFiguran) || 0}</td><td>${esc(PARADAS[h.motivoParada] || h.motivoParada)}</td><td>${Number(h.pendientesAlFinal) || 0}</td></tr>`).join("");
     clearTimeout(verTimer); if (j.corriendo) verTimer = setTimeout(cargarVer, 3000);
   };
   const cargarVer = () => pedir("GET", "/api/verificacion").then(pintarVer).catch(() => {});

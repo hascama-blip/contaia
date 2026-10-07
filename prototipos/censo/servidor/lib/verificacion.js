@@ -8,6 +8,17 @@ const ZONA = "America/Lima";
 const ESTADO_CIVIL = { SOLTERO: "Soltero(a)", SOLTERA: "Soltero(a)", CASADO: "Casado(a)", CASADA: "Casado(a)", CONVIVIENTE: "Conviviente", DIVORCIADO: "Divorciado(a)", DIVORCIADA: "Divorciado(a)", VIUDO: "Viudo(a)", VIUDA: "Viudo(a)" };
 const MAX_INTENTOS = 3;         // tras 3 errores propios del DNI (p. ej. no figura) se deja de intentar
 const PAUSA_MS = 400;           // entre consultas, para no saturar al proveedor
+const MAX_FOTO = 5 * 1048576;   // una foto de DNI real pesa decenas de KB; más de 5 MB no es una foto
+
+const normal = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
+/** ¿El apellido paterno del libro coincide razonablemente con el de RENIEC? (protege contra un DNI mal tecleado) */
+export function apellidoCoincide(fichaPaterno, reniecPaterno, reniecMaterno = "") {
+  const a = normal(fichaPaterno), b = normal(reniecPaterno), c = normal(reniecMaterno);
+  if (!a || !b) return true;                       // sin dato previo no hay con qué comparar
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  if (c && (a === c || a.includes(c) || c.includes(a))) return true; // apellidos invertidos en el libro
+  return false;
+}
 
 export const capitalizar = (s) => String(s || "").toLowerCase().replace(/(^|[\s\-])(\p{L})/gu, (m, sep, l) => sep + l.toUpperCase());
 export const dniValido = (dni) => /^\d{8}$/.test(String(dni || "").replace(/\D/g, ""));
@@ -40,8 +51,8 @@ export class Verificacion {
   /**
    * @param {object} dep  { almacen, reniec, guardarArchivo(buffer, tipo, nombre) → id, dir }
    */
-  constructor({ almacen, reniec, guardarArchivo, dir, hora = process.env.CENSO_VERIFICACION_HORA || "00:30" }) {
-    this.almacen = almacen; this.reniec = reniec; this.guardarArchivo = guardarArchivo;
+  constructor({ almacen, reniec, guardarArchivo, borrarArchivo = null, dir, hora = process.env.CENSO_VERIFICACION_HORA || "00:30" }) {
+    this.almacen = almacen; this.reniec = reniec; this.guardarArchivo = guardarArchivo; this.borrarArchivo = borrarArchivo;
     this.ruta = path.join(dir, "verificacion.json");
     let g = {}; try { g = JSON.parse(fs.readFileSync(this.ruta, "utf8")); } catch { /* primera vez */ }
     this.activa = g.activa ?? true;
@@ -63,7 +74,7 @@ export class Verificacion {
   pendientes() {
     return this.almacen.listar("asociados")
       .map(({ id, data }) => ({ id, ...data }))
-      .filter((a) => dniValido(a.dni) && !a.reniec?.verificadoAt && (a.reniec?.intentos || 0) < MAX_INTENTOS)
+      .filter((a) => dniValido(a.dni) && !a.reniec?.verificadoAt && !a.reniec?.discrepancia && (a.reniec?.intentos || 0) < MAX_INTENTOS)
       .sort((a, b) => String(a.numero).localeCompare(String(b.numero), "es", { numeric: true }));
   }
 
@@ -75,14 +86,18 @@ export class Verificacion {
       pendientes: this.pendientes().length,
       verificados: todos.filter((a) => a.reniec?.verificadoAt).length,
       sinDni: todos.filter((a) => !dniValido(a.dni)).length,
-      agotados: todos.filter((a) => !a.reniec?.verificadoAt && (a.reniec?.intentos || 0) >= MAX_INTENTOS).length,
+      agotados: todos.filter((a) => !a.reniec?.verificadoAt && !a.reniec?.discrepancia && (a.reniec?.intentos || 0) >= MAX_INTENTOS).length,
+      discrepancias: this.almacen.listar("asociados").filter(({ data }) => !data.reniec?.verificadoAt && data.reniec?.discrepancia)
+        .map(({ id, data }) => ({ id, numero: data.numero, dni: data.dni, ficha: `${data.apellidoPaterno || ""} ${data.apellidoMaterno || ""}, ${data.nombres || ""}`.trim(), reniec: data.reniec.discrepancia.persona })),
       ultima: this.ultima, historial: this.historial.slice(-10).reverse(),
     };
   }
 
-  configurar({ activa, hora }) {
-    if (activa !== undefined) this.activa = Boolean(activa);
-    if (hora !== undefined) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(hora))) throw { status: 400, message: "La hora debe tener formato HH:MM (24 h), por ejemplo 00:30." }; this.hora = hora; }
+  configurar(c) {
+    const { activa, hora } = c || {};
+    if (hora !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(hora))) throw { status: 400, message: "La hora debe tener formato HH:MM (24 h), por ejemplo 00:30." };
+    if (activa !== undefined) this.activa = activa === true || activa === "true";
+    if (hora !== undefined) this.hora = String(hora);
     this.#guardar();
     this.programar();
   }
@@ -109,43 +124,68 @@ export class Verificacion {
       const lista = this.pendientes();
       r.pendientesAlInicio = lista.length;
       let fallosRed = 0;
+      const fotosGuardadas = []; // para quitar, al final, las que resulten ser la imagen genérica del proveedor
       for (const a of lista) {
         if (this.detener) { r.motivoParada = "detenida"; break; }
         if (r.procesados >= maximo) { r.motivoParada = "maximo"; break; }
+        const dni = String(a.dni).replace(/\D/g, "");
         let persona;
         try {
-          persona = await this.reniec.consultar(a.dni);
+          persona = await this.reniec.consultar(dni);
         } catch (e) {
           const st = e?.status || 502;
           if (st === 429) { r.motivoParada = "limite_proveedor"; r.mensajeProveedor = e.message; break; }
           if (st === 401) { r.motivoParada = "token_rechazado"; r.mensajeProveedor = e.message; break; }
-          if (st === 502) { fallosRed++; r.errores++; r.detalle.push({ id: a.id, numero: a.numero, dni: a.dni, error: e.message }); if (fallosRed >= 3) { r.motivoParada = "sin_conexion"; break; } continue; }
+          if (st === 502) { fallosRed++; r.errores++; r.detalle.push({ id: a.id, numero: a.numero, dni, error: e.message }); if (fallosRed >= 3) { r.motivoParada = "sin_conexion"; break; } continue; }
           // 400/404: problema del DNI en sí → se anota y se cuenta el intento
           r.procesados++; r.noFiguran++;
-          r.detalle.push({ id: a.id, numero: a.numero, dni: a.dni, error: e.message });
-          this.almacen.actualizar("asociados", a.id, { reniec: { ...(a.reniec || {}), intentos: (a.reniec?.intentos || 0) + 1, ultimoError: e.message, intentadoAt: new Date().toISOString() } });
+          r.detalle.push({ id: a.id, numero: a.numero, dni, error: e.message });
+          this.#actualizarSeguro(a.id, (act) => ({ reniec: { ...(act.reniec || {}), intentos: (act.reniec?.intentos || 0) + 1, ultimoError: e.message, intentadoAt: new Date().toISOString() } }), r);
           await pausa(PAUSA_MS);
           continue;
         }
         fallosRed = 0;
         if (!persona || persona.fuente === "simulado") { r.motivoParada = "sin_token"; break; }
         r.procesados++;
-        const cambios = { ...camposDesdePersona(persona), reniec: { verificadoAt: new Date().toISOString(), fuente: persona.fuente || "apidni", por: "automatico" }, actualizadoAt: new Date().toISOString(), actualizadoPor: null };
-        // Foto del DNI: solo si la ficha aún no tiene foto (no se pisa una foto tomada por la directiva).
-        if (persona.fotoBase64 && !a.archivos?.foto) {
+        // Se relee la ficha: pudo cambiar (foto subida, verificación manual, borrado) mientras se consultaba.
+        const act = this.almacen.obtener("asociados", a.id)?.data;
+        if (!act) { r.detalle.push({ id: a.id, numero: a.numero, dni, error: "la ficha ya no existe" }); continue; }
+        if (act.reniec?.verificadoAt) continue;
+        if (!apellidoCoincide(act.apellidoPaterno, persona.apellidoPaterno, persona.apellidoMaterno)) {
+          // El DNI del libro parece ser de otra persona: no se pisa nada; queda para que la directiva lo revise.
+          r.discrepancias = (r.discrepancias || 0) + 1;
+          r.detalle.push({ id: a.id, numero: a.numero, dni, error: `RENIEC devuelve ${persona.apellidoPaterno} ${persona.apellidoMaterno}, ${persona.nombres}; la ficha dice ${act.apellidoPaterno || "?"}. Revisar el DNI.` });
+          this.#actualizarSeguro(a.id, () => ({ reniec: { ...(act.reniec || {}), discrepancia: { at: new Date().toISOString(), persona: `${persona.apellidoPaterno} ${persona.apellidoMaterno}, ${persona.nombres}` } } }), r);
+          await pausa(PAUSA_MS);
+          continue;
+        }
+        const cambios = { ...camposDesdePersona(persona), reniec: { ...(act.reniec || {}), verificadoAt: new Date().toISOString(), fuente: persona.fuente || "apidni", por: "automatico", discrepancia: null }, actualizadoAt: new Date().toISOString(), actualizadoPor: null };
+        // Foto del DNI: solo si la ficha aún no tiene foto (no se pisa una foto tomada por la directiva) y si es una imagen real.
+        let archivoFoto = null;
+        if (persona.fotoBase64 && !act.archivos?.foto) {
           try {
             const buf = Buffer.from(persona.fotoBase64, "base64");
-            const tipo = buf[0] === 0x89 && buf[1] === 0x50 ? "image/png" : "image/jpeg";
-            const id = this.guardarArchivo(buf, tipo, `dni-${a.dni}.${tipo === "image/png" ? "png" : "jpg"}`);
-            cambios.archivos = { foto: id };
-            r.conFoto++;
-          } catch (e) { r.detalle.push({ id: a.id, numero: a.numero, dni: a.dni, error: `foto: ${e.message}` }); }
+            const esJpeg = buf[0] === 0xff && buf[1] === 0xd8, esPng = buf[0] === 0x89 && buf[1] === 0x50;
+            if ((esJpeg || esPng) && buf.length > 500 && buf.length <= MAX_FOTO) {
+              const tipo = esPng ? "image/png" : "image/jpeg";
+              archivoFoto = { id: this.guardarArchivo(buf, tipo, `dni-${dni}.${esPng ? "png" : "jpg"}`), hash: this.reniec.hashFoto(persona.fotoBase64) };
+              cambios.archivos = { foto: archivoFoto.id };
+            }
+          } catch (e) { r.detalle.push({ id: a.id, numero: a.numero, dni, error: `foto: ${e.message}` }); }
         }
-        this.almacen.actualizar("asociados", a.id, cambios);
+        if (!this.#actualizarSeguro(a.id, () => cambios, r)) { if (archivoFoto) this.borrarArchivo?.(archivoFoto.id); continue; }
+        if (archivoFoto) { r.conFoto++; fotosGuardadas.push({ ficha: a.id, ...archivoFoto }); }
         r.verificados++;
         await pausa(PAUSA_MS);
       }
       if (!r.motivoParada) r.motivoParada = "completa";
+      // Si durante la corrida se descubrió que una foto era la genérica del proveedor, se quita de las fichas donde se guardó.
+      for (const f of fotosGuardadas) {
+        if (!this.reniec.esFotoGenerica(f.hash)) continue;
+        const act = this.almacen.obtener("asociados", f.ficha)?.data;
+        if (!act || act.archivos?.foto !== f.id) continue;
+        if (this.#actualizarSeguro(f.ficha, () => ({ archivos: { foto: null } }), r)) { this.borrarArchivo?.(f.id); r.conFoto = Math.max(0, r.conFoto - 1); r.fotosGenericasQuitadas = (r.fotosGenericasQuitadas || 0) + 1; }
+      }
       return r;
     } finally {
       r.fin = new Date().toISOString();
@@ -156,6 +196,16 @@ export class Verificacion {
       this.corriendo = false;
       try { this.#guardar(); } catch { /* sin disco */ }
     }
+  }
+
+  /** Escribe en la ficha releyéndola; si ya no existe o falla, lo anota y devuelve false. */
+  #actualizarSeguro(id, calcular, r) {
+    try {
+      const act = this.almacen.obtener("asociados", id)?.data;
+      if (!act) { r.detalle.push({ id, error: "la ficha ya no existe" }); return false; }
+      this.almacen.actualizar("asociados", id, calcular(act));
+      return true;
+    } catch (e) { r.errores++; r.detalle.push({ id, error: e?.message || String(e) }); return false; }
   }
 
   pedirDetener() { this.detener = true; }

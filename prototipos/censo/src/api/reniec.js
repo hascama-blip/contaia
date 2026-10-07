@@ -19,7 +19,7 @@ export async function actualizarDesdeReniec(a, { por = null, conFoto = true } = 
   const campos = fichaDesdeReniec(persona);
   await db.actualizarAsociado(a.id, {
     ...campos,
-    reniec: { verificadoAt: ahoraISO(), fuente: persona.fuente || "apidni", por },
+    reniec: { ...(a.reniec || {}), verificadoAt: ahoraISO(), fuente: persona.fuente || "apidni", por, discrepancia: null },
     actualizadoAt: ahoraISO(), actualizadoPor: por,
   });
   let foto = false;
