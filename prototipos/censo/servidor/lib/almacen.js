@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 
-export const COLECCIONES = ["asociados", "stands", "pagos", "incidencias"];
+export const COLECCIONES = ["asociados", "stands", "pagos", "incidencias", "tiendas", "articulos", "sitio"];
 
 const esObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 export function fusionar(a, b) {

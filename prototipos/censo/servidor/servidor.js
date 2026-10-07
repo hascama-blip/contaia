@@ -7,8 +7,9 @@
 //   DATOS=/var/censo PUERTO=3000 node servidor/servidor.js
 //
 // Rutas:
-//   GET  /, /index.html, /src/*, /estilos/*, /img/*   la web (con sesión)
-//   GET  /entrar, POST/GET/DELETE /api/sesion      entrar / quién soy / salir
+//   GET  /, /tienda/:id, /sitio/*, /api/publico/*     web pública del centro comercial (sin sesión)
+//   GET  /portal, /src/*, /estilos/*, /img/*          el padrón (con sesión) · GET /editar-sitio (sesión con edición)
+//   GET  /login, POST/GET/DELETE /api/sesion       entrar / quién soy / salir
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
 //   GET  /api/eventos                                  SSE: {col} cuando algo cambia
 //   POST /api/archivos · GET /_blob/:id · DELETE /api/archivos/:id
@@ -28,11 +29,13 @@ import { Usuarios, COOKIE, puedeEscribir, esAdmin } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
+import { SitioPublico } from "./lib/sitio.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ_WEB = path.resolve(AQUI, "..");            // carpeta censo (index.html, src, estilos, img)
 const PUBLICO = path.join(AQUI, "publico");           // login.html, adaptador.js
+const SITIO = path.join(PUBLICO, "sitio");            // web pública del centro comercial + editor
 const DATOS = path.resolve(process.env.DATOS || path.join(AQUI, "datos"));
 const PUERTO = Number(process.env.PUERTO || 3000);
 const MAX_ARCHIVO = 20 * 1048576;
@@ -58,6 +61,7 @@ function guardarArchivo(buffer, tipo, nombre, por = null) {
 const verificacion = new Verificacion({ almacen, reniec, dir: DATOS, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, "automatico"),
   borrarArchivo: (id) => { try { fs.unlinkSync(path.join(DATOS, "archivos", id)); } catch { /* ya no estaba */ } metaArchivos.del(id); } });
 verificacion.programar();
+const sitio = new SitioPublico({ almacen, existeArchivo: (id) => !!metaArchivos.get(id) });
 
 // ---- Avisos en vivo (SSE) ----
 const oyentes = new Set();
@@ -111,15 +115,31 @@ function inyectarAdaptador(html) {
     modulosPreload() + "\n" + previo + '<script type="module" src="src/main.js"></script>');
 }
 
+function servirBlob(res, id, cache) {
+  const meta = metaArchivos.get(id);
+  const abs = path.join(DATOS, "archivos", id);
+  if (!meta || !fs.existsSync(abs)) return json(res, 404, { error: "Archivo no encontrado." });
+  res.writeHead(200, { "Content-Type": meta.tipo, "Content-Length": meta.tamano, "Cache-Control": cache, "Content-Disposition": `inline; filename="${encodeURIComponent(meta.nombre || id)}"`, "X-Content-Type-Options": "nosniff" });
+  return fs.createReadStream(abs).pipe(res);
+}
+
 async function manejar(req, res) {
   const url = new URL(req.url, "http://x");
   const ruta = url.pathname;
   const metodo = req.method;
+  let m;
   const yo = usuarios.deCookie(cookies(req)[COOKIE]);
 
   // ---- Público: entrar ----
-  if (ruta === "/login.html") return redirigir(res, "/entrar" + (url.search || ""));
-  if (ruta === "/entrar") { if (yo) return redirigir(res, "/"); return servirArchivo(res, PUBLICO, "/login.html"); }
+  if (ruta === "/login.html" || ruta === "/entrar") return redirigir(res, "/login" + (url.search || ""));
+  if (ruta === "/login") { if (yo) return redirigir(res, "/portal"); return servirArchivo(res, PUBLICO, "/login.html"); }
+  // ---- Público: web del centro comercial (sin sesión) ----
+  if (ruta === "/") return servirArchivo(res, SITIO, "/index.html", { cache: "no-cache", req });
+  if ((m = ruta.match(/^\/tienda\/([A-Za-z0-9_.-]+)$/))) { if (sitio.tienda(m[1])) return servirArchivo(res, SITIO, "/tienda.html", { cache: "no-cache", req }); res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }); return res.end(fs.readFileSync(path.join(SITIO, "no-existe.html"))); }
+  if (ruta.startsWith("/sitio/")) return servirArchivo(res, SITIO, ruta.slice(6), { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
+  if (ruta === "/api/publico/sitio" && metodo === "GET") return json(res, 200, sitio.portada(), { "Cache-Control": "public, max-age=30" });
+  if ((m = ruta.match(/^\/api\/publico\/tienda\/([A-Za-z0-9_.-]+)$/)) && metodo === "GET") { const t = sitio.tienda(m[1]); return t ? json(res, 200, t, { "Cache-Control": "public, max-age=30" }) : json(res, 404, { error: "Tienda no encontrada." }); }
+  if ((m = ruta.match(/^\/_blob\/([A-Za-z0-9]+)$/)) && !yo && sitio.esArchivoPublico(m[1])) return servirBlob(res, m[1], "public, max-age=86400");
   if (ruta === "/adaptador.js") return servirArchivo(res, PUBLICO, ruta, { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   if (ruta === "/api/instalacion" && metodo === "POST") {
     // Primera configuración: solo mientras no exista ningún usuario y con el código de instalación.
@@ -151,13 +171,12 @@ async function manejar(req, res) {
   // ---- Todo lo demás exige sesión ----
   if (!yo) {
     if (ruta.startsWith("/api/") || ruta.startsWith("/_blob/")) return json(res, 401, { error: "No autenticado", code: "revoked" });
-    return redirigir(res, "/entrar");
+    return redirigir(res, "/login");
   }
   const escribe = puedeEscribir(yo);
   const soloLectura = () => json(res, 403, { error: "Tu usuario es de solo lectura.", code: "invalid_argument" });
 
   // ---- Base de datos ----
-  let m;
   if ((m = ruta.match(/^\/api\/db\/([a-z]+)(?:\/([A-Za-z0-9_.-]+))?$/))) {
     const [, col, id] = m;
     if (!COLECCIONES.includes(col)) return json(res, 404, { error: "Colección desconocida." });
@@ -191,13 +210,7 @@ async function manejar(req, res) {
     metaArchivos.del(m[1]);
     return json(res, 200, { deleted: true });
   }
-  if ((m = ruta.match(/^\/_blob\/([A-Za-z0-9]+)$/))) {
-    const meta = metaArchivos.get(m[1]);
-    const abs = path.join(DATOS, "archivos", m[1]);
-    if (!meta || !fs.existsSync(abs)) return json(res, 404, { error: "Archivo no encontrado." });
-    res.writeHead(200, { "Content-Type": meta.tipo, "Content-Length": meta.tamano, "Cache-Control": "private, max-age=86400", "Content-Disposition": `inline; filename="${encodeURIComponent(meta.nombre || m[1])}"`, "X-Content-Type-Options": "nosniff" });
-    return fs.createReadStream(abs).pipe(res);
-  }
+  if ((m = ruta.match(/^\/_blob\/([A-Za-z0-9]+)$/))) return servirBlob(res, m[1], "private, max-age=86400");
 
   // ---- Usuarios ----
   if (ruta === "/api/usuarios/perfiles" && metodo === "GET") {
@@ -220,7 +233,7 @@ async function manejar(req, res) {
   // ---- Administración (solo admin): respaldo, importación, dominio ----
   if (ruta === "/admin.html") return redirigir(res, "/administracion");
   if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
-    if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/") : json(res, 403, { error: "Solo un administrador." });
+    if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/portal") : json(res, 403, { error: "Solo un administrador." });
     if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
     if (ruta === "/api/exportar" && metodo === "GET") {
       const colecciones = Object.fromEntries(COLECCIONES.map((c) => [c, almacen.listar(c)]));
@@ -237,6 +250,7 @@ async function manejar(req, res) {
       else for (const col of COLECCIONES) porCol[col] = (fuente[col] || []).filter((d) => d && d.id && d.data).map((d) => ({ id: d.id, data: d.data }));
       if (modo === "completar") {
         const r = completarTodo(almacen, porCol);
+        for (const col of ["tiendas", "articulos", "sitio"]) for (const d of porCol[col]) if (!almacen.obtener(col, d.id)) almacen.establecer(col, d.id, d.data); // la web pública: solo lo que no exista
         almacen.vaciar();
         return json(res, 200, { modo, completado: r });
       }
@@ -286,8 +300,12 @@ async function manejar(req, res) {
     return json(res, 200, { persona, simulado: !reniec.real });
   }
 
-  // ---- La web ----
-  if (ruta === "/" || ruta === "/index.html") return servirArchivo(res, RAIZ_WEB, "/index.html", { transformar: inyectarAdaptador, req, cache: "no-cache" });
+  // ---- Editor de la web pública (cualquier usuario con permiso de edición) ----
+  if (ruta === "/editar-sitio") { if (!escribe) return redirigir(res, "/portal"); return servirArchivo(res, SITIO, "/editor.html", { cache: "no-cache", req }); }
+
+  // ---- El padrón (la web privada) ----
+  if (ruta === "/index.html" || ruta === "/portal/") return redirigir(res, "/portal");
+  if (ruta === "/portal") return servirArchivo(res, RAIZ_WEB, "/index.html", { transformar: inyectarAdaptador, req, cache: "no-cache" });
   if (ruta.startsWith("/src/")) return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   if (ruta.startsWith("/dist/")) return servirArchivo(res, RAIZ_WEB, ruta, { cache: "public, max-age=31536000, immutable", req }) || json(res, 404, { error: "No existe." });
   return json(res, 404, { error: "No existe." });

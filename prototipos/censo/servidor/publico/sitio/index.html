@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro Comercial Inmaculada Concepción · Mochilas, carteras y más</title>
+<meta name="description" content="Centro Comercial Inmaculada Concepción: mochilas, carteras, cartucheras, maletas y accesorios directo de fabricantes. Encuentra la tienda y contáctala por WhatsApp.">
+<meta property="og:title" content="Centro Comercial Inmaculada Concepción">
+<meta property="og:description" content="Mochilas, carteras, cartucheras y más, directo de los fabricantes.">
+<meta property="og:image" content="/img/icono-512.png">
+<link rel="icon" href="/img/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/img/icono-180.png">
+<meta name="theme-color" content="#5460B4">
+<link rel="stylesheet" href="/estilos/tokens.css">
+<link rel="stylesheet" href="/sitio/sitio.css">
+</head>
+<body>
+<header class="cab"><div class="contenedor cab-in">
+  <a class="marca" href="/"><img src="/img/logo.jpg" alt=""><span id="marca-nombre">C.C. Inmaculada Concepción<small id="marca-lema">Mochilas, carteras y más</small></span></a>
+  <div class="cab-acciones">
+    <a class="btn btn-wa btn-sm" id="wa-centro" href="#" hidden>WhatsApp</a>
+    <a class="btn btn-borde btn-sm" href="#tiendas">Tiendas</a>
+  </div>
+</div></header>
+
+<main class="contenedor">
+  <section class="carrusel" id="carrusel" aria-roledescription="carrusel" aria-label="Novedades">
+    <div class="carrusel-pista" id="pista"><div class="diapo diapo-vacia"><div><h1>Centro Comercial Inmaculada Concepción</h1><p>Cargando…</p></div></div></div>
+    <button class="carrusel-flecha izq" id="ant" aria-label="Anterior">‹</button>
+    <button class="carrusel-flecha der" id="sig" aria-label="Siguiente">›</button>
+    <div class="carrusel-puntos" id="puntos"></div>
+  </section>
+
+  <section class="seccion" id="categorias">
+    <div class="seccion-cab"><h2>¿Qué buscas?</h2><p>Toca una categoría para ver las tiendas que la venden.</p></div>
+    <div class="burbujas" id="burbujas" role="group" aria-label="Categorías"></div>
+    <div class="filtro-activo" id="filtro" hidden></div>
+  </section>
+
+  <section class="seccion" id="tiendas">
+    <div class="seccion-cab"><h2 id="tiendas-titulo">Tiendas</h2><p id="tiendas-sub"></p></div>
+    <div class="rejilla" id="lista-tiendas"></div>
+  </section>
+
+  <section class="seccion" id="articulos">
+    <div class="seccion-cab"><h2 id="art-titulo">Variedad de artículos</h2><p id="art-sub">Cada artículo dice quién lo vende. Contáctalo directamente.</p></div>
+    <div class="rejilla-art" id="lista-articulos"></div>
+  </section>
+
+  <footer class="pie">
+    <span id="pie-datos"></span>
+    <span><a href="/login">Acceso directiva</a></span>
+  </footer>
+</main>
+
+<dialog class="modal" id="modal">
+  <div class="modal-cab"><div class="logo" id="m-logo"></div><div><h3 id="m-nombre"></h3><div class="stand" id="m-stand" style="color:var(--texto-3);font-size:.85rem"></div></div><button class="modal-cerrar" id="m-cerrar" aria-label="Cerrar">×</button></div>
+  <div class="modal-cuerpo">
+    <div class="descripcion" id="m-desc"></div>
+    <div><b id="m-ofertas-titulo">Ofertas</b><div class="lista-ofertas" id="m-ofertas" style="margin-top:8px"></div></div>
+    <a class="btn btn-primario btn-bloque" id="m-contactar" href="#">Contactar · ver perfil completo</a>
+  </div>
+</dialog>
+
+<a class="btn btn-dorado editar-flotante" id="editar" href="/editar-sitio" hidden>✎ Editar esta web</a>
+<script src="/sitio/comun.js"></script>
+<script src="/sitio/sitio.js"></script>
+</body>
+</html>

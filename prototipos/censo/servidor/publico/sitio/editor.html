@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editar la web pública · Inmaculada Concepción</title>
+<link rel="icon" href="/img/favicon.ico" sizes="48x48"><meta name="theme-color" content="#5460B4">
+<link rel="stylesheet" href="/estilos/tokens.css"><link rel="stylesheet" href="/estilos/app.css">
+<style>
+  [hidden] { display: none !important; }
+  body { margin: 0; padding: 20px 16px 80px; }
+  main { max-width: 1000px; margin: 0 auto; display: grid; gap: 18px; }
+  .cab-ed { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; } .cab-ed h1 { font-size: var(--t-xl); margin: 0; } .cab-ed .sep { flex: 1; }
+  .pestanas { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--borde); }
+  .pestanas button { border: 0; background: none; padding: 10px 14px; font-weight: 600; color: var(--texto-3); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .pestanas button[aria-selected="true"] { color: var(--brand-700); border-color: var(--brand-500); }
+  .card-cuerpo { display: grid; gap: 12px; }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; } .fila .campo { flex: 1 1 180px; margin: 0; } .fila .campo.corto { flex: 0 1 120px; }
+  .lista { display: grid; gap: 8px; }
+  .item { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--borde); border-radius: 12px; background: #fff; color: var(--texto); }
+  .item .txt b { color: var(--texto); }
+  .item img, .item .ph { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--superficie-2); display: grid; place-items: center; flex: 0 0 auto; font-size: 1.4rem; }
+  .item .txt { flex: 1; min-width: 0; } .item .txt b { display: block; } .item .txt small { color: var(--texto-3); }
+  .item .acc { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .carr img { width: 120px; height: 68px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; } .chips label { display: inline-flex; gap: 5px; align-items: center; border: 1px solid var(--borde); border-radius: 999px; padding: 4px 10px; font-size: var(--t-sm); cursor: pointer; } .chips label:has(input:checked) { background: var(--brand-50); border-color: var(--brand-400); }
+  .chips input { margin: 0; }
+  dialog { border: 0; border-radius: 16px; padding: 0; width: min(680px, calc(100% - 24px)); max-height: 92vh; box-shadow: var(--sombra-2); } dialog::backdrop { background: rgba(20,24,60,.5); }
+  dialog form { display: grid; gap: 12px; padding: 20px; } dialog h2 { font-size: var(--t-lg); margin: 0; }
+  .archivo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .archivo img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--borde); } .archivo .doc { padding: 6px 10px; background: var(--superficie-2); border-radius: 8px; font-size: var(--t-sm); }
+  .ok { color: var(--verde-600); } .mal { color: var(--peligro, #b00020); }
+  .ayuda { font-size: var(--t-xs); color: var(--texto-3); }
+  .buscar { max-width: 320px; }
+  .estado { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--brand-900); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: var(--t-sm); box-shadow: var(--sombra-2); z-index: 50; }
+</style>
+</head>
+<body>
+<main>
+  <div class="cab-ed"><a href="/portal" class="btn btn-ghost btn-sm">← Portal</a><h1>Editar la web pública</h1><span class="sep"></span><a href="/" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Ver la web ↗</a></div>
+  <p class="ayuda">Todo lo que guardes aquí se publica al instante en <b>ccinmaculadaconcepcion.com</b>. Las fotos se guardan en el servidor.</p>
+  <nav class="pestanas" role="tablist">
+    <button role="tab" aria-selected="true" data-p="portada">Portada y carrusel</button>
+    <button role="tab" aria-selected="false" data-p="categorias">Categorías (burbujas)</button>
+    <button role="tab" aria-selected="false" data-p="tiendas">Tiendas</button>
+    <button role="tab" aria-selected="false" data-p="articulos">Artículos y ofertas</button>
+  </nav>
+
+  <section class="card" data-panel="portada">
+    <div class="card-cuerpo">
+      <h2 class="card-titulo">Datos del centro comercial</h2>
+      <form id="f-sitio" class="card-cuerpo" style="padding:0">
+        <div class="fila"><div class="campo"><label class="label">Nombre</label><input class="input" name="nombre" required></div><div class="campo"><label class="label">Lema (frase corta bajo el nombre)</label><input class="input" name="lema"></div></div>
+        <div class="campo"><label class="label">Descripción breve</label><textarea class="input" name="descripcion" rows="2"></textarea></div>
+        <div class="fila"><div class="campo"><label class="label">Dirección</label><input class="input" name="direccion" placeholder="Jr. … 123, Lima"></div><div class="campo"><label class="label">Horario</label><input class="input" name="horario" placeholder="Lun–Sáb 9:00–20:00"></div><div class="campo"><label class="label">WhatsApp del centro (opcional)</label><input class="input" name="whatsapp" inputmode="numeric" placeholder="999 999 999"></div></div>
+        <div><button class="btn btn-primary" type="submit">Guardar datos</button> <span id="sitio-estado"></span></div>
+      </form>
+      <hr style="border:0;border-top:1px solid var(--borde)">
+      <h2 class="card-titulo">Carrusel de fotos</h2>
+      <p class="ayuda">Fotos horizontales (ideal 1600×700). Puedes poner un título, un texto y un botón con enlace en cada una. Arrastra con ↑ ↓ para ordenar.</p>
+      <div class="lista carr" id="carrusel"></div>
+      <div class="fila"><label class="btn btn-accent">＋ Subir foto al carrusel<input type="file" id="carrusel-subir" accept="image/*" multiple hidden></label><span id="carrusel-estado" class="ayuda"></span></div>
+    </div>
+  </section>
+
+  <section class="card" data-panel="categorias" hidden>
+    <div class="card-cuerpo">
+      <h2 class="card-titulo">Categorías</h2>
+      <p class="ayuda">Son las burbujas de la portada. Cada tienda y artículo se asigna a una o varias. El ícono es un emoji (puedes pegar cualquiera).</p>
+      <div class="lista" id="categorias"></div>
+      <form id="f-cat" class="fila"><div class="campo corto"><label class="label">Ícono</label><input class="input" name="icono" placeholder="🎒" maxlength="4"></div><div class="campo"><label class="label">Nombre</label><input class="input" name="nombre" required placeholder="Mochilas"></div><button class="btn btn-primary" type="submit">Agregar categoría</button></form>
+    </div>
+  </section>
+
+  <section class="card" data-panel="tiendas" hidden>
+    <div class="card-cuerpo">
+      <div class="fila"><h2 class="card-titulo" style="flex:1">Tiendas <span class="ayuda" id="tiendas-n"></span></h2><input class="input buscar" id="buscar-tienda" placeholder="Buscar tienda o stand…"><button class="btn btn-primary" id="nueva-tienda" type="button">＋ Nueva tienda</button></div>
+      <p class="ayuda">Cada tienda tiene su perfil digital en <code>/tienda/…</code> con WhatsApp, catálogo, PDF de ofertas y QR de pago. Las ocultas no se publican.</p>
+      <div class="lista" id="tiendas"></div>
+    </div>
+  </section>
+
+  <section class="card" data-panel="articulos" hidden>
+    <div class="card-cuerpo">
+      <div class="fila"><h2 class="card-titulo" style="flex:1">Artículos <span class="ayuda" id="articulos-n"></span></h2><select class="input buscar" id="filtro-art-tienda"><option value="">Todas las tiendas</option></select><button class="btn btn-primary" id="nuevo-articulo" type="button">＋ Nuevo artículo</button></div>
+      <p class="ayuda">Los artículos aparecen en la portada con “quién lo vende” y botón Contactar. Marca <b>Oferta</b> y pon el precio de oferta para que resalte.</p>
+      <div class="lista" id="articulos"></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="d-tienda"><form id="f-tienda" method="dialog">
+  <h2 id="t-titulo">Tienda</h2>
+  <div class="fila"><div class="campo"><label class="label">Nombre de la tienda <span class="req">*</span></label><input class="input" name="nombre" required></div><div class="campo corto"><label class="label">Stand</label><input class="input" name="stand" placeholder="Stand 12"></div><div class="campo corto"><label class="label">Piso / pasaje</label><input class="input" name="piso" placeholder="2º piso"></div></div>
+  <div class="campo"><label class="label">Categorías que vende</label><div class="chips" id="t-cats"></div></div>
+  <div class="campo"><label class="label">Descripción</label><textarea class="input" name="descripcion" rows="3" placeholder="Fabricamos mochilas escolares y de viaje. Venta por mayor y menor."></textarea></div>
+  <div class="fila"><div class="campo"><label class="label">WhatsApp</label><input class="input" name="whatsapp" inputmode="numeric" placeholder="999 999 999"></div><div class="campo"><label class="label">Teléfono (llamadas)</label><input class="input" name="telefono"></div><div class="campo"><label class="label">Horario</label><input class="input" name="horario"></div></div>
+  <div class="fila"><div class="campo"><label class="label">Logo</label><div class="archivo" data-campo="logo"></div></div><div class="campo"><label class="label">QR de pago (Yape/Plin, imagen)</label><div class="archivo" data-campo="qrPago"></div></div></div>
+  <div class="fila"><div class="campo"><label class="label">Texto junto al QR</label><input class="input" name="qrPagoTexto" placeholder="Yape 999 999 999 · María Pérez"></div><div class="campo"><label class="label">Catálogo en línea (enlace)</label><input class="input" name="catalogoUrl" type="url" placeholder="https://…"></div></div>
+  <div class="fila"><div class="campo"><label class="label">Catálogo (PDF)</label><div class="archivo" data-campo="catalogoPdf" data-tipo="application/pdf"></div></div><div class="campo"><label class="label">Ofertas del mes (PDF)</label><div class="archivo" data-campo="ofertasPdf" data-tipo="application/pdf"></div></div></div>
+  <div class="fila"><div class="campo"><label class="label">Facebook</label><input class="input" name="facebook" placeholder="usuario o enlace"></div><div class="campo"><label class="label">Instagram</label><input class="input" name="instagram"></div><div class="campo"><label class="label">TikTok</label><input class="input" name="tiktok"></div></div>
+  <div class="campo"><label class="label">Otros botones (uno por línea: <i>Título | https://enlace</i>)</label><textarea class="input" name="enlaces" rows="2" placeholder="Mercado Libre | https://…"></textarea></div>
+  <div class="fila"><div class="campo"><label class="label">Ubicación en Google Maps (enlace, opcional)</label><input class="input" name="ubicacionUrl" type="url"></div><div class="campo corto"><label class="label">Orden</label><input class="input" name="orden" type="number" min="0"></div><label style="display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" name="visible" checked> Publicada</label></div>
+  <div class="fila" style="justify-content:flex-end"><button class="btn btn-peligro" type="button" id="t-borrar" hidden>Borrar tienda</button><button class="btn btn-ghost" type="button" data-cerrar>Cancelar</button><button class="btn btn-primary" type="submit">Guardar tienda</button></div>
+</form></dialog>
+
+<dialog id="d-art"><form id="f-art" method="dialog">
+  <h2 id="a-titulo">Artículo</h2>
+  <div class="fila"><div class="campo"><label class="label">Nombre <span class="req">*</span></label><input class="input" name="nombre" required placeholder="Mochila escolar reforzada 18”"></div><div class="campo"><label class="label">Tienda que lo vende <span class="req">*</span></label><select class="input" name="tiendaId" required></select></div></div>
+  <div class="fila"><div class="campo"><label class="label">Categoría</label><select class="input" name="categoriaId"></select></div><div class="campo corto"><label class="label">Precio (S/)</label><input class="input" name="precio" type="number" step="0.10" min="0"></div><div class="campo corto"><label class="label">Precio oferta (S/)</label><input class="input" name="precioOferta" type="number" step="0.10" min="0"></div><label style="display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" name="oferta"> Oferta</label></div>
+  <div class="campo"><label class="label">Descripción corta</label><input class="input" name="descripcion" maxlength="140" placeholder="Colores surtidos · Por mayor desde 6 unidades"></div>
+  <div class="fila"><div class="campo"><label class="label">Foto</label><div class="archivo" data-campo="foto"></div></div><label style="display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" name="visible" checked> Publicado</label></div>
+  <div class="fila" style="justify-content:flex-end"><button class="btn btn-peligro" type="button" id="a-borrar" hidden>Borrar artículo</button><button class="btn btn-ghost" type="button" data-cerrar>Cancelar</button><button class="btn btn-primary" type="submit">Guardar artículo</button></div>
+</form></dialog>
+
+<dialog id="d-diapo"><form id="f-diapo" method="dialog">
+  <h2>Texto de la foto</h2>
+  <div class="campo"><label class="label">Título</label><input class="input" name="titulo" placeholder="Campaña escolar 2027"></div>
+  <div class="campo"><label class="label">Texto</label><input class="input" name="texto" placeholder="Mochilas desde S/ 25 al por mayor"></div>
+  <div class="fila"><div class="campo"><label class="label">Botón: texto</label><input class="input" name="textoEnlace" placeholder="Ver mochilas"></div><div class="campo"><label class="label">Botón: enlace</label><input class="input" name="enlace" placeholder="?cat=mochilas o https://…"></div></div>
+  <div class="fila" style="justify-content:flex-end"><button class="btn btn-ghost" type="button" data-cerrar>Cancelar</button><button class="btn btn-primary" type="submit">Guardar</button></div>
+</form></dialog>
+
+<div class="estado" id="estado" hidden></div>
+<script src="/sitio/comun.js"></script>
+<script src="/sitio/editor.js"></script>
+</body>
+</html>

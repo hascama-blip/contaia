@@ -37,6 +37,7 @@ export function Cabecera({ seccion, usuario, hayEjemplos, puedeEscribir }) {
         <div className="usuario" title=${nombre}>
           <span className="avatar" aria-hidden="true">${iniciales(nombre)}</span>
           <span className="usuario-nombre">${nombre}</span>
+          ${typeof window.cerrarSesion === "function" && puedeEscribir !== false && html`<a className="btn btn-fantasma btn-salir" href="/editar-sitio" title="Carrusel, categorías, tiendas y artículos de la web pública">Web pública</a>`}
           ${typeof window.cerrarSesion === "function" && usuario?.esAdmin && html`<a className="btn btn-fantasma btn-salir" href="/administracion" title="Usuarios, dominio y respaldo">Administración</a>`}
           ${typeof window.cerrarSesion === "function" && html`<button type="button" className="btn btn-fantasma btn-salir" title="Cerrar sesión" onClick=${() => window.cerrarSesion()}>Salir</button>`}
         </div>

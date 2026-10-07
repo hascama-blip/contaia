@@ -114,6 +114,29 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   `Caddyfile`, `censo.service`, `censo.env.ejemplo`, `actualizar.sh`, `respaldo.sh`.
 - Probar en local: `DATOS=/tmp/censo node servidor/servidor.js` → `http://localhost:3000`.
 
+## Web pública del centro comercial (raíz del dominio)
+La raíz `ccinmaculadaconcepcion.com/` es la **web para compradores** (sin sesión); el padrón
+privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
+- **Portada** (`servidor/publico/sitio/index.html` + `sitio.js`): carrusel de fotos
+  (autoplay, puntos, flechas), **burbujas de categorías** (Mochilas, Carteras, Cartucheras…)
+  que filtran tiendas y artículos; cada tienda tiene **Ver ofertas** (resumen en ventana:
+  artículos en oferta + botón Contactar) y **Contactar**; abajo, la **variedad de artículos**
+  con “Vende: tienda · stand” y botón Contactar en cada uno. Filtro en la URL: `/?cat=mochilas`.
+- **Perfil digital de tienda** (`/tienda/:id`, `tienda.html`): WhatsApp con mensaje prellenado
+  (y por artículo con `?art=`), llamar, catálogo (PDF o enlace), PDF de ofertas, **QR de pago**
+  (imagen + texto Yape/Plin), cómo llegar, redes y botones extra; lista de ofertas y artículos.
+- **Editor** (`/editar-sitio`, `editor.html` + `editor.js`): cualquier usuario con permiso de
+  edición (enlace **Web pública** en la cabecera del portal y botón flotante “Editar esta web”
+  cuando ya entró). Pestañas: datos del centro + carrusel (subir/ordenar/quitar fotos, texto
+  y botón por foto), categorías (emoji + nombre, ocultar, ordenar), tiendas y artículos
+  (formularios con subida de logo, QR, PDF y foto). Todo se guarda al instante.
+- **Datos**: colecciones `sitio` (doc `config`: nombre, lema, dirección, horario, WhatsApp,
+  `carrusel[]`, `categorias[]`), `tiendas` y `articulos` (mismos `/api/db`). Entran en el
+  respaldo/importación. `lib/sitio.js` (`SitioPublico`) arma `GET /api/publico/sitio` y
+  `GET /api/publico/tienda/:id` (sin campos internos: `propietarioId`, `notas`) y decide qué
+  archivos de `/_blob/:id` pueden verse **sin sesión**: solo los referenciados por el carrusel,
+  una tienda o un artículo publicados (el resto sigue exigiendo sesión).
+
 ## RENIEC en el padrón (actualizar y verificación masiva)
 - En una ficha existente el botón junto al DNI es **«Actualizar desde RENIEC»** (`api/reniec.js`
   → `actualizarDesdeReniec`): guarda directo nombres, apellidos, fecha de nacimiento, dirección y
