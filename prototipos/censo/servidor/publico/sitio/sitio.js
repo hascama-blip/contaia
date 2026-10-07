@@ -23,14 +23,15 @@
   } else {
     pista.innerHTML = diapos.map((d, i) => `<div class="diapo" role="group" aria-label="${i + 1} de ${diapos.length}"><div class="fondo" style="background-image:url('${S.blob(d.archivo)}')"></div><picture>${d.archivoMovil ? `<source media="(max-width: 640px)" srcset="${S.blob(d.archivoMovil)}">` : ""}<img src="${S.blob(d.archivo)}" alt="${S.esc(d.titulo || "")}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}></picture>${d.titulo || d.texto || d.enlace ? `<div class="diapo-texto">${d.titulo ? `<h2>${S.esc(d.titulo)}</h2>` : ""}${d.texto ? `<p>${S.esc(d.texto)}</p>` : ""}${d.enlace ? `<a class="btn btn-dorado" href="${S.esc(d.enlace)}">${S.esc(d.textoEnlace || "Ver más")}</a>` : ""}</div>` : ""}</div>`).join("");
     puntos.innerHTML = diapos.map((_, i) => `<button type="button" aria-label="Ir a la foto ${i + 1}" data-i="${i}"></button>`).join("");
-    // La altura del carrusel sigue la proporción de la primera foto (así nunca se recorta);
-    // en celular, si no hay foto vertical, se muestra completa sobre un fondo difuminado.
-    const primera = pista.querySelector("img");
-    const ajustarAlto = () => { if (!primera.naturalWidth) return; let r = primera.naturalHeight / primera.naturalWidth; const movil = matchMedia("(max-width: 640px)").matches; if (movil && !primera.currentSrc.includes(S.blob(diapos[0].archivoMovil || "\u0000"))) r = Math.max(r, 0.75); pista.style.setProperty("--ratio", r.toFixed(4)); };
-    primera.complete ? ajustarAlto() : primera.addEventListener("load", ajustarAlto); addEventListener("resize", () => { clearTimeout(ajustarAlto.t); ajustarAlto.t = setTimeout(ajustarAlto, 150); });
     let actual = 0, temporizador;
+    // La caja mide exactamente lo que mide la foto que se está viendo: alto = ancho × proporción
+    // de esa imagen (en celular, de su versión vertical si la tiene). Sin recortes ni vacíos.
+    const imgs = [...pista.querySelectorAll("img")];
+    const ajustarAlto = () => { const im = imgs[actual]; if (!im || !im.naturalWidth) return; pista.style.setProperty("--ratio", (im.naturalHeight / im.naturalWidth).toFixed(4)); };
+    imgs.forEach((im, i) => im.addEventListener("load", () => { if (i === actual) ajustarAlto(); }));
+    ajustarAlto(); addEventListener("resize", () => { clearTimeout(ajustarAlto.t); ajustarAlto.t = setTimeout(ajustarAlto, 150); });
     const ir = (i, suave = true) => { actual = (i + diapos.length) % diapos.length; pista.scrollTo({ left: actual * pista.clientWidth, behavior: suave ? "smooth" : "auto" }); };
-    const marcar = () => { puntos.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", i === actual ? "true" : "false")); };
+    const marcar = () => { puntos.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", i === actual ? "true" : "false")); ajustarAlto(); };
     const auto = () => { clearInterval(temporizador); if (diapos.length > 1) temporizador = setInterval(() => ir(actual + 1), 5000); };
     pista.addEventListener("scroll", () => { const i = Math.round(pista.scrollLeft / pista.clientWidth); if (i !== actual) { actual = i; marcar(); } }, { passive: true });
     puntos.onclick = (e) => { const b = e.target.closest("button"); if (b) { ir(Number(b.dataset.i)); auto(); } };
