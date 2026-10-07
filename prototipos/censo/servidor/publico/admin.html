@@ -79,9 +79,10 @@
     <h2>Respaldo e importación</h2>
     <div class="fila">
       <a class="btn btn-ghost" href="/api/exportar" download>Descargar respaldo (JSON)</a>
+      <div class="campo" style="flex:0 0 330px;margin:0"><label class="label">Al importar</label><select class="input" id="importar-modo"><option value="completar">Completar solo lo que falta (recomendado)</option><option value="reemplazar">Reemplazar las fichas del archivo</option></select></div>
       <label class="btn btn-ghost" style="cursor:pointer">Importar semilla o respaldo… <input id="importar" type="file" accept="application/json,.json" class="sr"></label>
     </div>
-    <p class="ayuda" style="margin:0">El respaldo incluye padrón, stands, pagos e incidencias (las fotos y documentos se respaldan con las instantáneas del disco en AWS). Importar <b>reemplaza</b> las fichas con el mismo id y conserva el resto.</p>
+    <p class="ayuda" style="margin:0">El respaldo incluye padrón, stands, pagos e incidencias (las fotos y documentos se respaldan con las instantáneas del disco en AWS). <b>Completar</b> rellena solo los campos vacíos (hijos, familiares, contacto…) y nunca toca fotos, lo verificado por RENIEC ni el propietario de un stand; <b>Reemplazar</b> sobrescribe las fichas con el mismo id.</p>
     <div id="importar-estado" class="ayuda"></div>
   </div></section>
 </main>
@@ -105,7 +106,14 @@
   $("#importar").onchange = async (e) => {
     const a = e.target.files[0]; if (!a) return;
     $("#importar-estado").textContent = "Importando…";
-    try { const j = await pedir("POST", "/api/importar", JSON.parse(await a.text())); $("#importar-estado").innerHTML = `<span class="ok">Importado: ${Object.entries(j.importado).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>`; }
+    try {
+      const contenido = JSON.parse(await a.text()); const modo = $("#importar-modo").value;
+      if (modo === "reemplazar" && !confirm("Reemplazar sobrescribe las fichas del archivo (incluidos nombres y datos corregidos). ¿Continuar?")) { e.target.value = ""; $("#importar-estado").textContent = ""; return; }
+      const cuerpo = modo === "completar" ? { modo, ...(Array.isArray(contenido) ? { docs: contenido } : { colecciones: contenido.colecciones }) } : contenido;
+      const j = await pedir("POST", "/api/importar", cuerpo);
+      if (j.completado) { const c = j.completado; $("#importar-estado").innerHTML = `<span class="ok">Completado: ${c.asociadosActualizados} fichas con datos nuevos (${c.campos} campos, ${c.hijos} hijos, ${c.familiares} familiares) · ${c.asociadosNuevos} fichas nuevas · ${c.standsNuevos} stands nuevos${c.protegidos ? ` · ${c.protegidos} campos no tocados por estar verificados en RENIEC` : ""}</span>`; }
+      else $("#importar-estado").innerHTML = `<span class="ok">Importado: ${Object.entries(j.importado).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>`;
+    }
     catch (err) { $("#importar-estado").innerHTML = `<span class="mal">${err.message}</span>`; }
     e.target.value = "";
   };

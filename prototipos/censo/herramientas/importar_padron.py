@@ -63,6 +63,29 @@ cab = [texto(c) for c in next(hoja.iter_rows(min_row=4, max_row=4, values_only=T
 col = {nombre: i for i, nombre in enumerate(cab)}
 filas = [r for r in hoja.iter_rows(min_row=5, values_only=True) if r[0] is not None]
 
+
+def normal(s):
+    """Nombre normalizado para comparar (sin tildes, mayúsculas, espacios simples)."""
+    import unicodedata
+    t = unicodedata.normalize("NFD", texto(s)).encode("ascii", "ignore").decode().upper()
+    return re.sub(r"\s+", " ", t).strip()
+
+PARENTESCO = {"MAMA": "Madre", "MADRE": "Madre", "PAPA": "Padre", "PADRE": "Padre", "HRNO": "Hermano(a)", "HNO": "Hermano(a)", "HERMANO": "Hermano(a)",
+              "HRNA": "Hermano(a)", "HNA": "Hermano(a)", "HERMANA": "Hermano(a)", "SOBRINO": "Sobrino(a)", "SOBRINA": "Sobrino(a)", "NIETO": "Nieto(a)", "NIETA": "Nieto(a)"}
+ESTUDIOS = {"PRIMARIA": "Primaria", "PRI": "Primaria", "PRIM": "Primaria", "SECUNDARIA": "Secundaria", "SEC": "Secundaria", "SECUND": "Secundaria",
+            "INICIAL": "Inicial", "INI": "Inicial", "NINGUNO": "Ninguno", "SIN ESTUDIOS": "Ninguno", "SUP": "Superior técnica", "SUP TEC": "Superior técnica",
+            "UNIV": "Universitaria", "UNI": "Universitaria",
+            "TECNICO": "Superior técnica", "TECNICA": "Superior técnica", "SUPERIOR": "Superior técnica", "SUPERIOR TECNICA": "Superior técnica",
+            "UNIVERSITARIA": "Universitaria", "UNIVERSITARIO": "Universitaria", "UNIVERSIDAD": "Universitaria"}
+
+def edad_txt(v):
+    m = re.search(r"\d{1,3}", texto(v))
+    return m.group(0) if m else ""
+
+def estudios_txt(v):
+    t = normal(v)
+    return ESTUDIOS.get(t, titulo(t)) if t else ""
+
 asociados, stands, avisos = {}, {}, []
 sin_numero = 0
 for r in filas:
@@ -112,6 +135,10 @@ for r in filas:
         "origen": {"libro": "Libro de Padrón de Asociados", "lote": v("Lote"), "foto": texto(v("Foto original")), "carpeta": texto(v("Carpeta"))},
         "creadoAt": FECHA_CARGA, "actualizadoAt": FECHA_CARGA,
     }
+    nota_ficha = texto(v("Observaciones de la ficha")) if "Observaciones de la ficha" in col else ""
+    if nota_ficha:
+        asociados[ident]["observaciones"] = " ".join(x for x in [asociados[ident]["observaciones"], f"Nota de la ficha: {nota_ficha}"] if x)
+        asociados[ident]["revisar"] = True
     for i, c in enumerate(codigos):
         if c not in GALERIA:
             avisos.append(f"N° {numero_txt}: el stand {c} no está en el plano.")
@@ -133,6 +160,45 @@ for r in filas:
             "propietarioId": ident, "inquilino": None, "estado": "propietario",
             "cuenta": cuentas[i] if i < len(cuentas) else "",
         }
+
+
+# ---- Hojas "Hijos" y "Otros familiares" (por N° de asociado; los S/N se emparejan por nombre) ----
+por_numero = {a["numero"]: k for k, a in asociados.items()}
+por_nombre = {normal(f"{a['nombres']} {a['apellidoPaterno']} {a['apellidoMaterno']}"): k for k, a in asociados.items()}
+
+def ident_de(numero_v, nombre_v, hoja_nombre):
+    n = texto(numero_v)
+    if n and n.upper() != "S/N" and n in por_numero:
+        return por_numero[n]
+    k = por_nombre.get(normal(nombre_v))
+    if k is None:
+        avisos.append(f"Hoja {hoja_nombre}: no se encontró al asociado N° {n} «{texto(nombre_v)}».")
+    return k
+
+def filas_hoja(nombre):
+    if nombre not in wb.sheetnames:
+        return []
+    h = wb[nombre]
+    cab = [texto(c) for c in next(h.iter_rows(min_row=1, max_row=1, values_only=True))]
+    return [dict(zip(cab, r)) for r in h.iter_rows(min_row=2, values_only=True) if r and r[0] not in (None, "")]
+
+n_hijos = n_fam = 0
+for r in filas_hoja("Hijos"):
+    k = ident_de(r.get("N° Asociado"), r.get("Asociado"), "Hijos")
+    if not k or not texto(r.get("Nombre del hijo/a")):
+        continue
+    asociados[k]["hijos"].append({"nombre": titulo(r.get("Nombre del hijo/a")), "edad": edad_txt(r.get("Edad")),
+                                  "estudios": estudios_txt(r.get("Estudios")), "dni": re.sub(r"\D", "", texto(r.get("DNI hijo")))})
+    n_hijos += 1
+for r in filas_hoja("Otros familiares"):
+    k = ident_de(r.get("N° Asociado"), r.get("Asociado"), "Otros familiares")
+    if not k or not texto(r.get("Nombre")):
+        continue
+    par = normal(r.get("Parentesco"))
+    asociados[k]["familiares"].append({"nombre": titulo(r.get("Nombre")), "parentesco": PARENTESCO.get(par, titulo(par)) if par else "",
+                                       "edad": edad_txt(r.get("Edad")), "estudios": estudios_txt(r.get("Estudios"))})
+    n_fam += 1
+print(f"Hijos leídos: {n_hijos} · Otros familiares: {n_fam}")
 
 os.makedirs(os.path.join(SALIDA, "asociados"), exist_ok=True)
 os.makedirs(os.path.join(SALIDA, "stands"), exist_ok=True)

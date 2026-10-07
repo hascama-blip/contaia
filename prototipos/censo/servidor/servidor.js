@@ -27,6 +27,7 @@ import { Almacen, nuevoId, COLECCIONES } from "./lib/almacen.js";
 import { Usuarios, COOKIE, puedeEscribir, esAdmin } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
+import { completarTodo } from "./lib/completar.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -226,16 +227,22 @@ async function manejar(req, res) {
     }
     if (ruta === "/api/importar" && metodo === "POST") {
       const cuerpo = await leerJSON(req, 64 * 1048576);
-      const conteo = Object.fromEntries(COLECCIONES.map((c) => [c, 0]));
-      if (Array.isArray(cuerpo)) { // semilla.json: [{ path:"col/id", data }]
-        const porCol = Object.fromEntries(COLECCIONES.map((c) => [c, []]));
-        for (const { path: ruta2, data } of cuerpo) { const [col, id] = String(ruta2 || "").split("/"); if (COLECCIONES.includes(col) && id && data) { porCol[col].push([id, data]); conteo[col]++; } }
-        for (const col of COLECCIONES) almacen.establecerVarios(col, porCol[col]);
-      } else if (cuerpo && cuerpo.colecciones) { // respaldo de /api/exportar
-        for (const col of COLECCIONES) { const pares = (cuerpo.colecciones[col] || []).filter((d) => d && d.id && d.data).map((d) => [d.id, d.data]); almacen.establecerVarios(col, pares); conteo[col] += pares.length; }
-      } else return json(res, 400, { error: "Formato no reconocido: se espera semilla.json o un respaldo del portal." });
+      // Formatos: semilla.json ([{path,data}]), respaldo ({colecciones}) o {modo, docs|colecciones}.
+      const modo = cuerpo && !Array.isArray(cuerpo) && cuerpo.modo === "completar" ? "completar" : "reemplazar";
+      const fuente = Array.isArray(cuerpo) ? cuerpo : (cuerpo?.docs || cuerpo?.colecciones || null);
+      if (!fuente) return json(res, 400, { error: "Formato no reconocido: se espera semilla.json o un respaldo del portal." });
+      const porCol = Object.fromEntries(COLECCIONES.map((c) => [c, []]));
+      if (Array.isArray(fuente)) { for (const { path: ruta2, data } of fuente) { const [col, id] = String(ruta2 || "").split("/"); if (COLECCIONES.includes(col) && id && data) porCol[col].push({ id, data }); } }
+      else for (const col of COLECCIONES) porCol[col] = (fuente[col] || []).filter((d) => d && d.id && d.data).map((d) => ({ id: d.id, data: d.data }));
+      if (modo === "completar") {
+        const r = completarTodo(almacen, porCol);
+        almacen.vaciar();
+        return json(res, 200, { modo, completado: r });
+      }
+      const conteo = Object.fromEntries(COLECCIONES.map((c) => [c, porCol[c].length]));
+      for (const col of COLECCIONES) almacen.establecerVarios(col, porCol[col].map((d) => [d.id, d.data]));
       almacen.vaciar();
-      return json(res, 200, { importado: conteo });
+      return json(res, 200, { modo, importado: conteo });
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
     const estadoDni = () => ({ configurado: reniec.real, url: reniec.url, pista: reniec.token ? reniec.token.slice(0, 3) + "…" + reniec.token.slice(-3) : "", consumo: reniec.resumenConsumo() });
