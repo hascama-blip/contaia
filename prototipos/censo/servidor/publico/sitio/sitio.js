@@ -38,7 +38,7 @@
   const burbujas = $("#burbujas"); let filtro = new URLSearchParams(location.search).get("cat") || "";
   const conteo = (id) => tiendas.filter((t) => (t.categorias || []).includes(id)).length;
   const catsVisibles = sitio.categorias.filter((c) => c.visible !== false);
-  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
+  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.imagen ? `<img src="${S.blob(c.imagen)}" alt="">` : c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
   burbujas.onclick = (e) => { const b = e.target.closest(".burbuja"); if (!b) return; filtro = filtro === b.dataset.id ? "" : b.dataset.id; pintar(); if (filtro) $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
   $("#filtro").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; pintar(); } };
 
