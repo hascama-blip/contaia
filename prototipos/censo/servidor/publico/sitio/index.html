@@ -17,13 +17,17 @@
 <link rel="stylesheet" href="/sitio/sitio.css">
 </head>
 <body>
-<header class="cab"><div class="contenedor cab-in">
-  <a class="marca" href="/"><img src="/img/logo.jpg" alt=""><span id="marca-nombre">C.C. Inmaculada Concepción<small id="marca-lema">Mochilas, carteras y más</small></span></a>
-  <div class="cab-acciones">
-    <a class="btn btn-wa btn-sm" id="wa-centro" href="#" hidden>WhatsApp</a>
-    <a class="btn btn-borde btn-sm" href="#tiendas">Tiendas</a>
+<header class="cab">
+  <div class="cab-ancho cab-in">
+    <a class="marca" href="/"><img src="/img/logo.jpg" alt=""><span id="marca-nombre">C.C. Inmaculada Concepción<small id="marca-lema">Mochilas, carteras y más</small></span></a>
+    <form class="buscador" id="buscador" role="search" onsubmit="return false"><input type="search" id="q" placeholder="Buscar mochilas, carteras, tiendas…" autocomplete="off" aria-label="Buscar"><button type="submit" aria-label="Buscar">🔍</button></form>
+    <div class="cab-acciones">
+      <a class="btn btn-wa btn-sm" id="wa-centro" href="#" hidden>WhatsApp</a>
+      <a class="btn btn-borde btn-sm" href="#tiendas">Tiendas</a>
+    </div>
   </div>
-</div></header>
+  <div class="cab-sub"><div class="cab-ancho cab-sub-in"><span id="cab-direccion">📍 <span></span></span><nav class="cab-links"><a href="#categorias">Categorías</a><a href="#ofertas">Ofertas</a><a href="#novedades">Novedades</a><a href="#tiendas">Tiendas</a><a href="#articulos">Artículos</a></nav></div></div>
+</header>
 
 <main>
   <section class="carrusel" id="carrusel" aria-roledescription="carrusel" aria-label="Novedades">

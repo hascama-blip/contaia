@@ -12,6 +12,7 @@
   if (sitio.whatsapp) { const a = $("#wa-centro"); a.href = S.wa(sitio.whatsapp.replace(/\D/g, "").replace(/^(\d{9})$/, "51$1"), `Hola, escribo desde la web de ${sitio.nombre}.`); a.hidden = false; a.target = "_blank"; a.rel = "noopener"; }
   $("#pie-datos").textContent = [sitio.direccion, sitio.horario].filter(Boolean).join(" · ") || sitio.lema || "";
   $("#pie-nombre").textContent = sitio.nombre;
+  $("#cab-direccion span").textContent = [sitio.direccion, sitio.horario].filter(Boolean).join(" · ");
 
   // ---- Carrusel ----
   const pista = $("#pista"), puntos = $("#puntos");
@@ -35,12 +36,17 @@
   }
 
   // ---- Burbujas y filtro ----
-  const burbujas = $("#burbujas"); let filtro = new URLSearchParams(location.search).get("cat") || "";
+  const burbujas = $("#burbujas"); let filtro = new URLSearchParams(location.search).get("cat") || "", busca = "";
+  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const coincideTienda = (t) => !busca || norm(`${t.nombre} ${t.stand} ${t.piso} ${t.descripcion} ${(t.categorias || []).map((id) => cat.get(id)?.nombre).join(" ")}`).includes(busca);
+  const coincideArt = (a) => !busca || norm(`${a.nombre} ${a.descripcion} ${cat.get(a.categoriaId)?.nombre || ""} ${tiendaDe.get(a.tiendaId)?.nombre || ""}`).includes(busca);
+  let tBusca; $("#q").oninput = (e) => { clearTimeout(tBusca); tBusca = setTimeout(() => { busca = norm(e.target.value.trim()); pintar(); if (busca) $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); }, 250); };
+  $("#buscador").onsubmit = (e) => { e.preventDefault(); busca = norm($("#q").value.trim()); pintar(); $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
   const conteo = (id) => tiendas.filter((t) => (t.categorias || []).includes(id)).length;
   const catsVisibles = sitio.categorias.filter((c) => c.visible !== false);
   burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.imagen ? `<img src="${S.blob(c.imagen)}" alt="">` : c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
   burbujas.onclick = (e) => { const b = e.target.closest(".burbuja"); if (!b) return; filtro = filtro === b.dataset.id ? "" : b.dataset.id; pintar(); if (filtro) $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
-  $("#filtro").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; pintar(); } };
+  $("#filtro").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; busca = ""; $("#q").value = ""; pintar(); } };
 
   // ---- Las mejores ofertas (afiches) y novedades ----
   const descuento = (a) => (Number(a.precio) > 0 && Number(a.precioOferta) > 0 && Number(a.precioOferta) < Number(a.precio) ? Math.round((1 - Number(a.precioOferta) / Number(a.precio)) * 100) : 0);
@@ -68,8 +74,9 @@
     burbujas.querySelectorAll(".burbuja").forEach((b) => b.setAttribute("aria-pressed", b.dataset.id === filtro ? "true" : "false"));
     const f = $("#filtro"); f.hidden = !c; if (c) f.innerHTML = `Mostrando tiendas y artículos de <b>${S.esc(c.icono || "")} ${S.esc(c.nombre)}</b> <button type="button" class="quitar">✕ Ver todo</button>`;
     history.replaceState(null, "", c ? `?cat=${encodeURIComponent(filtro)}` : location.pathname);
-    const ts = c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas;
-    const as = c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos;
+    const ts = (c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas).filter(coincideTienda);
+    const as = (c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos).filter(coincideArt);
+    if (busca) { f.hidden = false; f.innerHTML = `Resultados para <b>“${S.esc($("#q").value.trim())}”</b>${c ? ` en ${S.esc(c.nombre)}` : ""}: ${ts.length} tienda(s), ${as.length} artículo(s) <button type="button" class="quitar">✕ Limpiar búsqueda</button>`; }
     $("#tiendas-sub").textContent = `${ts.length} tienda${ts.length === 1 ? "" : "s"}${c ? "" : " · toca una categoría arriba para filtrar"}`;
     $("#lista-tiendas").innerHTML = ts.length ? ts.map(tarjetaTienda).join("") : `<div class="vacio" style="grid-column:1/-1">Todavía no hay tiendas publicadas${c ? ` en ${S.esc(c.nombre)}` : ""}.</div>`;
     pintarOfertas(as);
