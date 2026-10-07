@@ -16,7 +16,6 @@
 </div></header>
 <main class="contenedor" id="perfil"><p style="padding:40px 0;text-align:center;color:var(--texto-3)">Cargando…</p></main>
 <dialog class="modal" id="qr"><div class="modal-cab"><h3>Paga con QR</h3><button class="modal-cerrar" id="qr-cerrar" aria-label="Cerrar">×</button></div><div class="modal-cuerpo qr-caja" id="qr-cuerpo"></div></dialog>
-<a class="btn btn-dorado editar-flotante" id="editar" href="/editar-sitio" hidden>✎ Editar esta web</a>
 <script src="/sitio/comun.js"></script>
 <script>
 (async function () {
@@ -52,7 +51,6 @@
     <footer class="pie"><span>${S.esc([sitio.nombre, sitio.direccion].filter(Boolean).join(" · "))}</span><span><a href="/">Ver todas las tiendas</a></span></footer>`;
   if (t.qrPago) { $("#qr-cuerpo").innerHTML = `<img src="${S.blob(t.qrPago)}" alt="QR de pago de ${S.esc(t.nombre)}">${t.qrPagoTexto ? `<p><b>${S.esc(t.qrPagoTexto)}</b></p>` : ""}<p class="vende">Escanea desde tu app (Yape, Plin o tu banco) y envía el comprobante por WhatsApp.</p>`; $("#ver-qr").onclick = () => $("#qr").showModal(); $("#qr-cerrar").onclick = () => $("#qr").close(); $("#qr").onclick = (e) => { if (e.target.id === "qr") $("#qr").close(); }; }
   if (art) setTimeout(() => document.querySelector('[style*="outline"]')?.scrollIntoView({ behavior: "smooth", block: "center" }), 200);
-  S.mostrarEditar("#editar");
 })();
 </script>
 </body>

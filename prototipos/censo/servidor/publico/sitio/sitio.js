@@ -123,5 +123,4 @@
   }
 
   pintar();
-  S.mostrarEditar("#editar");
 })();

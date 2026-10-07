@@ -13,6 +13,4 @@ window.S = {
     if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
     return j;
   },
-  // Muestra el botón "Editar" solo a quien ya entró con permiso de edición.
-  mostrarEditar: (sel) => fetch("/api/sesion").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.puedeEscribir) document.querySelector(sel).hidden = false; }).catch(() => {}),
 };

@@ -150,7 +150,6 @@ dialog.modal::backdrop { background: rgba(20,24,60,.55); backdrop-filter: blur(2
 
 .pie { margin: 48px 0 24px; padding-top: 20px; border-top: 1px solid var(--borde); color: var(--texto-3); font-size: .85rem; display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
 .vacio { padding: 28px; text-align: center; color: var(--texto-3); background: var(--superficie-2); border-radius: 16px; border: 1px dashed var(--borde-fuerte); }
-.editar-flotante { position: fixed; right: 16px; bottom: 16px; z-index: 30; box-shadow: var(--sombra-2); }
 @media (max-width: 520px) { .cab .marca { font-size: .92rem; } .cab .marca small { display: none; } .cab .marca img { width: 34px; height: 34px; } .cab .marca span { white-space: normal; } }
 
 /* Título centrado estilo tienda por departamentos */
