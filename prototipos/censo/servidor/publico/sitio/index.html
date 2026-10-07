@@ -11,6 +11,8 @@
 <link rel="icon" href="/img/favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="/img/icono-180.png">
 <meta name="theme-color" content="#5460B4">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
 <link rel="stylesheet" href="/estilos/tokens.css">
 <link rel="stylesheet" href="/sitio/sitio.css">
 </head>
@@ -23,7 +25,7 @@
   </div>
 </div></header>
 
-<main class="contenedor">
+<main>
   <section class="carrusel" id="carrusel" aria-roledescription="carrusel" aria-label="Novedades">
     <div class="carrusel-pista" id="pista"><div class="diapo diapo-vacia"><div><h1>Centro Comercial Inmaculada Concepción</h1><p>Cargando…</p></div></div></div>
     <button class="carrusel-flecha izq" id="ant" aria-label="Anterior">‹</button>
@@ -31,26 +33,36 @@
     <div class="carrusel-puntos" id="puntos"></div>
   </section>
 
-  <section class="seccion" id="categorias">
-    <div class="seccion-cab"><h2>¿Qué buscas?</h2><p>Toca una categoría para ver las tiendas que la venden.</p></div>
+  <section class="contenedor seccion seccion-cats" id="categorias">
     <div class="burbujas" id="burbujas" role="group" aria-label="Categorías"></div>
     <div class="filtro-activo" id="filtro" hidden></div>
   </section>
 
-  <section class="seccion" id="tiendas">
-    <div class="seccion-cab"><h2 id="tiendas-titulo">Tiendas</h2><p id="tiendas-sub"></p></div>
+  <section class="contenedor seccion" id="ofertas">
+    <h2 class="titulo-grande">Las mejores <b>ofertas</b><span class="punto">.</span></h2>
+    <p class="titulo-sub" id="ofertas-sub">Precios directos de los fabricantes del centro comercial.</p>
+    <div class="afiches" id="lista-ofertas"></div>
+  </section>
+
+  <section class="contenedor seccion" id="novedades">
+    <div class="seccion-cab"><h2>Novedades <span class="punto">.</span></h2><p>Lo último que publicaron las tiendas.</p></div>
+    <div class="carril" id="lista-novedades"></div>
+  </section>
+
+  <section class="contenedor seccion" id="tiendas">
+    <div class="seccion-cab"><h2 id="tiendas-titulo">Tiendas <span class="punto">.</span></h2><p id="tiendas-sub"></p></div>
     <div class="rejilla" id="lista-tiendas"></div>
   </section>
 
-  <section class="seccion" id="articulos">
-    <div class="seccion-cab"><h2 id="art-titulo">Variedad de artículos</h2><p id="art-sub">Cada artículo dice quién lo vende. Contáctalo directamente.</p></div>
+  <section class="contenedor seccion" id="articulos">
+    <div class="seccion-cab"><h2 id="art-titulo">Variedad de artículos <span class="punto">.</span></h2><p id="art-sub">Cada artículo dice quién lo vende. Contáctalo directamente.</p></div>
     <div class="rejilla-art" id="lista-articulos"></div>
   </section>
 
-  <footer class="pie">
-    <span id="pie-datos"></span>
-    <span><a href="/login">Acceso directiva</a></span>
-  </footer>
+  <footer class="pie-grande"><div class="contenedor pie-in">
+    <div><div class="pie-marca"><img src="/img/logo.jpg" alt=""><b id="pie-nombre">C.C. Inmaculada Concepción</b></div><p id="pie-datos"></p></div>
+    <div class="pie-links"><a href="#categorias">Categorías</a><a href="#ofertas">Ofertas</a><a href="#tiendas">Tiendas</a><a href="/login">Acceso directiva</a></div>
+  </div></footer>
 </main>
 
 <dialog class="modal" id="modal">

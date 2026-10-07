@@ -10,7 +10,8 @@
   $("#marca-nombre").firstChild.textContent = sitio.nombre.replace(/^Centro Comercial/i, "C.C.");
   $("#marca-lema").textContent = sitio.lema || "";
   if (sitio.whatsapp) { const a = $("#wa-centro"); a.href = S.wa(sitio.whatsapp.replace(/\D/g, "").replace(/^(\d{9})$/, "51$1"), `Hola, escribo desde la web de ${sitio.nombre}.`); a.hidden = false; a.target = "_blank"; a.rel = "noopener"; }
-  $("#pie-datos").textContent = [sitio.nombre, sitio.direccion, sitio.horario].filter(Boolean).join(" · ");
+  $("#pie-datos").textContent = [sitio.direccion, sitio.horario].filter(Boolean).join(" · ") || sitio.lema || "";
+  $("#pie-nombre").textContent = sitio.nombre;
 
   // ---- Carrusel ----
   const pista = $("#pista"), puntos = $("#puntos");
@@ -37,9 +38,30 @@
   const burbujas = $("#burbujas"); let filtro = new URLSearchParams(location.search).get("cat") || "";
   const conteo = (id) => tiendas.filter((t) => (t.categorias || []).includes(id)).length;
   const catsVisibles = sitio.categorias.filter((c) => c.visible !== false);
-  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
+  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
   burbujas.onclick = (e) => { const b = e.target.closest(".burbuja"); if (!b) return; filtro = filtro === b.dataset.id ? "" : b.dataset.id; pintar(); if (filtro) $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
   $("#filtro").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; pintar(); } };
+
+  // ---- Las mejores ofertas (afiches) y novedades ----
+  const descuento = (a) => (Number(a.precio) > 0 && Number(a.precioOferta) > 0 && Number(a.precioOferta) < Number(a.precio) ? Math.round((1 - Number(a.precioOferta) / Number(a.precio)) * 100) : 0);
+  function afiche(a) {
+    const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId);
+    const cifra = d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>` : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">S/ ${Number(a.precioOferta).toLocaleString("es-PE")}</div><div class="afiche-sub">precio de oferta</div>` : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? "S/ " + Number(a.precio).toLocaleString("es-PE") : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
+    return `<a class="afiche" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
+      <div class="afiche-eti">${S.esc(c?.nombre || a.nombre)}</div>
+      ${cifra}
+      <div class="afiche-marca">${d && Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s>` : S.esc(a.nombre)}</div>
+      <div class="afiche-vende">${S.esc(t.nombre || "")}${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
+      <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(c?.icono || "🛍️")}</span>`}</div>
+    </a>`;
+  }
+  function pintarOfertas(lista) {
+    const of = lista.filter((a) => a.oferta).sort((x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x)).slice(0, 8);
+    $("#ofertas").hidden = !of.length; $("#lista-ofertas").innerHTML = of.map(afiche).join("");
+    $("#ofertas-sub").textContent = of.length ? `${of.length} oferta${of.length === 1 ? "" : "s"} vigente${of.length === 1 ? "" : "s"} · toca una para contactar a la tienda` : "";
+    const nov = [...lista].sort((x, y) => String(y.creadoAt || y.actualizadoAt || "").localeCompare(String(x.creadoAt || x.actualizadoAt || ""))).slice(0, 10);
+    $("#novedades").hidden = nov.length < 3; $("#lista-novedades").innerHTML = nov.map(tarjetaArticulo).join("");
+  }
 
   function pintar() {
     const c = cat.get(filtro);
@@ -48,10 +70,11 @@
     history.replaceState(null, "", c ? `?cat=${encodeURIComponent(filtro)}` : location.pathname);
     const ts = c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas;
     const as = c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos;
-    $("#tiendas-titulo").textContent = c ? `Tiendas que venden ${c.nombre.toLowerCase()}` : "Tiendas";
     $("#tiendas-sub").textContent = `${ts.length} tienda${ts.length === 1 ? "" : "s"}${c ? "" : " · toca una categoría arriba para filtrar"}`;
     $("#lista-tiendas").innerHTML = ts.length ? ts.map(tarjetaTienda).join("") : `<div class="vacio" style="grid-column:1/-1">Todavía no hay tiendas publicadas${c ? ` en ${S.esc(c.nombre)}` : ""}.</div>`;
-    $("#art-titulo").textContent = c ? `${c.nombre} en oferta y más` : "Variedad de artículos";
+    pintarOfertas(as);
+    $("#art-titulo").innerHTML = (c ? `Todo en ${S.esc(c.nombre.toLowerCase())}` : "Variedad de artículos") + ' <span class="punto">.</span>';
+    $("#tiendas-titulo").innerHTML = (c ? `Tiendas que venden ${S.esc(c.nombre.toLowerCase())}` : "Tiendas") + ' <span class="punto">.</span>';
     $("#lista-articulos").innerHTML = as.length ? as.map(tarjetaArticulo).join("") : `<div class="vacio" style="grid-column:1/-1">Aún no hay artículos publicados${c ? ` en ${S.esc(c.nombre)}` : ""}.</div>`;
   }
   const nombresCat = (t) => (t.categorias || []).map((id) => cat.get(id)).filter(Boolean).slice(0, 3).map((c) => `<span class="etiqueta">${S.esc(c.icono || "")} ${S.esc(c.nombre)}</span>`).join("");

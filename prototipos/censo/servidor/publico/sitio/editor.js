@@ -126,7 +126,7 @@
     artActual = a; $("#a-titulo").textContent = a ? `Editar: ${a.nombre}` : "Nuevo artículo"; $("#a-borrar").hidden = !a;
     fA.reset(); fA.tiendaId.innerHTML = tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); fA.categoriaId.innerHTML = `<option value="">—</option>` + config.categorias.map((c) => `<option value="${S.esc(c.id)}">${S.esc(c.icono || "")} ${S.esc(c.nombre)}</option>`).join("");
     for (const k of ["nombre", "descripcion", "precio", "precioOferta"]) fA[k].value = a?.[k] ?? "";
-    fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.oferta.checked = !!a?.oferta; fA.visible.checked = a ? a.visible !== false : true;
+    fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.oferta.checked = !!a?.oferta; fA.destacado.checked = !!a?.destacado; fA.visible.checked = a ? a.visible !== false : true;
     pintarArchivo($(".archivo", fA), a?.foto || ""); dA.showModal();
   };
   $("#nuevo-articulo").onclick = () => abrirArticulo(null);
@@ -135,7 +135,7 @@
     e.preventDefault();
     const d = { ...(artActual || { creadoAt: ahora() }) }; delete d.id;
     d.nombre = fA.nombre.value.trim(); d.descripcion = fA.descripcion.value.trim(); d.tiendaId = fA.tiendaId.value; d.categoriaId = fA.categoriaId.value;
-    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = fA.oferta.checked; d.visible = fA.visible.checked;
+    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = fA.oferta.checked; d.destacado = fA.destacado.checked; d.visible = fA.visible.checked;
     Object.assign(d, leerArchivos(fA)); d.actualizadoAt = ahora();
     try { await S.pedir("PUT", `/api/db/articulos/${artActual?.id || nuevoId()}`, d); dA.close(); estado("Artículo guardado ✓"); await cargar(); pintarTodo(); } catch (err) { estado(err.message, true); }
   };

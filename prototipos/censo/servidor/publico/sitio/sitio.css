@@ -1,7 +1,9 @@
 /* Web pública del C.C. Inmaculada Concepción — misma paleta del escudo (tokens.css). */
 *, *::before, *::after { box-sizing: border-box; }
 html { font-size: 100%; scroll-behavior: smooth; }
-body { margin: 0; font-family: var(--fuente); color: var(--texto); background: var(--fondo); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body { margin: 0; font-family: "Outfit", var(--fuente); color: var(--texto); background: #f6f7fb; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { letter-spacing: -.02em; }
+.punto { color: var(--accent-500); }
 a { color: var(--enlace); text-decoration: none; }
 button { font: inherit; cursor: pointer; }
 img { display: block; max-width: 100%; }
@@ -30,38 +32,44 @@ img { display: block; max-width: 100%; }
 .btn-bloque { width: 100%; }
 
 /* Carrusel */
-.carrusel { position: relative; margin-top: 16px; border-radius: 20px; overflow: hidden; background: linear-gradient(135deg, var(--brand-700), var(--brand-500)); color: #fff; box-shadow: var(--sombra-2); }
-.carrusel-pista { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; aspect-ratio: 16 / 7; }
+.carrusel { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--brand-800), var(--brand-500)); color: #fff; }
+.carrusel-pista { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; aspect-ratio: 16 / 6; max-height: 520px; }
 .carrusel-pista::-webkit-scrollbar { display: none; }
 .diapo { flex: 0 0 100%; scroll-snap-align: start; position: relative; display: grid; align-items: end; }
 .diapo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.diapo-texto { position: relative; padding: clamp(16px, 4vw, 40px); background: linear-gradient(to top, rgba(20,24,60,.85), rgba(20,24,60,0)); }
+.diapo-texto { position: relative; padding: clamp(18px, 5vw, 56px) clamp(16px, 6vw, 80px); background: linear-gradient(to top, rgba(20,24,60,.88), rgba(20,24,60,0) 70%); }
 .diapo-texto h2 { margin: 0; font-size: clamp(1.2rem, 3.5vw, 2.2rem); line-height: 1.15; text-wrap: balance; }
 .diapo-texto p { margin: 6px 0 0; color: rgba(255,255,255,.85); font-size: clamp(.9rem, 2vw, 1.1rem); max-width: 60ch; }
-.diapo-texto .btn { margin-top: 12px; }
+.diapo-texto .btn { margin-top: 14px; padding: 12px 22px; font-size: 1rem; }
 .diapo-vacia { padding: clamp(24px, 6vw, 56px); text-align: center; align-self: center; }
 .diapo-vacia h1 { margin: 0; font-size: clamp(1.4rem, 4vw, 2.6rem); line-height: 1.1; }
 .diapo-vacia p { margin: 10px auto 0; max-width: 60ch; color: rgba(255,255,255,.85); }
-.carrusel-puntos { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; gap: 6px; }
+.carrusel-puntos { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; display: flex; gap: 7px; padding: 6px 10px; border-radius: 999px; background: rgba(20,24,60,.55); }
 .carrusel-puntos button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: rgba(255,255,255,.5); padding: 0; }
 .carrusel-puntos button[aria-current="true"] { background: var(--accent-400); width: 22px; border-radius: 6px; }
-.carrusel-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); color: var(--brand-700); font-size: 1.3rem; display: grid; place-items: center; }
-.carrusel-flecha.izq { left: 10px; } .carrusel-flecha.der { right: 10px; }
-@media (max-width: 640px) { .carrusel-flecha { display: none; } .carrusel-pista { aspect-ratio: 4 / 3; } }
+.carrusel-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(30,34,70,.72); color: #fff; font-size: 1.6rem; display: grid; place-items: center; transition: background .15s; }
+.carrusel-flecha:hover { background: var(--brand-600); }
+.carrusel-flecha.izq { left: 18px; } .carrusel-flecha.der { right: 18px; }
+@media (max-width: 640px) { .carrusel-flecha { display: none; } .carrusel-pista { aspect-ratio: 4 / 3; max-height: none; } }
 
 /* Burbujas de categorías */
-.seccion { margin-top: 32px; }
+.seccion { margin-top: 40px; }
+.seccion-cats { margin-top: -28px; position: relative; z-index: 2; }
 .seccion-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .seccion-cab h2 { margin: 0; font-size: clamp(1.15rem, 2.5vw, 1.5rem); letter-spacing: -.01em; }
 .seccion-cab p { margin: 0; color: var(--texto-3); font-size: .9rem; }
-.burbujas { display: flex; gap: 14px; overflow-x: auto; padding: 6px 4px 14px; scrollbar-width: thin; }
-.burbuja { flex: 0 0 auto; display: grid; justify-items: center; gap: 8px; background: none; border: 0; color: var(--texto-2); width: 96px; }
-.burbuja span.ico { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; font-size: 2rem; background: var(--brand-50); border: 2px solid var(--brand-100); transition: transform .15s, background .15s, border-color .15s; }
+.burbujas { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: #fff; border-radius: 18px; box-shadow: 0 10px 30px rgba(15,23,42,.10); scrollbar-width: thin; }
+.burbuja { flex: 1 0 118px; display: grid; justify-items: center; gap: 6px; background: none; border: 0; border-radius: 14px; padding: 12px 6px 10px; color: var(--texto-2); position: relative; transition: background .15s; }
+.burbuja:hover { background: var(--superficie-2); }
+.burbuja small { font-size: .72rem; color: var(--texto-4); }
+.burbuja::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 0; height: 3px; border-radius: 3px; background: transparent; transition: background .15s; }
+.burbuja[aria-pressed="true"]::after { background: var(--brand-500); }
+.burbuja span.ico { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 1.8rem; background: var(--brand-50); border: 2px solid var(--brand-100); transition: transform .15s, background .15s, border-color .15s; }
 .burbuja:hover span.ico { transform: translateY(-3px); background: var(--brand-100); }
 .burbuja[aria-pressed="true"] span.ico { background: var(--brand-500); border-color: var(--accent-400); color: #fff; box-shadow: 0 8px 20px rgba(84,96,180,.35); }
 .burbuja[aria-pressed="true"] { color: var(--brand-700); font-weight: 700; }
-.burbuja b { font-weight: 600; font-size: .85rem; text-align: center; line-height: 1.2; }
-.filtro-activo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .95rem; color: var(--texto-2); }
+.burbuja b { font-weight: 600; font-size: .9rem; text-align: center; line-height: 1.2; }
+.filtro-activo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .95rem; color: var(--texto-2); margin-top: 14px; }
 .filtro-activo .quitar { border: 0; background: var(--superficie-2); border-radius: 999px; padding: 4px 10px; color: var(--texto-2); font-size: .85rem; }
 
 /* Tiendas */
@@ -125,3 +133,49 @@ dialog.modal::backdrop { background: rgba(20,24,60,.55); backdrop-filter: blur(2
 .vacio { padding: 28px; text-align: center; color: var(--texto-3); background: var(--superficie-2); border-radius: 16px; border: 1px dashed var(--borde-fuerte); }
 .editar-flotante { position: fixed; right: 16px; bottom: 16px; z-index: 30; box-shadow: var(--sombra-2); }
 @media (max-width: 520px) { .cab .marca { font-size: .92rem; } .cab .marca small { display: none; } .cab .marca img { width: 34px; height: 34px; } }
+
+/* Título centrado estilo tienda por departamentos */
+.titulo-grande { text-align: center; font-size: clamp(1.7rem, 4.2vw, 2.8rem); font-weight: 500; margin: 0; }
+.titulo-grande b { font-weight: 800; }
+.titulo-sub { text-align: center; color: var(--texto-3); margin: 6px 0 22px; }
+
+/* Afiches de ofertas */
+.afiches { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.afiche { background: #fff; border-radius: 22px; padding: 22px 18px 0; text-align: center; color: var(--texto); display: grid; justify-items: center; gap: 2px; border: 1px solid var(--borde); box-shadow: var(--sombra); transition: transform .15s, box-shadow .15s; overflow: hidden; }
+.afiche:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(15,23,42,.12); text-decoration: none; }
+.afiche-eti { font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--texto-2); }
+.afiche-cifra { font-size: clamp(3.4rem, 7vw, 4.6rem); line-height: .95; font-weight: 900; color: var(--verde-500); letter-spacing: -.04em; margin-top: 6px; }
+.afiche-cifra small { font-size: .45em; font-weight: 800; margin-left: 2px; }
+.afiche-cifra.precio-cifra { font-size: clamp(2.2rem, 4.5vw, 3rem); }
+.afiche-sub { display: inline-block; background: var(--accent-400); color: #2b2300; font-weight: 800; padding: 2px 10px; border-radius: 6px; font-size: 1rem; margin-top: 6px; }
+.afiche-marca { margin-top: 8px; font-weight: 700; font-size: 1rem; }
+.afiche-marca s { color: var(--texto-4); font-weight: 500; font-size: .9rem; }
+.afiche-vende { font-size: .8rem; color: var(--texto-3); }
+.afiche-foto { width: 100%; aspect-ratio: 5 / 4; margin-top: 12px; display: grid; place-items: center; font-size: 4rem; }
+.afiche-foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px 16px 0 0; }
+
+/* Carril horizontal (novedades) */
+.carril { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 220px); gap: 14px; overflow-x: auto; padding: 4px 4px 14px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.carril .art { scroll-snap-align: start; }
+
+/* Tarjetas */
+.tienda, .art { border-radius: 18px; }
+.art-foto { background: #f1f3f9; }
+.oferta-pill { letter-spacing: .04em; }
+
+/* Pie grande */
+.pie-grande { margin-top: 56px; background: var(--brand-900); color: rgba(255,255,255,.8); padding: 36px 0 28px; }
+.pie-in { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+.pie-marca { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 1.1rem; margin-bottom: 6px; }
+.pie-marca img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+.pie-grande p { margin: 0; font-size: .9rem; }
+.pie-links { display: flex; gap: 18px; flex-wrap: wrap; }
+.pie-links a { color: rgba(255,255,255,.85); font-weight: 600; }
+.pie-links a:hover { color: var(--accent-400); text-decoration: none; }
+@media (max-width: 640px) {
+  .afiches { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .afiche { padding: 14px 10px 0; border-radius: 16px; }
+  .afiche-cifra { font-size: 2.6rem; } .afiche-cifra.precio-cifra { font-size: 1.7rem; }
+  .afiche-sub { font-size: .8rem; } .afiche-eti { font-size: .68rem; letter-spacing: .14em; } .afiche-marca { font-size: .9rem; }
+  .carril { grid-auto-columns: minmax(150px, 170px); }
+}
