@@ -51,7 +51,7 @@ img { display: block; max-width: 100%; }
 .carrusel-pista { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; height: min(calc(100vw * var(--ratio, 0.375)), 85vh); transition: height .35s ease; }
 .carrusel-pista::-webkit-scrollbar { display: none; }
 .diapo { flex: 0 0 100%; scroll-snap-align: start; position: relative; display: grid; align-items: end; }
-.diapo { background: var(--brand-800); }
+.diapo { background: var(--brand-800); overflow: hidden; }
 .diapo .fondo { position: absolute; inset: -24px; background-size: cover; background-position: center; filter: blur(22px) brightness(.55); transform: scale(1.1); }
 .carrusel-puntos { bottom: 8px; }
 .diapo picture { position: absolute; inset: 0; display: block; }
