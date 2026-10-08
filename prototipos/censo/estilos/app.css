@@ -385,7 +385,7 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 .pl-salida { fill: var(--verde-500); fill-opacity: 0.9; stroke: #c6f5c6; stroke-width: 1; }
 .pl-texto-salida { fill: #06240a; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; letter-spacing: 0.04em; }
 .pl-galeria circle { fill: var(--acento); }
-.pl-galeria text { fill: #1f2552; font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.pl-galeria text { fill: #0f4656; font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .pl-stand { cursor: pointer; outline: none; }
 .pl-stand polygon { stroke-width: 1; stroke-linejoin: round; transition: opacity 0.15s; }
 .pl-stand:hover polygon, .pl-stand:focus-visible polygon, .pl-activo polygon { stroke-width: 3; stroke: #ffffff; }
@@ -483,16 +483,16 @@ button.celda:hover { outline: 2px solid var(--borde-fuerte); }
 /* Cajas en azul marino (el azul del escudo, oscurecido) sobre la página blanca: tarjetas,
    paneles laterales y el plano. Los tokens se heredan a todo lo que contienen. */
 .card, .panel, .plano-azul {
-  --superficie: #1c2459; --superficie-2: #232c6b; --borde: #30398a; --borde-fuerte: #4651a6;
-  --texto: #f3f5ff; --texto-2: #d6dbf5; --texto-3: #a9b2e3; --texto-4: #7e88c4;
-  --primario: var(--verde-500); --primario-hover: var(--verde-400); --primario-texto: #06240a; --enlace: #9fb0ff;
+  --superficie: #0e3f4d; --superficie-2: #124b5b; --borde: #1d6477; --borde-fuerte: #2a7f94;
+  --texto: #eefafc; --texto-2: #cfe9ef; --texto-3: #9fcbd6; --texto-4: #6fa8b6;
+  --primario: var(--verde-500); --primario-hover: var(--verde-400); --primario-texto: #06240a; --enlace: #8fdcee;
   --ok: #7fe58a; --ok-fondo: #1b5a2b; --alerta: var(--accent-400); --alerta-fondo: #4e4100;
-  --peligro: #ff9e97; --peligro-fondo: #5e1f1f; --info: #9fb0ff; --info-fondo: #2a3680;
-  --neutro-fondo: #2a3376; --pasillo: #141a45; --anillo: #3d4a9e; --brand-400: #9fb0ff;
+  --peligro: #ff9e97; --peligro-fondo: #5e1f1f; --info: #8fdcee; --info-fondo: #175a6c;
+  --neutro-fondo: #16566a; --pasillo: #0a2f3a; --anillo: #2f8aa0; --brand-400: #8fdcee;
   color-scheme: dark; color: var(--texto);
 }
 .card, .panel { background: var(--superficie); }
-.plano-azul { background: #121842; border-radius: var(--radio); padding: 14px; }
+.plano-azul { background: #0a3340; border-radius: var(--radio); padding: 14px; }
 .plano-azul .leyenda { color: var(--texto-3); }
 
 /* Tarjeta desplegable (cerrada por defecto) */

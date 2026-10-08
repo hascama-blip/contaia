@@ -1,17 +1,17 @@
 /* Tokens de diseño — paleta del escudo del C.C. Inmaculada Concepción:
-   azul del óvalo #5460B4 (principal) · verde del laurel #2DBE2D (éxito) · dorado de la corona
+   azul turquesa #2aa7c0 (principal; el óvalo del escudo es #5460B4, se aclaró hacia turquesa a pedido de la directiva) · verde del laurel #2DBE2D (éxito) · dorado de la corona
    #E4C000 (acento) · rojo de la cinta #E01B1B (peligro). Cambia aquí y se aplica en toda la app.
    Tema claro fijo: el fondo de la página es blanco; las tarjetas van en azul marino. */
 :root { color-scheme: light; }
 :root {
-  --brand-50: #eef0fa;
-  --brand-100: #d9ddf3;
-  --brand-400: #7c86cf;
-  --brand-500: #5460B4;
-  --brand-600: #4a559f;
-  --brand-700: #3d4785;
-  --brand-800: #2e366a;
-  --brand-900: #1f2552;
+  --brand-50: #e9f7fa;
+  --brand-100: #cdeef4;
+  --brand-400: #5bbfd3;
+  --brand-500: #2aa7c0;
+  --brand-600: #2190a8;
+  --brand-700: #1b7890;
+  --brand-800: #155e72;
+  --brand-900: #0f4656;
   --verde-400: #5fd45f;
   --verde-500: #2DBE2D;
   --verde-600: #1f9a2a;
@@ -46,9 +46,9 @@
   --peligro: #c71414;
   --peligro-fondo: #fde2e2;
   --info: var(--brand-600);
-  --info-fondo: #e6e9f8;
+  --info-fondo: #e3f4f8;
   --neutro-fondo: #f1f5f9;
-  --pasillo: #e8ebf7;
+  --pasillo: #e6f3f6;
 
   /* Franja principal (hero) */
   --hero-desde: var(--brand-900);

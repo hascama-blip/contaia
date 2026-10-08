@@ -56,17 +56,17 @@ img { display: block; max-width: 100%; }
 .carrusel-puntos { bottom: 8px; }
 .diapo picture { position: absolute; inset: 0; display: block; }
 .diapo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.diapo-texto { position: relative; padding: clamp(18px, 5vw, 56px) clamp(16px, 6vw, 80px); background: linear-gradient(to top, rgba(20,24,60,.88), rgba(20,24,60,0) 70%); }
+.diapo-texto { position: relative; padding: clamp(18px, 5vw, 56px) clamp(16px, 6vw, 80px); background: linear-gradient(to top, rgba(8,40,50,.88), rgba(8,40,50,0) 70%); }
 .diapo-texto h2 { margin: 0; font-size: clamp(1.2rem, 3.5vw, 2.2rem); line-height: 1.15; text-wrap: balance; }
 .diapo-texto p { margin: 6px 0 0; color: rgba(255,255,255,.85); font-size: clamp(.9rem, 2vw, 1.1rem); max-width: 60ch; }
 .diapo-texto .btn { margin-top: 14px; padding: 12px 22px; font-size: 1rem; }
 .diapo-vacia { padding: clamp(24px, 6vw, 56px); text-align: center; align-self: center; }
 .diapo-vacia h1 { margin: 0; font-size: clamp(1.4rem, 4vw, 2.6rem); line-height: 1.1; }
 .diapo-vacia p { margin: 10px auto 0; max-width: 60ch; color: rgba(255,255,255,.85); }
-.carrusel-puntos { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; display: flex; gap: 7px; padding: 6px 10px; border-radius: 999px; background: rgba(20,24,60,.55); }
+.carrusel-puntos { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; display: flex; gap: 7px; padding: 6px 10px; border-radius: 999px; background: rgba(8,40,50,.55); }
 .carrusel-puntos button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: rgba(255,255,255,.5); padding: 0; }
 .carrusel-puntos button[aria-current="true"] { background: var(--accent-400); width: 22px; border-radius: 6px; }
-.carrusel-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(30,34,70,.72); color: #fff; font-size: 1.6rem; display: grid; place-items: center; transition: background .15s; }
+.carrusel-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(10,50,62,.72); color: #fff; font-size: 1.6rem; display: grid; place-items: center; transition: background .15s; }
 .carrusel-flecha:hover { background: var(--brand-600); }
 .carrusel-flecha.izq { left: 18px; } .carrusel-flecha.der { right: 18px; }
 @media (max-width: 640px) { .carrusel-flecha { display: none; } .diapo-texto { padding: 14px 16px 30px; } .diapo-texto h2 { font-size: 1.25rem; } .diapo-texto p { font-size: .9rem; } }
@@ -87,7 +87,7 @@ img { display: block; max-width: 100%; }
 .burbuja span.ico { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 1.8rem; background: var(--brand-50); border: 2px solid var(--brand-100); overflow: hidden; transition: transform .15s, background .15s, border-color .15s; }
 .burbuja span.ico img { width: 100%; height: 100%; object-fit: cover; }
 .burbuja:hover span.ico { transform: translateY(-3px); background: var(--brand-100); }
-.burbuja[aria-pressed="true"] span.ico { background: var(--brand-500); border-color: var(--accent-400); color: #fff; box-shadow: 0 8px 20px rgba(84,96,180,.35); }
+.burbuja[aria-pressed="true"] span.ico { background: var(--brand-500); border-color: var(--accent-400); color: #fff; box-shadow: 0 8px 20px rgba(42,167,192,.35); }
 .burbuja[aria-pressed="true"] { color: var(--brand-700); font-weight: 700; }
 .burbuja b { font-weight: 600; font-size: .9rem; text-align: center; line-height: 1.2; }
 .filtro-activo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .95rem; color: var(--texto-2); margin-top: 14px; }
@@ -123,7 +123,7 @@ img { display: block; max-width: 100%; }
 
 /* Modal resumen de tienda */
 dialog.modal { border: 0; border-radius: 20px; padding: 0; width: min(560px, calc(100% - 24px)); max-height: 90vh; box-shadow: 0 24px 60px rgba(15,23,42,.3); }
-dialog.modal::backdrop { background: rgba(20,24,60,.55); backdrop-filter: blur(2px); }
+dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2px); }
 .modal-cab { display: flex; gap: 12px; align-items: center; padding: 18px 20px 0; }
 .modal-cab h3 { margin: 0; font-size: 1.2rem; }
 .modal-cuerpo { padding: 14px 20px 20px; display: grid; gap: 12px; }
