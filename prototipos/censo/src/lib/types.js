@@ -39,7 +39,7 @@
  * @property {{nombre:string, dni:string, celular:string}|null} conyuge
  * @property {{nombre:string, edad:number|string, estudios:string, dni?:string}[]} hijos
  * @property {{nombre:string, parentesco:string, edad?:string, estudios:string}[]} familiares
- * @property {{estado:EstadoCenso, fecha:string|null, visita:string|null, por?:string}} censo
+ * @property {{estado:EstadoCenso, fecha:string|null, visita:string|null, por?:string|null, fuente?:"reniec"}} censo  "verificado" se marca solo al confirmar con RENIEC
  * @property {string} observaciones        de la Junta Directiva
  * @property {Partial<Record<TipoArchivo,string>>} archivos   ids de archivos subidos
  * @property {import("./documentos.js").Documento[]} [documentos]  documentos al pie de la ficha

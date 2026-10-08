@@ -119,6 +119,32 @@ export function filtrarPadron(asociados, mapaStands, { texto = "", galeria = "",
   });
 }
 
+/**
+ * Lo que aún falta completar en la ficha física/digital: foto, huella, firma, copia del
+ * DNI, datos de contacto y la autorización de datos. Es la "observación" que acompaña
+ * a una ficha verificada con RENIEC. Se calcula al vuelo, así desaparece al completarse.
+ */
+export function faltantes(a) {
+  if (!a) return [];
+  const f = [];
+  if (!a.archivos?.foto) f.push("foto");
+  if (!a.archivos?.huella) f.push("huella");
+  if (!a.archivos?.firma) f.push("firma");
+  if (!a.archivos?.dni) f.push("copia del DNI");
+  if (!String(a.celular || a.telefono || "").trim()) f.push("celular");
+  if (!String(a.direccion || "").trim()) f.push("dirección");
+  if (!a.fechaNacimiento) f.push("fecha de nacimiento");
+  if (!a.compromiso?.datos) f.push("autorización de datos (Ley 29733)");
+  return f;
+}
+
+/** "Faltan: firma, huella." o "" si la ficha está completa. */
+export function observacionFaltantes(a) {
+  const f = faltantes(a);
+  if (!f.length) return "";
+  return `Falta${f.length === 1 ? "" : "n"}: ${f.join(", ")}.`;
+}
+
 /** ¿Es un N° de padrón de verdad? (los "S/N-1" del libro no cuentan). */
 export function tieneNumero(a) {
   const n = String(a?.numero || "").trim();

@@ -160,6 +160,16 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
 
+## Estado "Verificado" y observación de lo que falta
+Una ficha pasa a **Verificado** automáticamente cuando sus datos se confirman con RENIEC
+(botón **Actualizar desde RENIEC**, verificación masiva o la verificación nocturna). Al
+arrancar, el servidor aplica la misma regla a las fichas ya verificadas (`lib/migraciones.js`,
+idempotente; no toca fichas con discrepancia de apellido). La **observación** de lo que falta
+(foto, huella, firma, copia del DNI, celular, dirección, fecha de nacimiento, autorización de
+datos) se calcula al vuelo con `faltantes(a)` / `observacionFaltantes(a)` (`src/lib/padron.js`),
+así desaparece sola al completar la ficha. Se muestra en la ficha (tarjeta "Estado de la
+ficha"), en la lista del padrón ("falta: …") y en el CSV del padrón ("Observación (falta)").
+
 ## Verificación automática de DNI (servidor)
 `servidor/lib/verificacion.js`: cada madrugada (hora de Lima, por defecto 00:30, `CENSO_VERIFICACION_HORA`)
 recorre las fichas con DNI válido y sin `reniec.verificadoAt`, consulta al proveedor y guarda datos

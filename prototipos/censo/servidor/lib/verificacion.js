@@ -159,7 +159,9 @@ export class Verificacion {
           await pausa(PAUSA_MS);
           continue;
         }
-        const cambios = { ...camposDesdePersona(persona), reniec: { ...(act.reniec || {}), verificadoAt: new Date().toISOString(), fuente: persona.fuente || "apidni", por: "automatico", discrepancia: null }, actualizadoAt: new Date().toISOString(), actualizadoPor: null };
+        const cambios = { ...camposDesdePersona(persona), reniec: { ...(act.reniec || {}), verificadoAt: new Date().toISOString(), fuente: persona.fuente || "apidni", por: "automatico", discrepancia: null },
+          censo: { ...(act.censo || {}), estado: "verificado", fecha: new Date().toISOString().slice(0, 10), por: "automatico", fuente: "reniec" }, // datos confirmados ⇒ ficha Verificada
+          actualizadoAt: new Date().toISOString(), actualizadoPor: null };
         // Foto del DNI: solo si la ficha aún no tiene foto (no se pisa una foto tomada por la directiva) y si es una imagen real.
         let archivoFoto = null;
         if (persona.fotoBase64 && !act.archivos?.foto) {

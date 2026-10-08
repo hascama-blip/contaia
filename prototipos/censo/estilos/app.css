@@ -625,3 +625,6 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 .paginador .btn { min-width: 32px; justify-content: center; }
 .paginador .btn-primary { color: var(--primario-texto); }
 .lista-simple { margin: 8px 0; padding-left: 18px; font-size: var(--t-sm); color: var(--texto-2); display: grid; gap: 4px; }
+
+/* Observación de lo que falta en una ficha verificada */
+.obs-faltan { color: var(--alerta); background: var(--alerta-fondo); padding: 6px 10px; border-radius: var(--radio-sm); }

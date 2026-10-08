@@ -30,6 +30,7 @@ import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
 import { SitioPublico } from "./lib/sitio.js";
+import { aplicarMigraciones } from "./lib/migraciones.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,7 @@ const TRAS_PROXY = process.env.TRAS_PROXY !== "false"; // detrás de Caddy/nginx
 
 fs.mkdirSync(path.join(DATOS, "archivos"), { recursive: true });
 const almacen = new Almacen(DATOS);
+aplicarMigraciones(almacen);
 const usuarios = new Usuarios(DATOS);
 const reniec = new Reniec(DATOS);
 const metaArchivos = (() => {

@@ -4,7 +4,7 @@ import { CabPagina, BadgeCenso, BadgeAtraso, Vacio, mensajeError } from "../comp
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero } from "../lib/padron.js";
+import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero, faltantes, observacionFaltantes } from "../lib/padron.js";
 import { aCSV, descargar, COLUMNAS_PADRON } from "../lib/exportar.js";
 import { Paginador, usePaginacion } from "../components/Paginador.js";
 import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
@@ -74,7 +74,7 @@ export function Padron() {
                     <td className="num">${a.dni}${a.reniec?.verificadoAt ? html` <span className="muted" title="Verificado en RENIEC">✓</span>` : ""}</td>
                     <td className="num">${suyos.map((s) => s.codigo).join(", ") || (vendidos.length ? html`<span className="muted">Vendió ${vendidos.join(", ")}</span>` : "—")}</td>
                     <td>${galerias || "—"}</td>
-                    <td><${BadgeCenso} estado=${a.censo?.estado || "pendiente"} /></td>
+                    <td><${BadgeCenso} estado=${a.censo?.estado || "pendiente"} />${(a.censo?.estado === "verificado" || a.censo?.estado === "actualizado") && faltantes(a).length ? html`<br /><span className="muted" style=${{ fontSize: "var(--t-xs)" }} title=${observacionFaltantes(a)}>falta: ${faltantes(a).slice(0, 3).join(", ")}${faltantes(a).length > 3 ? ` y ${faltantes(a).length - 3} más` : ""}</span>` : ""}</td>
                     <td><${BadgeAtraso} meses=${derivados.atraso(a).meses} /></td>
                   </tr>`;
               })}

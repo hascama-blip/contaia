@@ -9,7 +9,7 @@ import { Documentos } from "../components/Documentos.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido } from "../lib/padron.js";
+import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido, faltantes, observacionFaltantes } from "../lib/padron.js";
 import { registrosDe, deudaStand } from "../lib/pagos.js";
 import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
@@ -223,7 +223,10 @@ export function Ficha({ id }) {
               ${a.censo?.fecha ? `Último cambio el ${fecha(a.censo.fecha)}${nombrePor ? ` por ${nombrePor}` : ""}.` : "Aún no se visita."}
               ${a.censo?.visita ? ` Segunda visita programada el ${fecha(a.censo.visita)}.` : ""}
             </p>
-            <p className="ayuda" style=${{ marginTop: 6 }}>Verificado = ficha impresa y firmada, archivada en el libro físico.</p>
+            ${(estado === "verificado" || estado === "actualizado") && html`<p className=${`ayuda ${faltantes(a).length ? "obs-faltan" : ""}`} style=${{ marginTop: 8 }}>
+              ${faltantes(a).length ? html`<strong>Observación:</strong> ${observacionFaltantes(a)}` : html`<strong>Ficha completa:</strong> foto, huella, firma, copia del DNI, contacto y autorización de datos.`}
+            </p>`}
+            <p className="ayuda" style=${{ marginTop: 6 }}>Verificado = datos confirmados con RENIEC (se marca solo al actualizar desde RENIEC). La observación indica lo que falta completar en la ficha, por ejemplo firma o huella.</p>
           <//>
           <${Tarjeta} titulo=${`Cuenta corriente ${derivados.h.anio}`}>
             <ul className="lista">

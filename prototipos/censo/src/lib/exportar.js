@@ -3,7 +3,7 @@
 import { INSTITUCION } from "../config.js";
 import { ESTADOS_ASOCIADO, ESTADOS_CENSO, ESTADOS_STAND } from "./types.js";
 import { fecha, hoy } from "./formato.js";
-import { nombreCompleto, nombreGaleria } from "./padron.js";
+import { nombreCompleto, nombreGaleria, faltantes } from "./padron.js";
 import { archivoComoDataURL } from "./archivos.js";
 
 let conexion = null;
@@ -243,6 +243,8 @@ export const COLUMNAS_PADRON = (mapaStands, atraso) => [
   { titulo: "Galería", valor: (a) => [...new Set((mapaStands.get(a.id) || []).map((s) => nombreGaleria(s.galeria)))].join(" / ") },
   { titulo: "Celular", valor: (a) => a.celular },
   { titulo: "Estado de la ficha", valor: (a) => ESTADOS_CENSO[a.censo?.estado || "pendiente"]?.label },
+  { titulo: "Verificado en RENIEC", valor: (a) => (a.reniec?.verificadoAt ? String(a.reniec.verificadoAt).slice(0, 10) : "") },
+  { titulo: "Observación (falta)", valor: (a) => faltantes(a).join(", ") },
   { titulo: "Meses de atraso", valor: (a) => atraso(a).meses },
   { titulo: "Deuda (S/)", valor: (a) => atraso(a).monto },
   { titulo: "Fecha de ingreso", valor: (a) => a.fechaIngreso },

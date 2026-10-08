@@ -20,6 +20,8 @@ export async function actualizarDesdeReniec(a, { por = null, conFoto = true } = 
   await db.actualizarAsociado(a.id, {
     ...campos,
     reniec: { ...(a.reniec || {}), verificadoAt: ahoraISO(), fuente: persona.fuente || "apidni", por, discrepancia: null },
+    // Datos confirmados con RENIEC ⇒ la ficha pasa a "Verificado"; lo que falte (firma, huella…) se ve como observación.
+    censo: { ...(a.censo || {}), estado: "verificado", fecha: ahoraISO().slice(0, 10), por: por || null, fuente: "reniec" },
     actualizadoAt: ahoraISO(), actualizadoPor: por,
   });
   let foto = false;
