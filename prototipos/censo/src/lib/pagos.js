@@ -35,6 +35,12 @@ export function registrosDe(indice, stand, anio) {
   return indice.get(idPagos(stand, anio))?.registros || {};
 }
 
+/** Pagos revertidos del stand en el año, del más reciente al más antiguo. */
+export function anulacionesDe(indice, stand, anio) {
+  const a = indice.get(idPagos(stand, anio))?.anulaciones || {};
+  return Object.values(a).filter(Boolean).sort((x, y) => String(y.anuladoAt).localeCompare(String(x.anuladoAt)));
+}
+
 /** Deuda vencida de un stand en el año: monto, meses con atraso y detalle. */
 export function deudaStand(registros, anio, h) {
   const detalle = [];

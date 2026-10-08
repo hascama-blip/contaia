@@ -101,6 +101,13 @@ export async function escribirRegistroPago(stand, anio, clave, registro) {
   return conReintento(() => ref.set({ stand, anio, registros: { [clave]: registro } }));
 }
 
+/** Revierte un pago: la cuota vuelve a figurar impaga y el pago anulado queda en `anulaciones` (nunca se borra). */
+export async function anularRegistroPago(stand, anio, clave, anulacion) {
+  const db = await base();
+  const ref = db.doc(`pagos/${idPagos(stand, anio)}`);
+  return conReintento(() => ref.update({ registros: { [clave]: null }, anulaciones: { [`${clave}@${anulacion.anuladoAt}`]: anulacion } }));
+}
+
 // ---- Incidencias ----
 export async function guardarIncidencia(id, datos) {
   const db = await base();

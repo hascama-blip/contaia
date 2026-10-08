@@ -17,7 +17,11 @@ export async function registrarPago(p, { por } = {}) {
   await db.escribirRegistroPago(p.stand, Number(p.anio), claveRegistro(p.concepto, Number(p.mes)), registro);
 }
 
-/** Anula un pago mal registrado (la cuota vuelve a figurar como pendiente/vencida). */
-export async function anularPago(stand, anio, clave) {
-  await db.escribirRegistroPago(stand, anio, clave, null);
+/**
+ * Revierte un pago mal registrado: la cuota vuelve a figurar como pendiente/vencida y el
+ * pago anulado queda guardado (monto, medio, operación, quién lo registró, quién lo anuló y por qué).
+ */
+export async function anularPago(stand, anio, clave, { por = null, motivo = "", registro = null } = {}) {
+  if (!registro) throw new ErrorValidacion({ general: "Esa cuota no tiene un pago registrado." });
+  await db.anularRegistroPago(stand, Number(anio), clave, { ...registro, clave, anuladoPor: por, anuladoAt: new Date().toISOString(), motivo: String(motivo || "").trim() });
 }

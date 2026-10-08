@@ -3,14 +3,14 @@ import { html, useState, useEffect, useMemo } from "../components/html.js";
 import { CabPagina, Tarjeta, BadgeAsociado, BadgeStand, BadgeGravedad, BadgeIncidencia, Vacio, mensajeError, Badge } from "../components/ui.js";
 import { FichaForm } from "../components/FichaForm.js";
 import { FotoCampo, ArchivoCampo, FirmaCampo } from "../components/Archivos.js";
-import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
+import { CuadroAnual, Leyenda, PanelPago, PanelRevertirPago, ListaAnulaciones } from "../components/Pagos.js";
 import { PanelIncidencia } from "../components/Incidencias.js";
 import { Documentos } from "../components/Documentos.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
 import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido, faltantes, observacionFaltantes } from "../lib/padron.js";
-import { registrosDe, deudaStand } from "../lib/pagos.js";
+import { registrosDe, anulacionesDe, deudaStand } from "../lib/pagos.js";
 import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
 import { fecha, soles } from "../lib/formato.js";
@@ -165,8 +165,11 @@ export function Ficha({ id }) {
       ${stands.map((s) => html`<div key=${s.codigo} style=${{ marginBottom: 16 }}>
         <p className="label" style=${{ marginBottom: 6 }}>Stand ${s.codigo} · ${derivados.h.anio}</p>
         <${CuadroAnual} registros=${registrosDe(derivados.indicePagos, s.codigo, derivados.h.anio)} anio=${derivados.h.anio}
-          onCelda=${editable ? (concepto, mes) => setPanel({ tipo: "pago", stand: s.codigo, concepto, mes }) : null} />
-      </div>`)}`,
+          onCelda=${editable ? (concepto, mes) => setPanel({ tipo: "pago", stand: s.codigo, concepto, mes }) : null}
+          onPagado=${editable ? (concepto, mes, registro) => setPanel({ tipo: "revertir", stand: s.codigo, concepto, mes, registro }) : null} />
+        <${ListaAnulaciones} anulaciones=${anulacionesDe(derivados.indicePagos, s.codigo, derivados.h.anio)} />
+      </div>`)}
+      ${editable && stands.length > 0 && html`<p className="ayuda">Toca una cuota pagada (✓) para ver el detalle o revertir el pago.</p>`}`,
     incidencias: html`
       <div style=${{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
         ${editable && html`<button className="btn btn-primary btn-sm" onClick=${() => setPanel({ tipo: "incidencia" })}>Registrar incidencia</button>`}
@@ -240,6 +243,7 @@ export function Ficha({ id }) {
       <${Documentos} asociado=${a} />
 
       ${panel?.tipo === "pago" && html`<${PanelPago} inicial=${{ ...panel, anio: derivados.h.anio }} stands=${stands} onCerrar=${() => setPanel(null)} />`}
+      ${panel?.tipo === "revertir" && html`<${PanelRevertirPago} ...${panel} anio=${derivados.h.anio} onCerrar=${() => setPanel(null)} />`}
       ${panel?.tipo === "traspaso" && html`<${PanelTraspaso} stand=${panel.stand} onCerrar=${() => setPanel(null)} />`}
       ${panel?.tipo === "incidencia" && html`<${PanelIncidencia} inicial=${{ asociadoId: id, stand: stands[0]?.codigo }} onCerrar=${() => setPanel(null)} />`}
     </div>`;

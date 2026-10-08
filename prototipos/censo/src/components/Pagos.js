@@ -4,9 +4,11 @@ import { Buscador, opcionesStands } from "./Buscador.js";
 import { CONCEPTOS, MESES, MESES_LARGO, MEDIOS_PAGO, COBRANZA_DESDE } from "../config.js";
 import { estadoCuota, claveRegistro } from "../lib/pagos.js";
 import { soles, fecha, hoy } from "../lib/formato.js";
-import { Campo, Entrada, Selector, Panel, mensajeError } from "./ui.js";
-import { registrarPago } from "../api/pagos.js";
+import { Campo, Entrada, Selector, Texto, Panel, mensajeError } from "./ui.js";
+import { registrarPago, anularPago } from "../api/pagos.js";
 import { useApp } from "./contexto.js";
+import { nombresDe } from "../lib/usuario.js";
+import { useEffect } from "./html.js";
 
 const SIMBOLO = { pagado: "✓", vencido: "×", pendiente: "!", futuro: "", antes: "–", na: "·" };
 const TEXTO = { pagado: "Pagado", vencido: "Vencido", pendiente: "Pendiente (mes en curso)", futuro: "Aún no vence", antes: "Antes del registro en el sistema", na: "No se cobra" };
@@ -22,8 +24,8 @@ export function Leyenda() {
     </div>`;
 }
 
-/** onCelda(concepto, mes) se llama al tocar una cuota impaga (para registrarla). */
-export function CuadroAnual({ registros, anio, onCelda }) {
+/** onCelda(concepto, mes) se llama al tocar una cuota impaga (para registrarla); onPagado(concepto, mes, registro) al tocar una pagada (ver detalle / revertir). */
+export function CuadroAnual({ registros, anio, onCelda, onPagado }) {
   const h = hoy();
   return html`
     <p className="aviso-deslizar">Desliza hacia los lados para ver los 12 meses.</p>
@@ -42,10 +44,13 @@ export function CuadroAnual({ registros, anio, onCelda }) {
                   ? `${c.nombre} ${MESES_LARGO[i]}: ${soles(reg.monto)} · ${reg.medio} · ${fecha(reg.fecha)}`
                   : `${c.nombre} ${MESES_LARGO[i]}: ${TEXTO[est]}`;
                 const clic = onCelda && (est === "vencido" || est === "pendiente" || est === "futuro" || est === "antes");
+                const clicPagado = onPagado && est === "pagado" && reg;
                 return html`<td key=${mes}>
                   ${clic
                     ? html`<button type="button" className=${`celda c-${est}`} title=${`${titulo} — tocar para registrar`} aria-label=${titulo} onClick=${() => onCelda(c.id, mes)}>${SIMBOLO[est]}</button>`
-                    : html`<span className=${`celda c-${est}`} title=${titulo} aria-label=${titulo}>${SIMBOLO[est]}</span>`}
+                    : clicPagado
+                      ? html`<button type="button" className=${`celda c-${est}`} title=${`${titulo} — tocar para ver o revertir`} aria-label=${titulo} onClick=${() => onPagado(c.id, mes, reg)}>${SIMBOLO[est]}</button>`
+                      : html`<span className=${`celda c-${est}`} title=${titulo} aria-label=${titulo}>${SIMBOLO[est]}</span>`}
                 </td>`;
               })}
             </tr>`)}
@@ -125,4 +130,64 @@ export function PanelPago({ inicial, stands, onCerrar }) {
         <//>
       </div>
     <//>`;
+}
+
+/** Detalle de un pago registrado, con la opción de revertirlo (queda constancia; la cuota vuelve a figurar impaga). */
+export function PanelRevertirPago({ stand, anio, concepto, mes, registro, onCerrar }) {
+  const { usuario, avisar } = useApp();
+  const c = CONCEPTOS.find((x) => x.id === concepto) || { nombre: concepto };
+  const [motivo, setMotivo] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [nombrePor, setNombrePor] = useState("");
+  useEffect(() => { if (registro?.por) nombresDe([registro.por]).then((m) => setNombrePor(m[registro.por] || "")); }, [registro?.por]);
+
+  async function revertir() {
+    setOcupado(true);
+    try {
+      await anularPago(stand, anio, claveRegistro(concepto, Number(mes)), { por: usuario?.id, motivo, registro });
+      avisar(`Pago revertido: ${c.nombre} ${MESES_LARGO[Number(mes) - 1]} ${anio} · stand ${stand}. La cuota vuelve a figurar como pendiente.`);
+      onCerrar();
+    } catch (e) {
+      avisar(mensajeError(e), "error");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return html`
+    <${Panel} titulo=${`Pago registrado · stand ${stand}`} onCerrar=${onCerrar}
+      pie=${html`
+        <button className="btn btn-ghost" onClick=${onCerrar}>Cerrar</button>
+        ${confirmando
+          ? html`<button className="btn btn-peligro" disabled=${ocupado} onClick=${revertir}>${ocupado ? "Revirtiendo…" : "Sí, revertir el pago"}</button>`
+          : html`<button className="btn btn-peligro" onClick=${() => setConfirmando(true)}>Revertir pago</button>`}`}>
+      <ul className="lista">
+        <li><span>Concepto</span><span>${c.nombre} · ${MESES_LARGO[Number(mes) - 1]} ${anio}</span></li>
+        <li><span>Monto</span><span className="num" style=${{ fontWeight: 700 }}>${soles(registro?.monto)}</span></li>
+        <li><span>Medio</span><span>${registro?.medio || "—"}${registro?.operacion ? ` · op. ${registro.operacion}` : ""}</span></li>
+        <li><span>Fecha de pago</span><span>${registro?.fecha ? fecha(registro.fecha) : "—"}</span></li>
+        <li><span>Registrado por</span><span>${nombrePor || (registro?.por ? "usuario del portal" : "—")}</span></li>
+      </ul>
+      ${confirmando
+        ? html`
+          <div className="aviso aviso-alerta" style=${{ marginTop: 12 }}><span>Al revertirlo, la cuota vuelve a figurar como <strong>pendiente o vencida</strong> y este pago queda guardado como anulado, con tu nombre y la fecha. No se borra nada.</span></div>
+          <${Campo} id="rv-motivo" etiqueta="Motivo (opcional)" ayuda="Ej.: se registró por error, el voucher no corresponde, pago rechazado.">
+            <${Texto} id="rv-motivo" valor=${motivo} onCambio=${setMotivo} rows="2" />
+          <//>`
+        : html`<p className="ayuda" style=${{ marginTop: 12 }}>Si este pago se registró por error, usa <strong>Revertir pago</strong>. Quedará en el historial de pagos revertidos del stand.</p>`}
+    <//>`;
+}
+
+/** Historial de pagos revertidos de un stand en el año. */
+export function ListaAnulaciones({ anulaciones }) {
+  if (!anulaciones?.length) return null;
+  return html`
+    <details className="desplegable" style=${{ marginTop: 4 }}>
+      <summary className="ayuda" style=${{ cursor: "pointer" }}>Pagos revertidos este año: <strong>${anulaciones.length}</strong> (ver)</summary>
+      <ul className="lista" style=${{ marginTop: 6 }}>
+        ${anulaciones.map((an) => { const c = CONCEPTOS.find((x) => x.id === String(an.clave || "").split("-")[0]); const m = Number(String(an.clave || "").split("-")[1]); return html`
+          <li key=${`${an.clave}@${an.anuladoAt}`}><span>${c?.nombre || an.clave} ${MESES_LARGO[m - 1] || ""} · ${soles(an.monto)} · ${an.medio || ""}${an.operacion ? ` op. ${an.operacion}` : ""}</span><span className="muted" style=${{ fontSize: "var(--t-xs)" }}>revertido el ${fecha(String(an.anuladoAt).slice(0, 10))}${an.motivo ? ` · ${an.motivo}` : ""}</span></li>`; })}
+      </ul>
+    </details>`;
 }

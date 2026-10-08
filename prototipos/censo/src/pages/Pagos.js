@@ -1,11 +1,11 @@
 // Control de pagos: cuadro anual por stand, registro de pagos y morosidad.
 import { html, useState, useMemo } from "../components/html.js";
 import { CabPagina, Tarjeta, BadgeAtraso, Vacio } from "../components/ui.js";
-import { CuadroAnual, Leyenda, PanelPago } from "../components/Pagos.js";
+import { CuadroAnual, Leyenda, PanelPago, PanelRevertirPago, ListaAnulaciones } from "../components/Pagos.js";
 import { Buscador, opcionesStands } from "../components/Buscador.js";
 import { useApp } from "../components/contexto.js";
 import { compararCodigos, nombreCompleto, nombreGaleria } from "../lib/padron.js";
-import { registrosDe, deudaStand, morosidadPorGaleria } from "../lib/pagos.js";
+import { registrosDe, anulacionesDe, deudaStand, morosidadPorGaleria } from "../lib/pagos.js";
 import { soles } from "../lib/formato.js";
 
 export function Pagos({ stand: standRuta }) {
@@ -55,8 +55,10 @@ export function Pagos({ stand: standRuta }) {
               </div>
               <${Leyenda} />
               <${CuadroAnual} registros=${registros} anio=${anio}
-                onCelda=${editable ? (concepto, mes) => setPanel({ stand: stand.codigo, concepto, mes }) : null} />
-              ${editable && html`<p className="ayuda">Toca una cuota vencida o pendiente para registrar su pago.</p>`}
+                onCelda=${editable ? (concepto, mes) => setPanel({ stand: stand.codigo, concepto, mes }) : null}
+                onPagado=${editable ? (concepto, mes, registro) => setPanel({ tipo: "revertir", stand: stand.codigo, concepto, mes, registro }) : null} />
+              ${editable && html`<p className="ayuda">Toca una cuota vencida o pendiente para registrar su pago. Toca una cuota pagada (✓) para ver el detalle o <strong>revertir</strong> el pago.</p>`}
+              <${ListaAnulaciones} anulaciones=${anulacionesDe(indicePagos, stand.codigo, anio)} />
             </div>`
           : html`<${Vacio}>Aún no hay stands registrados.<//>`}
       </section>
@@ -108,6 +110,7 @@ export function Pagos({ stand: standRuta }) {
           </div>
         <//>
       </div>
-      ${panel && html`<${PanelPago} inicial=${{ ...panel, anio }} stands=${ordenados} onCerrar=${() => setPanel(null)} />`}
+      ${panel?.tipo === "revertir" && html`<${PanelRevertirPago} ...${panel} anio=${anio} onCerrar=${() => setPanel(null)} />`}
+      ${panel && panel.tipo !== "revertir" && html`<${PanelPago} inicial=${{ ...panel, anio }} stands=${ordenados} onCerrar=${() => setPanel(null)} />`}
     </div>`;
 }

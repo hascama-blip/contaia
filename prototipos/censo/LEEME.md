@@ -160,6 +160,14 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
 
+## Revertir un pago
+En el cuadro anual (Pagos o pestaña Pagos de la ficha) una cuota pagada (✓) se puede tocar: se abre
+el detalle (concepto, monto, medio, operación, fecha, quién lo registró) con **Revertir pago**
+(confirmación en dos pasos y motivo opcional). La cuota vuelve a figurar pendiente/vencida y el
+pago anulado **no se borra**: queda en `pagos/<stand>_<año>.anulaciones` con quién y cuándo lo
+revirtió (`anularPago` en `src/api/pagos.js`, `anularRegistroPago` en `src/lib/db.js`); se lista
+bajo el cuadro como "Pagos revertidos este año".
+
 ## Estado "Verificado" y observación de lo que falta
 Una ficha pasa a **Verificado** automáticamente cuando sus datos se confirman con RENIEC
 (botón **Actualizar desde RENIEC**, verificación masiva o la verificación nocturna). Al
