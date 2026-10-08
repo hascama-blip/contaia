@@ -107,5 +107,31 @@ Las sesiones duran 12 horas; tras 10 claves equivocadas una IP espera 15 minutos
 - Los datos viven en `/var/censo` (`asociados.json`, `stands.json`, `pagos.json`,
   `incidencias.json`, `usuarios.json`, carpeta `archivos/`). Nunca están en el repositorio.
 
+## 7. Seguridad: qué está activo y qué no
+**Activo hoy (sin hacer nada más):**
+- **Firewall en dos capas**: el de Lightsail (consola → Networking) y `ufw` dentro del servidor
+  (`instalar.sh`), ambos con solo los puertos **22 (SSH), 80 y 443**. El portal (puerto 3000) no es
+  accesible desde fuera. Comprobar: `sudo ufw status`.
+- **HTTPS automático con Caddy** (certificado Let's Encrypt renovado solo). Caddy hace el papel que
+  haría Apache o nginx; **no se usa Apache** y no hace falta instalarlo. Todo lo que llegue por http o
+  por la IP se redirige al dominio con HTTPS.
+- **Cabeceras de seguridad** (en Caddy y en el portal): HSTS, `nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy`, `Permissions-Policy`, sin cabecera `Server`.
+- **Sesiones**: cookie `HttpOnly; Secure; SameSite=Lax`, 12 h; claves con scrypt; **tope de
+  intentos** de entrada por IP (429 a los pocos intentos fallidos, 15 min); solo administradores
+  manejan usuarios, dominio, respaldo e importación.
+- **Datos**: las fotos del padrón, DNI, huellas y firmas solo se sirven con sesión; en la web pública
+  solo se ven los archivos que una tienda, un artículo o el carrusel publican.
+- **SSH** solo con la llave de Lightsail (sin contraseña). Copias automáticas (snapshots) diarias 06:00 UTC.
+
+**No activo (opcional):**
+- **Cloudflare**: no está. Es un servicio externo que se pone delante del dominio (protección DDoS,
+  WAF y caché). Para activarlo: crear cuenta gratuita en cloudflare.com → "Agregar sitio" con
+  `ccinmaculadaconcepcion.com` → copiar los dos nameservers que da Cloudflare → en GoDaddy
+  (Dominio → Administrar DNS → Servidores de nombres) reemplazarlos → en Cloudflare, registro A
+  `@` y `www` → `18.118.71.116` con la nube naranja (proxy), SSL/TLS en **Full (strict)**. Caddy
+  sigue renovando su certificado (usa el reto TLS-ALPN por el 443). Tarda hasta 24 h en propagar.
+- **fail2ban**: no hace falta con SSH solo por llave y el tope de intentos del portal.
+
 ## Costos aproximados
 Lightsail $7/mes + snapshots ~$2/mes + dominio (ya pagado en GoDaddy). Certificado HTTPS: gratis.

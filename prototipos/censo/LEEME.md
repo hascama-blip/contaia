@@ -160,6 +160,14 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
 
+## Tipos de oferta en la web pública
+Un artículo en oferta lleva `tipoOferta` (oferta, liquidacion, campana, combo, mayorista, nuevo;
+lista `TIPOS_OFERTA` en `servidor/lib/sitio.js`, expuesta como `sitio.tiposOferta`) y una
+`etiquetaOferta` libre ("Campaña escolar 2027"). La portada muestra chips para filtrar "Las mejores
+ofertas" por tipo, cada afiche lleva una franja de color con el tipo y la **tienda** (logo, nombre y
+stand) y un botón "Ver todas las ofertas" cuando hay más de 8. Seguridad del servidor: ver
+`servidor/GUIA-AWS.md` § 7.
+
 ## Revertir un pago
 En el cuadro anual (Pagos o pestaña Pagos de la ficha) una cuota pagada (✓) se puede tocar: se abre
 el detalle (concepto, monto, medio, operación, fecha, quién lo registró) con **Revertir pago**

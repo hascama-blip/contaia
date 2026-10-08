@@ -316,6 +316,8 @@ async function manejar(req, res) {
 const servidor = http.createServer((req, res) => {
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
   manejar(req, res).catch((e) => {
     if (res.headersSent) return res.end();
     json(res, e?.status || 500, { error: e?.message || "Error interno.", ...(e?.code ? { code: e.code } : {}) });

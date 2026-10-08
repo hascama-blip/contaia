@@ -121,7 +121,7 @@
     const sel = $("#filtro-art-tienda"); const val = sel.value; sel.innerHTML = `<option value="">Todas las tiendas</option>` + tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); sel.value = val;
     const lista = articulos.filter((a) => !val || a.tiendaId === val);
     $("#articulos-n").textContent = `(${articulos.length})`;
-    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(catDe(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="txt"><b>${S.esc(a.nombre)}${a.oferta ? ' <span class="ok">· OFERTA</span>' : ""}${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${S.soles(a.precio) || "sin precio"}${a.oferta && a.precioOferta ? ` → ${S.soles(a.precioOferta)}` : ""}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
+    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(catDe(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="txt"><b>${S.esc(a.nombre)}${a.oferta ? ` <span class="ok">· ${S.esc(((config.tiposOferta || []).find((t) => t.id === (a.tipoOferta || "oferta"))?.nombre || "Oferta").toUpperCase())}${a.etiquetaOferta ? " · " + S.esc(a.etiquetaOferta) : ""}</span>` : ""}${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${S.soles(a.precio) || "sin precio"}${a.oferta && a.precioOferta ? ` → ${S.soles(a.precioOferta)}` : ""}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
   };
   $("#filtro-art-tienda").onchange = pintarArticulos;
   const fA = $("#f-art"), dA = $("#d-art"); let artActual = null;
@@ -129,9 +129,12 @@
     if (!tiendas.length) return estado("Primero crea una tienda.", true);
     artActual = a; $("#a-titulo").textContent = a ? `Editar: ${a.nombre}` : "Nuevo artículo"; $("#a-borrar").hidden = !a;
     fA.reset(); fA.tiendaId.innerHTML = tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); fA.categoriaId.innerHTML = `<option value="">—</option>` + config.categorias.map((c) => `<option value="${S.esc(c.id)}">${S.esc(c.icono || "")} ${S.esc(c.nombre)}</option>`).join("");
-    for (const k of ["nombre", "descripcion", "precio", "precioOferta"]) fA[k].value = a?.[k] ?? "";
+    fA.tipoOferta.innerHTML = (config.tiposOferta || []).map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.icono)} ${S.esc(t.nombre)}</option>`).join("");
+    for (const k of ["nombre", "descripcion", "precio", "precioOferta", "etiquetaOferta"]) fA[k].value = a?.[k] ?? "";
+    fA.tipoOferta.value = a?.tipoOferta || "oferta"; if (!fA.tipoOferta.value) fA.tipoOferta.value = "oferta";
+    const mostrarTipo = () => { $("#a-tipo-fila").hidden = !fA.oferta.checked; }; fA.oferta.onchange = mostrarTipo;
     fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.oferta.checked = !!a?.oferta; fA.destacado.checked = !!a?.destacado; fA.visible.checked = a ? a.visible !== false : true;
-    pintarArchivo($(".archivo", fA), a?.foto || ""); dA.showModal();
+    pintarArchivo($(".archivo", fA), a?.foto || ""); mostrarTipo(); dA.showModal();
   };
   $("#nuevo-articulo").onclick = () => abrirArticulo(null);
   $("#articulos").onclick = (e) => { const b = e.target.closest("[data-editar]"); if (b) abrirArticulo(articulos.find((a) => a.id === b.dataset.editar)); };
@@ -139,7 +142,7 @@
     e.preventDefault();
     const d = { ...(artActual || { creadoAt: ahora() }) }; delete d.id;
     d.nombre = fA.nombre.value.trim(); d.descripcion = fA.descripcion.value.trim(); d.tiendaId = fA.tiendaId.value; d.categoriaId = fA.categoriaId.value;
-    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = fA.oferta.checked; d.destacado = fA.destacado.checked; d.visible = fA.visible.checked;
+    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = fA.oferta.checked; d.destacado = fA.destacado.checked; d.visible = fA.visible.checked; d.tipoOferta = fA.oferta.checked ? fA.tipoOferta.value : ""; d.etiquetaOferta = fA.oferta.checked ? fA.etiquetaOferta.value.trim() : "";
     Object.assign(d, leerArchivos(fA)); d.actualizadoAt = ahora();
     try { await S.pedir("PUT", `/api/db/articulos/${artActual?.id || nuevoId()}`, d); dA.close(); estado("Artículo guardado ✓"); await cargar(); pintarTodo(); } catch (err) { estado(err.message, true); }
   };

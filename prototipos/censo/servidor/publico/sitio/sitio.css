@@ -199,3 +199,31 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
   .afiche-sub { font-size: .8rem; } .afiche-eti { font-size: .68rem; letter-spacing: .14em; } .afiche-marca { font-size: .9rem; }
   .carril { grid-auto-columns: minmax(150px, 170px); }
 }
+
+/* Filtros de tipo de oferta */
+.filtros-oferta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: -8px 0 20px; }
+.filtros-oferta:empty { display: none; }
+.chip { border: 1.5px solid var(--borde-fuerte); background: #fff; color: var(--texto-2); border-radius: 999px; padding: 7px 14px; font-weight: 600; font-size: .9rem; display: inline-flex; gap: 6px; align-items: center; transition: background .12s, border-color .12s; }
+.chip small { font-weight: 700; font-size: .75rem; background: var(--superficie-2); color: var(--texto-3); border-radius: 999px; padding: 1px 7px; }
+.chip:hover { border-color: var(--brand-400); }
+.chip[aria-pressed="true"] { background: var(--brand-500); border-color: var(--brand-500); color: #fff; }
+.chip[aria-pressed="true"] small { background: rgba(255,255,255,.25); color: #fff; }
+.ver-mas { text-align: center; margin-top: 18px; }
+
+/* Afiche: tipo, tienda */
+.afiche-tipo { justify-self: stretch; margin: -22px -18px 10px; padding: 7px 12px; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--brand-600); }
+.afiche.tipo-liquidacion .afiche-tipo, .oferta-pill.tipo-liquidacion { background: #E01B1B; color: #fff; }
+.afiche.tipo-campana .afiche-tipo, .oferta-pill.tipo-campana { background: var(--accent-500); color: #2b2300; }
+.afiche.tipo-combo .afiche-tipo, .oferta-pill.tipo-combo { background: #7c3aed; color: #fff; }
+.afiche.tipo-mayorista .afiche-tipo, .oferta-pill.tipo-mayorista { background: var(--brand-800); color: #fff; }
+.afiche.tipo-nuevo .afiche-tipo, .oferta-pill.tipo-nuevo { background: var(--verde-600); color: #fff; }
+.afiche.tipo-oferta .afiche-tipo, .oferta-pill.tipo-oferta { background: #E01B1B; color: #fff; }
+.afiche-eti:empty { display: none; }
+.afiche-precios { font-weight: 800; color: var(--brand-700); }
+.afiche-precios s { color: var(--texto-4); font-weight: 500; font-size: .9rem; margin-left: 6px; }
+.afiche-tienda { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 6px 10px; border-radius: 999px; background: var(--superficie-2); text-align: left; max-width: 100%; }
+.afiche-tienda .afiche-logo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--brand-50); display: grid; place-items: center; font-size: .7rem; font-weight: 800; color: var(--brand-700); flex: 0 0 auto; }
+.afiche-tienda span { display: grid; line-height: 1.15; min-width: 0; }
+.afiche-tienda b { font-size: .85rem; color: var(--brand-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afiche-tienda small { font-size: .72rem; color: var(--texto-3); }
+@media (max-width: 640px) { .afiche-tipo { margin: -14px -10px 8px; font-size: .66rem; padding: 5px 8px; } .afiche-tienda { padding: 4px 8px; } .afiche-tienda b { font-size: .78rem; } }

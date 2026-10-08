@@ -56,21 +56,31 @@
 
   // ---- Las mejores ofertas (afiches) y novedades ----
   const descuento = (a) => (Number(a.precio) > 0 && Number(a.precioOferta) > 0 && Number(a.precioOferta) < Number(a.precio) ? Math.round((1 - Number(a.precioOferta) / Number(a.precio)) * 100) : 0);
+  let tipoFiltro = "", verTodas = false;
   function afiche(a) {
-    const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId);
+    const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
     const cifra = d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>` : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">S/ ${Number(a.precioOferta).toLocaleString("es-PE")}</div><div class="afiche-sub">precio de oferta</div>` : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? "S/ " + Number(a.precio).toLocaleString("es-PE") : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
-    return `<a class="afiche" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
-      <div class="afiche-eti">${S.esc(c?.nombre || a.nombre)}</div>
+    return `<a class="afiche tipo-${S.esc(tipo?.id || "oferta")}" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
+      <div class="afiche-tipo">${S.esc(tipo?.icono || "🔥")} ${S.esc(tipo?.nombre || "Oferta")}${a.etiquetaOferta ? ` · ${S.esc(a.etiquetaOferta)}` : ""}</div>
+      <div class="afiche-eti">${S.esc(c?.nombre || "")}</div>
       ${cifra}
-      <div class="afiche-marca">${d && Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s>` : S.esc(a.nombre)}</div>
-      <div class="afiche-vende">${S.esc(t.nombre || "")}${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
+      <div class="afiche-marca">${S.esc(a.nombre)}</div>
+      ${d && Number(a.precioOferta) > 0 ? `<div class="afiche-precios"><b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s></div>` : ""}
+      <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b>${t.stand ? `<small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · "))}</small>` : ""}</span></div>
       <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(c?.icono || "🛍️")}</span>`}</div>
     </a>`;
   }
   function pintarOfertas(lista) {
-    const of = lista.filter((a) => a.oferta).sort((x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x)).slice(0, 8);
-    $("#ofertas").hidden = !of.length; $("#lista-ofertas").innerHTML = of.map(afiche).join("");
-    $("#ofertas-sub").textContent = of.length ? `${of.length} oferta${of.length === 1 ? "" : "s"} vigente${of.length === 1 ? "" : "s"} · toca una para contactar a la tienda` : "";
+    const todas = lista.filter((a) => a.oferta).sort((x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x));
+    const tipos = (sitio.tiposOferta || []).map((t) => ({ ...t, n: todas.filter((a) => (a.tipoOferta || "oferta") === t.id).length })).filter((t) => t.n);
+    if (tipoFiltro && !tipos.some((t) => t.id === tipoFiltro)) tipoFiltro = "";
+    $("#ofertas-filtros").innerHTML = tipos.length > 1 ? [`<button type="button" class="chip" data-tipo="" aria-pressed="${!tipoFiltro}">Todas <small>${todas.length}</small></button>`, ...tipos.map((t) => `<button type="button" class="chip tipo-${S.esc(t.id)}" data-tipo="${S.esc(t.id)}" aria-pressed="${tipoFiltro === t.id}">${S.esc(t.icono)} ${S.esc(t.nombre)} <small>${t.n}</small></button>`)].join("") : "";
+    const of = tipoFiltro ? todas.filter((a) => (a.tipoOferta || "oferta") === tipoFiltro) : todas;
+    const LIM = 8, mostradas = verTodas ? of : of.slice(0, LIM);
+    $("#ofertas").hidden = !todas.length; $("#lista-ofertas").innerHTML = mostradas.map(afiche).join("");
+    const mas = $("#ofertas-mas"); mas.hidden = of.length <= LIM; mas.querySelector("button").textContent = verTodas ? "Ver menos" : `Ver todas las ofertas (${of.length})`;
+    const tiendasConOferta = new Set(of.map((a) => a.tiendaId)).size;
+    $("#ofertas-sub").textContent = of.length ? `${of.length} ${tipoFiltro ? (tipos.find((t) => t.id === tipoFiltro)?.nombre.toLowerCase() + (of.length === 1 ? "" : "s")) : `oferta${of.length === 1 ? "" : "s"}`} de ${tiendasConOferta} tienda${tiendasConOferta === 1 ? "" : "s"} · toca una para contactar a la tienda` : "";
     const nov = [...lista].sort((x, y) => String(y.creadoAt || y.actualizadoAt || "").localeCompare(String(x.creadoAt || x.actualizadoAt || ""))).slice(0, 10);
     $("#novedades").hidden = nov.length < 3; $("#lista-novedades").innerHTML = nov.map(tarjetaArticulo).join("");
   }
@@ -101,11 +111,14 @@
   function tarjetaArticulo(a) {
     const t = tiendaDe.get(a.tiendaId) || {};
     return `<article class="art">
-      <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</span>`}${a.oferta ? `<span class="oferta-pill">OFERTA</span>` : ""}</div>
+      <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
       <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}${a.descripcion ? `<div class="vende">${S.esc(a.descripcion).slice(0, 90)}</div>` : ""}<div class="vende">Vende: <b>${S.esc(t.nombre || "—")}</b>${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
       <a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(a.tiendaId)}${a.id ? `?art=${encodeURIComponent(a.id)}` : ""}">Contactar</a></div>
     </article>`;
   }
+
+  $("#ofertas-filtros").onclick = (e) => { const b = e.target.closest(".chip"); if (!b) return; tipoFiltro = b.dataset.tipo; verTodas = false; pintar(); };
+  $("#ofertas-mas").onclick = () => { verTodas = !verTodas; pintar(); if (!verTodas) $("#ofertas").scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   // ---- Resumen de ofertas (modal) ----
   const modal = $("#modal");
@@ -118,7 +131,7 @@
     $("#m-desc").textContent = t.descripcion || "";
     const mios = articulos.filter((a) => a.tiendaId === t.id); const of = mios.filter((a) => a.oferta); const lista = (of.length ? of : mios).slice(0, 6);
     $("#m-ofertas-titulo").textContent = of.length ? `Ofertas (${of.length})` : mios.length ? "Lo que vende" : "";
-    $("#m-ofertas").innerHTML = lista.length ? lista.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="nom">${S.esc(a.nombre)}${a.oferta ? ` <span class="oferta-pill">oferta</span>` : ""}</div>${S.precio(a)}</div>`).join("") + (mios.length > lista.length ? `<div class="vende" style="text-align:center">y ${mios.length - lista.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó artículos. Contáctala para consultar.</div>`;
+    $("#m-ofertas").innerHTML = lista.length ? lista.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="nom">${S.esc(a.nombre)}${a.oferta ? ` <span class="oferta-pill">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "oferta")}</span>` : ""}</div>${S.precio(a)}</div>`).join("") + (mios.length > lista.length ? `<div class="vende" style="text-align:center">y ${mios.length - lista.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó artículos. Contáctala para consultar.</div>`;
     $("#m-contactar").href = `/tienda/${encodeURIComponent(t.id)}`;
     modal.showModal();
   }

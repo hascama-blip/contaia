@@ -14,6 +14,16 @@ export const CATEGORIAS_INICIALES = [
   { id: "accesorios", nombre: "Accesorios", icono: "🧢" },
 ];
 
+/** Tipos de oferta que puede llevar un artículo (filtros de "Las mejores ofertas"). */
+export const TIPOS_OFERTA = [
+  { id: "oferta", nombre: "Oferta", icono: "🔥" },
+  { id: "liquidacion", nombre: "Liquidación", icono: "🏷️" },
+  { id: "campana", nombre: "Campaña", icono: "🎒" },
+  { id: "combo", nombre: "Combo / 2x1", icono: "🎁" },
+  { id: "mayorista", nombre: "Precio por mayor", icono: "📦" },
+  { id: "nuevo", nombre: "Lanzamiento", icono: "✨" },
+];
+
 export const SITIO_INICIAL = {
   nombre: "Centro Comercial Inmaculada Concepción",
   lema: "Mochilas, carteras, cartucheras y más, directo de los fabricantes",
@@ -42,7 +52,7 @@ export class SitioPublico {
   }
   config() {
     const c = this.#almacen.obtener("sitio", "config")?.data || {};
-    const cfg = { ...SITIO_INICIAL, ...c };
+    const cfg = { ...SITIO_INICIAL, ...c, tiposOferta: TIPOS_OFERTA };
     if (!Array.isArray(cfg.categorias) || !cfg.categorias.length) cfg.categorias = CATEGORIAS_INICIALES;
     if (!Array.isArray(cfg.carrusel)) cfg.carrusel = [];
     return cfg;
@@ -54,7 +64,7 @@ export class SitioPublico {
   }
   #articulos(tiendasVisibles) {
     return this.#almacen.listar("articulos").filter((d) => d.data && d.data.visible !== false && d.data.nombre && tiendasVisibles.has(d.data.tiendaId))
-      .map(({ id, data }) => ({ id, ...data, oferta: !!data.oferta || (Number(data.precioOferta) > 0 && Number(data.precioOferta) < Number(data.precio || Infinity)) }))
+      .map(({ id, data }) => { const oferta = !!data.oferta || (Number(data.precioOferta) > 0 && Number(data.precioOferta) < Number(data.precio || Infinity)); return { id, ...data, oferta, tipoOferta: oferta ? (TIPOS_OFERTA.some((t) => t.id === data.tipoOferta) ? data.tipoOferta : "oferta") : "" }; })
       .sort((a, b) => Number(b.oferta) - Number(a.oferta) || String(b.actualizadoAt || "").localeCompare(String(a.actualizadoAt || "")));
   }
   /** Lo que ve cualquiera en la portada. */

@@ -10,16 +10,19 @@ TU-DOMINIO.com {
 		flush_interval -1
 	}
 	header {
-		Strict-Transport-Security "max-age=31536000"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
 	}
 }
 
-# Por IP sigue respondiendo en http (útil mientras el DNS propaga).
+# Quien entre por la IP o por http va al dominio con HTTPS (Caddy sigue atendiendo
+# aquí el reto de Let's Encrypt para renovar el certificado).
 :80 {
-	reverse_proxy 127.0.0.1:3000 {
-		flush_interval -1
-	}
+	redir https://TU-DOMINIO.com{uri} permanent
 }
 
 www.TU-DOMINIO.com {
