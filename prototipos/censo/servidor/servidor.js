@@ -24,12 +24,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Almacen, nuevoId, COLECCIONES } from "./lib/almacen.js";
+import { Almacen, nuevoId, COLECCIONES, fusionar } from "./lib/almacen.js";
 import { Usuarios, COOKIE, puedeEscribir, esAdmin } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
-import { SitioPublico } from "./lib/sitio.js";
+import { SitioPublico, validarPublico } from "./lib/sitio.js";
 import { aplicarMigraciones } from "./lib/migraciones.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
@@ -185,8 +185,17 @@ async function manejar(req, res) {
     if (metodo === "GET" && !id) return json(res, 200, { docs: almacen.listar(col) });
     if (metodo === "GET") { const d = almacen.obtener(col, id); return d ? json(res, 200, d) : json(res, 404, { error: "No existe.", code: "not_found" }); }
     if (!escribe) return soloLectura();
-    if (metodo === "PUT") { almacen.establecer(col, id, await leerJSON(req)); return json(res, 200, { ok: true }); }
-    if (metodo === "PATCH") { almacen.actualizar(col, id, await leerJSON(req)); return json(res, 200, { ok: true }); }
+    const PUBLICAS = ["tiendas", "articulos", "sitio"];
+    if (metodo === "PUT") {
+      const datos = await leerJSON(req);
+      if (PUBLICAS.includes(col)) { const err = validarPublico(col, datos); if (err) return json(res, 400, { error: err, code: "invalid" }); }
+      almacen.establecer(col, id, datos); return json(res, 200, { ok: true });
+    }
+    if (metodo === "PATCH") {
+      const parcial = await leerJSON(req);
+      if (PUBLICAS.includes(col)) { const actual = almacen.obtener(col, id); const err = validarPublico(col, fusionar(actual?.data || {}, parcial)); if (err) return json(res, 400, { error: err, code: "invalid" }); }
+      almacen.actualizar(col, id, parcial); return json(res, 200, { ok: true });
+    }
     if (metodo === "DELETE") { almacen.borrar(col, id); return json(res, 200, { ok: true }); }
   }
   if (ruta === "/api/eventos" && metodo === "GET") {

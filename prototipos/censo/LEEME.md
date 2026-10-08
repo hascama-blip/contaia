@@ -168,6 +168,17 @@ ofertas" por tipo, cada afiche lleva una franja de color con el tipo y la **tien
 stand) y un botón "Ver todas las ofertas" cuando hay más de 8. Seguridad del servidor: ver
 `servidor/GUIA-AWS.md` § 7.
 
+## Validación y datos de ejemplo de la web pública
+- **Validación en dos capas**: el editor valida en el navegador (nombre obligatorio, WhatsApp de
+  9 dígitos que empiece en 9, enlaces solo `https://`, precio de oferta menor que el normal…) y el
+  servidor vuelve a validar cada PUT/PATCH de `tiendas`, `articulos` y `sitio` (`validarPublico` en
+  `servidor/lib/sitio.js`; responde 400 con el mensaje). Los enlaces se pasan por `urlSegura`/`S.url`
+  antes de pintarse: nunca se renderiza un `javascript:`.
+- **Datos de ejemplo** (editor → Portada → "Cargar ejemplos"): genera en el navegador 3 banners
+  (web y celular), 8 tiendas con logo, QR de ejemplo y WhatsApp, y 24 artículos con foto y ofertas
+  de todos los tipos, marcados `ejemplo: true`. "Quitar ejemplos" los borra junto con sus archivos
+  sin tocar lo cargado a mano. Pensado para la exposición a la directiva.
+
 ## Revertir un pago
 En el cuadro anual (Pagos o pestaña Pagos de la ficha) una cuota pagada (✓) se puede tocar: se abre
 el detalle (concepto, monto, medio, operación, fecha, quién lo registró) con **Revertir pago**

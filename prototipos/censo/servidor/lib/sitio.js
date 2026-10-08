@@ -37,6 +37,64 @@ export const SITIO_INICIAL = {
 
 const CAMPOS_PRIVADOS_TIENDA = new Set(["propietarioId", "notas", "actualizadoPor", "creadoPor"]);
 
+/** Solo enlaces http(s), mailto, tel o relativos (/, ?, #). Devuelve "" si no es seguro. */
+export function urlSegura(u) {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) return s;
+  if (/^[/?#]/.test(s) && !/^\/\//.test(s)) return s;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(s)) return "https://" + s;
+  return "";
+}
+const texto = (v, max) => v === undefined || v === null || (typeof v === "string" && v.length <= max);
+const numeroOk = (v, max = 1e7) => v === undefined || v === null || v === "" || (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max);
+const whatsappOk = (v) => { const s = String(v || "").trim(); if (!s) return true; if (/[^\d\s()+-]/.test(s)) return false; const d = s.replace(/\D/g, ""); return /^9\d{8}$/.test(d) || /^519\d{8}$/.test(d); };
+const enlaceOk = (v) => !String(v || "").trim() || !!urlSegura(v);
+
+/**
+ * Valida un documento de la web pública antes de guardarlo (PUT o PATCH ya fusionado).
+ * Devuelve el mensaje de error o null si está bien.
+ */
+export function validarPublico(col, d) {
+  if (!d || typeof d !== "object" || Array.isArray(d)) return "Datos no válidos.";
+  if (col === "tiendas") {
+    if (!String(d.nombre || "").trim()) return "La tienda necesita un nombre.";
+    if (!texto(d.nombre, 80)) return "El nombre de la tienda es muy largo (máximo 80 caracteres).";
+    if (!whatsappOk(d.whatsapp)) return "El WhatsApp debe tener 9 dígitos y empezar con 9 (por ejemplo 987654321).";
+    if (!texto(d.descripcion, 600)) return "La descripción es muy larga (máximo 600 caracteres).";
+    for (const [k, nombre] of [["catalogoUrl", "catálogo en línea"], ["ubicacionUrl", "ubicación"]]) if (!enlaceOk(d[k])) return `El enlace de ${nombre} no es válido: debe empezar con https://.`;
+    if (d.enlaces !== undefined && (!Array.isArray(d.enlaces) || d.enlaces.length > 10)) return "Máximo 10 enlaces adicionales.";
+    for (const e of d.enlaces || []) if (!e || !enlaceOk(e.url) || !String(e.url || "").trim()) return `El enlace "${e?.titulo || ""}" no es válido: debe empezar con https://.`;
+    for (const k of ["facebook", "instagram", "tiktok"]) if (d.redes && !texto(d.redes[k], 120)) return `El dato de ${k} es muy largo.`;
+    if (d.categorias !== undefined && (!Array.isArray(d.categorias) || d.categorias.some((c) => typeof c !== "string"))) return "Categorías no válidas.";
+    if (d.orden !== undefined && d.orden !== null && !(typeof d.orden === "number" && d.orden >= 0)) return "El orden debe ser un número desde 0.";
+    return null;
+  }
+  if (col === "articulos") {
+    if (!String(d.nombre || "").trim()) return "El artículo necesita un nombre.";
+    if (!texto(d.nombre, 80)) return "El nombre del artículo es muy largo (máximo 80 caracteres).";
+    if (!String(d.tiendaId || "").trim()) return "Elige la tienda que vende el artículo.";
+    if (!numeroOk(d.precio)) return "El precio debe ser un número desde 0.";
+    if (!numeroOk(d.precioOferta)) return "El precio de oferta debe ser un número desde 0.";
+    if (d.oferta && Number(d.precio) > 0 && Number(d.precioOferta) > 0 && Number(d.precioOferta) >= Number(d.precio)) return "El precio de oferta debe ser menor que el precio normal.";
+    if (d.tipoOferta && !TIPOS_OFERTA.some((t) => t.id === d.tipoOferta)) return "Tipo de oferta desconocido.";
+    if (!texto(d.etiquetaOferta, 40)) return "La etiqueta de la oferta es muy larga (máximo 40 caracteres).";
+    if (!texto(d.descripcion, 140)) return "La descripción corta es muy larga (máximo 140 caracteres).";
+    return null;
+  }
+  if (col === "sitio") {
+    if (!String(d.nombre || "").trim()) return "El centro comercial necesita un nombre.";
+    if (!texto(d.nombre, 100) || !texto(d.lema, 160) || !texto(d.descripcion, 400) || !texto(d.direccion, 200) || !texto(d.horario, 120)) return "Alguno de los textos del centro es demasiado largo.";
+    if (!whatsappOk(d.whatsapp)) return "El WhatsApp del centro debe tener 9 dígitos y empezar con 9.";
+    if (d.carrusel !== undefined && (!Array.isArray(d.carrusel) || d.carrusel.length > 12)) return "El carrusel admite hasta 12 fotos.";
+    for (const f of d.carrusel || []) { if (!f || typeof f.archivo !== "string") return "Foto del carrusel no válida."; if (!enlaceOk(f.enlace)) return `El enlace del botón "${f.titulo || "foto"}" no es válido.`; if (!texto(f.titulo, 80) || !texto(f.texto, 160)) return "El título o texto de una foto es muy largo."; }
+    if (d.categorias !== undefined && (!Array.isArray(d.categorias) || d.categorias.length > 30)) return "Máximo 30 categorías.";
+    for (const c of d.categorias || []) if (!c || !String(c.id || "").trim() || !String(c.nombre || "").trim() || !texto(c.nombre, 40)) return "Cada categoría necesita nombre (máximo 40 caracteres).";
+    return null;
+  }
+  return null;
+}
+
 /** Número de WhatsApp en formato wa.me: solo dígitos; 9 dígitos peruanos → 51. */
 export function waNumero(v) {
   const d = String(v || "").replace(/\D/g, "");

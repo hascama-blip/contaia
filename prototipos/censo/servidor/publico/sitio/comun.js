@@ -1,6 +1,7 @@
 // Utilidades compartidas por la portada, el perfil de tienda y el editor.
 window.S = {
   esc: (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])),
+  url: (u) => { const s = String(u || "").trim(); if (!s) return ""; if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) return s; if (/^[/?#]/.test(s) && !/^\/\//.test(s)) return s; if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(s)) return "https://" + s; return ""; },
   blob: (id) => (id ? `/_blob/${encodeURIComponent(id)}` : ""),
   soles: (v) => { const n = Number(v); return n > 0 ? "S/ " + n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; },
   iniciales: (n) => String(n || "?").split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase(),
