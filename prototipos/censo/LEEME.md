@@ -56,6 +56,19 @@ queda sin stands, su ficha pasa a "Transferido" (sigue en el padrón, fuera del
 avance). La línea 1.º → 2.º → actual sale de `lib/propietarios.js`. Quitar un
 stand desde la ficha también deja el tramo en el historial.
 
+## Venta de un stand y N° de padrón (regla del libro)
+Al registrar una venta (**Registrar venta** en la ficha o en Stands) **no se crea un N° nuevo**:
+- Si quien vende se queda **sin stands** (sale del padrón) y quien compra **no tiene N° propio**
+  (es nuevo o figura "S/N"), el comprador **hereda el N°** del vendedor (`numero`, `numeroDesde`,
+  `numeroHeredadoDe`). El vendedor queda con estado **Transferido**, `numero` vacío y el registro en
+  `numeroHistorial` (N°, fecha, a quién lo cedió, stand). Se muestra como **"ex N° 226"** en el padrón,
+  la ficha y el buscador, y sigue en el historial del stand.
+- Si el comprador ya tiene N° propio, lo conserva; el vendedor queda Transferido con su N° en el historial.
+- Si el vendedor **conserva otros stands**, no hay N° que heredar: un comprador nuevo recibe el
+  siguiente libre (es el único caso en que aparece un N° nuevo).
+Lógica en `src/lib/propietarios.js` (`numeroAHeredar`) y `src/api/stands.js` (`transferirStand`);
+etiquetas en `src/lib/padron.js` (`tieneNumero`, `etiquetaNumero`, `numeroCedido`).
+
 ## Padrón real (importación)
 
 El padrón se cargó desde el Excel transcrito del Libro de Padrón con

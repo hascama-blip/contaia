@@ -9,7 +9,7 @@ import { Documentos } from "../components/Documentos.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
+import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido } from "../lib/padron.js";
 import { registrosDe, deudaStand } from "../lib/pagos.js";
 import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
@@ -190,7 +190,7 @@ export function Ficha({ id }) {
   return html`
     <div className="pagina">
       <${CabPagina} miga=${{ href: "#padron", texto: "Padrón" }} titulo=${nombreCompleto(a)}
-        sub=${html`N° ${a.numero} · DNI ${a.dni} · ${stands.length > 1 ? "Stands" : "Stand"} ${standsTxt || "—"} · Ingreso ${fecha(a.fechaIngreso)} <${BadgeAsociado} estado=${a.estado} />${a.reniec?.verificadoAt && html` <span title=${`Datos tomados de RENIEC el ${fecha(a.reniec.verificadoAt.slice(0, 10))}`}><${Badge} tono="ok" punto>RENIEC</${Badge}></span>`}`}
+        sub=${html`${etiquetaNumero(a)}${a.numeroHeredadoDe ? html` <span className="muted" title=${`Heredó el N° de ${a.numeroHeredadoDe.nombre} al comprar el stand ${a.numeroHeredadoDe.stand}`}>(antes de ${a.numeroHeredadoDe.nombre})</span>` : ""}${!tieneNumero(a) && numeroCedido(a) ? html` <span className="muted" title=${`Cedió su N° al vender el stand ${numeroCedido(a).stand}`}>(cedido a ${numeroCedido(a).cedidoANombre} el ${fecha(numeroCedido(a).hasta)})</span>` : ""} · DNI ${a.dni} · ${stands.length > 1 ? "Stands" : "Stand"} ${standsTxt || "—"} · Ingreso ${fecha(a.fechaIngreso)} <${BadgeAsociado} estado=${a.estado} />${a.reniec?.verificadoAt && html` <span title=${`Datos tomados de RENIEC el ${fecha(a.reniec.verificadoAt.slice(0, 10))}`}><${Badge} tono="ok" punto>RENIEC</${Badge}></span>`}`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${bajarPDF}>Descargar ficha PDF</button>`}
           ${editable && html`<button className="btn btn-primary" disabled=${!sucio || ocupado} onClick=${guardar}>${ocupado ? "Guardando…" : sucio ? "Guardar cambios" : "Sin cambios"}</button>`}`} />

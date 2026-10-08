@@ -15,7 +15,10 @@
  * se leen de `stands` (campo propietarioId), para no tener dos verdades.
  * @typedef {Object} Asociado
  * @property {string} id
- * @property {string} numero               N° de asociado del libro de padrón
+ * @property {string} numero               N° de asociado del libro de padrón ("" si lo cedió al vender)
+ * @property {string} [numeroDesde]        AAAA-MM-DD desde que tiene ese N° (si lo heredó)
+ * @property {{asociadoId:string, nombre:string, dni:string, stand:string, fecha:string}} [numeroHeredadoDe]  de quién heredó el N° al comprar
+ * @property {{numero:string, hasta:string, cedidoA:string, cedidoANombre:string, stand:string, motivo:string, por:string|null, registradoAt:string}[]} [numeroHistorial]  N° que tuvo y cedió al vender
  * @property {string} nombres
  * @property {string} apellidoPaterno
  * @property {string} apellidoMaterno

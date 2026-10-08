@@ -1,5 +1,5 @@
 // Validación de la ficha del asociado. Devuelve { campo: mensaje } (vacío = todo bien).
-import { leerCodigos, normalizar, nombreCompleto } from "./padron.js";
+import { leerCodigos, normalizar, nombreCompleto, etiquetaNumero } from "./padron.js";
 
 const DNI = /^\d{8}$/;
 const CELULAR = /^9\d{8}$/;
@@ -17,8 +17,9 @@ export function validarFicha(f, { asociados = [], stands = [], idActual = null }
   const e = {};
   const otros = asociados.filter((a) => a.id !== idActual);
 
-  if (!String(f.numero || "").trim()) e.numero = "Escribe el N° de asociado del libro de padrón.";
-  else if (otros.some((a) => normalizar(a.numero) === normalizar(f.numero))) e.numero = `El N° ${f.numero} ya está asignado a otro asociado.`;
+  const numero = String(f.numero || "").trim();
+  if (!numero) { if (f.estado !== "transferido") e.numero = "Escribe el N° de asociado del libro de padrón."; } // quien vendió y cedió su N° queda sin N°
+  else if (otros.some((a) => String(a.numero || "").trim() && normalizar(a.numero) === normalizar(numero))) e.numero = `El N° ${f.numero} ya está asignado a otro asociado.`;
 
   if (!String(f.nombres || "").trim()) e.nombres = "Escribe los nombres.";
   if (!String(f.apellidoPaterno || "").trim()) e.apellidoPaterno = "Escribe el apellido paterno.";
@@ -27,7 +28,7 @@ export function validarFicha(f, { asociados = [], stands = [], idActual = null }
   if (!DNI.test(dni)) e.dni = "El DNI debe tener 8 dígitos.";
   else {
     const repetido = otros.find((a) => a.dni === dni);
-    if (repetido) e.dni = `Este DNI ya figura en la ficha de ${nombreCompleto(repetido)} (N° ${repetido.numero}).`;
+    if (repetido) e.dni = `Este DNI ya figura en la ficha de ${nombreCompleto(repetido)} (${etiquetaNumero(repetido)}).`;
   }
 
   if (f.celular && !CELULAR.test(soloDigitos(f.celular))) e.celular = "El celular debe tener 9 dígitos y empezar con 9.";

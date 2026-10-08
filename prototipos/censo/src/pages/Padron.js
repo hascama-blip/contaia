@@ -4,7 +4,7 @@ import { CabPagina, BadgeCenso, BadgeAtraso, Vacio, mensajeError } from "../comp
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero } from "../lib/padron.js";
+import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero } from "../lib/padron.js";
 import { aCSV, descargar, COLUMNAS_PADRON } from "../lib/exportar.js";
 import { Paginador, usePaginacion } from "../components/Paginador.js";
 import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
@@ -69,7 +69,7 @@ export function Padron() {
                 const galerias = [...new Set(suyos.map((s) => nombreGaleria(s.galeria)))].join(", ");
                 return html`
                   <tr key=${a.id} className="clic" onClick=${() => ir(`ficha-${a.id}`)}>
-                    <td className="num muted">${a.numero}</td>
+                    <td className="num muted">${tieneNumero(a) ? a.numero : html`<span title="Cedió su N° al vender">${etiquetaNumero(a)}</span>`}</td>
                     <td className="fuerte"><a href=${`#ficha-${a.id}`} onClick=${(e) => e.stopPropagation()} style=${{ color: "inherit" }}>${nombreCompleto(a)}</a></td>
                     <td className="num">${a.dni}${a.reniec?.verificadoAt ? html` <span className="muted" title="Verificado en RENIEC">✓</span>` : ""}</td>
                     <td className="num">${suyos.map((s) => s.codigo).join(", ") || (vendidos.length ? html`<span className="muted">Vendió ${vendidos.join(", ")}</span>` : "—")}</td>

@@ -1,7 +1,7 @@
 // Buscador con sugerencias (combobox): reemplaza a los desplegables largos.
 // Escribe DNI, nombre, N° de asociado o stand y elige de la lista.
 import { html, useState, useMemo, useRef } from "./html.js";
-import { normalizar, nombreCompleto, ordenarPorNumero } from "../lib/padron.js";
+import { normalizar, nombreCompleto, ordenarPorNumero, etiquetaNumero } from "../lib/padron.js";
 
 const MAX = 8;
 
@@ -82,7 +82,7 @@ export function opcionesAsociados(asociados, mapaStands) {
     return {
       valor: a.id,
       titulo: nombreCompleto(a),
-      detalle: `N° ${a.numero} · DNI ${a.dni}${suyos.length ? ` · ${suyos.join(", ")}` : ""}`,
+      detalle: `${etiquetaNumero(a)} · DNI ${a.dni}${suyos.length ? ` · ${suyos.join(", ")}` : ""}`,
       pajar: normalizar(`${a.numero} ${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${suyos.join(" ")}`),
     };
   });

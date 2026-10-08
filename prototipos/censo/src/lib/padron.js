@@ -119,6 +119,27 @@ export function filtrarPadron(asociados, mapaStands, { texto = "", galeria = "",
   });
 }
 
+/** ¿Es un N° de padrón de verdad? (los "S/N-1" del libro no cuentan). */
+export function tieneNumero(a) {
+  const n = String(a?.numero || "").trim();
+  return !!n && !/^s\/n/i.test(n);
+}
+
+/** Último N° que tuvo un asociado que lo cedió al vender (o null). */
+export function numeroCedido(a) {
+  const h = a?.numeroHistorial;
+  return h && h.length ? h[h.length - 1] : null;
+}
+
+/** "N° 226", "ex N° 226" (lo cedió al vender) o "sin N°". */
+export function etiquetaNumero(a) {
+  if (tieneNumero(a)) return `N° ${a.numero}`;
+  const c = numeroCedido(a);
+  return c ? `ex N° ${c.numero}` : "sin N°";
+}
+
 export function ordenarPorNumero(asociados) {
-  return [...asociados].sort((a, b) => String(a.numero).localeCompare(String(b.numero), "es", { numeric: true }));
+  // Primero los que tienen N°; los que lo cedieron al vender (ex N°) van al final, por su antiguo N°.
+  const clave = (a) => (tieneNumero(a) ? `0${String(a.numero).padStart(6, "0")}` : `1${String(numeroCedido(a)?.numero || "").padStart(6, "0")}`);
+  return [...asociados].sort((a, b) => clave(a).localeCompare(clave(b), "es", { numeric: true }));
 }

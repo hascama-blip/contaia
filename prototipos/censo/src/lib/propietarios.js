@@ -1,7 +1,22 @@
 // Historial de propietarios de cada stand. Regla: un dueño anterior NUNCA se
 // borra; al vender, pasa a `stand.historial` con su tramo (desde–hasta) y el
 // nuevo queda en `propietarioId` desde la fecha de la venta.
-import { nombreCompleto, compararCodigos } from "./padron.js";
+import { nombreCompleto, compararCodigos, tieneNumero } from "./padron.js";
+
+/**
+ * Regla del libro de padrón: al vender NO se crea un N° nuevo. Si quien vende se
+ * queda sin stands (sale del padrón) y quien compra no tiene N° propio (es nuevo o
+ * figura "S/N"), el comprador HEREDA el N° del vendedor; el vendedor queda en el
+ * historial como "ex N°". Devuelve el N° a heredar o null.
+ * @param {object} p { anterior, comprador, modo, standsDelAnterior, codigo }
+ */
+export function numeroAHeredar({ anterior, comprador, modo, standsDelAnterior, codigo }) {
+  if (!anterior || !tieneNumero(anterior)) return null;
+  const saleDelPadron = (standsDelAnterior || []).every((s) => s.codigo === codigo);
+  if (!saleDelPadron) return null;
+  const compradorSinNumero = modo === "nueva" || !tieneNumero(comprador);
+  return compradorSinNumero ? String(anterior.numero).trim() : null;
+}
 
 /**
  * Tramo de un propietario anterior (se guarda en stand.historial).

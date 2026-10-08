@@ -6,8 +6,8 @@ import { Badge, Campo, Entrada, Selector, Texto, Panel, mensajeError } from "./u
 import { useApp } from "./contexto.js";
 import { MOTIVOS_TRASPASO } from "../config.js";
 import { hoy, fecha } from "../lib/formato.js";
-import { nombreCompleto, nombreGaleria } from "../lib/padron.js";
-import { cadenaPropietarios, ordinal } from "../lib/propietarios.js";
+import { nombreCompleto, nombreGaleria, etiquetaNumero } from "../lib/padron.js";
+import { cadenaPropietarios, ordinal, numeroAHeredar } from "../lib/propietarios.js";
 import { transferirStand } from "../api/stands.js";
 import { adjuntarArchivo } from "../api/asociados.js";
 import { BotonReniec } from "./BotonReniec.js";
@@ -62,6 +62,10 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
     const n = datos.asociados.map((a) => parseInt(a.numero, 10)).filter((x) => x > 0);
     return String((n.length ? Math.max(...n) : 0) + 1).padStart(3, "0");
   }, [datos.asociados]);
+  // Regla del padrón: el comprador hereda el N° del vendedor cuando este se queda sin stands y el comprador no tiene N° propio.
+  const standsDelDueno = derivados.mapaStands.get(stand.propietarioId) || [];
+  const hereda = numeroAHeredar({ anterior: dueno, comprador, modo: t.modo, standsDelAnterior: standsDelDueno, codigo: stand.codigo });
+  const vendeTodo = !!dueno && standsDelDueno.every((s) => s.codigo === stand.codigo);
 
   async function guardar() {
     setOcupado(true);
@@ -88,9 +92,11 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
       <p className="muted">${nombreGaleria(stand.galeria)}${stand.giro ? ` · ${stand.giro}` : ""}</p>
       <div className="aviso aviso-info">
         <span>${dueno
-          ? html`Propietario actual: <strong>${nombreCompleto(dueno)}</strong> (DNI ${dueno.dni}). No se borra: pasará al historial como propietario anterior.`
+          ? html`Propietario actual: <strong>${nombreCompleto(dueno)}</strong> (${etiquetaNumero(dueno)} · DNI ${dueno.dni}). No se borra: pasará al historial como propietario anterior.`
           : html`Este stand no tiene propietario registrado; el nuevo será el primero del historial.`}</span>
       </div>
+      ${hereda && html`<div className="aviso aviso-info"><span>Al ser su único stand, <strong>${nombreCompleto(dueno)}</strong> sale del padrón y el comprador <strong>hereda su N° ${hereda}</strong>. No se crea un N° nuevo; el vendedor quedará como “Transferido · ex N° ${hereda}”.</span></div>`}
+      ${!hereda && vendeTodo && comprador && html`<div className="aviso aviso-info"><span>${nombreCompleto(comprador)} ya tiene ${etiquetaNumero(comprador)}, así que lo conserva. ${nombreCompleto(dueno)} quedará como “Transferido” con su ${etiquetaNumero(dueno)} en el historial.</span></div>`}
 
       <div className="campo">
         <span className="label">¿El nuevo propietario ya está en el padrón? <span className="req" aria-hidden="true">*</span></span>
@@ -117,9 +123,11 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
           <${Campo} id="t-ap" etiqueta="Apellido paterno" req error=${errores.apellidoPaterno}><${Entrada} id="t-ap" valor=${t.nueva.apellidoPaterno} onCambio=${cambiaNueva("apellidoPaterno")} error=${errores.apellidoPaterno} /><//>
           <${Campo} id="t-am" etiqueta="Apellido materno"><${Entrada} id="t-am" valor=${t.nueva.apellidoMaterno} onCambio=${cambiaNueva("apellidoMaterno")} /><//>
           <${Campo} id="t-cel" etiqueta="Celular" error=${errores.celular}><${Entrada} id="t-cel" valor=${t.nueva.celular} onCambio=${cambiaNueva("celular")} tipo="tel" error=${errores.celular} /><//>
-          <${Campo} id="t-num" etiqueta="N° de asociado" req error=${errores.numero} ayuda="Sugerido: el siguiente libre del libro de padrón.">
-            <${Entrada} id="t-num" valor=${t.nueva.numero} onCambio=${cambiaNueva("numero")} error=${errores.numero} />
-          <//>`}
+          ${hereda
+            ? html`<p className="ayuda"><strong>N° de asociado: ${hereda}</strong> (heredado de ${nombreCompleto(dueno)}; no se crea un N° nuevo).</p>`
+            : html`<${Campo} id="t-num" etiqueta="N° de asociado" req error=${errores.numero} ayuda=${dueno ? `${nombreCompleto(dueno)} conserva su N° porque sigue con otros stands; al nuevo le toca el siguiente libre.` : "Sugerido: el siguiente libre del libro de padrón."}>
+                <${Entrada} id="t-num" valor=${t.nueva.numero} onCambio=${cambiaNueva("numero")} error=${errores.numero} />
+              <//>`}`}
 
       <div className="form-rejilla">
         <${Campo} id="t-fecha" etiqueta="Fecha de la venta o traspaso" req error=${errores.fecha}>
