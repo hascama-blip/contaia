@@ -33,7 +33,7 @@
   const cx = S.contacto(t);
   const tarjeta = (a) => `<article class="art" ${a.id === artId ? 'style="outline:3px solid var(--accent-400)"' : ""}>
       <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
-      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "")}</div>${t.whatsapp ? `<a class="btn btn-wa btn-sm" href="${S.wa(t.whatsapp, `Hola ${t.nombre}, vi en la web de ${sitio.nombre} su oferta "${a.nombre}"${a.precioOferta ? ` (${S.soles(a.precioOferta)})` : ""}. ¿Sigue disponible?`)}" target="_blank" rel="noopener">Preguntar por WhatsApp</a>` : ""}</div></article>`;
+      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "")}</div>${t.whatsapp ? `<a class="btn btn-wa btn-sm" href="${S.wa(t.whatsapp, `Hola ${t.nombre}, vi en la web de ${sitio.nombre} su oferta "${a.nombre}"${a.precioOferta ? ` (${S.soles(a.precioOferta)})` : ""}. ¿Sigue disponible?`)}" target="_blank" rel="noopener">${S.icono("whatsapp")} Preguntar</a>` : ""}</div></article>`;
   const tipos = [...new Set(articulos.map((a) => S.tipo(a, sitio.tiposOferta)?.nombre))].filter(Boolean);
   $("#perfil").innerHTML = `
     <section class="perfil-hero">${S.logo(t)}<div style="flex:1;min-width:220px"><h1>${S.esc(t.nombre)}</h1><p>${S.esc([t.stand, t.piso, t.horario].filter(Boolean).join(" · "))}</p><div class="etiquetas" style="margin-top:8px">${(t.categorias || []).map((c) => cat.get(c)).filter(Boolean).map((c) => `<span class="etiqueta">${S.esc(c.nombre)}</span>`).join("")}</div></div>
