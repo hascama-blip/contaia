@@ -29,6 +29,7 @@
   const art = articulos.find((a) => a.id === artId);
   const saludo = `Hola ${t.nombre}, los vi en la web de ${sitio.nombre}.${art ? ` Me interesa: ${art.nombre}${art.oferta && art.precioOferta ? ` (oferta ${S.soles(art.precioOferta)})` : ""}.` : ""}`;
   const botones = [];
+  const cx = S.contacto(t); if (cx.externo) botones.push(`<a class="boton-perfil oro" href="${S.esc(cx.href)}" target="_blank" rel="noopener"><span class="ico">${S.icono("enlace")}</span>${S.esc(cx.texto === "Contactar" ? "Perfil digital" : cx.texto)}<small>Ver en su web</small></a>`);
   if (t.whatsapp) botones.push(`<a class="boton-perfil wa" href="${S.wa(t.whatsapp, saludo)}" target="_blank" rel="noopener"><span class="ico">${S.icono("whatsapp")}</span>WhatsApp<small>Escríbenos ahora</small></a>`);
   if (t.telefono) botones.push(`<a class="boton-perfil" href="tel:${S.esc(String(t.telefono).replace(/\s/g, ""))}"><span class="ico">${S.icono("telefono")}</span>Llamar<small>${S.esc(t.telefono)}</small></a>`);
   if (t.catalogoPdf) botones.push(`<a class="boton-perfil" href="${S.blob(t.catalogoPdf)}" target="_blank" rel="noopener"><span class="ico">${S.icono("catalogo")}</span>Catálogo<small>PDF</small></a>`);

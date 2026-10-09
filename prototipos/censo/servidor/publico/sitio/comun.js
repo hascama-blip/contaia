@@ -34,6 +34,10 @@ window.S = {
   soles: (v) => { const n = Number(v); return n > 0 ? "S/ " + n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; },
   iniciales: (n) => String(n || "?").split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase(),
   wa: (num, texto) => (num ? `https://wa.me/${num}${texto ? "?text=" + encodeURIComponent(texto) : ""}` : ""),
+  // Botón Contactar de una tienda: si tiene "contactoUrl" (su perfil digital en otra web) va ahí en pestaña nueva;
+  // si no, al perfil dentro de esta web (/tienda/id). El texto del botón también es editable (contactoTexto).
+  contacto: (t, interno) => { const u = S.url(t?.contactoUrl); const externo = !!u && !/^[/?#]/.test(u); return { href: externo ? u : interno || `/tienda/${encodeURIComponent(t?.id || "")}`, externo, texto: String(t?.contactoTexto || "").trim() || "Contactar" }; },
+  btnContacto: (t, cls = "btn btn-primario btn-sm", interno) => { const c = S.contacto(t, interno); return `<a class="${cls}" href="${S.esc(c.href)}"${c.externo ? ' target="_blank" rel="noopener"' : ""}>${S.esc(c.texto)}</a>`; },
   logo: (t, cls = "logo") => (t.logo ? `<img class="${cls}" src="${S.blob(t.logo)}" alt="" loading="lazy">` : `<div class="${cls}" aria-hidden="true">${S.esc(S.iniciales(t.nombre))}</div>`),
   tipo: (a, tipos) => (a.oferta ? (tipos || []).find((t) => t.id === (a.tipoOferta || "oferta")) || { id: "oferta", nombre: "Oferta" } : null),
   pill: (a, tipos) => { const t = S.tipo(a, tipos); return t ? `<span class="oferta-pill tipo-${S.esc(t.id)}">${S.esc(t.nombre.toUpperCase())}</span>` : ""; },

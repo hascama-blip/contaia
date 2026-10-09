@@ -69,7 +69,8 @@ export function validarPublico(col, d, ctx = {}) {
     if (!texto(d.nombre, 80)) return "El nombre de la tienda es muy largo (máximo 80 caracteres).";
     if (!whatsappOk(d.whatsapp)) return "El WhatsApp debe tener 9 dígitos y empezar con 9 (por ejemplo 987654321).";
     if (!texto(d.descripcion, 600)) return "La descripción es muy larga (máximo 600 caracteres).";
-    for (const [k, nombre] of [["catalogoUrl", "catálogo en línea"], ["ubicacionUrl", "ubicación"]]) if (!enlaceOk(d[k])) return `El enlace de ${nombre} no es válido: debe empezar con https://.`;
+    for (const [k, nombre] of [["catalogoUrl", "de catálogo en línea"], ["ubicacionUrl", "de ubicación"], ["contactoUrl", "del botón Contactar (perfil digital)"]]) if (!enlaceOk(d[k])) return `El enlace ${nombre} no es válido: debe empezar con https://.`;
+    if (!texto(d.contactoTexto, 30)) return "El texto del botón Contactar es muy largo (máximo 30 caracteres).";
     if (d.enlaces !== undefined && (!Array.isArray(d.enlaces) || d.enlaces.length > 10)) return "Máximo 10 enlaces adicionales.";
     for (const e of d.enlaces || []) if (!e || !enlaceOk(e.url) || !String(e.url || "").trim()) return `El enlace "${e?.titulo || ""}" no es válido: debe empezar con https://.`;
     for (const k of ["facebook", "instagram", "tiktok"]) if (d.redes && !texto(d.redes[k], 120)) return `El dato de ${k} es muy largo.`;
@@ -128,7 +129,7 @@ export class SitioPublico {
   }
   #tiendas() {
     return this.#almacen.listar("tiendas").filter((d) => d.data && d.data.visible !== false && d.data.nombre)
-      .map(({ id, data }) => ({ id, ...Object.fromEntries(Object.entries(data).filter(([k]) => !CAMPOS_PRIVADOS_TIENDA.has(k))), whatsapp: waNumero(data.whatsapp) }))
+      .map(({ id, data }) => ({ id, ...Object.fromEntries(Object.entries(data).filter(([k]) => !CAMPOS_PRIVADOS_TIENDA.has(k))), whatsapp: waNumero(data.whatsapp), contactoUrl: urlSegura(data.contactoUrl) }))
       .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre).localeCompare(String(b.nombre), "es"));
   }
   #articulos(tiendasVisibles) {

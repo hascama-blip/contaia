@@ -65,6 +65,7 @@
     if (f.telefono.value && !/^[\d\s()+-]{6,20}$/.test(f.telefono.value.trim())) return marcar(f.telefono, "Revisa el teléfono: solo números, espacios, + o guiones.");
     if (!esEnlace(f.catalogoUrl.value)) return marcar(f.catalogoUrl, "El enlace del catálogo debe empezar con https://");
     if (!esEnlace(f.ubicacionUrl.value)) return marcar(f.ubicacionUrl, "El enlace de ubicación debe empezar con https://");
+    if (!esEnlace(f.contactoUrl.value)) return marcar(f.contactoUrl, "El enlace del botón Contactar debe empezar con https://");
     for (const l of f.enlaces.value.split("\n")) { const [tit, url] = l.split("|").map((x) => (x || "").trim()); if ((tit || url) && !esEnlace(url || tit)) return marcar(f.enlaces, `El enlace "${tit || url}" no es válido: escribe "Título | https://…".`); }
     if (f.orden.value !== "" && !(Number(f.orden.value) >= 0)) return marcar(f.orden, "El orden debe ser un número desde 0.");
     return true;
@@ -140,7 +141,7 @@
   const fT = $("#f-tienda"), dT = $("#d-tienda"); let tiendaActual = null;
   const abrirTienda = (t) => {
     tiendaActual = t; $("#t-titulo").textContent = t ? `Editar: ${t.nombre}` : "Nueva tienda"; $("#t-borrar").hidden = !t;
-    fT.reset(); for (const k of ["nombre", "stand", "piso", "descripcion", "whatsapp", "telefono", "horario", "qrPagoTexto", "catalogoUrl", "ubicacionUrl", "orden"]) fT[k].value = t?.[k] ?? "";
+    fT.reset(); for (const k of ["nombre", "stand", "piso", "descripcion", "whatsapp", "telefono", "horario", "qrPagoTexto", "catalogoUrl", "ubicacionUrl", "contactoUrl", "contactoTexto", "orden"]) fT[k].value = t?.[k] ?? "";
     for (const k of ["facebook", "instagram", "tiktok"]) fT[k].value = t?.redes?.[k] || "";
     fT.enlaces.value = (t?.enlaces || []).map((e) => `${e.titulo || ""} | ${e.url || ""}`).join("\n"); fT.visible.checked = t ? t.visible !== false : true;
     $("#t-cats").innerHTML = config.categorias.map((c) => `<label><input type="checkbox" name="cat" value="${S.esc(c.id)}" ${(t?.categorias || []).includes(c.id) ? "checked" : ""}>${S.esc(c.nombre)}</label>`).join("") || `<span class="ayuda">Primero crea categorías en la pestaña “Categorías”.</span>`;
@@ -153,7 +154,7 @@
     e.preventDefault();
     if (!validarTienda(fT)) return;
     const d = { ...(tiendaActual || { creadoAt: ahora() }) }; delete d.id;
-    for (const k of ["nombre", "stand", "piso", "descripcion", "whatsapp", "telefono", "horario", "qrPagoTexto", "catalogoUrl", "ubicacionUrl"]) d[k] = fT[k].value.trim();
+    for (const k of ["nombre", "stand", "piso", "descripcion", "whatsapp", "telefono", "horario", "qrPagoTexto", "catalogoUrl", "ubicacionUrl", "contactoUrl", "contactoTexto"]) d[k] = fT[k].value.trim();
     d.orden = fT.orden.value === "" ? null : Number(fT.orden.value); d.visible = fT.visible.checked;
     d.categorias = $$("input[name=cat]:checked", fT).map((i) => i.value);
     d.redes = { facebook: fT.facebook.value.trim(), instagram: fT.instagram.value.trim(), tiktok: fT.tiktok.value.trim() };
@@ -284,7 +285,7 @@
       for (const [i, t] of EJ.tiendas.entries()) {
         paso(`Creando tienda ${i + 1} de ${EJ.tiendas.length}: ${t.nombre}…`);
         const id = "ej_" + nuevoId(); ids.push(id);
-        await S.pedir("PUT", `/api/db/tiendas/${id}`, { nombre: t.nombre, stand: t.stand, piso: t.piso, categorias: t.cats, descripcion: t.desc, whatsapp: t.wa, telefono: "", horario: t.horario, logo: await subir(await imagenLogo(t), "image/"), qrPago: await subir(await imagenQR(t), "image/"), qrPagoTexto: t.qr, catalogoUrl: "", catalogoPdf: "", ofertasPdf: "", ubicacionUrl: "", redes: { facebook: t.redes.facebook || "", instagram: t.redes.instagram || "", tiktok: t.redes.tiktok || "" }, enlaces: [], orden: null, visible: true, ejemplo: true, creadoAt: ahora(), actualizadoAt: ahora() });
+        await S.pedir("PUT", `/api/db/tiendas/${id}`, { nombre: t.nombre, stand: t.stand, piso: t.piso, categorias: t.cats, descripcion: t.desc, whatsapp: t.wa, telefono: "", horario: t.horario, logo: await subir(await imagenLogo(t), "image/"), qrPago: await subir(await imagenQR(t), "image/"), qrPagoTexto: t.qr, catalogoUrl: "", catalogoPdf: "", ofertasPdf: "", ubicacionUrl: "", contactoUrl: "", contactoTexto: "", redes: { facebook: t.redes.facebook || "", instagram: t.redes.instagram || "", tiktok: t.redes.tiktok || "" }, enlaces: [], orden: null, visible: true, ejemplo: true, creadoAt: ahora(), actualizadoAt: ahora() });
       }
       for (const [i, a] of EJ.articulos.entries()) {
         const [ti, nombre, categoriaId, precio, precioOferta, tipoOferta, etiquetaOferta, emoji, destacado, descripcion] = a;

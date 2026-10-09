@@ -145,6 +145,11 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   que filtran tiendas y artículos; cada tienda tiene **Ver ofertas** (resumen en ventana:
   artículos en oferta + botón Contactar) y **Contactar**; abajo, la **variedad de artículos**
   con “Vende: tienda · stand” y botón Contactar en cada uno. Filtro en la URL: `/?cat=mochilas`.
+  **Botón Contactar editable por tienda**: en el editor, campo “Botón Contactar: enlace al
+  perfil digital” (`contactoUrl`, solo https/mailto/tel, validado en servidor) y “Texto del
+  botón” (`contactoTexto`, ≤ 30). Con enlace, Contactar (tarjeta, artículos, resumen de ofertas)
+  abre esa web en pestaña nueva y el perfil interno muestra un botón “Perfil digital”; sin
+  enlace abre `/tienda/:id`. Helper `S.contacto(t)` / `S.btnContacto(t)` en `comun.js`.
 - **Perfil digital de tienda** (`/tienda/:id`, `tienda.html`): WhatsApp con mensaje prellenado
   (y por artículo con `?art=`), llamar, catálogo (PDF o enlace), PDF de ofertas, **QR de pago**
   (imagen + texto Yape/Plin), cómo llegar, redes y botones extra; lista de ofertas y artículos.

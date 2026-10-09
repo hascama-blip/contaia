@@ -123,7 +123,7 @@
       <div class="tienda-cab">${S.logo(t)}<div><h3>${S.esc(t.nombre)}</h3><div class="stand">${S.esc([t.stand, t.piso].filter(Boolean).join(" · ")) || "&nbsp;"}</div></div></div>
       <p class="tienda-desc">${S.esc(t.descripcion || "") || `<span class="muted">Vende ${S.esc((t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ").toLowerCase() || "en el centro comercial")}.</span>`}</p>
       <div class="tienda-meta"><button type="button" class="ver-mas" hidden>Ver más</button><span class="tienda-ofertas ${t.ofertas ? "con" : ""}">${t.ofertas ? `${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}` : `${t.articulos || 0} artículo${t.articulos === 1 ? "" : "s"}`}</span></div>
-      <div class="tienda-acciones"><button type="button" class="btn btn-borde btn-sm ver">Ver ofertas</button><a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(t.id)}">Contactar</a></div>
+      <div class="tienda-acciones"><button type="button" class="btn btn-borde btn-sm ver">Ver ofertas</button>${S.btnContacto(t)}</div>
     </article>`;
   }
   function tarjetaArticulo(a) {
@@ -131,7 +131,7 @@
     return `<article class="art">
       <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
       <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "").slice(0, 90)}</div><div class="vende">Vende: <b>${S.esc(t.nombre || "—")}</b>${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
-      <a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(a.tiendaId)}${a.id ? `?art=${encodeURIComponent(a.id)}` : ""}">Contactar</a></div>
+      ${S.btnContacto(t.id ? t : { id: a.tiendaId }, "btn btn-primario btn-sm", `/tienda/${encodeURIComponent(a.tiendaId)}${a.id ? `?art=${encodeURIComponent(a.id)}` : ""}`)}</div>
     </article>`;
   }
 
@@ -153,7 +153,8 @@
     const mios = articulos.filter((a) => a.tiendaId === t.id); const of = mios.filter((a) => a.oferta); const lista = (of.length ? of : mios).slice(0, 6);
     $("#m-ofertas-titulo").textContent = of.length ? `Ofertas (${of.length})` : mios.length ? "Lo que vende" : "";
     $("#m-ofertas").innerHTML = lista.length ? lista.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.icono("foto")}</div>`}<div class="nom">${S.esc(a.nombre)}${a.oferta ? ` <span class="oferta-pill">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "oferta")}</span>` : ""}</div>${S.precio(a)}</div>`).join("") + (mios.length > lista.length ? `<div class="vende" style="text-align:center">y ${mios.length - lista.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó artículos. Contáctala para consultar.</div>`;
-    $("#m-contactar").href = `/tienda/${encodeURIComponent(t.id)}`;
+    const c = S.contacto(t), mc = $("#m-contactar"); mc.href = c.href; mc.textContent = c.externo ? (c.texto === "Contactar" ? "Contactar · ver perfil digital" : c.texto) : `${c.texto} · ver perfil completo`;
+    if (c.externo) { mc.target = "_blank"; mc.rel = "noopener"; } else { mc.removeAttribute("target"); mc.removeAttribute("rel"); }
     modal.showModal();
   }
 
