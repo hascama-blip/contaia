@@ -45,7 +45,12 @@
   <section class="contenedor seccion" id="ofertas">
     <h2 class="titulo-grande">Las mejores <b>ofertas</b><span class="punto">.</span></h2>
     <p class="titulo-sub" id="ofertas-sub">Precios directos de los fabricantes del centro comercial.</p>
-    <div class="filtros-oferta" id="ofertas-filtros" role="group" aria-label="Tipo de oferta"></div>
+    <div class="filtros-barra" id="ofertas-filtros" role="group" aria-label="Filtros de ofertas">
+      <label class="filtro"><span>Tipo</span><select id="f-tipo"><option value="">Todas</option></select></label>
+      <label class="filtro"><span>Tienda</span><select id="f-tienda"><option value="">Todas</option></select></label>
+      <label class="filtro"><span>Ordenar</span><select id="f-orden"><option value="descuento">Mayor descuento</option><option value="precio-asc">Menor precio</option><option value="precio-desc">Mayor precio</option><option value="reciente">Más recientes</option></select></label>
+      <button type="button" class="filtro-limpiar" id="f-limpiar" hidden>Limpiar filtros</button>
+    </div>
     <div class="afiches" id="lista-ofertas"></div>
     <div class="ver-mas" id="ofertas-mas" hidden><button type="button" class="btn btn-borde">Ver todas las ofertas</button></div>
   </section>

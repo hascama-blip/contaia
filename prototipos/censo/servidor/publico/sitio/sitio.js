@@ -56,7 +56,7 @@
 
   // ---- Las mejores ofertas (afiches) y novedades ----
   const descuento = (a) => (Number(a.precio) > 0 && Number(a.precioOferta) > 0 && Number(a.precioOferta) < Number(a.precio) ? Math.round((1 - Number(a.precioOferta) / Number(a.precio)) * 100) : 0);
-  let tipoFiltro = "", verTodas = false;
+  let tipoFiltro = "", tiendaFiltro = "", ordenOfertas = "descuento", verTodas = false;
   function afiche(a) {
     const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
     const cifra = d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>` : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">S/ ${Number(a.precioOferta).toLocaleString("es-PE")}</div><div class="afiche-sub">precio de oferta</div>` : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? "S/ " + Number(a.precio).toLocaleString("es-PE") : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
@@ -71,18 +71,30 @@
       <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}</div>
     </a>`;
   }
+  const precioVigente = (a) => (Number(a.precioOferta) > 0 ? Number(a.precioOferta) : Number(a.precio) > 0 ? Number(a.precio) : Infinity);
   function pintarOfertas(lista) {
-    const todas = lista.filter((a) => a.oferta).sort((x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x));
-    const tipos = (sitio.tiposOferta || []).map((t) => ({ ...t, n: todas.filter((a) => (a.tipoOferta || "oferta") === t.id).length })).filter((t) => t.n);
+    const todas = lista.filter((a) => a.oferta);
+    // Cada lista de opciones depende del otro filtro: solo tipos que tenga la tienda elegida y solo tiendas con ofertas del tipo elegido.
+    const tipos = (sitio.tiposOferta || []).filter((t) => todas.some((a) => (a.tipoOferta || "oferta") === t.id && (!tiendaFiltro || a.tiendaId === tiendaFiltro)));
+    const tiendasOf = [...new Set(todas.filter((a) => !tipoFiltro || (a.tipoOferta || "oferta") === tipoFiltro).map((a) => a.tiendaId))].map((id) => tiendaDe.get(id)).filter(Boolean).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
     if (tipoFiltro && !tipos.some((t) => t.id === tipoFiltro)) tipoFiltro = "";
-    $("#ofertas-filtros").innerHTML = tipos.length > 1 ? [`<button type="button" class="chip" data-tipo="" aria-pressed="${!tipoFiltro}">Todas <small>${todas.length}</small></button>`, ...tipos.map((t) => `<button type="button" class="chip tipo-${S.esc(t.id)}" data-tipo="${S.esc(t.id)}" aria-pressed="${tipoFiltro === t.id}"><i class="punto-tipo tipo-${S.esc(t.id)}"></i>${S.esc(t.nombre)} <small>${t.n}</small></button>`)].join("") : "";
-    const of = tipoFiltro ? todas.filter((a) => (a.tipoOferta || "oferta") === tipoFiltro) : todas;
+    if (tiendaFiltro && !tiendasOf.some((t) => t.id === tiendaFiltro)) tiendaFiltro = "";
+    const selTipo = $("#f-tipo"), selTienda = $("#f-tienda");
+    selTipo.innerHTML = `<option value="">Todas</option>` + tipos.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); selTipo.value = tipoFiltro;
+    selTienda.innerHTML = `<option value="">Todas</option>` + tiendasOf.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); selTienda.value = tiendaFiltro;
+    $("#f-orden").value = ordenOfertas;
+    $("#ofertas-filtros").hidden = todas.length < 2;
+    $("#f-limpiar").hidden = !(tipoFiltro || tiendaFiltro || ordenOfertas !== "descuento");
+    let of = todas.filter((a) => (!tipoFiltro || (a.tipoOferta || "oferta") === tipoFiltro) && (!tiendaFiltro || a.tiendaId === tiendaFiltro));
+    const porFecha = (x, y) => String(y.creadoAt || y.actualizadoAt || "").localeCompare(String(x.creadoAt || x.actualizadoAt || ""));
+    of = of.sort(ordenOfertas === "precio-asc" ? (x, y) => precioVigente(x) - precioVigente(y) : ordenOfertas === "precio-desc" ? (x, y) => precioVigente(y) - precioVigente(x) : ordenOfertas === "reciente" ? porFecha : (x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x));
     const LIM = 8, mostradas = verTodas ? of : of.slice(0, LIM);
-    $("#ofertas").hidden = !todas.length; $("#lista-ofertas").innerHTML = mostradas.map(afiche).join("");
+    $("#ofertas").hidden = !todas.length; $("#lista-ofertas").innerHTML = mostradas.length ? mostradas.map(afiche).join("") : `<div class="vacio" style="grid-column:1/-1">No hay ofertas con esos filtros.</div>`;
     const mas = $("#ofertas-mas"); mas.hidden = of.length <= LIM; mas.querySelector("button").textContent = verTodas ? "Ver menos" : `Ver todas las ofertas (${of.length})`;
     const tiendasConOferta = new Set(of.map((a) => a.tiendaId)).size;
-    $("#ofertas-sub").textContent = of.length ? `${of.length} ${tipoFiltro ? (tipos.find((t) => t.id === tipoFiltro)?.nombre.toLowerCase() + (of.length === 1 ? "" : "s")) : `oferta${of.length === 1 ? "" : "s"}`} de ${tiendasConOferta} tienda${tiendasConOferta === 1 ? "" : "s"} · toca una para contactar a la tienda` : "";
-    const nov = [...lista].sort((x, y) => String(y.creadoAt || y.actualizadoAt || "").localeCompare(String(x.creadoAt || x.actualizadoAt || ""))).slice(0, 10);
+    const nombreTipo = tipos.find((t) => t.id === tipoFiltro)?.nombre;
+    $("#ofertas-sub").textContent = of.length ? `${of.length} oferta${of.length === 1 ? "" : "s"}${nombreTipo ? ` · ${nombreTipo}` : ""}${tiendaFiltro ? ` · ${tiendaDe.get(tiendaFiltro)?.nombre || ""}` : ` de ${tiendasConOferta} tienda${tiendasConOferta === 1 ? "" : "s"}`} · toca una para contactar a la tienda` : "Ninguna oferta coincide con los filtros elegidos.";
+    const nov = [...lista].sort(porFecha).slice(0, 10);
     $("#novedades").hidden = nov.length < 3; $("#lista-novedades").innerHTML = nov.map(tarjetaArticulo).join("");
   }
 
@@ -123,7 +135,10 @@
     </article>`;
   }
 
-  $("#ofertas-filtros").onclick = (e) => { const b = e.target.closest(".chip"); if (!b) return; tipoFiltro = b.dataset.tipo; verTodas = false; pintar(); };
+  $("#f-tipo").onchange = (e) => { tipoFiltro = e.target.value; verTodas = false; pintar(); };
+  $("#f-tienda").onchange = (e) => { tiendaFiltro = e.target.value; verTodas = false; pintar(); };
+  $("#f-orden").onchange = (e) => { ordenOfertas = e.target.value; pintar(); };
+  $("#f-limpiar").onclick = () => { tipoFiltro = ""; tiendaFiltro = ""; ordenOfertas = "descuento"; verTodas = false; pintar(); };
   $("#ofertas-mas").onclick = () => { verTodas = !verTodas; pintar(); if (!verTodas) $("#ofertas").scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   // ---- Resumen de ofertas (modal) ----

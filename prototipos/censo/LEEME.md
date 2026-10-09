@@ -171,8 +171,8 @@ el texto no cabe (medido en pantalla) y abre el resumen de la tienda.
 ## Tipos de oferta en la web pública
 Un artículo en oferta lleva `tipoOferta` (oferta, liquidacion, campana, combo, mayorista, nuevo;
 lista `TIPOS_OFERTA` en `servidor/lib/sitio.js`, expuesta como `sitio.tiposOferta`) y una
-`etiquetaOferta` libre ("Campaña escolar 2027"). La portada muestra chips para filtrar "Las mejores
-ofertas" por tipo, cada afiche lleva una franja de color con el tipo y la **tienda** (logo, nombre y
+`etiquetaOferta` libre ("Campaña escolar 2027"). La portada tiene una barra de filtros en "Las mejores
+ofertas" (tipo, tienda y orden: mayor descuento, menor/mayor precio, más recientes), cada afiche lleva una franja de color con el tipo y la **tienda** (logo, nombre y
 stand) y un botón "Ver todas las ofertas" cuando hay más de 8. Seguridad del servidor: ver
 `servidor/GUIA-AWS.md` § 7.
 
