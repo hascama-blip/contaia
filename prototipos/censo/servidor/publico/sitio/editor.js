@@ -30,15 +30,17 @@
   const pedirArchivo = (accept) => new Promise((ok) => { const i = document.createElement("input"); i.type = "file"; i.accept = accept; i.onchange = () => ok(i.files[0] || null); i.click(); });
 
   // ---- Datos ----
-  let config, tiendas = [], articulos = [];
+  let config, tiendas = [], articulos = []; let visitas = new Map();
   const cargar = async () => {
     const [c, t, a] = await Promise.all([fetch("/api/db/sitio/config").then((r) => (r.ok ? r.json() : null)), S.pedir("GET", "/api/db/tiendas"), S.pedir("GET", "/api/db/articulos")]);
     const pub = await S.pedir("GET", "/api/publico/sitio"); // trae los valores por defecto (categorías iniciales, nombre…)
-    config = { ...pub.sitio, ...(c?.data || {}) }; if (!Array.isArray(config.categorias) || !config.categorias.length) config.categorias = pub.sitio.categorias; if (!Array.isArray(config.carrusel)) config.carrusel = [];
+    visitas = new Map(pub.tiendas.map((t) => [t.id, t.visitas || 0])); // visitas al perfil (las cuenta el servidor)
+    config = { ...pub.sitio, ...(c?.data || {}), tiposOferta: pub.sitio.tiposOferta, maxOfertasPorTienda: pub.sitio.maxOfertasPorTienda }; // los tipos los define el servidor, no el documento guardado
+    if (!Array.isArray(config.categorias) || !config.categorias.length) config.categorias = pub.sitio.categorias; if (!Array.isArray(config.carrusel)) config.carrusel = [];
     tiendas = t.docs.map((d) => ({ id: d.id, ...d.data })).sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
     articulos = a.docs.map((d) => ({ id: d.id, ...d.data })).sort((a, b) => String(b.actualizadoAt || "").localeCompare(String(a.actualizadoAt || "")));
   };
-  const guardarConfig = async () => { await S.pedir("PUT", "/api/db/sitio/config", { ...config, actualizadoAt: ahora() }); estado("Guardado ✓"); };
+  const guardarConfig = async () => { const { tiposOferta, maxOfertasPorTienda, ...c } = config; await S.pedir("PUT", "/api/db/sitio/config", { ...c, actualizadoAt: ahora() }); estado("Guardado ✓"); }; // tipos y máximos los define el servidor
   const catDe = (id) => config.categorias.find((c) => c.id === id);
   const tiendaDe = (id) => tiendas.find((t) => t.id === id);
 
@@ -76,9 +78,10 @@
     const precio = f.precio.value === "" ? null : Number(f.precio.value), oferta = f.precioOferta.value === "" ? null : Number(f.precioOferta.value);
     if (precio !== null && !(precio >= 0)) return marcar(f.precio, "El precio debe ser un número desde 0.");
     if (oferta !== null && !(oferta >= 0)) return marcar(f.precioOferta, "El precio de oferta debe ser un número desde 0.");
-    if (f.oferta.checked && precio > 0 && oferta > 0 && oferta >= precio) return marcar(f.precioOferta, "El precio de oferta debe ser menor que el precio normal.");
-    if (f.oferta.checked && ofertasDe(f.tiendaId.value, artActual?.id) >= MAX_OFERTAS) return marcar(f.oferta, `Esta tienda ya tiene ${MAX_OFERTAS} artículos en oferta (el máximo). Quita una oferta antes de agregar otra.`);
-    if (f.oferta.checked && !(oferta > 0) && !(precio > 0)) estado("Sin precios la oferta saldrá como “consultar precio”.");
+    if (!f.tipoOferta.value) return marcar(f.tipoOferta, "Elige el tipo de oferta (oferta, liquidación, 2 x 1…).");
+    if (precio > 0 && oferta > 0 && oferta >= precio) return marcar(f.precioOferta, "El precio de oferta debe ser menor que el precio de etiqueta.");
+    if (ofertasDe(f.tiendaId.value, artActual?.id) >= MAX_OFERTAS) return marcar(f.tiendaId, `Esta tienda ya tiene ${MAX_OFERTAS} ofertas publicadas (el máximo). Quita una antes de agregar otra.`);
+    if (!(oferta > 0) && !(precio > 0)) estado("Sin precios la oferta saldrá como “consultar precio”.");
     return true;
   };
 
@@ -135,7 +138,7 @@
     const q = $("#buscar-tienda").value.trim().toLowerCase();
     const lista = tiendas.filter((t) => !q || `${t.nombre} ${t.stand} ${t.piso}`.toLowerCase().includes(q));
     $("#tiendas-n").textContent = `(${tiendas.length})`;
-    $("#tiendas").innerHTML = lista.map((t) => `<div class="item">${t.logo ? `<img src="${S.blob(t.logo)}" alt="">` : `<div class="ph">${S.esc(S.iniciales(t.nombre))}</div>`}<div class="txt"><b>${S.esc(t.nombre)}${t.visible === false ? ' <span class="mal">(oculta)</span>' : ""}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · "))} · ${(t.categorias || []).map((c) => catDe(c)?.nombre).filter(Boolean).join(", ") || "sin categoría"} · ${articulos.filter((a) => a.tiendaId === t.id).length} artículo(s)${t.whatsapp ? "" : ' · <span class="mal">sin WhatsApp</span>'}</small></div><div class="acc"><a class="btn btn-ghost btn-sm" href="/tienda/${encodeURIComponent(t.id)}" target="_blank" rel="noopener">Ver perfil</a><button class="btn btn-primary btn-sm" data-editar="${S.esc(t.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay tiendas${q ? " que coincidan" : ". Crea la primera con “＋ Nueva tienda”"}.</p>`;
+    $("#tiendas").innerHTML = lista.map((t) => `<div class="item">${t.logo ? `<img src="${S.blob(t.logo)}" alt="">` : `<div class="ph">${S.esc(S.iniciales(t.nombre))}</div>`}<div class="txt"><b>${S.esc(t.nombre)}${t.visible === false ? ' <span class="mal">(oculta)</span>' : ""}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · "))} · ${(t.categorias || []).map((c) => catDe(c)?.nombre).filter(Boolean).join(", ") || "sin categoría"} · ${articulos.filter((a) => a.tiendaId === t.id).length} oferta(s) · ${visitas.get(t.id) || 0} visita(s) al perfil${t.whatsapp ? "" : ' · <span class="mal">sin WhatsApp</span>'}</small></div><div class="acc"><a class="btn btn-ghost btn-sm" href="/tienda/${encodeURIComponent(t.id)}" target="_blank" rel="noopener">Ver perfil</a><button class="btn btn-primary btn-sm" data-editar="${S.esc(t.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay tiendas${q ? " que coincidan" : ". Crea la primera con “＋ Nueva tienda”"}.</p>`;
   };
   $("#buscar-tienda").oninput = pintarTiendas;
   const fT = $("#f-tienda"), dT = $("#d-tienda"); let tiendaActual = null;
@@ -170,12 +173,12 @@
     const sel = $("#filtro-art-tienda"); const val = sel.value; sel.innerHTML = `<option value="">Todas las tiendas</option>` + tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); sel.value = val;
     const lista = articulos.filter((a) => !val || a.tiendaId === val);
     $("#articulos-n").textContent = `(${articulos.length})`;
-    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(String(a.nombre || "?").charAt(0).toUpperCase())}</div>`}<div class="txt"><b>${S.esc(a.nombre)}${a.oferta ? ` <span class="ok">· ${S.esc(((config.tiposOferta || []).find((t) => t.id === (a.tipoOferta || "oferta"))?.nombre || "Oferta").toUpperCase())}${a.etiquetaOferta ? " · " + S.esc(a.etiquetaOferta) : ""}</span>` : ""}${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${S.soles(a.precio) || "sin precio"}${a.oferta && a.precioOferta ? ` → ${S.soles(a.precioOferta)}` : ""}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
+    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(String(a.nombre || "?").charAt(0).toUpperCase())}</div>`}<div class="txt"><b>${S.esc(a.nombre)} <span class="ok">· ${S.esc(((config.tiposOferta || []).find((t) => t.id === (a.tipoOferta || "oferta"))?.nombre || "Oferta").toUpperCase())}${a.etiquetaOferta ? " · " + S.esc(a.etiquetaOferta) : ""}</span>${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${a.precioOferta ? S.soles(a.precioOferta) + (a.precio ? ` (antes ${S.soles(a.precio)})` : "") : S.soles(a.precio) || "sin precio"}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
   };
   $("#filtro-art-tienda").onchange = pintarArticulos;
   const fA = $("#f-art"), dA = $("#d-art"); let artActual = null;
   const MAX_OFERTAS = 15;
-  const ofertasDe = (tiendaId, excluirId) => articulos.filter((a) => a.tiendaId === tiendaId && a.oferta && a.visible !== false && a.id !== excluirId).length;
+  const ofertasDe = (tiendaId, excluirId) => articulos.filter((a) => a.tiendaId === tiendaId && a.visible !== false && a.id !== excluirId).length; // todo artículo publicado es una oferta
   const avisoOfertas = () => { const n = ofertasDe(fA.tiendaId.value, artActual?.id); const e = $("#a-ofertas-aviso"); if (!e) return; e.textContent = `Ofertas publicadas de esta tienda: ${n} de ${MAX_OFERTAS}${n >= MAX_OFERTAS ? " · llegó al máximo" : ""}.`; e.classList.toggle("mal", n >= MAX_OFERTAS); };
   const abrirArticulo = (a) => {
     if (!tiendas.length) return estado("Primero crea una tienda.", true);
@@ -184,9 +187,9 @@
     fA.tipoOferta.innerHTML = (config.tiposOferta || []).map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join("");
     for (const k of ["nombre", "descripcion", "precio", "precioOferta", "etiquetaOferta"]) fA[k].value = a?.[k] ?? "";
     fA.tipoOferta.value = a?.tipoOferta || "oferta"; if (!fA.tipoOferta.value) fA.tipoOferta.value = "oferta";
-    const mostrarTipo = () => { $("#a-tipo-fila").hidden = !fA.oferta.checked; avisoOfertas(); }; fA.oferta.onchange = mostrarTipo; fA.tiendaId.onchange = avisoOfertas;
-    fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.oferta.checked = !!a?.oferta; fA.destacado.checked = !!a?.destacado; fA.visible.checked = a ? a.visible !== false : true;
-    pintarArchivo($(".archivo", fA), a?.foto || ""); mostrarTipo(); dA.showModal();
+    fA.tiendaId.onchange = avisoOfertas;
+    fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.destacado.checked = !!a?.destacado; fA.visible.checked = a ? a.visible !== false : true;
+    pintarArchivo($(".archivo", fA), a?.foto || ""); avisoOfertas(); dA.showModal();
   };
   $("#nuevo-articulo").onclick = () => abrirArticulo(null);
   $("#articulos").onclick = (e) => { const b = e.target.closest("[data-editar]"); if (b) abrirArticulo(articulos.find((a) => a.id === b.dataset.editar)); };
@@ -195,7 +198,7 @@
     if (!validarArticulo(fA)) return;
     const d = { ...(artActual || { creadoAt: ahora() }) }; delete d.id;
     d.nombre = fA.nombre.value.trim(); d.descripcion = fA.descripcion.value.trim(); d.tiendaId = fA.tiendaId.value; d.categoriaId = fA.categoriaId.value;
-    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = fA.oferta.checked; d.destacado = fA.destacado.checked; d.visible = fA.visible.checked; d.tipoOferta = fA.oferta.checked ? fA.tipoOferta.value : ""; d.etiquetaOferta = fA.oferta.checked ? fA.etiquetaOferta.value.trim() : "";
+    d.precio = fA.precio.value === "" ? null : Number(fA.precio.value); d.precioOferta = fA.precioOferta.value === "" ? null : Number(fA.precioOferta.value); d.oferta = true; d.destacado = fA.destacado.checked; d.visible = fA.visible.checked; d.tipoOferta = fA.tipoOferta.value || "oferta"; d.etiquetaOferta = fA.etiquetaOferta.value.trim();
     Object.assign(d, leerArchivos(fA)); d.actualizadoAt = ahora();
     try { await S.pedir("PUT", `/api/db/articulos/${artActual?.id || nuevoId()}`, d); dA.close(); estado("Artículo guardado ✓"); await cargar(); pintarTodo(); } catch (err) { estado(err.message, true); }
   };
@@ -222,27 +225,27 @@
     ],
     articulos: [
       [0, "Mochila escolar reforzada 18”", "mochilas", 45, 35, "oferta", "", "", true, "Colores surtidos · Por mayor desde 6 unidades"],
-      [0, "Morral urbano antirrobo", "mochilas", 79, null, "", "", "", false, "Puerto USB y bolsillo oculto"],
+      [0, "Morral urbano antirrobo", "mochilas", 79, 65, "oferta", "Solo esta semana", "", false, "Puerto USB y bolsillo oculto"],
       [0, "Cartuchera triple cierre", "cartucheras", 25, 18, "campana", "Campaña escolar 2027", "", false, "Tela impermeable"],
       [0, "Mochila con ruedas", "mochilas", 120, 95, "campana", "Campaña escolar 2027", "", false, "Para primaria · 2 ruedas"],
       [1, "Cartera bandolera Lucero", "carteras", 89, 69, "oferta", "", "", true, "Cuero sintético premium"],
-      [1, "Billetera dama con cierre", "billeteras", 40, 29, "combo", "2x1 esta semana", "", false, "Lleva 2 por el precio de 1"],
-      [1, "Cartera tote grande", "carteras", 110, null, "", "", "", false, "Ideal para oficina"],
-      [2, "Billetera de cuero legítimo", "billeteras", 95, null, "", "", "", false, "Hecha a mano · Grabado gratis"],
+      [1, "Billetera dama con cierre", "billeteras", 40, null, "dosxuno", "Solo esta semana", "", false, "Lleva 2 por el precio de 1"],
+      [1, "Cartera tote grande", "carteras", 110, 89, "campana", "Campaña de oficina", "", false, "Ideal para oficina"],
+      [2, "Billetera de cuero legítimo", "billeteras", 95, 80, "mayorista", "Por docena", "", false, "Hecha a mano · Grabado gratis"],
       [2, "Cartera de cuero clásica", "carteras", 260, 199, "liquidacion", "Hasta agotar stock", "", true, "Últimas unidades"],
-      [2, "Correa de cuero caballero", "accesorios", 55, null, "", "", "", false, "Tallas 32 a 44"],
+      [2, "Correa de cuero caballero", "accesorios", 55, 45, "oferta", "", "", false, "Tallas 32 a 44"],
       [3, "Maleta de cabina 20”", "maletas", 180, 149, "liquidacion", "Hasta agotar stock", "", false, "Rígida · 4 ruedas 360°"],
       [3, "Maleta de bodega 28”", "maletas", 320, 259, "liquidacion", "Hasta agotar stock", "", false, "Expandible · candado TSA"],
       [3, "Set de 3 maletas", "maletas", 650, 520, "combo", "Set completo", "", false, "20” + 24” + 28”"],
-      [4, "Lonchera térmica infantil", "loncheras", 35, null, "", "", "", false, "Con tomatodo 500 ml"],
+      [4, "Lonchera térmica infantil", "loncheras", 35, 29, "campana", "Campaña escolar 2027", "", false, "Con tomatodo 500 ml"],
       [4, "Set escolar inicial", "utiles", 60, 48, "campana", "Campaña escolar 2027", "", false, "Lonchera + cartuchera + tomatodo"],
-      [4, "Tomatodo acero 750 ml", "accesorios", 28, null, "", "", "", false, "Libre de BPA"],
+      [4, "Tomatodo acero 750 ml", "accesorios", 28, null, "dosxuno", "Hasta agotar stock", "", false, "Libre de BPA · Lleva 2, paga 1"],
       [5, "Pack de 10 cuadernos A4", "utiles", 48, 39, "mayorista", "Precio por mayor", "", false, "Rayado y cuadriculado"],
-      [5, "Cartuchera de 2 pisos", "cartucheras", 22, null, "", "", "", false, "Con 24 divisiones"],
+      [5, "Cartuchera de 2 pisos", "cartucheras", 22, 18, "oferta", "", "", false, "Con 24 divisiones"],
       [5, "Colores x 36 unidades", "utiles", 30, 24, "campana", "Campaña escolar 2027", "", false, "Largos · estuche metálico"],
       [6, "Tarjetero slim de cuero", "billeteras", 45, null, "nuevo", "Nuevo modelo", "", false, "Protección RFID"],
       [6, "Billetera caballero bifold", "billeteras", 60, 45, "oferta", "", "", false, "Cuero graso · 8 tarjetas"],
-      [7, "Gorra urbana bordada", "accesorios", 30, null, "", "", "", false, "Talla única ajustable"],
+      [7, "Gorra urbana bordada", "accesorios", 30, null, "tresxuno", "Por docena", "", false, "Talla única ajustable · Lleva 3, paga 1"],
       [7, "Riñonera deportiva", "accesorios", 35, 25, "mayorista", "Por docena", "", false, "Impermeable · 2 bolsillos"],
       [7, "Cartera mini crossbody", "carteras", 55, 45, "nuevo", "Lanzamiento", "", false, "Cadena dorada"],
     ],
@@ -290,7 +293,7 @@
       for (const [i, a] of EJ.articulos.entries()) {
         const [ti, nombre, categoriaId, precio, precioOferta, tipoOferta, etiquetaOferta, emoji, destacado, descripcion] = a;
         paso(`Creando artículo ${i + 1} de ${EJ.articulos.length}: ${nombre}…`);
-        await S.pedir("PUT", `/api/db/articulos/ej_${nuevoId()}`, { nombre, tiendaId: ids[ti], categoriaId, precio, precioOferta, oferta: !!(tipoOferta || (precioOferta && precioOferta < precio)), tipoOferta: tipoOferta || (precioOferta ? "oferta" : ""), etiquetaOferta, destacado, descripcion, foto: await subir(await imagenArticulo(nombre, EJ.tiendas[ti].colores), "image/"), visible: true, ejemplo: true, creadoAt: new Date(Date.now() - i * 3600e3).toISOString(), actualizadoAt: ahora() });
+        await S.pedir("PUT", `/api/db/articulos/ej_${nuevoId()}`, { nombre, tiendaId: ids[ti], categoriaId, precio, precioOferta, oferta: true, tipoOferta: tipoOferta || "oferta", etiquetaOferta, destacado, descripcion, foto: await subir(await imagenArticulo(nombre, EJ.tiendas[ti].colores), "image/"), visible: true, ejemplo: true, creadoAt: new Date(Date.now() - i * 3600e3).toISOString(), actualizadoAt: ahora() });
       }
       paso("Listo: 3 banners, 8 tiendas y 24 artículos de ejemplo."); estado("Ejemplos cargados ✓"); await cargar(); pintarTodo();
     } catch (err) { estado(err.message, true); paso("No se pudo completar: " + err.message); }

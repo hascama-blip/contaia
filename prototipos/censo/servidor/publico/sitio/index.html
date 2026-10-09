@@ -26,7 +26,7 @@
       <a class="btn btn-borde btn-sm" href="#tiendas">Tiendas</a>
     </div>
   </div>
-  <div class="cab-sub"><div class="cab-ancho cab-sub-in"><nav class="cab-links"><a href="#categorias">Categorías</a><a href="#ofertas">Ofertas</a><a href="#novedades">Novedades</a><a href="#tiendas">Tiendas</a><a href="#articulos">Artículos</a></nav><span id="cab-direccion"><span></span></span></div></div>
+  <div class="cab-sub"><div class="cab-ancho cab-sub-in"><nav class="cab-links"><a href="#categorias">Categorías</a><a href="#ofertas">Ofertas</a><a href="#tiendas">Tiendas</a><a href="/ofertas">Todas las ofertas</a><a href="/tiendas">Todas las tiendas</a></nav><span id="cab-direccion"><span></span></span></div></div>
 </header>
 
 <main>
@@ -44,20 +44,18 @@
 
   <section class="contenedor seccion" id="ofertas">
     <h2 class="titulo-grande">Las mejores <b>ofertas</b><span class="punto">.</span></h2>
-    <p class="titulo-sub" id="ofertas-sub">Precios directos de los fabricantes del centro comercial.</p>
+    <p class="titulo-sub" id="ofertas-sub">Ofertas, liquidaciones y promociones directas de las tiendas del centro comercial.</p>
     <div class="filtros-barra" id="ofertas-filtros" role="group" aria-label="Filtros de ofertas">
       <label class="filtro"><span>Tipo</span><select id="f-tipo"><option value="">Todas</option></select></label>
       <label class="filtro"><span>Tienda</span><select id="f-tienda"><option value="">Todas</option></select></label>
       <label class="filtro"><span>Ordenar</span><select id="f-orden"><option value="descuento">Mayor descuento</option><option value="precio-asc">Menor precio</option><option value="precio-desc">Mayor precio</option><option value="reciente">Más recientes</option></select></label>
       <button type="button" class="filtro-limpiar" id="f-limpiar" hidden>Limpiar filtros</button>
     </div>
-    <div class="afiches" id="lista-ofertas"></div>
-    <div class="ver-mas" id="ofertas-mas" hidden><button type="button" class="btn btn-borde">Ver todas las ofertas</button></div>
-  </section>
-
-  <section class="contenedor seccion" id="novedades">
-    <div class="seccion-cab"><h2>Novedades <span class="punto">.</span></h2><p>Lo último que publicaron las tiendas.</p></div>
-    <div class="carril" id="lista-novedades"></div>
+    <div class="carril-ofertas" aria-roledescription="carrusel" aria-label="Ofertas">
+      <button type="button" class="carril-flecha izq" id="of-ant" aria-label="Ofertas anteriores">‹</button>
+      <div class="afiches-carril" id="lista-ofertas"></div>
+      <button type="button" class="carril-flecha der" id="of-sig" aria-label="Más ofertas">›</button>
+    </div>
   </section>
 
   <section class="contenedor seccion" id="tiendas">
@@ -65,14 +63,9 @@
     <div class="rejilla" id="lista-tiendas"></div>
   </section>
 
-  <section class="contenedor seccion" id="articulos">
-    <div class="seccion-cab"><h2 id="art-titulo">Variedad de artículos <span class="punto">.</span></h2><p id="art-sub">Cada artículo dice quién lo vende. Contáctalo directamente.</p></div>
-    <div class="rejilla-art" id="lista-articulos"></div>
-  </section>
-
   <footer class="pie-grande"><div class="contenedor pie-in">
     <div><div class="pie-marca"><img src="/img/logo.jpg" alt=""><b id="pie-nombre">C.C. Inmaculada Concepción</b></div><p id="pie-datos"></p></div>
-    <div class="pie-links"><a href="#categorias">Categorías</a><a href="#ofertas">Ofertas</a><a href="#tiendas">Tiendas</a><a href="/login">Acceso directiva</a></div>
+    <div class="pie-links"><a href="#categorias">Categorías</a><a href="/ofertas">Todas las ofertas</a><a href="/tiendas">Todas las tiendas</a><a href="/login">Acceso directiva</a></div>
   </div></footer>
 </main>
 

@@ -142,14 +142,24 @@ La raíz `ccinmaculadaconcepcion.com/` es la **web para compradores** (sin sesi�
 privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
 - **Portada** (`servidor/publico/sitio/index.html` + `sitio.js`): carrusel de fotos
   (autoplay, puntos, flechas), **burbujas de categorías** (Mochilas, Carteras, Cartucheras…)
-  que filtran tiendas y artículos; cada tienda tiene **Ver ofertas** (resumen en ventana:
-  artículos en oferta + botón Contactar) y **Contactar**; abajo, la **variedad de artículos**
-  con “Vende: tienda · stand” y botón Contactar en cada uno. Filtro en la URL: `/?cat=mochilas`.
-  **Botón Contactar editable por tienda**: en el editor, campo “Botón Contactar: enlace al
-  perfil digital” (`contactoUrl`, solo https/mailto/tel, validado en servidor) y “Texto del
-  botón” (`contactoTexto`, ≤ 30). Con enlace, Contactar (tarjeta, artículos, resumen de ofertas)
-  abre esa web en pestaña nueva y el perfil interno muestra un botón “Perfil digital”; sin
-  enlace abre `/tienda/:id`. Helper `S.contacto(t)` / `S.btnContacto(t)` en `comun.js`.
+  que filtran ofertas y tiendas, **Las mejores ofertas** como **carrusel** (hasta 10 afiches,
+  flechas, avance automático cada 4 s que se detiene al tocar o al salir de pantalla, filtros
+  tipo/tienda/orden) terminado en una **burbuja redonda “Ver más”** que lleva a **`/ofertas`**
+  (`ofertas.html` + `ofertas.js`: todas las ofertas en rejilla con filtros categoría, tipo,
+  tienda, orden y búsqueda; los filtros van en la URL `?cat=&tipo=&tienda=&orden=&q=`), y
+  **Tiendas**: las **más visitadas primero** (sello “Más visitada” en las 3 primeras), 8 en la
+  portada y burbuja “Ver más tiendas” → **`/tiendas`** (`tiendas.html` + `tiendas.js`, filtro por
+  categoría, orden más visitadas / más ofertas / nombre, búsqueda). Ya no hay secciones
+  “Novedades” ni “Variedad de artículos”: en la web **solo se publican ofertas y promociones**
+  (tipos: oferta, liquidación, campaña, **2 x 1**, **3 x 1**, combo, precio por mayor, lanzamiento;
+  2 x 1 / 3 x 1 muestran la cifra “2x1” y cuentan como 50 % / 67 % al ordenar por descuento).
+  El precio normal de etiqueta va en el catálogo de la tienda (en el artículo es opcional, sirve
+  para el % de descuento). Lo compartido (afiche, tarjeta de tienda, burbuja, modal, cabecera)
+  vive en `comun.js` (`S.afiche`, `S.tarjetaTienda`, `S.burbujaMas`, `S.modalTienda`, `S.cabecera`).
+- **Visitas al perfil** (colección `visitas`, solo la escribe el servidor): cada `GET /tienda/:id`
+  cuenta una visita por visitante (hash ip+navegador) y hora; los clics al perfil digital externo
+  avisan con `POST /api/publico/visita/:id` (beacon). Se guarda total + conteo por día (90 días);
+  `/api/db/visitas` no admite escrituras. El editor muestra las visitas en la lista de tiendas.
 - **Perfil digital de tienda** (`/tienda/:id`, `tienda.html`): WhatsApp con mensaje prellenado
   (y por artículo con `?art=`), llamar, catálogo (PDF o enlace), PDF de ofertas, **QR de pago**
   (imagen + texto Yape/Plin), cómo llegar, redes y botones extra; lista de ofertas y artículos.

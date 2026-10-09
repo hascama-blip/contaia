@@ -9,6 +9,7 @@ const ICONOS = {
   loncheras: '<rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M3 13h18"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   utiles: '<path d="M5 4h9a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M16 8h3v12h-3"/><path d="M8 8h5M8 11h5"/>',
   accesorios: '<path d="M5 14a7 7 0 0 1 14 0"/><path d="M3 14h18l-2 2H5z"/><path d="M12 7V5"/>',
+  flecha: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
   tienda: '<path d="M4 9l1.5-4h13L20 9"/><path d="M4 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M5 11v9h14v-9"/><path d="M10 20v-5h4v5"/>',
   buscar: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   whatsapp: '<path d="M4 20l1.3-3.8A8 8 0 1 1 8.2 19z"/><path d="M9.5 9.5c0 3 2 5 5 5l1-1.5-1.8-.8-.8.8c-1-.4-1.8-1.2-2.2-2.2l.8-.8-.8-1.8z"/>',
@@ -37,11 +38,86 @@ window.S = {
   // Botón Contactar de una tienda: si tiene "contactoUrl" (su perfil digital en otra web) va ahí en pestaña nueva;
   // si no, al perfil dentro de esta web (/tienda/id). El texto del botón también es editable (contactoTexto).
   contacto: (t, interno) => { const u = S.url(t?.contactoUrl); const externo = !!u && !/^[/?#]/.test(u); return { href: externo ? u : interno || `/tienda/${encodeURIComponent(t?.id || "")}`, externo, texto: String(t?.contactoTexto || "").trim() || "Contactar" }; },
-  btnContacto: (t, cls = "btn btn-primario btn-sm", interno) => { const c = S.contacto(t, interno); return `<a class="${cls}" href="${S.esc(c.href)}"${c.externo ? ' target="_blank" rel="noopener"' : ""}>${S.esc(c.texto)}</a>`; },
+  btnContacto: (t, cls = "btn btn-primario btn-sm", interno) => { const c = S.contacto(t, interno); return `<a class="${cls}" href="${S.esc(c.href)}"${c.externo ? ` target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}"` : ""}>${S.esc(c.texto)}</a>`; },
   logo: (t, cls = "logo") => (t.logo ? `<img class="${cls}" src="${S.blob(t.logo)}" alt="" loading="lazy">` : `<div class="${cls}" aria-hidden="true">${S.esc(S.iniciales(t.nombre))}</div>`),
   tipo: (a, tipos) => (a.oferta ? (tipos || []).find((t) => t.id === (a.tipoOferta || "oferta")) || { id: "oferta", nombre: "Oferta" } : null),
   pill: (a, tipos) => { const t = S.tipo(a, tipos); return t ? `<span class="oferta-pill tipo-${S.esc(t.id)}">${S.esc(t.nombre.toUpperCase())}</span>` : ""; },
   precio: (a) => (a.oferta && Number(a.precioOferta) > 0 ? `<div class="precio">${S.soles(a.precioOferta)}${Number(a.precio) > 0 ? `<s>${S.soles(a.precio)}</s>` : ""}</div>` : Number(a.precio) > 0 ? `<div class="precio">${S.soles(a.precio)}</div>` : `<div class="precio" style="font-size:.9rem;color:var(--texto-3);font-weight:600">Consultar precio</div>`),
+  // ---- Compartido por la portada, /ofertas y /tiendas ----
+  norm: (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""),
+  // Rellena cabecera y pie con los datos del centro (nombre, lema, WhatsApp, dirección).
+  cabecera: (sitio) => {
+    const $ = (q) => document.querySelector(q);
+    if ($("#marca-nombre")) $("#marca-nombre").firstChild.textContent = sitio.nombre.replace(/^Centro Comercial/i, "C.C.");
+    if ($("#marca-lema")) $("#marca-lema").textContent = sitio.lema || "";
+    if (sitio.whatsapp && $("#wa-centro")) { const a = $("#wa-centro"); a.href = S.wa(sitio.whatsapp.replace(/\D/g, "").replace(/^(\d{9})$/, "51$1"), `Hola, escribo desde la web de ${sitio.nombre}.`); a.hidden = false; a.target = "_blank"; a.rel = "noopener"; }
+    if ($("#pie-datos")) $("#pie-datos").textContent = [sitio.direccion, sitio.horario].filter(Boolean).join(" · ") || sitio.lema || "";
+    if ($("#pie-nombre")) $("#pie-nombre").textContent = sitio.nombre;
+    if ($("#cab-direccion span")) $("#cab-direccion span").textContent = [sitio.direccion, sitio.horario].filter(Boolean).join(" · ");
+  },
+  descuento: (a) => (Number(a.precio) > 0 && Number(a.precioOferta) > 0 && Number(a.precioOferta) < Number(a.precio) ? Math.round((1 - Number(a.precioOferta) / Number(a.precio)) * 100) : 0),
+  // Para ordenar por "mayor descuento": 2 x 1 equivale a 50 % y 3 x 1 a 67 %.
+  descuentoEquivalente: (a) => (a.tipoOferta === "dosxuno" ? 50 : a.tipoOferta === "tresxuno" ? 67 : S.descuento(a)),
+  precioVigente: (a) => (Number(a.precioOferta) > 0 ? Number(a.precioOferta) : Number(a.precio) > 0 ? Number(a.precio) : Infinity),
+  // Orden de ofertas: mayor descuento (destacadas primero), menor/mayor precio o más recientes.
+  ordenarOfertas: (lista, orden) => {
+    const porFecha = (x, y) => String(y.creadoAt || y.actualizadoAt || "").localeCompare(String(x.creadoAt || x.actualizadoAt || ""));
+    return [...lista].sort(orden === "precio-asc" ? (x, y) => S.precioVigente(x) - S.precioVigente(y) : orden === "precio-desc" ? (x, y) => S.precioVigente(y) - S.precioVigente(x) : orden === "reciente" ? porFecha : (x, y) => Number(!!y.destacado) - Number(!!x.destacado) || S.descuentoEquivalente(y) - S.descuentoEquivalente(x) || porFecha(x, y));
+  },
+  pen: (v, dec = 2) => "S/ " + Number(v).toLocaleString("es-PE", { minimumFractionDigits: dec, maximumFractionDigits: dec }),
+  // Afiche de oferta (estilo tienda por departamentos): banda del tipo, % o "2x1", precios, tienda y foto.
+  afiche: (a, { tiendaDe, cat, sitio }) => {
+    const t = tiendaDe.get(a.tiendaId) || {}, d = S.descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
+    const promo = tipo?.id === "dosxuno" ? ["2", "1", "lleva 2, paga 1"] : tipo?.id === "tresxuno" ? ["3", "1", "lleva 3, paga 1"] : null;
+    const cifra = promo ? `<div class="afiche-cifra promo">${promo[0]}<small>x</small>${promo[1]}</div><div class="afiche-sub">${promo[2]}</div>`
+      : d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>`
+      : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">${S.pen(a.precioOferta, 0)}</div><div class="afiche-sub">precio de oferta</div>`
+      : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? S.pen(a.precio, 0) : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
+    const precios = d && Number(a.precioOferta) > 0 ? `<b>${S.pen(a.precioOferta)}</b> <s>${S.pen(a.precio)}</s>` : Number(a.precioOferta) > 0 ? `<b>${S.pen(a.precioOferta)}</b>${promo ? " c/u" : ""}` : Number(a.precio) > 0 ? `<b>${S.pen(a.precio)}</b>${promo ? " c/u" : ""}` : " ";
+    return `<a class="afiche tipo-${S.esc(tipo?.id || "oferta")}" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
+      <div class="afiche-tipo">${S.esc(tipo?.nombre || "Oferta")}</div>
+      <div class="afiche-etiqueta">${a.etiquetaOferta ? `<span>${S.esc(a.etiquetaOferta)}</span>` : ""}</div>
+      <div class="afiche-eti">${S.esc(c?.nombre || " ")}</div>
+      ${cifra}
+      <div class="afiche-marca">${S.esc(a.nombre)}</div>
+      <div class="afiche-precios">${precios}</div>
+      <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · ") || " ")}</small></span></div>
+      <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}</div>
+    </a>`;
+  },
+  // Tarjeta de tienda: logo, nombre (con sello "Más visitada" si corresponde), descripción con "Ver más", ofertas y botones.
+  tarjetaTienda: (t, { cat, sello }) => `<article class="tienda" data-id="${S.esc(t.id)}">
+      <div class="tienda-cab">${S.logo(t)}<div><h3>${S.esc(t.nombre)}</h3><div class="stand">${S.esc([t.stand, t.piso].filter(Boolean).join(" · ")) || "&nbsp;"}${sello ? `<span class="sello-top">${S.esc(sello)}</span>` : ""}</div></div></div>
+      <p class="tienda-desc">${S.esc(t.descripcion || "") || `<span class="muted">Vende ${S.esc((t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ").toLowerCase() || "en el centro comercial")}.</span>`}</p>
+      <div class="tienda-meta"><button type="button" class="ver-mas" hidden>Ver más</button><span class="tienda-ofertas ${t.ofertas ? "con" : ""}">${t.ofertas ? `${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}` : "Sin ofertas por ahora"}</span></div>
+      <div class="tienda-acciones"><button type="button" class="btn btn-borde btn-sm ver">Ver ofertas</button>${S.btnContacto(t)}</div>
+    </article>`,
+  // Burbuja redonda "Ver más" al final de un carrusel o rejilla.
+  burbujaMas: (href, texto, sub) => `<a class="burbuja-mas" href="${S.esc(href)}"><span class="circulo">${S.icono("flecha")}</span><b>${S.esc(texto)}</b>${sub ? `<small>${S.esc(sub)}</small>` : ""}</a>`,
+  // "Ver más" de la descripción aparece solo cuando no cabe en sus 3 líneas (medido en pantalla).
+  ajustarVerMas: () => { for (const d of document.querySelectorAll(".tienda-desc")) { const b = d.parentElement.querySelector(".ver-mas"); if (b) b.hidden = d.scrollHeight <= d.clientHeight + 1; } },
+  // Ventana "Ver ofertas" de una tienda (#modal). Devuelve abrir(tienda).
+  modalTienda: ({ tiendaDe, cat, sitio, articulos, lista }) => {
+    const $ = (q) => document.querySelector(q), modal = $("#modal");
+    if (!modal) return () => {};
+    const abrir = (t) => {
+      if (!t) return;
+      $("#m-logo").outerHTML = S.logo(t).replace('class="logo"', 'class="logo" id="m-logo"');
+      $("#m-nombre").textContent = t.nombre; $("#m-stand").textContent = [t.stand, t.piso, t.horario, (t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+      $("#m-desc").textContent = t.descripcion || "";
+      const mios = articulos.filter((a) => a.tiendaId === t.id), of = mios.slice(0, 6);
+      $("#m-ofertas-titulo").textContent = mios.length ? `Ofertas (${mios.length})` : "";
+      $("#m-ofertas").innerHTML = of.length ? of.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.icono("foto")}</div>`}<div class="nom">${S.esc(a.nombre)} <span class="oferta-pill tipo-${S.esc(a.tipoOferta || "oferta")}">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "Oferta")}</span></div>${S.precio(a)}</div>`).join("") + (mios.length > of.length ? `<div class="vende" style="text-align:center">y ${mios.length - of.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó ofertas. Contáctala para consultar.</div>`;
+      const c = S.contacto(t), mc = $("#m-contactar"); mc.href = c.href; mc.textContent = c.externo ? (c.texto === "Contactar" ? "Contactar · ver perfil digital" : c.texto) : `${c.texto} · ver perfil completo`;
+      if (c.externo) { mc.target = "_blank"; mc.rel = "noopener"; mc.dataset.visita = t.id; } else { mc.removeAttribute("target"); mc.removeAttribute("rel"); delete mc.dataset.visita; }
+      modal.showModal();
+    };
+    (lista || $("#lista-tiendas"))?.addEventListener("click", (e) => { const b = e.target.closest(".ver, .ver-mas"); if (!b) return; abrir(tiendaDe.get(b.closest(".tienda").dataset.id)); });
+    $("#m-cerrar").onclick = () => modal.close(); modal.onclick = (e) => { if (e.target === modal) modal.close(); };
+    return abrir;
+  },
+  // Visita al perfil digital externo: se avisa al servidor al hacer clic (los perfiles internos las cuenta el servidor al abrirse).
+  visita: (id) => { try { navigator.sendBeacon(`/api/publico/visita/${encodeURIComponent(id)}`); } catch {} },
   pedir: async (metodo, ruta, cuerpo, cabeceras = {}) => {
     const r = await fetch(ruta, { method: metodo, headers: { ...(cuerpo !== undefined && !(cuerpo instanceof Blob) ? { "Content-Type": "application/json" } : {}), ...cabeceras }, body: cuerpo instanceof Blob ? cuerpo : cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined });
     const j = await r.json().catch(() => ({}));
@@ -49,3 +125,4 @@ window.S = {
     return j;
   },
 };
+document.addEventListener("click", (e) => { const a = e.target.closest("a[data-visita]"); if (a && a.dataset.visita) S.visita(a.dataset.visita); });

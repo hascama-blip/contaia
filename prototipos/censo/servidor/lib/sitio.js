@@ -1,7 +1,9 @@
 // Web pública del centro comercial: qué se muestra sin sesión y qué archivos
 // (fotos del carrusel, logos, PDF de ofertas, QR de pago) pueden verse sin entrar.
 // Las colecciones son "sitio" (un solo documento "config"), "tiendas" y "articulos";
-// se editan desde /editar-sitio con los mismos /api/db de siempre.
+// se editan desde /editar-sitio con los mismos /api/db de siempre. "visitas" (una por
+// tienda) la escribe solo el servidor: cada vista del perfil cuenta una vez por visitante y hora.
+import { createHash } from "node:crypto";
 
 export const CATEGORIAS_INICIALES = [
   { id: "mochilas", nombre: "Mochilas", icono: "🎒" },
@@ -14,15 +16,19 @@ export const CATEGORIAS_INICIALES = [
   { id: "accesorios", nombre: "Accesorios", icono: "🧢" },
 ];
 
-/** Tipos de oferta que puede llevar un artículo (filtros de "Las mejores ofertas"). */
+/** Tipos de oferta. En la web solo se publican ofertas y promociones: todo artículo lleva uno. */
 export const TIPOS_OFERTA = [
-  { id: "oferta", nombre: "Oferta", icono: "🔥" },
-  { id: "liquidacion", nombre: "Liquidación", icono: "🏷️" },
-  { id: "campana", nombre: "Campaña", icono: "🎒" },
-  { id: "combo", nombre: "Combo / 2x1", icono: "🎁" },
-  { id: "mayorista", nombre: "Precio por mayor", icono: "📦" },
-  { id: "nuevo", nombre: "Lanzamiento", icono: "✨" },
+  { id: "oferta", nombre: "Oferta" },
+  { id: "liquidacion", nombre: "Liquidación" },
+  { id: "campana", nombre: "Campaña" },
+  { id: "dosxuno", nombre: "2 x 1" },
+  { id: "tresxuno", nombre: "3 x 1" },
+  { id: "combo", nombre: "Combo" },
+  { id: "mayorista", nombre: "Precio por mayor" },
+  { id: "nuevo", nombre: "Lanzamiento" },
 ];
+const DEDUP_VISITA_MS = 3600e3, DIAS_VISITAS = 90;
+const diaLima = (ms = Date.now()) => new Date(ms - 5 * 3600e3).toISOString().slice(0, 10);
 
 export const SITIO_INICIAL = {
   nombre: "Centro Comercial Inmaculada Concepción",
@@ -84,12 +90,12 @@ export function validarPublico(col, d, ctx = {}) {
     if (!String(d.tiendaId || "").trim()) return "Elige la tienda que vende el artículo.";
     if (!numeroOk(d.precio)) return "El precio debe ser un número desde 0.";
     if (!numeroOk(d.precioOferta)) return "El precio de oferta debe ser un número desde 0.";
-    if (d.oferta && Number(d.precio) > 0 && Number(d.precioOferta) > 0 && Number(d.precioOferta) >= Number(d.precio)) return "El precio de oferta debe ser menor que el precio normal.";
+    if (Number(d.precio) > 0 && Number(d.precioOferta) > 0 && Number(d.precioOferta) >= Number(d.precio)) return "El precio de oferta debe ser menor que el precio de etiqueta.";
     if (d.tipoOferta && !TIPOS_OFERTA.some((t) => t.id === d.tipoOferta)) return "Tipo de oferta desconocido.";
     if (!texto(d.etiquetaOferta, 40)) return "La etiqueta de la oferta es muy larga (máximo 40 caracteres).";
     if (!texto(d.descripcion, 140)) return "La descripción corta es muy larga (máximo 140 caracteres).";
-    const esOferta = !!d.oferta || (Number(d.precioOferta) > 0 && Number(d.precioOferta) < Number(d.precio || Infinity));
-    if (esOferta && d.visible !== false && ctx.ofertasDeTienda && ctx.ofertasDeTienda(d.tiendaId, ctx.id) >= MAX_OFERTAS_POR_TIENDA) return `Esta tienda ya tiene ${MAX_OFERTAS_POR_TIENDA} artículos en oferta (el máximo). Quita una oferta antes de agregar otra.`;
+    // Todo artículo publicado es una oferta o promoción (el precio de etiqueta va en el catálogo de la tienda).
+    if (d.visible !== false && ctx.ofertasDeTienda && ctx.ofertasDeTienda(d.tiendaId, ctx.id) >= MAX_OFERTAS_POR_TIENDA) return `Esta tienda ya tiene ${MAX_OFERTAS_POR_TIENDA} ofertas publicadas (el máximo). Quita una antes de agregar otra.`;
     return imagenOk(d.foto, "artículo");
   }
   if (col === "sitio") {
@@ -115,7 +121,7 @@ export function waNumero(v) {
 }
 
 export class SitioPublico {
-  #almacen; #existeArchivo; #cache = { en: 0, ids: null };
+  #almacen; #existeArchivo; #cache = { en: 0, ids: null }; #recientes = new Map();
   constructor({ almacen, existeArchivo }) {
     this.#almacen = almacen; this.#existeArchivo = existeArchivo;
     almacen.on("cambio", (col) => { if (["sitio", "tiendas", "articulos"].includes(col)) this.#cache.ids = null; });
@@ -132,21 +138,45 @@ export class SitioPublico {
       .map(({ id, data }) => ({ id, ...Object.fromEntries(Object.entries(data).filter(([k]) => !CAMPOS_PRIVADOS_TIENDA.has(k))), whatsapp: waNumero(data.whatsapp), contactoUrl: urlSegura(data.contactoUrl) }))
       .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre).localeCompare(String(b.nombre), "es"));
   }
+  /** Todo artículo publicado es una oferta: si el tipo guardado no existe, sale como "Oferta". */
   #articulos(tiendasVisibles) {
     return this.#almacen.listar("articulos").filter((d) => d.data && d.data.visible !== false && d.data.nombre && tiendasVisibles.has(d.data.tiendaId))
-      .map(({ id, data }) => { const oferta = !!data.oferta || (Number(data.precioOferta) > 0 && Number(data.precioOferta) < Number(data.precio || Infinity)); return { id, ...data, oferta, tipoOferta: oferta ? (TIPOS_OFERTA.some((t) => t.id === data.tipoOferta) ? data.tipoOferta : "oferta") : "" }; })
-      .sort((a, b) => Number(b.oferta) - Number(a.oferta) || String(b.actualizadoAt || "").localeCompare(String(a.actualizadoAt || "")));
+      .map(({ id, data }) => ({ id, ...data, oferta: true, tipoOferta: TIPOS_OFERTA.some((t) => t.id === data.tipoOferta) ? data.tipoOferta : "oferta" }))
+      .sort((a, b) => Number(!!b.destacado) - Number(!!a.destacado) || String(b.actualizadoAt || "").localeCompare(String(a.actualizadoAt || "")));
   }
-  /** Lo que ve cualquiera en la portada. */
+  /** Visitas al perfil de cada tienda: { total, mes (últimos 30 días) }. */
+  visitas() {
+    const desde = diaLima(Date.now() - 30 * 86400e3), m = new Map();
+    for (const { id, data } of this.#almacen.listar("visitas")) m.set(id, { total: Number(data?.total) || 0, mes: Object.entries(data?.dias || {}).filter(([d]) => d >= desde).reduce((s, [, n]) => s + (Number(n) || 0), 0) });
+    return m;
+  }
+  /** Cuenta una visita al perfil de la tienda (una por visitante y hora). Devuelve si contó. */
+  registrarVisita(id, ip, ua) {
+    if (!this.#almacen.obtener("tiendas", id)) return false;
+    const clave = createHash("sha256").update(`${id}|${ip || ""}|${ua || ""}`).digest("base64url").slice(0, 24), ahora = Date.now();
+    if (this.#recientes.size > 5000) for (const [k, t] of this.#recientes) if (ahora - t > DEDUP_VISITA_MS) this.#recientes.delete(k);
+    const previo = this.#recientes.get(clave);
+    if (previo && ahora - previo < DEDUP_VISITA_MS) return false;
+    this.#recientes.set(clave, ahora);
+    const dia = diaLima(ahora), corte = diaLima(ahora - DIAS_VISITAS * 86400e3);
+    const v = this.#almacen.obtener("visitas", id)?.data || { total: 0, dias: {} };
+    const dias = Object.fromEntries(Object.entries(v.dias || {}).filter(([d]) => d >= corte));
+    dias[dia] = (Number(dias[dia]) || 0) + 1;
+    this.#almacen.establecer("visitas", id, { total: (Number(v.total) || 0) + 1, ultimaAt: new Date(ahora).toISOString(), dias });
+    return true;
+  }
+  /** Lo que ve cualquiera en la portada, /ofertas y /tiendas. Tiendas: las más visitadas primero. */
   portada() {
     const tiendas = this.#tiendas();
     const visibles = new Set(tiendas.map((t) => t.id));
     const articulos = this.#articulos(visibles);
     const ofertasPorTienda = new Map();
-    for (const a of articulos) if (a.oferta) ofertasPorTienda.set(a.tiendaId, (ofertasPorTienda.get(a.tiendaId) || 0) + 1);
+    for (const a of articulos) ofertasPorTienda.set(a.tiendaId, (ofertasPorTienda.get(a.tiendaId) || 0) + 1);
+    const vis = this.visitas();
     return {
       sitio: this.config(),
-      tiendas: tiendas.map((t) => ({ ...t, ofertas: ofertasPorTienda.get(t.id) || 0, articulos: articulos.filter((a) => a.tiendaId === t.id).length })),
+      tiendas: tiendas.map((t) => ({ ...t, ofertas: ofertasPorTienda.get(t.id) || 0, articulos: ofertasPorTienda.get(t.id) || 0, visitas: vis.get(t.id)?.total || 0, visitasMes: vis.get(t.id)?.mes || 0 }))
+        .sort((a, b) => b.visitas - a.visitas || (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre).localeCompare(String(b.nombre), "es")),
       articulos,
     };
   }
@@ -154,7 +184,8 @@ export class SitioPublico {
   tienda(id) {
     const t = this.#tiendas().find((x) => x.id === id);
     if (!t) return null;
-    return { sitio: this.config(), tienda: t, articulos: this.#articulos(new Set([id])) };
+    const v = this.visitas().get(id);
+    return { sitio: this.config(), tienda: { ...t, visitas: v?.total || 0 }, articulos: this.#articulos(new Set([id])) };
   }
   /** Un archivo es público si alguna tienda, artículo o el carrusel lo referencia. */
   esArchivoPublico(id) {

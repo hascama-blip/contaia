@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Todas las tiendas · Centro Comercial Inmaculada Concepción</title>
+<meta name="description" content="Todas las tiendas del Centro Comercial Inmaculada Concepción, las más visitadas primero, con filtro por categoría.">
+<link rel="icon" href="/img/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="/img/icono-180.png">
+<meta name="theme-color" content="#2aa7c0">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/estilos/tokens.css">
+<link rel="stylesheet" href="/sitio/sitio.css">
+</head>
+<body>
+<header class="cab">
+  <div class="cab-ancho cab-in">
+    <a class="marca" href="/"><img src="/img/logo.jpg" alt=""><span id="marca-nombre">C.C. Inmaculada Concepción<small id="marca-lema">Mochilas, carteras y más</small></span></a>
+    <form class="buscador" id="buscador" role="search" onsubmit="return false"><input type="search" id="q" placeholder="Buscar mochilas, carteras, tiendas…" autocomplete="off" aria-label="Buscar"><button type="submit" aria-label="Buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button></form>
+    <div class="cab-acciones">
+      <a class="btn btn-wa btn-sm" id="wa-centro" href="#" hidden>WhatsApp</a>
+      <a class="btn btn-borde btn-sm" href="/">Inicio</a>
+    </div>
+  </div>
+  <div class="cab-sub"><div class="cab-ancho cab-sub-in"><nav class="cab-links"><a href="/">Inicio</a><a href="/#categorias">Categorías</a><a href="/ofertas">Todas las ofertas</a><a href="/tiendas">Todas las tiendas</a></nav><span id="cab-direccion"><span></span></span></div></div>
+</header>
+
+<main>
+  <section class="contenedor seccion seccion-pagina" id="tiendas">
+    <h1 class="titulo-grande">Todas las <b>tiendas</b><span class="punto">.</span></h1>
+    <p class="titulo-sub" id="tiendas-sub">Las más visitadas primero. Toca “Ver ofertas” o “Contactar” en cada tienda.</p>
+    <div class="filtros-barra" id="tiendas-filtros" role="group" aria-label="Filtros de tiendas">
+      <label class="filtro"><span>Categoría</span><select id="f-cat"><option value="">Todas</option></select></label>
+      <label class="filtro"><span>Ordenar</span><select id="f-orden"><option value="visitas">Más visitadas</option><option value="ofertas">Más ofertas</option><option value="nombre">Nombre A–Z</option></select></label>
+      <button type="button" class="filtro-limpiar" id="f-limpiar" hidden>Limpiar filtros</button>
+    </div>
+    <div class="filtro-activo" id="filtro" hidden></div>
+    <div class="rejilla" id="lista-tiendas"></div>
+  </section>
+
+  <footer class="pie-grande"><div class="contenedor pie-in">
+    <div><div class="pie-marca"><img src="/img/logo.jpg" alt=""><b id="pie-nombre">C.C. Inmaculada Concepción</b></div><p id="pie-datos"></p></div>
+    <div class="pie-links"><a href="#categorias">Categorías</a><a href="/ofertas">Todas las ofertas</a><a href="/tiendas">Todas las tiendas</a><a href="/login">Acceso directiva</a></div>
+  </div></footer>
+</main>
+
+<dialog class="modal" id="modal">
+  <div class="modal-cab"><div class="logo" id="m-logo"></div><div><h3 id="m-nombre"></h3><div class="stand" id="m-stand" style="color:var(--texto-3);font-size:.85rem"></div></div><button class="modal-cerrar" id="m-cerrar" aria-label="Cerrar">×</button></div>
+  <div class="modal-cuerpo">
+    <div class="descripcion" id="m-desc"></div>
+    <div><b id="m-ofertas-titulo">Ofertas</b><div class="lista-ofertas" id="m-ofertas" style="margin-top:8px"></div></div>
+    <a class="btn btn-primario btn-bloque" id="m-contactar" href="#">Contactar · ver perfil completo</a>
+  </div>
+</dialog>
+<script src="/sitio/comun.js"></script>
+<script src="/sitio/tiendas.js"></script>
+</body>
+</html>

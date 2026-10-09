@@ -283,3 +283,39 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .filtro-limpiar { border: 0; background: none; color: var(--brand-600); font-weight: 700; font-size: .88rem; cursor: pointer; padding: 6px 10px; }
 .filtro-limpiar:hover { text-decoration: underline; }
 @media (max-width: 640px) { .filtros-barra { gap: 8px; justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 6px; } .filtro { flex: 0 0 auto; font-size: .8rem; } .filtro select { padding: 5px 26px 5px 10px; max-width: 160px; } }
+
+/* Carrusel de "Las mejores ofertas": 10 afiches + burbuja "Ver más"; flechas y avance automático */
+.carril-ofertas { position: relative; }
+.afiches-carril { display: grid; grid-auto-flow: column; grid-auto-columns: 250px; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px 2px 16px; scrollbar-width: none; -ms-overflow-style: none; }
+.afiches-carril::-webkit-scrollbar { display: none; }
+.afiches-carril > * { scroll-snap-align: start; }
+.carril-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 1px solid var(--borde); box-shadow: 0 8px 24px rgba(15,23,42,.16); font-size: 1.7rem; line-height: 1; color: var(--brand-700); display: grid; place-items: center; cursor: pointer; z-index: 2; padding: 0 0 3px; }
+.carril-flecha:hover { background: var(--brand-50); }
+.carril-flecha[disabled] { opacity: .3; cursor: default; }
+.carril-flecha.izq { left: -20px; } .carril-flecha.der { right: -20px; }
+@media (max-width: 1240px) { .carril-flecha.izq { left: 4px; } .carril-flecha.der { right: 4px; } }
+@media (max-width: 640px) { .afiches-carril { grid-auto-columns: min(74vw, 250px); gap: 10px; } .carril-flecha { display: none; } }
+
+/* Burbuja redonda "Ver más" (al final del carrusel y de la rejilla de tiendas) */
+.burbuja-mas { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--texto-2); min-height: 100%; padding: 20px 10px; border-radius: 22px; }
+.burbuja-mas .circulo { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, var(--brand-500), var(--brand-700)); color: #fff; box-shadow: 0 12px 28px rgba(42,167,192,.35); transition: transform .15s, box-shadow .15s; }
+.burbuja-mas .circulo .ico-svg { width: 34px; height: 34px; stroke-width: 2.2; }
+.burbuja-mas:hover { text-decoration: none; }
+.burbuja-mas:hover .circulo { transform: scale(1.07); box-shadow: 0 16px 34px rgba(42,167,192,.45); }
+.burbuja-mas b { font-size: 1.05rem; color: var(--brand-700); }
+.burbuja-mas small { font-size: .82rem; color: var(--texto-3); }
+.rejilla .burbuja-mas { background: #fff; border: 1px dashed var(--borde-fuerte); border-radius: 18px; }
+@media (max-width: 640px) { .burbuja-mas .circulo { width: 68px; height: 68px; } .burbuja-mas .circulo .ico-svg { width: 28px; height: 28px; } }
+
+/* Sello "Más visitada" y tipos 2 x 1 / 3 x 1 */
+.sello-top { display: inline-block; font-size: .66rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-600); background: var(--accent-100); border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+.afiche.tipo-dosxuno .afiche-tipo, .oferta-pill.tipo-dosxuno { background: #7c3aed; color: #fff; }
+.afiche.tipo-tresxuno .afiche-tipo, .oferta-pill.tipo-tresxuno { background: #db2777; color: #fff; }
+.afiche-cifra.promo { font-size: clamp(2.9rem, 6vw, 3.9rem); }
+.afiche-cifra.promo small { font-size: .5em; font-weight: 800; margin: 0 2px; }
+@media (max-width: 640px) { .afiche-cifra.promo { font-size: 2.2rem; } }
+
+/* Páginas /ofertas y /tiendas */
+.seccion-pagina { margin-top: 28px; }
+.seccion-pagina .filtro-activo { justify-content: center; margin: -8px 0 18px; }
+.oferta-fila .oferta-pill { font-size: .62rem; margin-left: 4px; vertical-align: middle; }

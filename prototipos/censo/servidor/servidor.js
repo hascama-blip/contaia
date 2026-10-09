@@ -7,7 +7,7 @@
 //   DATOS=/var/censo PUERTO=3000 node servidor/servidor.js
 //
 // Rutas:
-//   GET  /, /tienda/:id, /sitio/*, /api/publico/*     web pública del centro comercial (sin sesión)
+//   GET  /, /ofertas, /tiendas, /tienda/:id, /sitio/*, /api/publico/*   web pública (sin sesión)
 //   GET  /portal, /src/*, /estilos/*, /img/*          el padrón (con sesión) · GET /editar-sitio (sesión con edición)
 //   GET  /login, POST/GET/DELETE /api/sesion       entrar / quién soy / salir
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
@@ -137,7 +137,10 @@ async function manejar(req, res) {
   if (ruta === "/login") { if (yo) return redirigir(res, "/portal"); return servirArchivo(res, PUBLICO, "/login.html"); }
   // ---- Público: web del centro comercial (sin sesión) ----
   if (ruta === "/") return servirArchivo(res, SITIO, "/index.html", { cache: "no-cache", req });
-  if ((m = ruta.match(/^\/tienda\/([A-Za-z0-9_.-]+)$/))) { if (sitio.tienda(m[1])) return servirArchivo(res, SITIO, "/tienda.html", { cache: "no-cache", req }); res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }); return res.end(fs.readFileSync(path.join(SITIO, "no-existe.html"))); }
+  if (ruta === "/ofertas" || ruta === "/tiendas") return servirArchivo(res, SITIO, ruta + ".html", { cache: "no-cache", req });
+  // Cada vista del perfil cuenta como visita (una por visitante y hora); también los clics al perfil digital externo (beacon).
+  if ((m = ruta.match(/^\/api\/publico\/visita\/([A-Za-z0-9_.-]+)$/)) && metodo === "POST") { sitio.registrarVisita(m[1], ipDe(req), req.headers["user-agent"]); res.writeHead(204); return res.end(); }
+  if ((m = ruta.match(/^\/tienda\/([A-Za-z0-9_.-]+)$/))) { if (sitio.tienda(m[1])) { if (metodo === "GET") sitio.registrarVisita(m[1], ipDe(req), req.headers["user-agent"]); return servirArchivo(res, SITIO, "/tienda.html", { cache: "no-cache", req }); } res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }); return res.end(fs.readFileSync(path.join(SITIO, "no-existe.html"))); }
   if (ruta.startsWith("/sitio/")) return servirArchivo(res, SITIO, ruta.slice(6), { cache: "public, max-age=0, must-revalidate", req }) || json(res, 404, { error: "No existe." });
   if (ruta === "/api/publico/sitio" && metodo === "GET") return json(res, 200, sitio.portada(), { "Cache-Control": "public, max-age=30" });
   if ((m = ruta.match(/^\/api\/publico\/tienda\/([A-Za-z0-9_.-]+)$/)) && metodo === "GET") { const t = sitio.tienda(m[1]); return t ? json(res, 200, t, { "Cache-Control": "public, max-age=30" }) : json(res, 404, { error: "Tienda no encontrada." }); }
@@ -184,10 +187,11 @@ async function manejar(req, res) {
     if (!COLECCIONES.includes(col)) return json(res, 404, { error: "Colección desconocida." });
     if (metodo === "GET" && !id) return json(res, 200, { docs: almacen.listar(col) });
     if (metodo === "GET") { const d = almacen.obtener(col, id); return d ? json(res, 200, d) : json(res, 404, { error: "No existe.", code: "not_found" }); }
+    if (col === "visitas") return json(res, 403, { error: "Las visitas las cuenta el servidor; no se editan.", code: "invalid_argument" });
     // Seguridad solo puede crear y actualizar incidencias (no borrarlas ni tocar otra colección).
     if (!escribe && !(col === "incidencias" && metodo !== "DELETE" && puedeIncidencias(yo))) return soloLectura();
     const PUBLICAS = ["tiendas", "articulos", "sitio"];
-    const ctxPublico = { id, tamanoArchivo: (a) => metaArchivos.get(a)?.tamano, ofertasDeTienda: (tiendaId, excluir) => almacen.listar("articulos").filter((x) => x.id !== excluir && x.data?.tiendaId === tiendaId && x.data.visible !== false && (!!x.data.oferta || (Number(x.data.precioOferta) > 0 && Number(x.data.precioOferta) < Number(x.data.precio || Infinity)))).length };
+    const ctxPublico = { id, tamanoArchivo: (a) => metaArchivos.get(a)?.tamano, ofertasDeTienda: (tiendaId, excluir) => almacen.listar("articulos").filter((x) => x.id !== excluir && x.data?.tiendaId === tiendaId && x.data.visible !== false).length };
     if (metodo === "PUT") {
       const datos = await leerJSON(req);
       if (PUBLICAS.includes(col)) { const err = validarPublico(col, datos, ctxPublico); if (err) return json(res, 400, { error: err, code: "invalid" }); }
