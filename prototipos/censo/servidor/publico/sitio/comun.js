@@ -79,7 +79,9 @@ window.S = {
     const precioTxt = Number(a.precioOferta) > 0 ? S.pen(a.precioOferta) + (promo ? " c/u" : "") : Number(a.precio) > 0 ? S.pen(a.precio) : "";
     const mensaje = `Hola ${t.nombre}, vi en la web de ${sitio.nombre} su oferta "${a.nombre}"${tipo ? ` (${tipo.nombre}${precioTxt ? `, ${precioTxt}` : ""})` : ""}. ¿Sigue disponible?`;
     const wa = t.whatsapp ? S.wa(t.whatsapp, mensaje) : "";
-    const perfil = S.contacto(t, `/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}`);
+    // El botón de perfil solo sale si la tienda cargó su perfil digital externo (contactoUrl); el perfil interno no se enlaza desde aquí.
+    const perfil = S.contacto(t);
+    const btnPerfil = perfil.externo ? `<a class="btn btn-borde" href="${S.esc(perfil.href)}" target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}">${S.esc(perfil.texto === "Contactar" ? "Ver perfil digital" : perfil.texto)}</a>` : "";
     const cats = (t.categorias || []).map((id) => cat.get(id)).filter(Boolean).slice(0, 3).map((x) => `<span class="etiqueta">${S.esc(x.nombre)}</span>`).join("");
     return `<article class="afiche tipo-${S.esc(tipo?.id || "oferta")}" data-art="${S.esc(a.id)}" data-tienda="${S.esc(a.tiendaId)}">
       <div class="afiche-caras">
@@ -101,7 +103,7 @@ window.S = {
           <div class="dorso-art">Oferta: <b>${S.esc(a.nombre)}</b>${precioTxt ? ` · ${S.esc(precioTxt)}` : ""}</div>
           <div class="dorso-botones">
             ${wa ? `<a class="btn btn-wa" href="${S.esc(wa)}" target="_blank" rel="noopener">${S.icono("whatsapp")} <span class="largo">Preguntar por </span>WhatsApp</a>` : `<span class="dorso-sinwa">Esta tienda aún no registró WhatsApp.</span>`}
-            <a class="btn btn-borde" href="${S.esc(perfil.href)}"${perfil.externo ? ` target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}"` : ""}>${perfil.externo ? S.esc(perfil.texto === "Contactar" ? "Ver perfil digital" : perfil.texto) : `Ver perfil<span class="largo"> de la tienda</span>`}</a>
+            ${btnPerfil}
             <button type="button" class="afiche-volver">Volver a la oferta</button>
           </div>
         </div>

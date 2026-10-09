@@ -160,8 +160,9 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   para el % de descuento). **El afiche tiene dos caras**: el frente muestra la oferta (banda del
   tipo, % o “2x1”, nombre, precios, foto con la pastilla “Ver tienda”); al tocarlo gira y el dorso
   muestra el **perfil de la tienda** (logo, nombre, stand, horario, categorías, descripción) con
-  **Preguntar por WhatsApp** (mensaje ya escrito con el nombre, tipo y precio de la oferta) y
-  **Ver perfil de la tienda** (o su perfil digital externo). Volver: botón, clic en el dorso o Esc.
+  **Preguntar por WhatsApp** (mensaje ya escrito con el nombre, tipo y precio de la oferta) y, solo
+  si la tienda cargó su **perfil digital externo** (`contactoUrl`), el botón que lo abre (el perfil
+  interno `/tienda/:id` no se enlaza desde el afiche). Volver: botón, clic en el dorso o Esc.
   El carrusel se detiene mientras haya un afiche volteado. Lo compartido (afiche, tarjeta de
   tienda, burbuja, modal, cabecera) vive en `comun.js` (`S.afiche`, `S.afichesInteractivos`,
   `S.tarjetaTienda`, `S.burbujaMas`, `S.modalTienda`, `S.cabecera`).
