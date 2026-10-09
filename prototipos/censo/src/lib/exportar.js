@@ -87,6 +87,18 @@ export async function pdfFicha(a, { stands = [] } = {}) {
   doc.setDrawColor(...BORDE);
   doc.setLineWidth(0.25);
 
+  // Marca de agua: el escudo grande y centrado, detrás de todo el contenido, con opacidad del 35 %.
+  // Se dibuja primero para que quede al fondo; las celdas sin relleno son transparentes y lo dejan ver.
+  if (logo && doc.GState) {
+    try {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.35 }));
+      const LADO = 120;
+      doc.addImage(logo, formatoImg(logo), (210 - LADO) / 2, (297 - LADO) / 2, LADO, LADO);
+      doc.restoreGraphicsState();
+    } catch { /* si el visor no soporta transparencia, la ficha sale sin marca de agua */ }
+  }
+
   /** Celda con borde, relleno opcional y texto centrado verticalmente (recorta si no cabe). */
   const celda = (x, yy, w, h, texto, { fill = null, bold = false, size = 8, align = "left", color = NEGRO } = {}) => {
     if (fill) { doc.setFillColor(...fill); doc.rect(x, yy, w, h, "FD"); } else doc.rect(x, yy, w, h);

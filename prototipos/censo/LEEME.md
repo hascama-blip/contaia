@@ -115,7 +115,7 @@ Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el du
 ## Tecnología
 
 React 18 + htm (plantillas `html\`…\`` sin compilación), cargados desde CDN.
-PDF de la ficha con jsPDF (se carga al pedir el PDF).
+PDF de la ficha con jsPDF (se carga al pedir el PDF). El escudo va además como **marca de agua** centrada detrás del contenido (opacidad 35 %, `GState` de jsPDF).
 
 ## Servidor propio en AWS (dominio de GoDaddy)
 Carpeta `servidor/`: servidor Node 22 **sin dependencias** que reemplaza lo que da
