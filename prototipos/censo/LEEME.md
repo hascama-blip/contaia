@@ -142,9 +142,12 @@ La raíz `ccinmaculadaconcepcion.com/` es la **web para compradores** (sin sesi�
 privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
 - **Portada** (`servidor/publico/sitio/index.html` + `sitio.js`): carrusel de fotos
   (autoplay, puntos, flechas), **burbujas de categorías** (Mochilas, Carteras, Cartucheras…)
-  que filtran ofertas y tiendas, **Las mejores ofertas** como **carrusel** (hasta 10 afiches,
-  flechas, avance automático cada 4 s que se detiene al tocar o al salir de pantalla, filtros
-  tipo/tienda/orden) terminado en una **burbuja redonda “Ver más”** que lleva a **`/ofertas`**
+  que filtran ofertas y tiendas, **Las mejores ofertas** como **carrusel** (hasta 10 afiches;
+  caben N tarjetas **enteras** por pantalla, `--n` en CSS: 4 / 3 / 2, nunca se ve una cortada;
+  flechas siempre activas, puntos de página, avance automático cada 4 s que se detiene al tocar
+  o al salir de pantalla y **vuelve al inicio** al llegar al final; filtros tipo/tienda/orden y
+  aviso “Mostrando solo la categoría X · Ver todas” cuando hay filtro de categoría o búsqueda;
+  al recargar no se conserva el filtro) terminado en una **burbuja redonda “Ver más”** que lleva a **`/ofertas`**
   (`ofertas.html` + `ofertas.js`: todas las ofertas en rejilla con filtros categoría, tipo,
   tienda, orden y búsqueda; los filtros van en la URL `?cat=&tipo=&tienda=&orden=&q=`), y
   **Tiendas**: las **más visitadas primero** (sello “Más visitada” en las 3 primeras), 8 en la

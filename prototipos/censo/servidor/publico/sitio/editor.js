@@ -248,6 +248,22 @@
       [7, "Gorra urbana bordada", "accesorios", 30, null, "tresxuno", "Por docena", "", false, "Talla única ajustable · Lleva 3, paga 1"],
       [7, "Riñonera deportiva", "accesorios", 35, 25, "mayorista", "Por docena", "", false, "Impermeable · 2 bolsillos"],
       [7, "Cartera mini crossbody", "carteras", 55, 45, "nuevo", "Lanzamiento", "", false, "Cadena dorada"],
+      [0, "Mochila de viaje 40 L", "mochilas", 150, 119, "liquidacion", "Hasta agotar stock", "", false, "Porta laptop 15”"],
+      [0, "Mochila infantil con luces", "mochilas", 55, null, "dosxuno", "Solo esta semana", "", false, "Lleva 2, paga 1"],
+      [1, "Bandolera de cuero sintético", "carteras", 75, 59, "oferta", "", "", false, "Correa ajustable"],
+      [1, "Monedero con llavero", "billeteras", 18, null, "tresxuno", "Por docena", "", false, "Lleva 3, paga 1"],
+      [2, "Porta documentos ejecutivo", "accesorios", 140, 110, "campana", "Campaña ejecutiva", "", false, "Cuero legítimo"],
+      [2, "Cinturón trenzado", "accesorios", 48, 39, "oferta", "", "", false, "Cuero natural"],
+      [3, "Maleta de cabina blanda 22”", "maletas", 160, 129, "campana", "Viaja en verano", "", false, "Expandible · 2 ruedas"],
+      [3, "Neceser de viaje", "accesorios", 35, null, "dosxuno", "Solo esta semana", "", false, "Lleva 2, paga 1"],
+      [4, "Lonchera escolar con compartimentos", "loncheras", 42, 35, "oferta", "", "", false, "Fácil de limpiar"],
+      [4, "Mochila inicial con lonchera", "mochilas", 70, 55, "combo", "Set inicial", "", false, "Mochila + lonchera"],
+      [5, "Set de cartucheras x 3", "cartucheras", 45, 36, "mayorista", "Precio por mayor", "", false, "Colores surtidos"],
+      [5, "Mochila con ruedas primaria", "mochilas", 130, 99, "liquidacion", "Hasta agotar stock", "", false, "Asa telescópica"],
+      [6, "Billetera dama larga", "billeteras", 70, 55, "oferta", "", "", false, "12 tarjetas · cierre"],
+      [6, "Tarjetero metálico", "billeteras", 35, null, "dosxuno", "Solo esta semana", "", false, "Lleva 2, paga 1"],
+      [7, "Riñonera urbana", "accesorios", 40, 29, "liquidacion", "Hasta agotar stock", "", false, "Correa reflectiva"],
+      [7, "Mochila pequeña de moda", "mochilas", 65, 49, "nuevo", "Nuevo modelo", "", false, "Tamaño mini"],
     ],
   };
   const lienzo = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
@@ -295,7 +311,7 @@
         paso(`Creando artículo ${i + 1} de ${EJ.articulos.length}: ${nombre}…`);
         await S.pedir("PUT", `/api/db/articulos/ej_${nuevoId()}`, { nombre, tiendaId: ids[ti], categoriaId, precio, precioOferta, oferta: true, tipoOferta: tipoOferta || "oferta", etiquetaOferta, destacado, descripcion, foto: await subir(await imagenArticulo(nombre, EJ.tiendas[ti].colores), "image/"), visible: true, ejemplo: true, creadoAt: new Date(Date.now() - i * 3600e3).toISOString(), actualizadoAt: ahora() });
       }
-      paso("Listo: 3 banners, 8 tiendas y 24 artículos de ejemplo."); estado("Ejemplos cargados ✓"); await cargar(); pintarTodo();
+      paso("Listo: 3 banners, 8 tiendas y 40 ofertas de ejemplo."); estado("Ejemplos cargados ✓"); await cargar(); pintarTodo();
     } catch (err) { estado(err.message, true); paso("No se pudo completar: " + err.message); }
     b.disabled = false;
   };

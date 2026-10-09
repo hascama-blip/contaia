@@ -51,11 +51,13 @@
       <label class="filtro"><span>Ordenar</span><select id="f-orden"><option value="descuento">Mayor descuento</option><option value="precio-asc">Menor precio</option><option value="precio-desc">Mayor precio</option><option value="reciente">Más recientes</option></select></label>
       <button type="button" class="filtro-limpiar" id="f-limpiar" hidden>Limpiar filtros</button>
     </div>
+    <div class="filtro-activo centrado" id="filtro-ofertas" hidden></div>
     <div class="carril-ofertas" aria-roledescription="carrusel" aria-label="Ofertas">
       <button type="button" class="carril-flecha izq" id="of-ant" aria-label="Ofertas anteriores">‹</button>
       <div class="afiches-carril" id="lista-ofertas"></div>
       <button type="button" class="carril-flecha der" id="of-sig" aria-label="Más ofertas">›</button>
     </div>
+    <div class="carril-puntos" id="of-puntos" role="tablist" aria-label="Posición del carrusel"></div>
   </section>
 
   <section class="contenedor seccion" id="tiendas">

@@ -75,27 +75,42 @@
     carril.innerHTML = mostradas.length
       ? mostradas.map((a) => S.afiche(a, ctx)).join("") + S.burbujaMas(urlOfertas(), resto ? "Ver más" : "Ver todas", resto ? `${resto} oferta${resto === 1 ? "" : "s"} más` : "con todos los filtros")
       : `<div class="vacio" style="grid-column:1/-1;width:min(560px,80vw)">No hay ofertas con esos filtros.</div>`;
-    carril.scrollTo({ left: 0, behavior: "auto" }); flechas(); arrancar();
+    indice = 0; irA(0, false); arrancar();
     const tiendasConOferta = new Set(of.map((a) => a.tiendaId)).size, nombreTipo = tipos.find((t) => t.id === tipoFiltro)?.nombre;
     $("#ofertas-sub").textContent = of.length ? `${of.length} oferta${of.length === 1 ? "" : "s"}${nombreTipo ? ` · ${nombreTipo}` : ""}${tiendaFiltro ? ` · ${tiendaDe.get(tiendaFiltro)?.nombre || ""}` : ` de ${tiendasConOferta} tienda${tiendasConOferta === 1 ? "" : "s"}`} · toca una para contactar a la tienda` : "Ninguna oferta coincide con los filtros elegidos.";
+    const c = cat.get(filtro), fo = $("#filtro-ofertas"); fo.hidden = !(c || busca);
+    if (c || busca) fo.innerHTML = `Mostrando solo ${busca ? `resultados de <b>“${S.esc($("#q").value.trim())}”</b>` : ""}${busca && c ? " en " : ""}${c ? `la categoría <b>${S.esc(c.nombre)}</b>` : ""} (${of.length} de ${articulos.length} ofertas) <button type="button" class="quitar">✕ Ver todas las ofertas</button>`;
   }
-  // Carrusel: flechas, deslizamiento automático (se detiene al tocar, al pasar el mouse o fuera de pantalla).
-  let autoOf, visible = true;
-  const pasoAncho = () => (carril.firstElementChild?.getBoundingClientRect().width || 250) + (parseFloat(getComputedStyle(carril).columnGap) || 18);
-  const alFinal = () => carril.scrollLeft + carril.clientWidth >= carril.scrollWidth - 4;
-  const flechas = () => { const hay = carril.scrollWidth > carril.clientWidth + 4; $("#of-ant").hidden = $("#of-sig").hidden = !hay; $("#of-ant").disabled = carril.scrollLeft <= 2; $("#of-sig").disabled = alFinal(); };
-  const mover = (dir) => { if (dir > 0 && alFinal()) carril.scrollTo({ left: 0, behavior: "smooth" }); else carril.scrollBy({ left: dir * Math.max(pasoAncho(), carril.clientWidth * 0.8), behavior: "smooth" }); };
+  $("#filtro-ofertas").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; busca = ""; $("#q").value = ""; pintar(); } };
+  // Carrusel por tarjetas enteras: caben N por pantalla (--n del CSS) y siempre se alinea al inicio de una
+  // tarjeta, así nunca se ve una cortada a la izquierda. Al llegar al final vuelve al inicio (también solo).
+  let autoOf, visible = true, indice = 0;
+  const porPantalla = () => Math.max(1, Number(getComputedStyle(carril).getPropertyValue("--n")) || 1);
+  const total = () => carril.children.length;
+  const paso = () => (carril.firstElementChild?.getBoundingClientRect().width || 0) + (parseFloat(getComputedStyle(carril).columnGap) || 0);
+  const ultimo = () => Math.max(0, total() - porPantalla());
+  const irA = (i, suave = true) => { indice = i > ultimo() ? 0 : i < 0 ? ultimo() : i; carril.scrollTo({ left: Math.round(indice * paso()), behavior: suave ? "smooth" : "auto" }); pintarPuntos(); };
+  const pintarPuntos = () => {
+    const n = porPantalla(), paginas = Math.max(1, Math.ceil(total() / n)), act = Math.min(paginas - 1, Math.round(indice / n));
+    const caja = $("#of-puntos"); caja.hidden = paginas < 2;
+    caja.innerHTML = Array.from({ length: paginas }, (_, p) => `<button type="button" role="tab" aria-label="Página ${p + 1} de ${paginas}" aria-current="${p === act}" data-i="${Math.min(p * n, ultimo())}"></button>`).join("");
+    $("#of-ant").hidden = $("#of-sig").hidden = paginas < 2;
+  };
   const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const arrancar = () => { clearInterval(autoOf); if (reducir || !visible || carril.scrollWidth <= carril.clientWidth + 4) return; autoOf = setInterval(() => { if (alFinal()) carril.scrollTo({ left: 0, behavior: "smooth" }); else carril.scrollBy({ left: pasoAncho(), behavior: "smooth" }); }, 4000); };
+  const arrancar = () => { clearInterval(autoOf); if (reducir || !visible || total() <= porPantalla()) return; autoOf = setInterval(() => irA(indice + 1), 4000); };
   const parar = () => clearInterval(autoOf);
-  carril.addEventListener("scroll", () => { clearTimeout(flechas.t); flechas.t = setTimeout(flechas, 80); }, { passive: true });
+  const flechas = () => { irA(Math.min(indice, ultimo()), false); };
+  // Si el visitante desliza con el dedo, se toma la tarjeta en la que quedó.
+  carril.addEventListener("scroll", () => { clearTimeout(carril.t); carril.t = setTimeout(() => { const i = Math.round(carril.scrollLeft / (paso() || 1)); if (i !== indice) { indice = Math.min(i, ultimo()); pintarPuntos(); } }, 120); }, { passive: true });
   carril.addEventListener("pointerenter", parar); carril.addEventListener("pointerleave", arrancar);
   carril.addEventListener("touchstart", parar, { passive: true }); carril.addEventListener("touchend", () => setTimeout(arrancar, 6000), { passive: true });
   carril.addEventListener("focusin", parar); carril.addEventListener("focusout", arrancar);
-  $("#of-ant").onclick = () => { mover(-1); arrancar(); }; $("#of-sig").onclick = () => { mover(1); arrancar(); };
+  $("#of-ant").onclick = () => { irA(indice - porPantalla() < 0 && indice > 0 ? 0 : indice - porPantalla()); arrancar(); };
+  $("#of-sig").onclick = () => { irA(indice >= ultimo() ? 0 : Math.min(indice + porPantalla(), ultimo())); arrancar(); };
+  $("#of-puntos").onclick = (e) => { const b = e.target.closest("button"); if (b) { irA(Number(b.dataset.i)); arrancar(); } };
   if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) arrancar(); else parar(); }, { threshold: 0.2 }).observe(carril);
   document.addEventListener("visibilitychange", () => (document.hidden ? parar() : arrancar()));
-  addEventListener("resize", () => { clearTimeout(flechas.r); flechas.r = setTimeout(flechas, 150); });
+  addEventListener("resize", () => { clearTimeout(flechas.r); flechas.r = setTimeout(() => { flechas(); arrancar(); }, 150); });
   $("#f-tipo").onchange = (e) => { tipoFiltro = e.target.value; pintar(); };
   $("#f-tienda").onchange = (e) => { tiendaFiltro = e.target.value; pintar(); };
   $("#f-orden").onchange = (e) => { ordenOfertas = e.target.value; pintar(); };
@@ -107,7 +122,7 @@
     const c = cat.get(filtro);
     burbujas.querySelectorAll(".burbuja").forEach((b) => b.setAttribute("aria-pressed", b.dataset.id === filtro ? "true" : "false"));
     const f = $("#filtro"); f.hidden = !c; if (c) f.innerHTML = `Mostrando ofertas y tiendas de <b>${S.esc(c.nombre)}</b> <button type="button" class="quitar">✕ Ver todo</button>`;
-    history.replaceState(null, "", c ? `?cat=${encodeURIComponent(filtro)}` : location.pathname);
+    if (location.search) history.replaceState(null, "", location.pathname); // al recargar se ve todo; el enlace del banner (?cat=) solo aplica al entrar
     const ts = (c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas).filter(coincideTienda);
     const as = (c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos).filter(coincideArt);
     if (busca) { f.hidden = false; f.innerHTML = `Resultados para <b>“${S.esc($("#q").value.trim())}”</b>${c ? ` en ${S.esc(c.nombre)}` : ""}: ${as.length} oferta(s), ${ts.length} tienda(s) <button type="button" class="quitar">✕ Limpiar búsqueda</button>`; }

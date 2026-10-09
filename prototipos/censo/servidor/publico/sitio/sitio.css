@@ -284,17 +284,22 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .filtro-limpiar:hover { text-decoration: underline; }
 @media (max-width: 640px) { .filtros-barra { gap: 8px; justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 6px; } .filtro { flex: 0 0 auto; font-size: .8rem; } .filtro select { padding: 5px 26px 5px 10px; max-width: 160px; } }
 
-/* Carrusel de "Las mejores ofertas": 10 afiches + burbuja "Ver más"; flechas y avance automático */
+/* Carrusel de "Las mejores ofertas": caben N tarjetas enteras por pantalla (sin cortes), flechas, puntos y avance automático */
 .carril-ofertas { position: relative; }
-.afiches-carril { display: grid; grid-auto-flow: column; grid-auto-columns: 250px; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px 2px 16px; scrollbar-width: none; -ms-overflow-style: none; }
+.afiches-carril { --n: 4; --gap: 18px; display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - var(--gap) * (var(--n) - 1)) / var(--n)); gap: var(--gap); overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px 0 14px; scrollbar-width: none; -ms-overflow-style: none; }
 .afiches-carril::-webkit-scrollbar { display: none; }
 .afiches-carril > * { scroll-snap-align: start; }
 .carril-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 1px solid var(--borde); box-shadow: 0 8px 24px rgba(15,23,42,.16); font-size: 1.7rem; line-height: 1; color: var(--brand-700); display: grid; place-items: center; cursor: pointer; z-index: 2; padding: 0 0 3px; }
 .carril-flecha:hover { background: var(--brand-50); }
-.carril-flecha[disabled] { opacity: .3; cursor: default; }
-.carril-flecha.izq { left: -20px; } .carril-flecha.der { right: -20px; }
-@media (max-width: 1240px) { .carril-flecha.izq { left: 4px; } .carril-flecha.der { right: 4px; } }
-@media (max-width: 640px) { .afiches-carril { grid-auto-columns: min(74vw, 250px); gap: 10px; } .carril-flecha { display: none; } }
+.carril-flecha.izq { left: -23px; } .carril-flecha.der { right: -23px; }
+@media (max-width: 1260px) { .carril-flecha.izq { left: -16px; } .carril-flecha.der { right: -16px; } } /* sin sitio fuera del contenedor: pegadas al borde, sin desbordar la página */
+main { overflow-x: clip; }
+.carril-puntos { display: flex; justify-content: center; gap: 7px; margin-top: 4px; }
+.carril-puntos button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: var(--borde-fuerte); padding: 0; transition: width .15s, background .15s; }
+.carril-puntos button[aria-current="true"] { background: var(--brand-500); width: 22px; border-radius: 6px; }
+@media (max-width: 1000px) { .afiches-carril { --n: 3; } }
+@media (max-width: 640px) { .afiches-carril { --n: 2; --gap: 10px; } .carril-flecha { display: none; } }
+.filtro-activo.centrado { justify-content: center; margin: -8px 0 16px; }
 
 /* Burbuja redonda "Ver más" (al final del carrusel y de la rejilla de tiendas) */
 .burbuja-mas { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--texto-2); min-height: 100%; padding: 20px 10px; border-radius: 22px; }
