@@ -233,3 +233,16 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .afiche-tienda b { font-size: .85rem; color: var(--brand-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .afiche-tienda small { font-size: .72rem; color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 640px) { .afiche-tipo { margin: -14px -10px 6px; font-size: .66rem; padding: 6px 8px; } .afiche-tienda { padding: 4px 8px; height: 40px; } .afiche-eti { font-size: .66rem; letter-spacing: .12em; } .afiche-marca { font-size: .9rem; } .afiche-etiqueta span { font-size: .66rem; } .afiche-tienda b { font-size: .78rem; } }
+
+/* Celular: precios en una sola línea y sello de tienda más compacto */
+@media (max-width: 640px) {
+  .art .precio { font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .art .precio s { font-size: .75rem; margin-left: 4px; }
+  .afiche-precios { font-size: .9rem; white-space: nowrap; }
+  .afiche-precios s { font-size: .75rem; margin-left: 4px; }
+  .afiche-tienda { gap: 6px; padding: 4px 8px; }
+  .afiche-tienda .afiche-logo { width: 22px; height: 22px; font-size: .55rem; }
+  .afiche-tienda small { font-size: .66rem; }
+  .art h3 { font-size: .92rem; }
+  .art .desc, .art .vende { font-size: .78rem; }
+}
