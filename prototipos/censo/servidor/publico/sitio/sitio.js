@@ -126,7 +126,8 @@
     const ts = (c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas).filter(coincideTienda);
     const as = (c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos).filter(coincideArt);
     if (busca) { f.hidden = false; f.innerHTML = `Resultados para <b>“${S.esc($("#q").value.trim())}”</b>${c ? ` en ${S.esc(c.nombre)}` : ""}: ${as.length} oferta(s), ${ts.length} tienda(s) <button type="button" class="quitar">✕ Limpiar búsqueda</button>`; }
-    const mostradas = ts.slice(0, LIM_TIENDAS), resto = ts.length - mostradas.length;
+    // 8 casillas en total: hasta 7 tiendas + la burbuja "Ver más tiendas" en la última, así la rejilla queda completa (2 filas de 4).
+    const mostradas = ts.slice(0, LIM_TIENDAS - 1), resto = ts.length - mostradas.length;
     $("#tiendas-sub").textContent = `${ts.length} tienda${ts.length === 1 ? "" : "s"} · las más visitadas primero${c ? "" : " · toca una categoría arriba para filtrar"}`;
     $("#lista-tiendas").innerHTML = ts.length
       ? mostradas.map((t) => S.tarjetaTienda(t, { cat, sello: top.has(t.id) ? "Más visitada" : "" })).join("") + S.burbujaMas(urlTiendas(), resto ? "Ver más tiendas" : "Todas las tiendas", resto ? `${resto} tienda${resto === 1 ? "" : "s"} más` : "buscar y filtrar")

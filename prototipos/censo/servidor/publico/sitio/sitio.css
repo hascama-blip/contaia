@@ -21,13 +21,14 @@ img { display: block; max-width: 100%; }
 .buscador input::-webkit-search-cancel-button { cursor: pointer; }
 .buscador button { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--brand-500); color: #fff; font-size: 1.1rem; display: grid; place-items: center; }
 .buscador button:hover { background: var(--brand-600); }
-.cab-sub { border-top: 1px solid var(--borde); background: #fff; }
-.cab-sub-in { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 42px; font-size: .9rem; color: var(--texto-2); }
-.cab-sub-in #cab-direccion { color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Barra de enlaces turquesa (color de marca del portal) */
+.cab-sub { background: var(--brand-600); color: #fff; }
+.cab-sub-in { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 42px; font-size: .9rem; color: #fff; }
+.cab-sub-in #cab-direccion { color: rgba(255,255,255,.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cab-links { flex: 0 0 auto; }
 .cab-sub-in #cab-direccion span:empty { display: none; }
 .cab-links { display: flex; gap: 22px; }
-.cab-links a { color: var(--texto-2); font-weight: 500; } .cab-links a:hover { color: var(--brand-600); text-decoration: none; }
+.cab-links a { color: #fff; font-weight: 600; } .cab-links a:hover { color: var(--accent-400); text-decoration: none; }
 @media (max-width: 860px) { .cab-in { grid-template-columns: auto 1fr; } .buscador { grid-column: 1 / -1; grid-row: 2; margin-bottom: 10px; } .cab-acciones { grid-column: 2; grid-row: 1; } .cab-sub { display: none; } }
 .cab .marca { display: flex; align-items: center; gap: 10px; color: var(--texto); font-weight: 800; letter-spacing: -.01em; }
 .cab .marca img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; }
