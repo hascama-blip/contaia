@@ -160,6 +160,14 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
 
+## Sin emojis en la web pública
+La web no usa emojis: las categorías base llevan íconos de línea SVG (`ICONOS` en
+`servidor/publico/sitio/comun.js`, `S.icono(clave)` / `S.iconoCategoria(c)`), una categoría nueva
+muestra su inicial hasta que se le sube imagen, los botones del perfil y el buscador usan los mismos
+íconos, y los tipos de oferta se distinguen por color (franja y punto en el chip). Las tarjetas de
+tienda muestran la **descripción** recortada a 3 líneas con un "Ver más" que aparece solo cuando
+el texto no cabe (medido en pantalla) y abre el resumen de la tienda.
+
 ## Tipos de oferta en la web pública
 Un artículo en oferta lleva `tipoOferta` (oferta, liquidacion, campana, combo, mayorista, nuevo;
 lista `TIPOS_OFERTA` en `servidor/lib/sitio.js`, expuesta como `sitio.tiposOferta`) y una

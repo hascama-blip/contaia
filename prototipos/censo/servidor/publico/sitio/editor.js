@@ -84,13 +84,13 @@
 
   // ---- Categorías ----
   const pintarCategorias = () => {
-    $("#categorias").innerHTML = config.categorias.map((c, i) => `<div class="item">${c.imagen ? `<img src="${S.blob(c.imagen)}" alt="">` : `<div class="ph">${S.esc(c.icono || "🛍️")}</div>`}<div class="txt"><b>${S.esc(c.nombre)}</b><small>${tiendas.filter((t) => (t.categorias || []).includes(c.id)).length} tienda(s) · ${articulos.filter((a) => a.categoriaId === c.id).length} artículo(s)${c.visible === false ? " · <b>oculta</b>" : ""}</small></div><div class="acc"><button class="btn btn-ghost btn-sm" data-mover="${i}:-1" ${i === 0 ? "disabled" : ""}>↑</button><button class="btn btn-ghost btn-sm" data-mover="${i}:1" ${i === config.categorias.length - 1 ? "disabled" : ""}>↓</button><button class="btn btn-ghost btn-sm" data-editar="${i}">Editar</button><button class="btn btn-ghost btn-sm" data-imagen="${i}">${c.imagen ? "Cambiar imagen" : "Subir imagen"}</button>${c.imagen ? `<button class="btn btn-ghost btn-sm" data-sin-imagen="${i}">Usar emoji</button>` : ""}<button class="btn btn-ghost btn-sm" data-ocultar="${i}">${c.visible === false ? "Mostrar" : "Ocultar"}</button><button class="btn btn-peligro btn-sm" data-quitar="${i}">Quitar</button></div></div>`).join("");
+    $("#categorias").innerHTML = config.categorias.map((c, i) => `<div class="item">${c.imagen ? `<img src="${S.blob(c.imagen)}" alt="">` : `<div class="ph">${S.esc(String(c.nombre || "?").charAt(0).toUpperCase())}</div>`}<div class="txt"><b>${S.esc(c.nombre)}</b><small>${tiendas.filter((t) => (t.categorias || []).includes(c.id)).length} tienda(s) · ${articulos.filter((a) => a.categoriaId === c.id).length} artículo(s)${c.visible === false ? " · <b>oculta</b>" : ""}</small></div><div class="acc"><button class="btn btn-ghost btn-sm" data-mover="${i}:-1" ${i === 0 ? "disabled" : ""}>↑</button><button class="btn btn-ghost btn-sm" data-mover="${i}:1" ${i === config.categorias.length - 1 ? "disabled" : ""}>↓</button><button class="btn btn-ghost btn-sm" data-editar="${i}">Editar</button><button class="btn btn-ghost btn-sm" data-imagen="${i}">${c.imagen ? "Cambiar imagen" : "Subir imagen"}</button>${c.imagen ? `<button class="btn btn-ghost btn-sm" data-sin-imagen="${i}">Quitar imagen</button>` : ""}<button class="btn btn-ghost btn-sm" data-ocultar="${i}">${c.visible === false ? "Mostrar" : "Ocultar"}</button><button class="btn btn-peligro btn-sm" data-quitar="${i}">Quitar</button></div></div>`).join("");
   };
   $("#f-cat").onsubmit = async (e) => { e.preventDefault(); const f = e.target; const nombre = f.nombre.value.trim(); if (!nombre) return; let id = nombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || nuevoId(); if (catDe(id)) id += "-" + nuevoId().slice(-3); config.categorias.push({ id, nombre, icono: f.icono.value.trim() }); await guardarConfig(); f.reset(); pintarCategorias(); };
   $("#categorias").onclick = async (e) => {
     const b = e.target.closest("button"); if (!b) return; const cs = config.categorias;
     if (b.dataset.mover) { const [i, d] = b.dataset.mover.split(":").map(Number); [cs[i], cs[i + d]] = [cs[i + d], cs[i]]; }
-    if (b.dataset.editar !== undefined) { const c = cs[Number(b.dataset.editar)]; const n = prompt("Nombre de la categoría:", c.nombre); if (n === null) return; const ic = prompt("Ícono (emoji):", c.icono || ""); if (ic === null) return; c.nombre = n.trim() || c.nombre; c.icono = ic.trim(); }
+    if (b.dataset.editar !== undefined) { const c = cs[Number(b.dataset.editar)]; const n = prompt("Nombre de la categoría:", c.nombre); if (n === null) return; c.nombre = n.trim() || c.nombre; }
     if (b.dataset.ocultar !== undefined) { const c = cs[Number(b.dataset.ocultar)]; c.visible = c.visible === false; }
     if (b.dataset.imagen !== undefined) { const a = await pedirArchivo("image/*"); if (!a) return; b.disabled = true; b.textContent = "Subiendo…"; try { cs[Number(b.dataset.imagen)].imagen = await subir(a, "image/"); } catch (err) { estado(err.message, true); pintarCategorias(); return; } }
     if (b.dataset.sinImagen !== undefined) { const c = cs[Number(b.dataset.sinImagen)]; const vieja = c.imagen; delete c.imagen; if (vieja) S.pedir("DELETE", `/api/archivos/${vieja}`).catch(() => {}); }
@@ -126,7 +126,7 @@
     fT.reset(); for (const k of ["nombre", "stand", "piso", "descripcion", "whatsapp", "telefono", "horario", "qrPagoTexto", "catalogoUrl", "ubicacionUrl", "orden"]) fT[k].value = t?.[k] ?? "";
     for (const k of ["facebook", "instagram", "tiktok"]) fT[k].value = t?.redes?.[k] || "";
     fT.enlaces.value = (t?.enlaces || []).map((e) => `${e.titulo || ""} | ${e.url || ""}`).join("\n"); fT.visible.checked = t ? t.visible !== false : true;
-    $("#t-cats").innerHTML = config.categorias.map((c) => `<label><input type="checkbox" name="cat" value="${S.esc(c.id)}" ${(t?.categorias || []).includes(c.id) ? "checked" : ""}>${S.esc(c.icono || "")} ${S.esc(c.nombre)}</label>`).join("") || `<span class="ayuda">Primero crea categorías en la pestaña “Categorías”.</span>`;
+    $("#t-cats").innerHTML = config.categorias.map((c) => `<label><input type="checkbox" name="cat" value="${S.esc(c.id)}" ${(t?.categorias || []).includes(c.id) ? "checked" : ""}>${S.esc(c.nombre)}</label>`).join("") || `<span class="ayuda">Primero crea categorías en la pestaña “Categorías”.</span>`;
     for (const caja of $$(".archivo", fT)) pintarArchivo(caja, t?.[caja.dataset.campo] || "");
     dT.showModal();
   };
@@ -152,15 +152,15 @@
     const sel = $("#filtro-art-tienda"); const val = sel.value; sel.innerHTML = `<option value="">Todas las tiendas</option>` + tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); sel.value = val;
     const lista = articulos.filter((a) => !val || a.tiendaId === val);
     $("#articulos-n").textContent = `(${articulos.length})`;
-    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(catDe(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="txt"><b>${S.esc(a.nombre)}${a.oferta ? ` <span class="ok">· ${S.esc(((config.tiposOferta || []).find((t) => t.id === (a.tipoOferta || "oferta"))?.nombre || "Oferta").toUpperCase())}${a.etiquetaOferta ? " · " + S.esc(a.etiquetaOferta) : ""}</span>` : ""}${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${S.soles(a.precio) || "sin precio"}${a.oferta && a.precioOferta ? ` → ${S.soles(a.precioOferta)}` : ""}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
+    $("#articulos").innerHTML = lista.map((a) => `<div class="item">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="ph">${S.esc(String(a.nombre || "?").charAt(0).toUpperCase())}</div>`}<div class="txt"><b>${S.esc(a.nombre)}${a.oferta ? ` <span class="ok">· ${S.esc(((config.tiposOferta || []).find((t) => t.id === (a.tipoOferta || "oferta"))?.nombre || "Oferta").toUpperCase())}${a.etiquetaOferta ? " · " + S.esc(a.etiquetaOferta) : ""}</span>` : ""}${a.visible === false ? ' <span class="mal">(oculto)</span>' : ""}</b><small>${S.esc(tiendaDe(a.tiendaId)?.nombre || "⚠ tienda borrada")} · ${S.esc(catDe(a.categoriaId)?.nombre || "sin categoría")} · ${S.soles(a.precio) || "sin precio"}${a.oferta && a.precioOferta ? ` → ${S.soles(a.precioOferta)}` : ""}</small></div><div class="acc"><button class="btn btn-primary btn-sm" data-editar="${S.esc(a.id)}">Editar</button></div></div>`).join("") || `<p class="ayuda">No hay artículos${val ? " de esta tienda" : ""}. Crea uno con “＋ Nuevo artículo”.</p>`;
   };
   $("#filtro-art-tienda").onchange = pintarArticulos;
   const fA = $("#f-art"), dA = $("#d-art"); let artActual = null;
   const abrirArticulo = (a) => {
     if (!tiendas.length) return estado("Primero crea una tienda.", true);
     artActual = a; $("#a-titulo").textContent = a ? `Editar: ${a.nombre}` : "Nuevo artículo"; $("#a-borrar").hidden = !a;
-    fA.reset(); fA.tiendaId.innerHTML = tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); fA.categoriaId.innerHTML = `<option value="">—</option>` + config.categorias.map((c) => `<option value="${S.esc(c.id)}">${S.esc(c.icono || "")} ${S.esc(c.nombre)}</option>`).join("");
-    fA.tipoOferta.innerHTML = (config.tiposOferta || []).map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.icono)} ${S.esc(t.nombre)}</option>`).join("");
+    fA.reset(); fA.tiendaId.innerHTML = tiendas.map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join(""); fA.categoriaId.innerHTML = `<option value="">—</option>` + config.categorias.map((c) => `<option value="${S.esc(c.id)}">${S.esc(c.nombre)}</option>`).join("");
+    fA.tipoOferta.innerHTML = (config.tiposOferta || []).map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join("");
     for (const k of ["nombre", "descripcion", "precio", "precioOferta", "etiquetaOferta"]) fA[k].value = a?.[k] ?? "";
     fA.tipoOferta.value = a?.tipoOferta || "oferta"; if (!fA.tipoOferta.value) fA.tipoOferta.value = "oferta";
     const mostrarTipo = () => { $("#a-tipo-fila").hidden = !fA.oferta.checked; }; fA.oferta.onchange = mostrarTipo;
@@ -185,9 +185,9 @@
   // ---- Datos de ejemplo para exposición (imágenes generadas en el navegador) ----
   const EJ = {
     banners: [
-      { titulo: "Campaña escolar 2027", texto: "Mochilas desde S/ 25 al por mayor · más de 250 tiendas", enlace: "?cat=mochilas", textoEnlace: "Ver mochilas", colores: ["#0f4656", "#2aa7c0"], emoji: "🎒" },
-      { titulo: "Liquidación de maletas", texto: "Hasta 40 % de descuento en maletas de cabina y bodega", enlace: "?cat=maletas", textoEnlace: "Ver maletas", colores: ["#7a0d0d", "#E01B1B"], emoji: "🧳" },
-      { titulo: "Carteras y billeteras de cuero", texto: "Directo del fabricante · Galerías A y C", enlace: "?cat=carteras", textoEnlace: "Ver carteras", colores: ["#5a4300", "#E4C000"], emoji: "👜" },
+      { titulo: "Campaña escolar 2027", texto: "Mochilas desde S/ 25 al por mayor · más de 250 tiendas", enlace: "?cat=mochilas", textoEnlace: "Ver mochilas", colores: ["#0f4656", "#2aa7c0"], inicial: "M" },
+      { titulo: "Liquidación de maletas", texto: "Hasta 40 % de descuento en maletas de cabina y bodega", enlace: "?cat=maletas", textoEnlace: "Ver maletas", colores: ["#7a0d0d", "#E01B1B"], inicial: "%" },
+      { titulo: "Carteras y billeteras de cuero", texto: "Directo del fabricante · Galerías A y C", enlace: "?cat=carteras", textoEnlace: "Ver carteras", colores: ["#5a4300", "#E4C000"], inicial: "C" },
     ],
     tiendas: [
       { nombre: "Mochilas Pérez", stand: "Stand 1012", piso: "Galería A · 1er piso", cats: ["mochilas", "cartucheras"], wa: "987654321", desc: "Fabricamos mochilas escolares, de viaje y morrales urbanos. Venta por mayor desde 6 unidades y al menudeo.", redes: { instagram: "@mochilasperez", facebook: "mochilasperezlima" }, horario: "Lun–Sáb 9:00–19:30", colores: ["#2aa7c0", "#155e72"], qr: "Yape 987654321 · Juan Pérez" },
@@ -200,30 +200,30 @@
       { nombre: "Accesorios Nova", stand: "Stand 1310", piso: "Galería E · 2do piso", cats: ["accesorios", "carteras"], wa: "911009988", desc: "Gorras, correas, riñoneras y accesorios de temporada. Precios especiales por docena.", redes: { tiktok: "@accesoriosnova" }, horario: "Lun–Sáb 10:00–20:00", colores: ["#16a34a", "#14532d"], qr: "Plin 911009988 · Accesorios Nova" },
     ],
     articulos: [
-      [0, "Mochila escolar reforzada 18”", "mochilas", 45, 35, "oferta", "", "🎒", true, "Colores surtidos · Por mayor desde 6 unidades"],
-      [0, "Morral urbano antirrobo", "mochilas", 79, null, "", "", "🎒", false, "Puerto USB y bolsillo oculto"],
-      [0, "Cartuchera triple cierre", "cartucheras", 25, 18, "campana", "Campaña escolar 2027", "✏️", false, "Tela impermeable"],
-      [0, "Mochila con ruedas", "mochilas", 120, 95, "campana", "Campaña escolar 2027", "🎒", false, "Para primaria · 2 ruedas"],
-      [1, "Cartera bandolera Lucero", "carteras", 89, 69, "oferta", "", "👜", true, "Cuero sintético premium"],
-      [1, "Billetera dama con cierre", "billeteras", 40, 29, "combo", "2x1 esta semana", "👛", false, "Lleva 2 por el precio de 1"],
-      [1, "Cartera tote grande", "carteras", 110, null, "", "", "👜", false, "Ideal para oficina"],
-      [2, "Billetera de cuero legítimo", "billeteras", 95, null, "", "", "👛", false, "Hecha a mano · Grabado gratis"],
-      [2, "Cartera de cuero clásica", "carteras", 260, 199, "liquidacion", "Hasta agotar stock", "👜", true, "Últimas unidades"],
-      [2, "Correa de cuero caballero", "accesorios", 55, null, "", "", "🧢", false, "Tallas 32 a 44"],
-      [3, "Maleta de cabina 20”", "maletas", 180, 149, "liquidacion", "Hasta agotar stock", "🧳", false, "Rígida · 4 ruedas 360°"],
-      [3, "Maleta de bodega 28”", "maletas", 320, 259, "liquidacion", "Hasta agotar stock", "🧳", false, "Expandible · candado TSA"],
-      [3, "Set de 3 maletas", "maletas", 650, 520, "combo", "Set completo", "🧳", false, "20” + 24” + 28”"],
-      [4, "Lonchera térmica infantil", "loncheras", 35, null, "", "", "🍱", false, "Con tomatodo 500 ml"],
-      [4, "Set escolar inicial", "utiles", 60, 48, "campana", "Campaña escolar 2027", "📚", false, "Lonchera + cartuchera + tomatodo"],
-      [4, "Tomatodo acero 750 ml", "accesorios", 28, null, "", "", "🍱", false, "Libre de BPA"],
-      [5, "Pack de 10 cuadernos A4", "utiles", 48, 39, "mayorista", "Precio por mayor", "📚", false, "Rayado y cuadriculado"],
-      [5, "Cartuchera de 2 pisos", "cartucheras", 22, null, "", "", "✏️", false, "Con 24 divisiones"],
-      [5, "Colores x 36 unidades", "utiles", 30, 24, "campana", "Campaña escolar 2027", "📚", false, "Largos · estuche metálico"],
-      [6, "Tarjetero slim de cuero", "billeteras", 45, null, "nuevo", "Nuevo modelo", "👛", false, "Protección RFID"],
-      [6, "Billetera caballero bifold", "billeteras", 60, 45, "oferta", "", "👛", false, "Cuero graso · 8 tarjetas"],
-      [7, "Gorra urbana bordada", "accesorios", 30, null, "", "", "🧢", false, "Talla única ajustable"],
-      [7, "Riñonera deportiva", "accesorios", 35, 25, "mayorista", "Por docena", "🧢", false, "Impermeable · 2 bolsillos"],
-      [7, "Cartera mini crossbody", "carteras", 55, 45, "nuevo", "Lanzamiento", "👜", false, "Cadena dorada"],
+      [0, "Mochila escolar reforzada 18”", "mochilas", 45, 35, "oferta", "", "", true, "Colores surtidos · Por mayor desde 6 unidades"],
+      [0, "Morral urbano antirrobo", "mochilas", 79, null, "", "", "", false, "Puerto USB y bolsillo oculto"],
+      [0, "Cartuchera triple cierre", "cartucheras", 25, 18, "campana", "Campaña escolar 2027", "", false, "Tela impermeable"],
+      [0, "Mochila con ruedas", "mochilas", 120, 95, "campana", "Campaña escolar 2027", "", false, "Para primaria · 2 ruedas"],
+      [1, "Cartera bandolera Lucero", "carteras", 89, 69, "oferta", "", "", true, "Cuero sintético premium"],
+      [1, "Billetera dama con cierre", "billeteras", 40, 29, "combo", "2x1 esta semana", "", false, "Lleva 2 por el precio de 1"],
+      [1, "Cartera tote grande", "carteras", 110, null, "", "", "", false, "Ideal para oficina"],
+      [2, "Billetera de cuero legítimo", "billeteras", 95, null, "", "", "", false, "Hecha a mano · Grabado gratis"],
+      [2, "Cartera de cuero clásica", "carteras", 260, 199, "liquidacion", "Hasta agotar stock", "", true, "Últimas unidades"],
+      [2, "Correa de cuero caballero", "accesorios", 55, null, "", "", "", false, "Tallas 32 a 44"],
+      [3, "Maleta de cabina 20”", "maletas", 180, 149, "liquidacion", "Hasta agotar stock", "", false, "Rígida · 4 ruedas 360°"],
+      [3, "Maleta de bodega 28”", "maletas", 320, 259, "liquidacion", "Hasta agotar stock", "", false, "Expandible · candado TSA"],
+      [3, "Set de 3 maletas", "maletas", 650, 520, "combo", "Set completo", "", false, "20” + 24” + 28”"],
+      [4, "Lonchera térmica infantil", "loncheras", 35, null, "", "", "", false, "Con tomatodo 500 ml"],
+      [4, "Set escolar inicial", "utiles", 60, 48, "campana", "Campaña escolar 2027", "", false, "Lonchera + cartuchera + tomatodo"],
+      [4, "Tomatodo acero 750 ml", "accesorios", 28, null, "", "", "", false, "Libre de BPA"],
+      [5, "Pack de 10 cuadernos A4", "utiles", 48, 39, "mayorista", "Precio por mayor", "", false, "Rayado y cuadriculado"],
+      [5, "Cartuchera de 2 pisos", "cartucheras", 22, null, "", "", "", false, "Con 24 divisiones"],
+      [5, "Colores x 36 unidades", "utiles", 30, 24, "campana", "Campaña escolar 2027", "", false, "Largos · estuche metálico"],
+      [6, "Tarjetero slim de cuero", "billeteras", 45, null, "nuevo", "Nuevo modelo", "", false, "Protección RFID"],
+      [6, "Billetera caballero bifold", "billeteras", 60, 45, "oferta", "", "", false, "Cuero graso · 8 tarjetas"],
+      [7, "Gorra urbana bordada", "accesorios", 30, null, "", "", "", false, "Talla única ajustable"],
+      [7, "Riñonera deportiva", "accesorios", 35, 25, "mayorista", "Por docena", "", false, "Impermeable · 2 bolsillos"],
+      [7, "Cartera mini crossbody", "carteras", 55, 45, "nuevo", "Lanzamiento", "", false, "Cadena dorada"],
     ],
   };
   const lienzo = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
@@ -234,14 +234,22 @@
   // El banner no lleva texto dibujado: el título, el texto y el botón los pone el carrusel encima (y se pueden editar).
   async function imagenBanner(b, movil) {
     const w = movil ? 1080 : 1920, h = movil ? 1350 : 700; const [c, ctx] = lienzo(w, h); degradado(ctx, w, h, b.colores); burbujas(ctx, w, h, 10);
-    ctx.save(); ctx.globalAlpha = .12; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.arc(w * 0.78, h * 0.5, (movil ? 120 : 160) + i * 46, 0, Math.PI * 2); ctx.stroke(); } ctx.restore();
-    ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.font = `${movil ? 520 : 420}px serif`; ctx.globalAlpha = .96;
-    ctx.fillText(b.emoji, movil ? w / 2 : w * 0.76, movil ? h * 0.4 : h / 2); ctx.globalAlpha = 1;
+    ctx.save(); ctx.globalAlpha = .14; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; for (let i = 0; i < 16; i++) { ctx.beginPath(); ctx.arc(movil ? w / 2 : w * 0.76, movil ? h * 0.42 : h * 0.5, (movil ? 90 : 120) + i * 44, 0, Math.PI * 2); ctx.stroke(); } ctx.restore();
+    ctx.save(); ctx.globalAlpha = .22; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(movil ? w / 2 : w * 0.76, movil ? h * 0.42 : h * 0.5, movil ? 150 : 200, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `800 ${movil ? 150 : 180}px Outfit, "Segoe UI", Arial, sans-serif`; ctx.fillText(b.inicial, movil ? w / 2 : w * 0.76, movil ? h * 0.42 : h * 0.5);
     return aArchivo(c, `banner-${movil ? "movil" : "web"}.jpg`, "image/jpeg", .86);
   }
   async function imagenLogo(t) { const [c, ctx] = lienzo(400, 400); degradado(ctx, 400, 400, t.colores); burbujas(ctx, 400, 400, 4); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = '800 150px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillText(S.iniciales(t.nombre), 200, 190); ctx.font = '600 30px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillText(t.nombre.toUpperCase().slice(0, 22), 200, 320); return aArchivo(c, "logo.png"); }
   async function imagenQR(t) { const [c, ctx] = lienzo(600, 700); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 600, 700); const n = 25, m = 20, s = (600 - m * 2) / n; let semilla = [...t.nombre].reduce((a, ch) => a + ch.charCodeAt(0), 7); const rnd = () => { semilla = (semilla * 9301 + 49297) % 233280; return semilla / 233280; }; ctx.fillStyle = "#111"; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (rnd() > .55) ctx.fillRect(m + i * s, m + j * s, s - 1, s - 1); const buscador = (x, y) => { ctx.fillStyle = "#111"; ctx.fillRect(x, y, s * 7, s * 7); ctx.fillStyle = "#fff"; ctx.fillRect(x + s, y + s, s * 5, s * 5); ctx.fillStyle = "#111"; ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 3); }; buscador(m, m); buscador(m + s * 18, m); buscador(m, m + s * 18); ctx.fillStyle = "#111"; ctx.textAlign = "center"; ctx.font = '700 30px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillText(t.qr, 300, 640); ctx.font = '500 20px Arial, sans-serif'; ctx.fillStyle = "#b00020"; ctx.fillText("QR DE EJEMPLO · NO ES UN CÓDIGO REAL", 300, 675); return aArchivo(c, "qr.png"); }
-  async function imagenArticulo(emoji, colores) { const [c, ctx] = lienzo(800, 800); degradado(ctx, 800, 800, [colores[0] + "33", colores[1] + "55"]); ctx.fillStyle = "#fff"; ctx.globalAlpha = .55; ctx.beginPath(); ctx.arc(400, 400, 300, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "380px serif"; ctx.fillText(emoji, 400, 420); return aArchivo(c, "articulo.jpg", "image/jpeg", .85); }
+  async function imagenArticulo(nombre, colores) {
+    const [c, ctx] = lienzo(800, 800); degradado(ctx, 800, 800, colores); burbujas(ctx, 800, 800, 6);
+    ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(400, 380, 250, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    const palabras = String(nombre).split(/\s+/); const ini = (palabras[0]?.[0] || "") + (palabras[1]?.[0] || "");
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = '800 260px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillText(ini.toUpperCase(), 400, 380);
+    ctx.font = '600 40px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillText(String(nombre).toUpperCase().slice(0, 30), 400, 700);
+    ctx.font = '500 26px Outfit, "Segoe UI", Arial, sans-serif'; ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.fillText("FOTO DE EJEMPLO", 400, 748);
+    return aArchivo(c, "articulo.jpg", "image/jpeg", .85);
+  }
 
   $("#ej-cargar").onclick = async () => {
     const yaHay = tiendas.some((t) => t.ejemplo);
@@ -261,7 +269,7 @@
       for (const [i, a] of EJ.articulos.entries()) {
         const [ti, nombre, categoriaId, precio, precioOferta, tipoOferta, etiquetaOferta, emoji, destacado, descripcion] = a;
         paso(`Creando artículo ${i + 1} de ${EJ.articulos.length}: ${nombre}…`);
-        await S.pedir("PUT", `/api/db/articulos/ej_${nuevoId()}`, { nombre, tiendaId: ids[ti], categoriaId, precio, precioOferta, oferta: !!(tipoOferta || (precioOferta && precioOferta < precio)), tipoOferta: tipoOferta || (precioOferta ? "oferta" : ""), etiquetaOferta, destacado, descripcion, foto: await subir(await imagenArticulo(emoji, EJ.tiendas[ti].colores), "image/"), visible: true, ejemplo: true, creadoAt: new Date(Date.now() - i * 3600e3).toISOString(), actualizadoAt: ahora() });
+        await S.pedir("PUT", `/api/db/articulos/ej_${nuevoId()}`, { nombre, tiendaId: ids[ti], categoriaId, precio, precioOferta, oferta: !!(tipoOferta || (precioOferta && precioOferta < precio)), tipoOferta: tipoOferta || (precioOferta ? "oferta" : ""), etiquetaOferta, destacado, descripcion, foto: await subir(await imagenArticulo(nombre, EJ.tiendas[ti].colores), "image/"), visible: true, ejemplo: true, creadoAt: new Date(Date.now() - i * 3600e3).toISOString(), actualizadoAt: ahora() });
       }
       paso("Listo: 3 banners, 8 tiendas y 24 artículos de ejemplo."); estado("Ejemplos cargados ✓"); await cargar(); pintarTodo();
     } catch (err) { estado(err.message, true); paso("No se pudo completar: " + err.message); }

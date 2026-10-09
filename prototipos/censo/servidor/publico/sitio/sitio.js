@@ -50,7 +50,7 @@
   $("#buscador").onsubmit = (e) => { e.preventDefault(); busca = norm($("#q").value.trim()); pintar(); $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
   const conteo = (id) => tiendas.filter((t) => (t.categorias || []).includes(id)).length;
   const catsVisibles = sitio.categorias.filter((c) => c.visible !== false);
-  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${c.imagen ? `<img src="${S.blob(c.imagen)}" alt="">` : c.icono ? S.esc(c.icono) : "🛍️"}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
+  burbujas.innerHTML = catsVisibles.map((c) => `<button type="button" class="burbuja" data-id="${S.esc(c.id)}" aria-pressed="false"><span class="ico">${S.iconoCategoria(c)}</span><b>${S.esc(c.nombre)}</b><small>${conteo(c.id)} tienda${conteo(c.id) === 1 ? "" : "s"}</small></button>`).join("") || `<p class="vacio" style="width:100%">Aún no hay categorías.</p>`;
   burbujas.onclick = (e) => { const b = e.target.closest(".burbuja"); if (!b) return; filtro = filtro === b.dataset.id ? "" : b.dataset.id; pintar(); if (filtro) $("#tiendas").scrollIntoView({ behavior: "smooth", block: "start" }); };
   $("#filtro").onclick = (e) => { if (e.target.closest(".quitar")) { filtro = ""; busca = ""; $("#q").value = ""; pintar(); } };
 
@@ -61,21 +61,21 @@
     const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
     const cifra = d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>` : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">S/ ${Number(a.precioOferta).toLocaleString("es-PE")}</div><div class="afiche-sub">precio de oferta</div>` : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? "S/ " + Number(a.precio).toLocaleString("es-PE") : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
     return `<a class="afiche tipo-${S.esc(tipo?.id || "oferta")}" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
-      <div class="afiche-tipo">${S.esc(tipo?.icono || "🔥")} ${S.esc(tipo?.nombre || "Oferta")}</div>
+      <div class="afiche-tipo">${S.esc(tipo?.nombre || "Oferta")}</div>
       <div class="afiche-etiqueta">${a.etiquetaOferta ? `<span>${S.esc(a.etiquetaOferta)}</span>` : ""}</div>
       <div class="afiche-eti">${S.esc(c?.nombre || "\u00a0")}</div>
       ${cifra}
       <div class="afiche-marca">${S.esc(a.nombre)}</div>
       <div class="afiche-precios">${d && Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s>` : Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>` : Number(a.precio) > 0 ? `<b>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>` : "\u00a0"}</div>
       <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · ") || "\u00a0")}</small></span></div>
-      <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(c?.icono || "🛍️")}</span>`}</div>
+      <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}</div>
     </a>`;
   }
   function pintarOfertas(lista) {
     const todas = lista.filter((a) => a.oferta).sort((x, y) => Number(!!y.destacado) - Number(!!x.destacado) || descuento(y) - descuento(x));
     const tipos = (sitio.tiposOferta || []).map((t) => ({ ...t, n: todas.filter((a) => (a.tipoOferta || "oferta") === t.id).length })).filter((t) => t.n);
     if (tipoFiltro && !tipos.some((t) => t.id === tipoFiltro)) tipoFiltro = "";
-    $("#ofertas-filtros").innerHTML = tipos.length > 1 ? [`<button type="button" class="chip" data-tipo="" aria-pressed="${!tipoFiltro}">Todas <small>${todas.length}</small></button>`, ...tipos.map((t) => `<button type="button" class="chip tipo-${S.esc(t.id)}" data-tipo="${S.esc(t.id)}" aria-pressed="${tipoFiltro === t.id}">${S.esc(t.icono)} ${S.esc(t.nombre)} <small>${t.n}</small></button>`)].join("") : "";
+    $("#ofertas-filtros").innerHTML = tipos.length > 1 ? [`<button type="button" class="chip" data-tipo="" aria-pressed="${!tipoFiltro}">Todas <small>${todas.length}</small></button>`, ...tipos.map((t) => `<button type="button" class="chip tipo-${S.esc(t.id)}" data-tipo="${S.esc(t.id)}" aria-pressed="${tipoFiltro === t.id}"><i class="punto-tipo tipo-${S.esc(t.id)}"></i>${S.esc(t.nombre)} <small>${t.n}</small></button>`)].join("") : "";
     const of = tipoFiltro ? todas.filter((a) => (a.tipoOferta || "oferta") === tipoFiltro) : todas;
     const LIM = 8, mostradas = verTodas ? of : of.slice(0, LIM);
     $("#ofertas").hidden = !todas.length; $("#lista-ofertas").innerHTML = mostradas.map(afiche).join("");
@@ -89,30 +89,35 @@
   function pintar() {
     const c = cat.get(filtro);
     burbujas.querySelectorAll(".burbuja").forEach((b) => b.setAttribute("aria-pressed", b.dataset.id === filtro ? "true" : "false"));
-    const f = $("#filtro"); f.hidden = !c; if (c) f.innerHTML = `Mostrando tiendas y artículos de <b>${S.esc(c.icono || "")} ${S.esc(c.nombre)}</b> <button type="button" class="quitar">✕ Ver todo</button>`;
+    const f = $("#filtro"); f.hidden = !c; if (c) f.innerHTML = `Mostrando tiendas y artículos de <b>${S.esc(c.nombre)}</b> <button type="button" class="quitar">✕ Ver todo</button>`;
     history.replaceState(null, "", c ? `?cat=${encodeURIComponent(filtro)}` : location.pathname);
     const ts = (c ? tiendas.filter((t) => (t.categorias || []).includes(filtro)) : tiendas).filter(coincideTienda);
     const as = (c ? articulos.filter((a) => a.categoriaId === filtro || (tiendaDe.get(a.tiendaId)?.categorias || []).includes(filtro) && !a.categoriaId) : articulos).filter(coincideArt);
     if (busca) { f.hidden = false; f.innerHTML = `Resultados para <b>“${S.esc($("#q").value.trim())}”</b>${c ? ` en ${S.esc(c.nombre)}` : ""}: ${ts.length} tienda(s), ${as.length} artículo(s) <button type="button" class="quitar">✕ Limpiar búsqueda</button>`; }
     $("#tiendas-sub").textContent = `${ts.length} tienda${ts.length === 1 ? "" : "s"}${c ? "" : " · toca una categoría arriba para filtrar"}`;
     $("#lista-tiendas").innerHTML = ts.length ? ts.map(tarjetaTienda).join("") : `<div class="vacio" style="grid-column:1/-1">Todavía no hay tiendas publicadas${c ? ` en ${S.esc(c.nombre)}` : ""}.</div>`;
+    ajustarVerMas();
     pintarOfertas(as);
     $("#art-titulo").innerHTML = (c ? `Todo en ${S.esc(c.nombre.toLowerCase())}` : "Variedad de artículos") + ' <span class="punto">.</span>';
     $("#tiendas-titulo").innerHTML = (c ? `Tiendas que venden ${S.esc(c.nombre.toLowerCase())}` : "Tiendas") + ' <span class="punto">.</span>';
     $("#lista-articulos").innerHTML = as.length ? as.map(tarjetaArticulo).join("") : `<div class="vacio" style="grid-column:1/-1">Aún no hay artículos publicados${c ? ` en ${S.esc(c.nombre)}` : ""}.</div>`;
   }
-  const nombresCat = (t) => (t.categorias || []).map((id) => cat.get(id)).filter(Boolean).slice(0, 3).map((c) => `<span class="etiqueta">${S.esc(c.icono || "")} ${S.esc(c.nombre)}</span>`).join("");
+  // "Ver más" aparece solo cuando la descripción no cabe en sus 3 líneas (medido en pantalla).
+  function ajustarVerMas() { for (const d of document.querySelectorAll(".tienda-desc")) { const b = d.parentElement.querySelector(".ver-mas"); if (b) b.hidden = d.scrollHeight <= d.clientHeight + 1; } }
+  addEventListener("resize", () => { clearTimeout(ajustarVerMas.t); ajustarVerMas.t = setTimeout(ajustarVerMas, 150); });
+  const nombresCat = (t) => (t.categorias || []).map((id) => cat.get(id)).filter(Boolean).slice(0, 3).map((c) => `<span class="etiqueta">${S.esc(c.nombre)}</span>`).join("");
   function tarjetaTienda(t) {
     return `<article class="tienda" data-id="${S.esc(t.id)}">
       <div class="tienda-cab">${S.logo(t)}<div><h3>${S.esc(t.nombre)}</h3><div class="stand">${S.esc([t.stand, t.piso].filter(Boolean).join(" · ")) || "&nbsp;"}</div></div></div>
-      <div class="etiquetas">${nombresCat(t)}${t.ofertas ? `<span class="oferta-pill">🔥 ${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}</span>` : ""}</div>
+      <p class="tienda-desc">${S.esc(t.descripcion || "") || `<span class="muted">Vende ${S.esc((t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ").toLowerCase() || "en el centro comercial")}.</span>`}</p>
+      <div class="tienda-meta"><button type="button" class="ver-mas" hidden>Ver más</button><span class="tienda-ofertas ${t.ofertas ? "con" : ""}">${t.ofertas ? `${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}` : `${t.articulos || 0} artículo${t.articulos === 1 ? "" : "s"}`}</span></div>
       <div class="tienda-acciones"><button type="button" class="btn btn-borde btn-sm ver">Ver ofertas</button><a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(t.id)}">Contactar</a></div>
     </article>`;
   }
   function tarjetaArticulo(a) {
     const t = tiendaDe.get(a.tiendaId) || {};
     return `<article class="art">
-      <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
+      <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
       <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "").slice(0, 90)}</div><div class="vende">Vende: <b>${S.esc(t.nombre || "—")}</b>${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
       <a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(a.tiendaId)}${a.id ? `?art=${encodeURIComponent(a.id)}` : ""}">Contactar</a></div>
     </article>`;
@@ -123,16 +128,16 @@
 
   // ---- Resumen de ofertas (modal) ----
   const modal = $("#modal");
-  $("#lista-tiendas").onclick = (e) => { const b = e.target.closest(".ver"); if (!b) return; abrir(tiendaDe.get(b.closest(".tienda").dataset.id)); };
+  $("#lista-tiendas").onclick = (e) => { const b = e.target.closest(".ver, .ver-mas"); if (!b) return; abrir(tiendaDe.get(b.closest(".tienda").dataset.id)); };
   $("#m-cerrar").onclick = () => modal.close(); modal.onclick = (e) => { if (e.target === modal) modal.close(); };
   function abrir(t) {
     if (!t) return;
     $("#m-logo").outerHTML = S.logo(t).replace('class="logo"', 'class="logo" id="m-logo"');
-    $("#m-nombre").textContent = t.nombre; $("#m-stand").textContent = [t.stand, t.piso, t.horario].filter(Boolean).join(" · ");
+    $("#m-nombre").textContent = t.nombre; $("#m-stand").textContent = [t.stand, t.piso, t.horario, (t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
     $("#m-desc").textContent = t.descripcion || "";
     const mios = articulos.filter((a) => a.tiendaId === t.id); const of = mios.filter((a) => a.oferta); const lista = (of.length ? of : mios).slice(0, 6);
     $("#m-ofertas-titulo").textContent = of.length ? `Ofertas (${of.length})` : mios.length ? "Lo que vende" : "";
-    $("#m-ofertas").innerHTML = lista.length ? lista.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</div>`}<div class="nom">${S.esc(a.nombre)}${a.oferta ? ` <span class="oferta-pill">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "oferta")}</span>` : ""}</div>${S.precio(a)}</div>`).join("") + (mios.length > lista.length ? `<div class="vende" style="text-align:center">y ${mios.length - lista.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó artículos. Contáctala para consultar.</div>`;
+    $("#m-ofertas").innerHTML = lista.length ? lista.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.icono("foto")}</div>`}<div class="nom">${S.esc(a.nombre)}${a.oferta ? ` <span class="oferta-pill">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "oferta")}</span>` : ""}</div>${S.precio(a)}</div>`).join("") + (mios.length > lista.length ? `<div class="vende" style="text-align:center">y ${mios.length - lista.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó artículos. Contáctala para consultar.</div>`;
     $("#m-contactar").href = `/tienda/${encodeURIComponent(t.id)}`;
     modal.showModal();
   }
