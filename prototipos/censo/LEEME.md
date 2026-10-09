@@ -126,7 +126,8 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   `/api/usuarios`, `/api/eventos` (SSE) y `/api/reniec/:dni` (token en el servidor).
   Sirve `index.html` inyectando `publico/adaptador.js` (mismo `window.claude`).
 - `lib/almacen.js` (JSON por colección, escritura atómica), `lib/sesiones.js` (scrypt +
-  cookie firmada, roles admin/edicion/lectura), `lib/reniec.js` (apidni con caché).
+  cookie firmada, roles admin/edicion/lectura/seguridad; `seguridad` solo escribe en
+  `incidencias` y nunca borra), `lib/reniec.js` (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
 - Primera configuración sin SSH: con cero usuarios, `login.html` pide el **código de instalación**
   (`CENSO_CODIGO_INSTALACION`) y crea el admin (`POST /api/instalacion`). `publico/admin.html`

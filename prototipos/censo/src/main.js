@@ -46,7 +46,7 @@ function App() {
   const [datos, setDatos] = useState({ asociados: [], stands: [], pagos: [], incidencias: [], cargado: false });
   const [estadoBase, setEstadoBase] = useState("conectando"); // conectando | lista | sin_base | error
   const [ruta, setRuta] = useState(leerRuta);
-  const [usuario, setUsuario] = useState({ id: null, nombre: "", puedeEscribir: null });
+  const [usuario, setUsuario] = useState({ id: null, nombre: "", puedeEscribir: null, puedeIncidencias: null });
   const [caps, setCaps] = useState({ archivos: false, descargas: false });
   const [aviso, setAviso] = useState(null);
   const temporizador = useRef(null);
@@ -68,7 +68,7 @@ function App() {
 
   // Capacidades opcionales: usuario, archivos y descargas.
   useEffect(() => {
-    usuarioActual().then(setUsuario).catch(() => {});
+    usuarioActual().then((u) => { setUsuario(u); if (u.rol === "seguridad" && !location.hash) location.hash = "#incidencias"; }).catch(() => {}); // seguridad entra directo a Incidencias
     Promise.all([conectarArchivos(), conectarDescargas()]).then(([a, d]) => setCaps({ archivos: Boolean(a), descargas: Boolean(d) }));
   }, []);
 
@@ -106,7 +106,7 @@ function App() {
   }, [datos]);
 
   const hayEjemplos = datos.asociados.some((a) => a.ejemplo);
-  const ctx = { datos, derivados, usuario, caps, ir, avisar, puedeEscribir: usuario.puedeEscribir };
+  const ctx = { datos, derivados, usuario, caps, ir, avisar, puedeEscribir: usuario.puedeEscribir, puedeIncidencias: usuario.puedeIncidencias };
 
   let pagina;
   if (estadoBase === "conectando") pagina = html`<div className="arranque">Cargando el padrón…</div>`;

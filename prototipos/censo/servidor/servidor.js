@@ -25,7 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Almacen, nuevoId, COLECCIONES, fusionar } from "./lib/almacen.js";
-import { Usuarios, COOKIE, puedeEscribir, esAdmin } from "./lib/sesiones.js";
+import { Usuarios, COOKIE, puedeEscribir, puedeIncidencias, esAdmin } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
@@ -163,7 +163,7 @@ async function manejar(req, res) {
       return json(res, 200, { usuario: usuarios.publico(u) }, { "Set-Cookie": usuarios.emitirCookie(u, seguro(req)) });
     }
     if (metodo === "DELETE") return json(res, 200, { ok: true }, { "Set-Cookie": usuarios.cookieSalida() });
-    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
+    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), puedeIncidencias: puedeIncidencias(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
   }
   // Estáticos públicos que la página de entrada necesita (logo, estilos).
   if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/") || ruta === "/manifest.webmanifest") {
@@ -184,7 +184,8 @@ async function manejar(req, res) {
     if (!COLECCIONES.includes(col)) return json(res, 404, { error: "Colección desconocida." });
     if (metodo === "GET" && !id) return json(res, 200, { docs: almacen.listar(col) });
     if (metodo === "GET") { const d = almacen.obtener(col, id); return d ? json(res, 200, d) : json(res, 404, { error: "No existe.", code: "not_found" }); }
-    if (!escribe) return soloLectura();
+    // Seguridad solo puede crear y actualizar incidencias (no borrarlas ni tocar otra colección).
+    if (!escribe && !(col === "incidencias" && metodo !== "DELETE" && puedeIncidencias(yo))) return soloLectura();
     const PUBLICAS = ["tiendas", "articulos", "sitio"];
     const ctxPublico = { id, tamanoArchivo: (a) => metaArchivos.get(a)?.tamano, ofertasDeTienda: (tiendaId, excluir) => almacen.listar("articulos").filter((x) => x.id !== excluir && x.data?.tiendaId === tiendaId && x.data.visible !== false && (!!x.data.oferta || (Number(x.data.precioOferta) > 0 && Number(x.data.precioOferta) < Number(x.data.precio || Infinity)))).length };
     if (metodo === "PUT") {

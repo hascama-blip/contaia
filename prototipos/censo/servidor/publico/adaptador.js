@@ -66,9 +66,9 @@
   let sesion = null;
   const miSesion = async () => (sesion ||= pedir("GET", "/api/sesion"));
   const user = {
-    me: async () => { const s = await miSesion(); return { id: s.usuario.id, name: s.usuario.nombre }; },
+    me: async () => { const s = await miSesion(); return { id: s.usuario.id, name: s.usuario.nombre, rol: s.usuario.rol }; },
     id: async () => (await miSesion()).usuario.id,
-    can: async (q) => { const s = await miSesion(); return q === "data.write" ? s.puedeEscribir : s.esAdmin; },
+    can: async (q) => { const s = await miSesion(); return q === "data.write" ? s.puedeEscribir : q === "incidencias.write" ? Boolean(s.puedeIncidencias) : s.esAdmin; },
     canEdit: async () => (await miSesion()).esAdmin,
     isOwner: async () => (await miSesion()).esAdmin,
     profiles: async (ids) => { const lista = [].concat(ids).filter(Boolean); return lista.length ? pedir("GET", `/api/usuarios/perfiles?ids=${lista.map(encodeURIComponent).join(",")}`) : {}; },

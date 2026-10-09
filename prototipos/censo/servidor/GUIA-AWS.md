@@ -85,11 +85,14 @@ el portal responde en `http://IP-ESTATICA/` y muestra la pantalla de **primera c
 
 ## 5. Usuarios de la directiva
 Roles: **admin** (todo y manejar usuarios), **edicion** (registrar y modificar),
-**lectura** (solo consultar). Lo normal es manejarlos desde **Administración** en el portal
-(`/admin.html`, solo admin). También desde el SSH:
+**lectura** (solo consultar) y **seguridad** (para el personal de vigilancia: consulta el
+padrón y **solo** puede registrar y actualizar incidencias; no borra, no edita fichas ni
+pagos, no sube archivos ni edita la web; al entrar va directo a Incidencias). Lo normal es
+manejarlos desde **Administración** en el portal (`/administracion`, solo admin). También desde el SSH:
 ```bash
 cd /opt/censo/prototipos/censo/servidor
 sudo -u censo DATOS=/var/censo node usuarios.js crear tesorera "Nombre Apellido" 'Clave' edicion
+sudo -u censo DATOS=/var/censo node usuarios.js crear vigilante "Nombre Apellido" 'Clave' seguridad
 sudo -u censo DATOS=/var/censo node usuarios.js listar
 sudo -u censo DATOS=/var/censo node usuarios.js clave tesorera 'ClaveNueva'
 sudo -u censo DATOS=/var/censo node usuarios.js borrar tesorera

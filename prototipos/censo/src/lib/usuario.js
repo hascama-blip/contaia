@@ -12,9 +12,10 @@ export function conectarUsuario() {
 
 export async function usuarioActual() {
   const u = await conectarUsuario();
-  if (!u) return { id: null, nombre: "", puedeEscribir: null };
-  const [yo, puede, admin] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null), u.isOwner ? u.isOwner().catch(() => false) : false]);
-  return { id: yo?.id ?? null, nombre: yo?.name || "", puedeEscribir: puede, esAdmin: Boolean(admin) };
+  if (!u) return { id: null, nombre: "", puedeEscribir: null, puedeIncidencias: null };
+  const [yo, puede, incid, admin] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null), u.can("incidencias.write").catch(() => null), u.isOwner ? u.isOwner().catch(() => false) : false]);
+  // puedeIncidencias: edición y administración siempre; el rol "seguridad" solo esto (en claude.ai no existe, equivale a puedeEscribir).
+  return { id: yo?.id ?? null, nombre: yo?.name || "", rol: yo?.rol || null, puedeEscribir: puede, puedeIncidencias: incid === null ? puede : Boolean(incid || puede), esAdmin: Boolean(admin) };
 }
 
 export async function nombresDe(ids) {

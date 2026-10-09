@@ -3,7 +3,7 @@
 //   node servidor/usuarios.js crear   <usuario> "<Nombre Apellido>" <clave> [admin|edicion|lectura]
 //   node servidor/usuarios.js listar
 //   node servidor/usuarios.js clave   <usuario> <clave-nueva>
-//   node servidor/usuarios.js rol     <usuario> <admin|edicion|lectura>
+//   node servidor/usuarios.js rol     <usuario> <admin|edicion|lectura|seguridad>
 //   node servidor/usuarios.js borrar  <usuario>
 // (DATOS=/var/censo si los datos no están en servidor/datos)
 import path from "node:path";

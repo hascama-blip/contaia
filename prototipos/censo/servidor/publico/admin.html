@@ -30,10 +30,10 @@
       <div class="campo"><label class="label">Usuario</label><input class="input" name="usuario" required autocapitalize="none" placeholder="tesorera"></div>
       <div class="campo"><label class="label">Nombre y apellido</label><input class="input" name="nombre" required></div>
       <div class="campo"><label class="label">Clave (mín. 8)</label><input class="input" name="clave" type="text" required minlength="8"></div>
-      <div class="campo" style="flex:0 0 150px"><label class="label">Rol</label><select class="input" name="rol"><option value="edicion">Edición</option><option value="lectura">Solo lectura</option><option value="admin">Administración</option></select></div>
+      <div class="campo" style="flex:0 0 150px"><label class="label">Rol</label><select class="input" name="rol"><option value="edicion">Edición</option><option value="lectura">Solo lectura</option><option value="seguridad">Seguridad (solo incidencias)</option><option value="admin">Administración</option></select></div>
       <button class="btn btn-primary" type="submit">Crear usuario</button>
     </form>
-    <p class="ayuda" style="margin:0">Edición: registra y modifica. Lectura: solo consulta. Administración: todo, incluida esta página.</p>
+    <p class="ayuda" style="margin:0">Edición: registra y modifica. Solo lectura: consulta sin cambiar nada. Seguridad: consulta y solo puede registrar y actualizar incidencias (entra directo a Incidencias). Administración: todo, incluida esta página.</p>
   </div></section>
 
   <section class="card"><div class="card-cuerpo">
@@ -93,7 +93,7 @@
   const pedir = async (m, u, cuerpo) => { const r = await fetch(u, { method: m, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined }); const j = await r.json().catch(() => ({})); if (r.status === 401) location.href = "/entrar?vencida=1"; if (!r.ok) throw new Error(j.error || "Error"); return j; };
   async function cargarUsuarios() {
     const { usuarios } = await pedir("GET", "/api/usuarios");
-    $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${esc(u.usuario)}</b></td><td>${esc(u.nombre)}</td><td>${esc(u.rol)}</td><td style="text-align:right;white-space:nowrap">
+    $("#usuarios").innerHTML = usuarios.map((u) => `<tr><td><b>${esc(u.usuario)}</b></td><td>${esc(u.nombre)}</td><td>${esc({ admin: "Administración", edicion: "Edición", lectura: "Solo lectura", seguridad: "Seguridad (incidencias)" }[u.rol] || u.rol)}</td><td style="text-align:right;white-space:nowrap">
       <button class="btn btn-ghost" data-clave="${esc(u.id)}">Cambiar clave</button> <button class="btn btn-ghost" data-borrar="${esc(u.id)}" data-n="${esc(u.usuario)}">Borrar</button></td></tr>`).join("");
   }
   $("#usuarios").onclick = async (e) => {

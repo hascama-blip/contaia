@@ -5,7 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 export const COOKIE = "censo_sesion";
-export const ROLES = ["admin", "edicion", "lectura"];
+export const ROLES = ["admin", "edicion", "lectura", "seguridad"]; // seguridad: consulta y solo registra incidencias
 const DURACION_MS = 1000 * 60 * 60 * 12; // 12 horas de sesión
 
 export class Usuarios {
@@ -133,4 +133,6 @@ export class Usuarios {
 }
 
 export const puedeEscribir = (u) => Boolean(u && (u.rol === "admin" || u.rol === "edicion"));
+/** Registrar y actualizar incidencias: edición, administración y el personal de seguridad. */
+export const puedeIncidencias = (u) => puedeEscribir(u) || Boolean(u && u.rol === "seguridad");
 export const esAdmin = (u) => Boolean(u && u.rol === "admin");

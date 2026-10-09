@@ -13,7 +13,7 @@ import { fecha, fechaHora } from "../lib/formato.js";
 import { cambiarEstadoIncidencia } from "../api/incidencias.js";
 
 export function Incidencias() {
-  const { datos, derivados, puedeEscribir, avisar, usuario } = useApp();
+  const { datos, derivados, puedeEscribir, puedeIncidencias, avisar, usuario } = useApp();
   // Autor de cada incidencia: se guarda el id y el nombre se resuelve al mostrar.
   const [autores, setAutores] = useState({});
   const idsAutores = [...new Set(datos.incidencias.map((i) => i.por).filter(Boolean))].sort().join(",");
@@ -41,7 +41,7 @@ export function Incidencias() {
   }, [datos.incidencias, filtro, texto, porId]);
   const alertas = useMemo(() => alertasReincidencia(datos.incidencias, h.iso), [datos.incidencias, h]);
   const porTipo = useMemo(() => conteoPorTipo(datos.incidencias, h.anio), [datos.incidencias, h]);
-  const editable = puedeEscribir !== false;
+  const editable = puedeEscribir !== false || puedeIncidencias === true; // seguridad registra y actualiza incidencias
 
   async function estado(id, valor) {
     try {

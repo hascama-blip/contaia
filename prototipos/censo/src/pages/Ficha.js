@@ -41,7 +41,7 @@ function fichaDesde(a, stands) {
 }
 
 export function Ficha({ id }) {
-  const { datos, derivados, usuario, caps, avisar, puedeEscribir } = useApp();
+  const { datos, derivados, usuario, caps, avisar, puedeEscribir, puedeIncidencias } = useApp();
   const a = derivados.porId.get(id);
   const stands = derivados.mapaStands.get(id) || [];
   const [pestana, setPestana] = useState("datos");
@@ -172,7 +172,7 @@ export function Ficha({ id }) {
       ${editable && stands.length > 0 && html`<p className="ayuda">Toca una cuota pagada (✓) para ver el detalle o revertir el pago.</p>`}`,
     incidencias: html`
       <div style=${{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-        ${editable && html`<button className="btn btn-primary btn-sm" onClick=${() => setPanel({ tipo: "incidencia" })}>Registrar incidencia</button>`}
+        ${(editable || puedeIncidencias === true) && html`<button className="btn btn-primary btn-sm" onClick=${() => setPanel({ tipo: "incidencia" })}>Registrar incidencia</button>`}
       </div>
       ${!incidencias.length && html`<${Vacio}>Sin llamadas de atención registradas.<//>`}
       ${incidencias.length > 0 && html`<div className="tabla-caja"><table className="tabla">
