@@ -355,3 +355,10 @@ main { overflow-x: clip; }
 .perfil-acciones { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 .perfil-acciones .btn { white-space: nowrap; }
 @media (max-width: 640px) { .perfil-acciones { width: 100%; } }
+
+/* Tarjeta de tienda: el logo, muy desenfocado, como fondo; un velo blanco encima mantiene todo legible */
+.tienda { position: relative; overflow: hidden; isolation: isolate; }
+.tienda-fondo { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(36px) saturate(1.2); opacity: .6; z-index: -2; pointer-events: none; }
+.tienda-velo { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.82) 55%, rgba(255,255,255,.9) 100%); z-index: -1; pointer-events: none; }
+.tienda.con-fondo .tienda-ofertas.con { background: rgba(253,246,214,.95); }
+.tienda.con-fondo .btn-borde { background: rgba(255,255,255,.92); }

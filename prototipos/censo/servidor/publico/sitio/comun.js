@@ -123,7 +123,8 @@ window.S = {
     raiz.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("afiche-frente")) { e.preventDefault(); voltear(e.target.closest(".afiche"), true); } if (e.key === "Escape") { for (const a of raiz.querySelectorAll(".afiche.volteado")) voltear(a, false); } });
   },
   // Tarjeta de tienda: logo, nombre (con sello "Más visitada" si corresponde), descripción con "Ver más", ofertas y botones.
-  tarjetaTienda: (t, { cat, sello }) => `<article class="tienda" data-id="${S.esc(t.id)}">
+  tarjetaTienda: (t, { cat, sello }) => `<article class="tienda${t.logo ? " con-fondo" : ""}" data-id="${S.esc(t.id)}">
+      ${t.logo ? `<div class="tienda-fondo" style="background-image:url('${S.blob(t.logo)}')" aria-hidden="true"></div><div class="tienda-velo" aria-hidden="true"></div>` : ""}
       <div class="tienda-cab">${S.logo(t)}<div><h3>${S.esc(t.nombre)}</h3><div class="stand">${S.esc([t.stand, t.piso].filter(Boolean).join(" · ")) || "&nbsp;"}${sello ? `<span class="sello-top">${S.esc(sello)}</span>` : ""}</div></div></div>
       <p class="tienda-desc">${S.esc(t.descripcion || "") || `<span class="muted">Vende ${S.esc((t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ").toLowerCase() || "en el centro comercial")}.</span>`}</p>
       <div class="tienda-meta"><button type="button" class="ver-mas" hidden>Ver más</button><span class="tienda-ofertas ${t.ofertas ? "con" : ""}">${t.ofertas ? `${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}` : "Sin ofertas por ahora"}</span></div>
