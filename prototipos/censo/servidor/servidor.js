@@ -186,14 +186,15 @@ async function manejar(req, res) {
     if (metodo === "GET") { const d = almacen.obtener(col, id); return d ? json(res, 200, d) : json(res, 404, { error: "No existe.", code: "not_found" }); }
     if (!escribe) return soloLectura();
     const PUBLICAS = ["tiendas", "articulos", "sitio"];
+    const ctxPublico = { id, tamanoArchivo: (a) => metaArchivos.get(a)?.tamano, ofertasDeTienda: (tiendaId, excluir) => almacen.listar("articulos").filter((x) => x.id !== excluir && x.data?.tiendaId === tiendaId && x.data.visible !== false && (!!x.data.oferta || (Number(x.data.precioOferta) > 0 && Number(x.data.precioOferta) < Number(x.data.precio || Infinity)))).length };
     if (metodo === "PUT") {
       const datos = await leerJSON(req);
-      if (PUBLICAS.includes(col)) { const err = validarPublico(col, datos); if (err) return json(res, 400, { error: err, code: "invalid" }); }
+      if (PUBLICAS.includes(col)) { const err = validarPublico(col, datos, ctxPublico); if (err) return json(res, 400, { error: err, code: "invalid" }); }
       almacen.establecer(col, id, datos); return json(res, 200, { ok: true });
     }
     if (metodo === "PATCH") {
       const parcial = await leerJSON(req);
-      if (PUBLICAS.includes(col)) { const actual = almacen.obtener(col, id); const err = validarPublico(col, fusionar(actual?.data || {}, parcial)); if (err) return json(res, 400, { error: err, code: "invalid" }); }
+      if (PUBLICAS.includes(col)) { const actual = almacen.obtener(col, id); const err = validarPublico(col, fusionar(actual?.data || {}, parcial), ctxPublico); if (err) return json(res, 400, { error: err, code: "invalid" }); }
       almacen.actualizar(col, id, parcial); return json(res, 200, { ok: true });
     }
     if (metodo === "DELETE") { almacen.borrar(col, id); return json(res, 200, { ok: true }); }

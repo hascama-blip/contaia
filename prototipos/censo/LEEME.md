@@ -160,6 +160,16 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   avance, botón Detener y lista de errores. Las repetidas salen de la caché del servidor.
 - Padrón paginado de 25 en 25 (`Paginador.js`, `usePaginacion`).
 
+## Peso de las imágenes y tope de ofertas (web pública)
+- El editor **reduce cada imagen en el navegador** antes de subirla (`comprimirImagen` en `editor.js`):
+  foto de artículo 1200 px, logo 600 px, QR 800 px (PNG si el original es PNG), carrusel 1920 px (web) y
+  1350 px (celular), ícono de categoría 400 px; JPEG al 84–86 %. Una foto de celular de 4 MB queda en
+  ~200 KB. El servidor rechaza (400) cualquier imagen pública que pese más de 2,5 MB (`MAX_IMAGEN_BYTES`,
+  `validarPublico` con `tamanoArchivo`), por si alguien salta el editor.
+- **Máximo 15 artículos en oferta por tienda** (`MAX_OFERTAS_POR_TIENDA`): el formulario muestra
+  "Ofertas publicadas de esta tienda: n de 15" y bloquea, y el servidor vuelve a comprobarlo contando
+  las ofertas visibles de la tienda (`ofertasDeTienda`). Los artículos sin oferta no tienen tope.
+
 ## Sin emojis en la web pública
 La web no usa emojis: las categorías base llevan íconos de línea SVG (`ICONOS` en
 `servidor/publico/sitio/comun.js`, `S.icono(clave)` / `S.iconoCategoria(c)`), una categoría nueva

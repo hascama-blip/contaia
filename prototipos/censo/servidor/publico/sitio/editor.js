@@ -5,9 +5,25 @@
   const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const ahora = () => new Date().toISOString();
   let aviso; const estado = (t, mal = false) => { const e = $("#estado"); e.textContent = t; e.hidden = false; e.style.background = mal ? "var(--peligro, #b00020)" : "var(--brand-900)"; clearTimeout(aviso); aviso = setTimeout(() => (e.hidden = true), mal ? 5000 : 2200); };
-  const subir = async (archivo, tipoEsperado) => {
+  // Reduce la imagen en el navegador antes de subirla: lado mayor ≤ max px, JPEG (o PNG para logos/QR).
+  // Así una foto de celular de 5 MB queda en ~200 KB y la web carga rápido con datos móviles.
+  const MAX_IMAGEN = 2.5 * 1048576;
+  const comprimirImagen = async (archivo, { max = 1200, png = false, calidad = 0.84 } = {}) => {
+    if (!archivo.type.startsWith("image/") || /gif|svg/.test(archivo.type)) return archivo;
+    let bmp; try { bmp = await createImageBitmap(archivo, { imageOrientation: "from-image" }); } catch { try { bmp = await createImageBitmap(archivo); } catch { return archivo; } }
+    const esc = Math.min(1, max / Math.max(bmp.width, bmp.height)); const w = Math.max(1, Math.round(bmp.width * esc)), h = Math.max(1, Math.round(bmp.height * esc));
+    const usarPng = png && archivo.type === "image/png";
+    if (esc === 1 && archivo.size <= 350 * 1024) { bmp.close?.(); return archivo; } // ya es chica
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const ctx = c.getContext("2d");
+    if (!usarPng) { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); } ctx.drawImage(bmp, 0, 0, w, h); bmp.close?.();
+    const blob = await new Promise((ok) => c.toBlob(ok, usarPng ? "image/png" : "image/jpeg", calidad));
+    if (!blob || blob.size >= archivo.size) return archivo;
+    return new File([blob], String(archivo.name || "imagen").replace(/\.\w+$/, "") + (usarPng ? ".png" : ".jpg"), { type: blob.type });
+  };
+  const subir = async (archivo, tipoEsperado, opciones = {}) => {
     if (tipoEsperado && !archivo.type.startsWith(tipoEsperado)) throw new Error(`Se esperaba un archivo ${tipoEsperado === "image/" ? "de imagen" : "PDF"}.`);
     if (archivo.size > 20 * 1048576) throw new Error("El archivo pesa más de 20 MB.");
+    if (archivo.type.startsWith("image/")) { archivo = await comprimirImagen(archivo, opciones); if (archivo.size > MAX_IMAGEN) throw new Error(`La imagen sigue pesando ${(archivo.size / 1048576).toFixed(1)} MB (máximo 2,5 MB). Prueba con otra foto o recórtala.`); }
     const j = await S.pedir("POST", "/api/archivos", archivo, { "Content-Type": archivo.type || "application/octet-stream", "X-Nombre": encodeURIComponent(archivo.name || "") });
     return j.id;
   };
@@ -60,6 +76,7 @@
     if (precio !== null && !(precio >= 0)) return marcar(f.precio, "El precio debe ser un número desde 0.");
     if (oferta !== null && !(oferta >= 0)) return marcar(f.precioOferta, "El precio de oferta debe ser un número desde 0.");
     if (f.oferta.checked && precio > 0 && oferta > 0 && oferta >= precio) return marcar(f.precioOferta, "El precio de oferta debe ser menor que el precio normal.");
+    if (f.oferta.checked && ofertasDe(f.tiendaId.value, artActual?.id) >= MAX_OFERTAS) return marcar(f.oferta, `Esta tienda ya tiene ${MAX_OFERTAS} artículos en oferta (el máximo). Quita una oferta antes de agregar otra.`);
     if (f.oferta.checked && !(oferta > 0) && !(precio > 0)) estado("Sin precios la oferta saldrá como “consultar precio”.");
     return true;
   };
@@ -70,14 +87,14 @@
   };
   $("#carrusel-subir").onchange = async (e) => {
     const lista = [...e.target.files]; if (!lista.length) return; $("#carrusel-estado").textContent = `Subiendo ${lista.length} foto(s)…`;
-    try { for (const a of lista) config.carrusel.push({ archivo: await subir(a, "image/"), titulo: "", texto: "" }); await guardarConfig(); pintarCarrusel(); $("#carrusel-estado").textContent = ""; } catch (err) { $("#carrusel-estado").innerHTML = `<span class="mal">${S.esc(err.message)}</span>`; }
+    try { for (const a of lista) config.carrusel.push({ archivo: await subir(a, "image/", { max: 1920, calidad: 0.86 }), titulo: "", texto: "" }); await guardarConfig(); pintarCarrusel(); $("#carrusel-estado").textContent = ""; } catch (err) { $("#carrusel-estado").innerHTML = `<span class="mal">${S.esc(err.message)}</span>`; }
     e.target.value = "";
   };
   $("#carrusel").onclick = async (e) => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.mover) { const [i, d] = b.dataset.mover.split(":").map(Number); const j = i + d; [config.carrusel[i], config.carrusel[j]] = [config.carrusel[j], config.carrusel[i]]; await guardarConfig(); pintarCarrusel(); }
     if (b.dataset.quitar !== undefined) { if (!confirm("¿Quitar esta foto del carrusel?")) return; const [q] = config.carrusel.splice(Number(b.dataset.quitar), 1); await guardarConfig(); pintarCarrusel(); for (const id of [q.archivo, q.archivoMovil]) if (id) S.pedir("DELETE", `/api/archivos/${id}`).catch(() => {}); }
-    if (b.dataset.movil !== undefined) { const a = await pedirArchivo("image/*"); if (!a) return; b.disabled = true; b.textContent = "Subiendo…"; try { config.carrusel[Number(b.dataset.movil)].archivoMovil = await subir(a, "image/"); await guardarConfig(); } catch (err) { estado(err.message, true); } pintarCarrusel(); }
+    if (b.dataset.movil !== undefined) { const a = await pedirArchivo("image/*"); if (!a) return; b.disabled = true; b.textContent = "Subiendo…"; try { config.carrusel[Number(b.dataset.movil)].archivoMovil = await subir(a, "image/", { max: 1350, calidad: 0.86 }); await guardarConfig(); } catch (err) { estado(err.message, true); } pintarCarrusel(); }
     if (b.dataset.sinMovil !== undefined) { const d = config.carrusel[Number(b.dataset.sinMovil)]; const v = d.archivoMovil; delete d.archivoMovil; await guardarConfig(); pintarCarrusel(); if (v) S.pedir("DELETE", `/api/archivos/${v}`).catch(() => {}); }
     if (b.dataset.texto !== undefined) { const i = Number(b.dataset.texto), d = config.carrusel[i], f = $("#f-diapo"); for (const k of ["titulo", "texto", "textoEnlace", "enlace"]) f[k].value = d[k] || ""; f.onsubmit = async (ev) => { ev.preventDefault(); for (const k of ["titulo", "texto", "textoEnlace", "enlace"]) d[k] = f[k].value.trim(); await guardarConfig(); pintarCarrusel(); $("#d-diapo").close(); }; $("#d-diapo").showModal(); }
   };
@@ -92,7 +109,7 @@
     if (b.dataset.mover) { const [i, d] = b.dataset.mover.split(":").map(Number); [cs[i], cs[i + d]] = [cs[i + d], cs[i]]; }
     if (b.dataset.editar !== undefined) { const c = cs[Number(b.dataset.editar)]; const n = prompt("Nombre de la categoría:", c.nombre); if (n === null) return; c.nombre = n.trim() || c.nombre; }
     if (b.dataset.ocultar !== undefined) { const c = cs[Number(b.dataset.ocultar)]; c.visible = c.visible === false; }
-    if (b.dataset.imagen !== undefined) { const a = await pedirArchivo("image/*"); if (!a) return; b.disabled = true; b.textContent = "Subiendo…"; try { cs[Number(b.dataset.imagen)].imagen = await subir(a, "image/"); } catch (err) { estado(err.message, true); pintarCategorias(); return; } }
+    if (b.dataset.imagen !== undefined) { const a = await pedirArchivo("image/*"); if (!a) return; b.disabled = true; b.textContent = "Subiendo…"; try { cs[Number(b.dataset.imagen)].imagen = await subir(a, "image/", { max: 400, png: true }); } catch (err) { estado(err.message, true); pintarCategorias(); return; } }
     if (b.dataset.sinImagen !== undefined) { const c = cs[Number(b.dataset.sinImagen)]; const vieja = c.imagen; delete c.imagen; if (vieja) S.pedir("DELETE", `/api/archivos/${vieja}`).catch(() => {}); }
     if (b.dataset.quitar !== undefined) { const i = Number(b.dataset.quitar); const n = tiendas.filter((t) => (t.categorias || []).includes(cs[i].id)).length; if (!confirm(`¿Quitar la categoría "${cs[i].nombre}"?${n ? ` ${n} tienda(s) la tienen asignada.` : ""}`)) return; cs.splice(i, 1); }
     await guardarConfig(); pintarCategorias();
@@ -108,7 +125,7 @@
     if (b.hasAttribute("data-quitar")) return pintarArchivo(caja, "");
     const a = await pedirArchivo(caja.dataset.tipo || "image/*"); if (!a) return;
     b.disabled = true; b.textContent = "Subiendo…";
-    try { pintarArchivo(caja, await subir(a, caja.dataset.tipo || "image/")); } catch (err) { estado(err.message, true); b.disabled = false; b.textContent = "Subir"; }
+    try { pintarArchivo(caja, await subir(a, caja.dataset.tipo || "image/", { max: Number(caja.dataset.max) || 1200, png: caja.dataset.formato === "png" })); } catch (err) { estado(err.message, true); b.disabled = false; b.textContent = "Subir"; }
   });
   const leerArchivos = (form) => Object.fromEntries($$(".archivo", form).map((c) => [c.dataset.campo, c.dataset.id || ""]));
 
@@ -156,6 +173,9 @@
   };
   $("#filtro-art-tienda").onchange = pintarArticulos;
   const fA = $("#f-art"), dA = $("#d-art"); let artActual = null;
+  const MAX_OFERTAS = 15;
+  const ofertasDe = (tiendaId, excluirId) => articulos.filter((a) => a.tiendaId === tiendaId && a.oferta && a.visible !== false && a.id !== excluirId).length;
+  const avisoOfertas = () => { const n = ofertasDe(fA.tiendaId.value, artActual?.id); const e = $("#a-ofertas-aviso"); if (!e) return; e.textContent = `Ofertas publicadas de esta tienda: ${n} de ${MAX_OFERTAS}${n >= MAX_OFERTAS ? " · llegó al máximo" : ""}.`; e.classList.toggle("mal", n >= MAX_OFERTAS); };
   const abrirArticulo = (a) => {
     if (!tiendas.length) return estado("Primero crea una tienda.", true);
     artActual = a; $("#a-titulo").textContent = a ? `Editar: ${a.nombre}` : "Nuevo artículo"; $("#a-borrar").hidden = !a;
@@ -163,7 +183,7 @@
     fA.tipoOferta.innerHTML = (config.tiposOferta || []).map((t) => `<option value="${S.esc(t.id)}">${S.esc(t.nombre)}</option>`).join("");
     for (const k of ["nombre", "descripcion", "precio", "precioOferta", "etiquetaOferta"]) fA[k].value = a?.[k] ?? "";
     fA.tipoOferta.value = a?.tipoOferta || "oferta"; if (!fA.tipoOferta.value) fA.tipoOferta.value = "oferta";
-    const mostrarTipo = () => { $("#a-tipo-fila").hidden = !fA.oferta.checked; }; fA.oferta.onchange = mostrarTipo;
+    const mostrarTipo = () => { $("#a-tipo-fila").hidden = !fA.oferta.checked; avisoOfertas(); }; fA.oferta.onchange = mostrarTipo; fA.tiendaId.onchange = avisoOfertas;
     fA.tiendaId.value = a?.tiendaId || $("#filtro-art-tienda").value || tiendas[0].id; fA.categoriaId.value = a?.categoriaId || ""; fA.oferta.checked = !!a?.oferta; fA.destacado.checked = !!a?.destacado; fA.visible.checked = a ? a.visible !== false : true;
     pintarArchivo($(".archivo", fA), a?.foto || ""); mostrarTipo(); dA.showModal();
   };

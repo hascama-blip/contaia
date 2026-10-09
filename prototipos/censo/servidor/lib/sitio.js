@@ -55,7 +55,14 @@ const enlaceOk = (v) => !String(v || "").trim() || !!urlSegura(v);
  * Valida un documento de la web pública antes de guardarlo (PUT o PATCH ya fusionado).
  * Devuelve el mensaje de error o null si está bien.
  */
-export function validarPublico(col, d) {
+export const MAX_OFERTAS_POR_TIENDA = 15;
+export const MAX_IMAGEN_BYTES = 2.5 * 1048576;
+
+/**
+ * @param {object} [ctx] { tamanoArchivo(id) → bytes|undefined, ofertasDeTienda(tiendaId, excluirId) → n, id }
+ */
+export function validarPublico(col, d, ctx = {}) {
+  const imagenOk = (id, nombre) => { const t = ctx.tamanoArchivo?.(id); return !id || t === undefined || t <= MAX_IMAGEN_BYTES ? null : `La imagen del ${nombre} pesa ${(t / 1048576).toFixed(1)} MB (máximo 2,5 MB). Súbela desde el editor para que se reduzca sola.`; };
   if (!d || typeof d !== "object" || Array.isArray(d)) return "Datos no válidos.";
   if (col === "tiendas") {
     if (!String(d.nombre || "").trim()) return "La tienda necesita un nombre.";
@@ -68,7 +75,7 @@ export function validarPublico(col, d) {
     for (const k of ["facebook", "instagram", "tiktok"]) if (d.redes && !texto(d.redes[k], 120)) return `El dato de ${k} es muy largo.`;
     if (d.categorias !== undefined && (!Array.isArray(d.categorias) || d.categorias.some((c) => typeof c !== "string"))) return "Categorías no válidas.";
     if (d.orden !== undefined && d.orden !== null && !(typeof d.orden === "number" && d.orden >= 0)) return "El orden debe ser un número desde 0.";
-    return null;
+    return imagenOk(d.logo, "logo") || imagenOk(d.qrPago, "QR de pago");
   }
   if (col === "articulos") {
     if (!String(d.nombre || "").trim()) return "El artículo necesita un nombre.";
@@ -80,7 +87,9 @@ export function validarPublico(col, d) {
     if (d.tipoOferta && !TIPOS_OFERTA.some((t) => t.id === d.tipoOferta)) return "Tipo de oferta desconocido.";
     if (!texto(d.etiquetaOferta, 40)) return "La etiqueta de la oferta es muy larga (máximo 40 caracteres).";
     if (!texto(d.descripcion, 140)) return "La descripción corta es muy larga (máximo 140 caracteres).";
-    return null;
+    const esOferta = !!d.oferta || (Number(d.precioOferta) > 0 && Number(d.precioOferta) < Number(d.precio || Infinity));
+    if (esOferta && d.visible !== false && ctx.ofertasDeTienda && ctx.ofertasDeTienda(d.tiendaId, ctx.id) >= MAX_OFERTAS_POR_TIENDA) return `Esta tienda ya tiene ${MAX_OFERTAS_POR_TIENDA} artículos en oferta (el máximo). Quita una oferta antes de agregar otra.`;
+    return imagenOk(d.foto, "artículo");
   }
   if (col === "sitio") {
     if (!String(d.nombre || "").trim()) return "El centro comercial necesita un nombre.";
@@ -90,6 +99,8 @@ export function validarPublico(col, d) {
     for (const f of d.carrusel || []) { if (!f || typeof f.archivo !== "string") return "Foto del carrusel no válida."; if (!enlaceOk(f.enlace)) return `El enlace del botón "${f.titulo || "foto"}" no es válido.`; if (!texto(f.titulo, 80) || !texto(f.texto, 160)) return "El título o texto de una foto es muy largo."; }
     if (d.categorias !== undefined && (!Array.isArray(d.categorias) || d.categorias.length > 30)) return "Máximo 30 categorías.";
     for (const c of d.categorias || []) if (!c || !String(c.id || "").trim() || !String(c.nombre || "").trim() || !texto(c.nombre, 40)) return "Cada categoría necesita nombre (máximo 40 caracteres).";
+    for (const f of d.carrusel || []) { const e = imagenOk(f.archivo, "carrusel") || imagenOk(f.archivoMovil, "carrusel (celular)"); if (e) return e; }
+    for (const c of d.categorias || []) { const e = imagenOk(c.imagen, `ícono de ${c.nombre}`); if (e) return e; }
     return null;
   }
   return null;
@@ -110,7 +121,7 @@ export class SitioPublico {
   }
   config() {
     const c = this.#almacen.obtener("sitio", "config")?.data || {};
-    const cfg = { ...SITIO_INICIAL, ...c, tiposOferta: TIPOS_OFERTA };
+    const cfg = { ...SITIO_INICIAL, ...c, tiposOferta: TIPOS_OFERTA, maxOfertasPorTienda: MAX_OFERTAS_POR_TIENDA };
     if (!Array.isArray(cfg.categorias) || !cfg.categorias.length) cfg.categorias = CATEGORIAS_INICIALES;
     if (!Array.isArray(cfg.carrusel)) cfg.carrusel = [];
     return cfg;
