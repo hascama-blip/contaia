@@ -176,8 +176,11 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
 - **Editor** (`/editar-sitio`, `editor.html` + `editor.js`): cualquier usuario con permiso de
   edición (enlace **Web pública** en la cabecera del portal y botón flotante “Editar esta web”
   cuando ya entró). Pestañas: datos del centro + carrusel (subir/ordenar/quitar fotos, texto
-  y botón por foto), categorías (emoji + nombre, ocultar, ordenar), tiendas y artículos
-  (formularios con subida de logo, QR, PDF y foto). Todo se guarda al instante.
+  y botón por foto), categorías (emoji + nombre, ocultar, ordenar), tiendas y artículos.
+  El formulario de tienda es mínimo: nombre, stand, galería (`piso`), logo, horario,
+  categorías, descripción, WhatsApp y **enlace al perfil digital** (`contactoUrl`); catálogo,
+  QR de pago, redes, teléfono y otros botones ya no se editan (los detalles van en el perfil
+  digital externo; si una tienda ya los tenía guardados, se conservan). Todo se guarda al instante.
 - **Datos**: colecciones `sitio` (doc `config`: nombre, lema, dirección, horario, WhatsApp,
   `carrusel[]`, `categorias[]`), `tiendas` y `articulos` (mismos `/api/db`). Entran en el
   respaldo/importación. `lib/sitio.js` (`SitioPublico`) arma `GET /api/publico/sitio` y
