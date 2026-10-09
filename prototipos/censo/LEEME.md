@@ -69,6 +69,15 @@ Al registrar una venta (**Registrar venta** en la ficha o en Stands) **no se cre
 Lógica en `src/lib/propietarios.js` (`numeroAHeredar`) y `src/api/stands.js` (`transferirStand`);
 etiquetas en `src/lib/padron.js` (`tieneNumero`, `etiquetaNumero`, `numeroCedido`).
 
+## Traspasos anotados en el libro (automático)
+Al arrancar, el servidor aplica las ventas que el libro de padrón dejó anotadas (`traspasosAnotadosEnElLibro`
+en `servidor/lib/migraciones.js`): si una ficha sin N° trae la nota del importador "Figura en la ficha del
+stand XXXX, que hoy está a nombre de N° YYY: verificar traspaso" y la ficha del dueño actual tiene la nota
+adhesiva "VENDIÓ…", el stand pasa al comprador, el vendedor queda Transferido en el historial del stand y el
+comprador hereda el N° (misma regla que "Registrar venta"). La nota se reemplaza por el registro del traspaso
+(fecha de asiento; la fecha real de la venta no está en el libro). Idempotente. Casos del padrón 2026:
+stand 1077 (Rojas Guardia → Gutiérrez Oscco, N° 226) y stand 1181 (Huillcas Villa → Pablo Ramos, N° 123).
+
 ## Padrón real (importación)
 
 El padrón se cargó desde el Excel transcrito del Libro de Padrón con
