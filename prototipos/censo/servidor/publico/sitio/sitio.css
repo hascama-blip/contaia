@@ -349,3 +349,8 @@ main { overflow-x: clip; }
 .seccion-pagina { margin-top: 28px; }
 .seccion-pagina .filtro-activo { justify-content: center; margin: -8px 0 18px; }
 .oferta-fila .oferta-pill { font-size: .62rem; margin-left: 4px; vertical-align: middle; }
+
+/* Página de ofertas de la tienda: acciones del encabezado */
+.perfil-acciones { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.perfil-acciones .btn { white-space: nowrap; }
+@media (max-width: 640px) { .perfil-acciones { width: 100%; } }

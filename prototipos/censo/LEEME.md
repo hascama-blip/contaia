@@ -170,9 +170,14 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   cuenta una visita por visitante (hash ip+navegador) y hora; los clics al perfil digital externo
   avisan con `POST /api/publico/visita/:id` (beacon). Se guarda total + conteo por día (90 días);
   `/api/db/visitas` no admite escrituras. El editor muestra las visitas en la lista de tiendas.
-- **Perfil digital de tienda** (`/tienda/:id`, `tienda.html`): WhatsApp con mensaje prellenado
-  (y por artículo con `?art=`), llamar, catálogo (PDF o enlace), PDF de ofertas, **QR de pago**
-  (imagen + texto Yape/Plin), cómo llegar, redes y botones extra; lista de ofertas y artículos.
+- **Página de ofertas de la tienda** (`/tienda/:id`, `tienda.html`): logo, nombre, stand, galería,
+  horario, categorías, descripción, botón WhatsApp (mensaje prellenado; por artículo con `?art=`),
+  botón al **perfil digital externo** si lo cargó, y la rejilla de sus ofertas con “Preguntar por
+  WhatsApp”. Ya no muestra la fila de botones (catálogo, QR, cómo llegar, redes): eso vive en el
+  perfil digital externo. En la tarjeta de tienda, **Ver ofertas** lleva aquí y **Contactar** abre
+  el perfil digital externo (`contactoUrl`, pestaña nueva) y **no aparece** si la tienda no lo
+  cargó; “Ver más” de la descripción abre la ventana resumen, cuyo botón final es el perfil
+  digital o, sin enlace, “Ver todas sus ofertas”.
 - **Editor** (`/editar-sitio`, `editor.html` + `editor.js`): cualquier usuario con permiso de
   edición (enlace **Web pública** en la cabecera del portal y botón flotante “Editar esta web”
   cuando ya entró). Pestañas: datos del centro + carrusel (subir/ordenar/quitar fotos, texto

@@ -38,7 +38,8 @@ window.S = {
   // Botón Contactar de una tienda: si tiene "contactoUrl" (su perfil digital en otra web) va ahí en pestaña nueva;
   // si no, al perfil dentro de esta web (/tienda/id). El texto del botón también es editable (contactoTexto).
   contacto: (t, interno) => { const u = S.url(t?.contactoUrl); const externo = !!u && !/^[/?#]/.test(u); return { href: externo ? u : interno || `/tienda/${encodeURIComponent(t?.id || "")}`, externo, texto: String(t?.contactoTexto || "").trim() || "Contactar" }; },
-  btnContacto: (t, cls = "btn btn-primario btn-sm", interno) => { const c = S.contacto(t, interno); return `<a class="${cls}" href="${S.esc(c.href)}"${c.externo ? ` target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}"` : ""}>${S.esc(c.texto)}</a>`; },
+  // Botón Contactar: abre el perfil digital externo de la tienda (contactoUrl). Sin enlace no se muestra.
+  btnContacto: (t, cls = "btn btn-primario btn-sm") => { const c = S.contacto(t); return c.externo ? `<a class="${cls}" href="${S.esc(c.href)}" target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}">${S.esc(c.texto)}</a>` : ""; },
   logo: (t, cls = "logo") => (t.logo ? `<img class="${cls}" src="${S.blob(t.logo)}" alt="" loading="lazy">` : `<div class="${cls}" aria-hidden="true">${S.esc(S.iniciales(t.nombre))}</div>`),
   tipo: (a, tipos) => (a.oferta ? (tipos || []).find((t) => t.id === (a.tipoOferta || "oferta")) || { id: "oferta", nombre: "Oferta" } : null),
   pill: (a, tipos) => { const t = S.tipo(a, tipos); return t ? `<span class="oferta-pill tipo-${S.esc(t.id)}">${S.esc(t.nombre.toUpperCase())}</span>` : ""; },
@@ -126,7 +127,7 @@ window.S = {
       <div class="tienda-cab">${S.logo(t)}<div><h3>${S.esc(t.nombre)}</h3><div class="stand">${S.esc([t.stand, t.piso].filter(Boolean).join(" · ")) || "&nbsp;"}${sello ? `<span class="sello-top">${S.esc(sello)}</span>` : ""}</div></div></div>
       <p class="tienda-desc">${S.esc(t.descripcion || "") || `<span class="muted">Vende ${S.esc((t.categorias || []).map((id) => cat.get(id)?.nombre).filter(Boolean).join(", ").toLowerCase() || "en el centro comercial")}.</span>`}</p>
       <div class="tienda-meta"><button type="button" class="ver-mas" hidden>Ver más</button><span class="tienda-ofertas ${t.ofertas ? "con" : ""}">${t.ofertas ? `${t.ofertas} oferta${t.ofertas === 1 ? "" : "s"}` : "Sin ofertas por ahora"}</span></div>
-      <div class="tienda-acciones"><button type="button" class="btn btn-borde btn-sm ver">Ver ofertas</button>${S.btnContacto(t)}</div>
+      <div class="tienda-acciones"><a class="btn btn-borde btn-sm ver" href="/tienda/${encodeURIComponent(t.id)}">Ver ofertas</a>${S.btnContacto(t)}</div>
     </article>`,
   // Burbuja redonda "Ver más" al final de un carrusel o rejilla.
   burbujaMas: (href, texto, sub) => `<a class="burbuja-mas" href="${S.esc(href)}"><span class="circulo">${S.icono("flecha")}</span><b>${S.esc(texto)}</b>${sub ? `<small>${S.esc(sub)}</small>` : ""}</a>`,
@@ -144,11 +145,13 @@ window.S = {
       const mios = articulos.filter((a) => a.tiendaId === t.id), of = mios.slice(0, 6);
       $("#m-ofertas-titulo").textContent = mios.length ? `Ofertas (${mios.length})` : "";
       $("#m-ofertas").innerHTML = of.length ? of.map((a) => `<div class="oferta-fila">${a.foto ? `<img src="${S.blob(a.foto)}" alt="">` : `<div class="sin">${S.icono("foto")}</div>`}<div class="nom">${S.esc(a.nombre)} <span class="oferta-pill tipo-${S.esc(a.tipoOferta || "oferta")}">${S.esc(S.tipo(a, sitio.tiposOferta)?.nombre || "Oferta")}</span></div>${S.precio(a)}</div>`).join("") + (mios.length > of.length ? `<div class="vende" style="text-align:center">y ${mios.length - of.length} más en su perfil</div>` : "") : `<div class="vende">Esta tienda aún no publicó ofertas. Contáctala para consultar.</div>`;
-      const c = S.contacto(t), mc = $("#m-contactar"); mc.href = c.href; mc.textContent = c.externo ? (c.texto === "Contactar" ? "Contactar · ver perfil digital" : c.texto) : `${c.texto} · ver perfil completo`;
-      if (c.externo) { mc.target = "_blank"; mc.rel = "noopener"; mc.dataset.visita = t.id; } else { mc.removeAttribute("target"); mc.removeAttribute("rel"); delete mc.dataset.visita; }
+      // Con perfil digital externo: "Contactar · ver perfil digital"; si no, el botón lleva a la página de ofertas de la tienda.
+      const c = S.contacto(t), mc = $("#m-contactar");
+      if (c.externo) { mc.href = c.href; mc.textContent = c.texto === "Contactar" ? "Contactar · ver perfil digital" : c.texto; mc.target = "_blank"; mc.rel = "noopener"; mc.dataset.visita = t.id; }
+      else { mc.href = `/tienda/${encodeURIComponent(t.id)}`; mc.textContent = "Ver todas sus ofertas"; mc.removeAttribute("target"); mc.removeAttribute("rel"); delete mc.dataset.visita; }
       modal.showModal();
     };
-    (lista || $("#lista-tiendas"))?.addEventListener("click", (e) => { const b = e.target.closest(".ver, .ver-mas"); if (!b) return; abrir(tiendaDe.get(b.closest(".tienda").dataset.id)); });
+    (lista || $("#lista-tiendas"))?.addEventListener("click", (e) => { const b = e.target.closest(".ver-mas"); if (!b) return; abrir(tiendaDe.get(b.closest(".tienda").dataset.id)); });
     $("#m-cerrar").onclick = () => modal.close(); modal.onclick = (e) => { if (e.target === modal) modal.close(); };
     return abrir;
   },

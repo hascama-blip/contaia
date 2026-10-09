@@ -12,45 +12,36 @@
 <body>
 <header class="cab"><div class="contenedor cab-in">
   <a class="marca" href="/"><img src="/img/logo.jpg" alt=""><span id="marca-nombre">C.C. Inmaculada Concepción<small>Perfil de tienda</small></span></a>
-  <div class="cab-acciones"><a class="btn btn-borde btn-sm" href="/">← Todas las tiendas</a></div>
+  <div class="cab-acciones"><a class="btn btn-primario btn-sm" href="/tiendas">← Todas las tiendas</a></div>
 </div></header>
 <main class="contenedor" id="perfil"><p style="padding:40px 0;text-align:center;color:var(--texto-3)">Cargando…</p></main>
-<dialog class="modal" id="qr"><div class="modal-cab"><h3>Paga con QR</h3><button class="modal-cerrar" id="qr-cerrar" aria-label="Cerrar">×</button></div><div class="modal-cuerpo qr-caja" id="qr-cuerpo"></div></dialog>
 <script src="/sitio/comun.js"></script>
 <script>
+// Página de ofertas de una tienda: datos básicos (logo, nombre, stand, galería, horario, categorías,
+// descripción), WhatsApp y, si lo cargó, el enlace a su perfil digital; luego sus ofertas. Los detalles
+// (catálogo, QR, redes, cómo llegar) viven en el perfil digital externo, no aquí.
 (async function () {
   const $ = (s) => document.querySelector(s);
   const id = decodeURIComponent(location.pathname.split("/")[2] || ""), artId = new URLSearchParams(location.search).get("art");
   let d; try { d = await S.pedir("GET", `/api/publico/tienda/${encodeURIComponent(id)}`); } catch { location.replace("/"); return; }
   const { sitio, tienda: t, articulos } = d;
   const cat = new Map(sitio.categorias.map((c) => [c.id, c]));
-  document.title = `${t.nombre} · ${sitio.nombre}`;
+  document.title = `${t.nombre} · Ofertas · ${sitio.nombre}`;
   $("#marca-nombre").firstChild.textContent = sitio.nombre.replace(/^Centro Comercial/i, "C.C.");
   const art = articulos.find((a) => a.id === artId);
-  const saludo = `Hola ${t.nombre}, los vi en la web de ${sitio.nombre}.${art ? ` Me interesa: ${art.nombre}${art.oferta && art.precioOferta ? ` (oferta ${S.soles(art.precioOferta)})` : ""}.` : ""}`;
-  const botones = [];
-  const cx = S.contacto(t); if (cx.externo) botones.push(`<a class="boton-perfil oro" href="${S.esc(cx.href)}" target="_blank" rel="noopener"><span class="ico">${S.icono("enlace")}</span>${S.esc(cx.texto === "Contactar" ? "Perfil digital" : cx.texto)}<small>Ver en su web</small></a>`);
-  if (t.whatsapp) botones.push(`<a class="boton-perfil wa" href="${S.wa(t.whatsapp, saludo)}" target="_blank" rel="noopener"><span class="ico">${S.icono("whatsapp")}</span>WhatsApp<small>Escríbenos ahora</small></a>`);
-  if (t.telefono) botones.push(`<a class="boton-perfil" href="tel:${S.esc(String(t.telefono).replace(/\s/g, ""))}"><span class="ico">${S.icono("telefono")}</span>Llamar<small>${S.esc(t.telefono)}</small></a>`);
-  if (t.catalogoPdf) botones.push(`<a class="boton-perfil" href="${S.blob(t.catalogoPdf)}" target="_blank" rel="noopener"><span class="ico">${S.icono("catalogo")}</span>Catálogo<small>PDF</small></a>`);
-  if (S.url(t.catalogoUrl)) botones.push(`<a class="boton-perfil" href="${S.esc(S.url(t.catalogoUrl))}" target="_blank" rel="noopener"><span class="ico">${S.icono("enlace")}</span>Catálogo en línea<small>Ver en la web</small></a>`);
-  if (t.ofertasPdf) botones.push(`<a class="boton-perfil oro" href="${S.blob(t.ofertasPdf)}" target="_blank" rel="noopener"><span class="ico">${S.icono("ofertas")}</span>Ofertas<small>PDF del mes</small></a>`);
-  if (t.qrPago) botones.push(`<button type="button" class="boton-perfil oro" id="ver-qr"><span class="ico">${S.icono("qr")}</span>QR de pago<small>${S.esc(t.qrPagoTexto || "Yape / Plin")}</small></button>`);
-  if (t.ubicacionUrl || sitio.direccion) botones.push(`<a class="boton-perfil" href="${S.esc(S.url(t.ubicacionUrl) || `https://www.google.com/maps/search/${encodeURIComponent(sitio.direccion)}`)}" target="_blank" rel="noopener"><span class="ico">${S.icono("mapa")}</span>Cómo llegar<small>${S.esc(t.stand || sitio.direccion || "")}</small></a>`);
-  for (const [k, ico, nom] of [["facebook", S.icono("facebook"), "Facebook"], ["instagram", S.icono("instagram"), "Instagram"], ["tiktok", S.icono("tiktok"), "TikTok"]]) if (t.redes?.[k]) botones.push(`<a class="boton-perfil" href="${S.esc(S.url(t.redes[k]) || `https://${k}.com/${encodeURIComponent(t.redes[k].replace(/^@/, "").replace(/[^A-Za-z0-9._-]/g, ""))}`)}" target="_blank" rel="noopener"><span class="ico">${ico}</span>${nom}<small>${S.esc(t.redes[k].replace(/^https?:\/\/(www\.)?/, "").slice(0, 28))}</small></a>`);
-  for (const e of t.enlaces || []) if (e && S.url(e.url)) botones.push(`<a class="boton-perfil" href="${S.esc(S.url(e.url))}" target="_blank" rel="noopener"><span class="ico">${S.icono("enlace")}</span>${S.esc(e.titulo || "Enlace")}${e.detalle ? `<small>${S.esc(e.detalle)}</small>` : ""}</a>`);
+  const saludo = `Hola ${t.nombre}, los vi en la web de ${sitio.nombre}.${art ? ` Me interesa: ${art.nombre}${art.precioOferta ? ` (oferta ${S.soles(art.precioOferta)})` : ""}.` : ""}`;
+  const cx = S.contacto(t);
   const tarjeta = (a) => `<article class="art" ${a.id === artId ? 'style="outline:3px solid var(--accent-400)"' : ""}>
       <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
-      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "")}</div>${t.whatsapp ? `<a class="btn btn-wa btn-sm" href="${S.wa(t.whatsapp, `Hola ${t.nombre}, me interesa: ${a.nombre}${a.oferta && a.precioOferta ? ` (oferta ${S.soles(a.precioOferta)})` : ""}. Los vi en la web de ${sitio.nombre}.`)}" target="_blank" rel="noopener">Pedir por WhatsApp</a>` : ""}</div></article>`;
-  const of = articulos;
+      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "")}</div>${t.whatsapp ? `<a class="btn btn-wa btn-sm" href="${S.wa(t.whatsapp, `Hola ${t.nombre}, vi en la web de ${sitio.nombre} su oferta "${a.nombre}"${a.precioOferta ? ` (${S.soles(a.precioOferta)})` : ""}. ¿Sigue disponible?`)}" target="_blank" rel="noopener">Preguntar por WhatsApp</a>` : ""}</div></article>`;
+  const tipos = [...new Set(articulos.map((a) => S.tipo(a, sitio.tiposOferta)?.nombre))].filter(Boolean);
   $("#perfil").innerHTML = `
-    <section class="perfil-hero">${S.logo(t)}<div style="flex:1;min-width:220px"><h1>${S.esc(t.nombre)}</h1><p>${S.esc([t.stand, t.piso, t.horario].filter(Boolean).join(" · "))}</p><div class="etiquetas" style="margin-top:8px">${(t.categorias || []).map((c) => cat.get(c)).filter(Boolean).map((c) => `<span class="etiqueta">${S.esc(c.nombre)}</span>`).join("")}</div></div>${t.whatsapp ? `<a class="btn btn-wa" href="${S.wa(t.whatsapp, saludo)}" target="_blank" rel="noopener">${S.icono("whatsapp")} Contactar por WhatsApp</a>` : ""}</section>
+    <section class="perfil-hero">${S.logo(t)}<div style="flex:1;min-width:220px"><h1>${S.esc(t.nombre)}</h1><p>${S.esc([t.stand, t.piso, t.horario].filter(Boolean).join(" · "))}</p><div class="etiquetas" style="margin-top:8px">${(t.categorias || []).map((c) => cat.get(c)).filter(Boolean).map((c) => `<span class="etiqueta">${S.esc(c.nombre)}</span>`).join("")}</div></div>
+      <div class="perfil-acciones">${t.whatsapp ? `<a class="btn btn-wa" href="${S.wa(t.whatsapp, saludo)}" target="_blank" rel="noopener">${S.icono("whatsapp")} Contactar por WhatsApp</a>` : ""}${cx.externo ? `<a class="btn btn-dorado" href="${S.esc(cx.href)}" target="_blank" rel="noopener" data-visita="${S.esc(t.id)}">${S.esc(cx.texto === "Contactar" ? "Ver perfil digital" : cx.texto)}</a>` : ""}</div></section>
     ${t.descripcion ? `<p class="descripcion" style="margin-top:16px">${S.esc(t.descripcion)}</p>` : ""}
-    <div class="botones-perfil">${botones.join("") || `<div class="vacio" style="grid-column:1/-1">Esta tienda aún no agregó formas de contacto.</div>`}</div>
-    ${of.length ? `<section class="seccion"><div class="seccion-cab"><h2>Ofertas y promociones</h2><p>${of.length} artículo${of.length === 1 ? "" : "s"} en oferta${[...new Set(of.map((a) => S.tipo(a, sitio.tiposOferta)?.nombre))].filter(Boolean).length > 1 ? ` · ${[...new Set(of.map((a) => S.tipo(a, sitio.tiposOferta)?.nombre))].filter(Boolean).join(", ")}` : ""}</p></div><div class="rejilla-art">${of.map(tarjeta).join("")}</div></section>` : ""}
-    ${!of.length ? `<section class="seccion"><div class="vacio">Esta tienda aún no publicó ofertas. Consulta su catálogo o escríbele por WhatsApp.</div></section>` : ""}
-    <footer class="pie"><span>${S.esc([sitio.nombre, sitio.direccion].filter(Boolean).join(" · "))}</span><span><a href="/">Ver todas las tiendas</a></span></footer>`;
-  if (t.qrPago) { $("#qr-cuerpo").innerHTML = `<img src="${S.blob(t.qrPago)}" alt="QR de pago de ${S.esc(t.nombre)}">${t.qrPagoTexto ? `<p><b>${S.esc(t.qrPagoTexto)}</b></p>` : ""}<p class="vende">Escanea desde tu app (Yape, Plin o tu banco) y envía el comprobante por WhatsApp.</p>`; $("#ver-qr").onclick = () => $("#qr").showModal(); $("#qr-cerrar").onclick = () => $("#qr").close(); $("#qr").onclick = (e) => { if (e.target.id === "qr") $("#qr").close(); }; }
+    ${articulos.length ? `<section class="seccion"><div class="seccion-cab"><h2>Ofertas y promociones</h2><p>${articulos.length} oferta${articulos.length === 1 ? "" : "s"}${tipos.length > 1 ? ` · ${tipos.join(", ")}` : ""}</p></div><div class="rejilla-art">${articulos.map(tarjeta).join("")}</div></section>`
+      : `<section class="seccion"><div class="vacio">Esta tienda aún no publicó ofertas.${t.whatsapp ? " Escríbele por WhatsApp para consultar." : ""}</div></section>`}
+    <footer class="pie"><span>${S.esc([sitio.nombre, sitio.direccion].filter(Boolean).join(" · "))}</span><span><a href="/tiendas">Ver todas las tiendas</a> · <a href="/ofertas">Todas las ofertas</a></span></footer>`;
   if (art) setTimeout(() => document.querySelector('[style*="outline"]')?.scrollIntoView({ behavior: "smooth", block: "center" }), 200);
 })();
 </script>
