@@ -23,7 +23,8 @@ img { display: block; max-width: 100%; }
 .buscador button:hover { background: var(--brand-600); }
 .cab-sub { border-top: 1px solid var(--borde); background: #fff; }
 .cab-sub-in { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 42px; font-size: .9rem; color: var(--texto-2); }
-.cab-sub-in #cab-direccion { color: var(--texto-3); }
+.cab-sub-in #cab-direccion { color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cab-links { flex: 0 0 auto; }
 .cab-sub-in #cab-direccion span:empty { display: none; }
 .cab-links { display: flex; gap: 22px; }
 .cab-links a { color: var(--texto-2); font-weight: 500; } .cab-links a:hover { color: var(--brand-600); text-decoration: none; }
@@ -95,31 +96,36 @@ img { display: block; max-width: 100%; }
 
 /* Tiendas */
 .rejilla { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
-.tienda { background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 14px; display: grid; gap: 10px; box-shadow: var(--sombra); transition: box-shadow .15s, transform .15s; }
+.tienda { background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--sombra); transition: box-shadow .15s, transform .15s; height: 100%; }
 .tienda:hover { box-shadow: var(--sombra-2); transform: translateY(-2px); }
 .tienda-cab { display: flex; gap: 12px; align-items: center; }
 .logo { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; background: var(--brand-50); display: grid; place-items: center; font-weight: 800; color: var(--brand-600); font-size: 1.3rem; flex: 0 0 auto; }
-.tienda h3 { margin: 0; font-size: 1.05rem; line-height: 1.2; }
+.tienda h3 { margin: 0; font-size: 1.05rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tienda .etiquetas { min-height: 26px; align-content: flex-start; }
 .tienda .stand { color: var(--texto-3); font-size: .85rem; }
 .etiquetas { display: flex; gap: 6px; flex-wrap: wrap; }
 .etiqueta { background: var(--brand-50); color: var(--brand-700); font-size: .75rem; padding: 3px 9px; border-radius: 999px; font-weight: 600; }
 .oferta-pill { background: var(--accent-100); color: var(--accent-600); font-size: .78rem; padding: 3px 9px; border-radius: 999px; font-weight: 700; }
-.tienda-acciones { display: flex; gap: 8px; margin-top: 2px; }
+.tienda-acciones { display: flex; gap: 8px; margin-top: auto; padding-top: 2px; }
 .tienda-acciones .btn { flex: 1; }
 
 /* Artículos */
 .rejilla-art { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
-.art { background: #fff; border: 1px solid var(--borde); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--sombra); }
-.art-foto { aspect-ratio: 1; background: var(--superficie-2); display: grid; place-items: center; color: var(--texto-4); font-size: 2.4rem; position: relative; }
+.art { background: #fff; border: 1px solid var(--borde); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--sombra); height: 100%; }
+.art-foto { aspect-ratio: 1; flex: 0 0 auto; background: var(--superficie-2); display: grid; place-items: center; color: var(--texto-4); font-size: 2.4rem; position: relative; }
 .art-foto img { width: 100%; height: 100%; object-fit: cover; }
 .art-foto .oferta-pill { position: absolute; top: 8px; left: 8px; background: var(--rojo, #E01B1B); color: #fff; }
-.art-cuerpo { padding: 10px 12px 12px; display: grid; gap: 4px; flex: 1; align-content: start; }
-.art h3 { margin: 0; font-size: .98rem; line-height: 1.25; }
+.art-cuerpo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.art h3 { margin: 0; font-size: .98rem; line-height: 1.25; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.art .precio { min-height: 1.5em; line-height: 1.5; }
+.art .desc { font-size: .82rem; color: var(--texto-3); line-height: 1.35; min-height: 2.7em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.art .vende { min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .precio { font-weight: 800; color: var(--brand-700); font-size: 1.05rem; }
 .precio s { color: var(--texto-4); font-weight: 500; font-size: .85rem; margin-left: 6px; }
 .vende { font-size: .82rem; color: var(--texto-3); }
 .vende b { color: var(--texto-2); font-weight: 600; }
-.art .btn { margin-top: 6px; }
+.art .btn { margin-top: auto; }
+.art .btn + .btn { margin-top: 6px; }
 
 /* Modal resumen de tienda */
 dialog.modal { border: 0; border-radius: 20px; padding: 0; width: min(560px, calc(100% - 24px)); max-height: 90vh; box-shadow: 0 24px 60px rgba(15,23,42,.3); }
@@ -161,17 +167,18 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 
 /* Afiches de ofertas */
 .afiches { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.afiche { background: #fff; border-radius: 22px; padding: 22px 18px 0; text-align: center; color: var(--texto); display: grid; justify-items: center; gap: 2px; border: 1px solid var(--borde); box-shadow: var(--sombra); transition: transform .15s, box-shadow .15s; overflow: hidden; }
+.afiche { background: #fff; border-radius: 22px; padding: 22px 18px 0; text-align: center; color: var(--texto); display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--borde); box-shadow: var(--sombra); transition: transform .15s, box-shadow .15s; overflow: hidden; height: 100%; }
 .afiche:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(15,23,42,.12); text-decoration: none; }
-.afiche-eti { font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--texto-2); }
-.afiche-cifra { font-size: clamp(3.4rem, 7vw, 4.6rem); line-height: .95; font-weight: 900; color: var(--verde-500); letter-spacing: -.04em; margin-top: 6px; }
+.afiche-eti { font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--texto-2); min-height: 1.3em; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.afiche-etiqueta { min-height: 24px; display: flex; align-items: center; justify-content: center; margin: 2px 0; max-width: 100%; }
+.afiche-etiqueta span { font-size: .74rem; font-weight: 700; color: var(--texto-2); background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 2px 10px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afiche-cifra { font-size: clamp(3.4rem, 7vw, 4.6rem); line-height: 1; height: 1em; display: flex; align-items: center; font-weight: 900; color: var(--verde-500); letter-spacing: -.04em; margin-top: 4px; }
 .afiche-cifra small { font-size: .45em; font-weight: 800; margin-left: 2px; }
-.afiche-cifra.precio-cifra { font-size: clamp(2.2rem, 4.5vw, 3rem); }
-.afiche-sub { display: inline-block; background: var(--accent-400); color: #2b2300; font-weight: 800; padding: 2px 10px; border-radius: 6px; font-size: 1rem; margin-top: 6px; }
-.afiche-marca { margin-top: 8px; font-weight: 700; font-size: 1rem; }
-.afiche-marca s { color: var(--texto-4); font-weight: 500; font-size: .9rem; }
+.afiche-cifra.precio-cifra { font-size: clamp(2.2rem, 4.5vw, 3rem); height: clamp(3.4rem, 7vw, 4.6rem); }
+.afiche-sub { display: inline-block; background: var(--accent-400); color: #2b2300; font-weight: 800; padding: 2px 10px; border-radius: 6px; font-size: 1rem; line-height: 1.4; margin-top: 6px; white-space: nowrap; }
+.afiche-marca { margin-top: 8px; font-weight: 700; font-size: 1rem; line-height: 1.25; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .afiche-vende { font-size: .8rem; color: var(--texto-3); }
-.afiche-foto { width: 100%; aspect-ratio: 5 / 4; margin-top: 12px; display: grid; place-items: center; font-size: 4rem; }
+.afiche-foto { width: 100%; aspect-ratio: 5 / 4; margin-top: auto; padding-top: 12px; display: grid; place-items: center; font-size: 4rem; }
 .afiche-foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px 16px 0 0; }
 
 /* Carril horizontal (novedades) */
@@ -211,19 +218,18 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .ver-mas { text-align: center; margin-top: 18px; }
 
 /* Afiche: tipo, tienda */
-.afiche-tipo { justify-self: stretch; margin: -22px -18px 10px; padding: 7px 12px; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--brand-600); }
+.afiche-tipo { align-self: stretch; margin: -22px -18px 8px; padding: 8px 12px; font-size: .78rem; line-height: 1.2; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--brand-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .afiche.tipo-liquidacion .afiche-tipo, .oferta-pill.tipo-liquidacion { background: #E01B1B; color: #fff; }
 .afiche.tipo-campana .afiche-tipo, .oferta-pill.tipo-campana { background: var(--accent-500); color: #2b2300; }
 .afiche.tipo-combo .afiche-tipo, .oferta-pill.tipo-combo { background: #7c3aed; color: #fff; }
 .afiche.tipo-mayorista .afiche-tipo, .oferta-pill.tipo-mayorista { background: var(--brand-800); color: #fff; }
 .afiche.tipo-nuevo .afiche-tipo, .oferta-pill.tipo-nuevo { background: var(--verde-600); color: #fff; }
 .afiche.tipo-oferta .afiche-tipo, .oferta-pill.tipo-oferta { background: #E01B1B; color: #fff; }
-.afiche-eti:empty { display: none; }
-.afiche-precios { font-weight: 800; color: var(--brand-700); }
+.afiche-precios { font-weight: 800; color: var(--brand-700); min-height: 1.5em; line-height: 1.5; }
 .afiche-precios s { color: var(--texto-4); font-weight: 500; font-size: .9rem; margin-left: 6px; }
-.afiche-tienda { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 6px 10px; border-radius: 999px; background: var(--superficie-2); text-align: left; max-width: 100%; }
+.afiche-tienda { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 6px 10px; border-radius: 999px; background: var(--superficie-2); text-align: left; max-width: 100%; height: 44px; box-sizing: border-box; }
 .afiche-tienda .afiche-logo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--brand-50); display: grid; place-items: center; font-size: .7rem; font-weight: 800; color: var(--brand-700); flex: 0 0 auto; }
 .afiche-tienda span { display: grid; line-height: 1.15; min-width: 0; }
 .afiche-tienda b { font-size: .85rem; color: var(--brand-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.afiche-tienda small { font-size: .72rem; color: var(--texto-3); }
-@media (max-width: 640px) { .afiche-tipo { margin: -14px -10px 8px; font-size: .66rem; padding: 5px 8px; } .afiche-tienda { padding: 4px 8px; } .afiche-tienda b { font-size: .78rem; } }
+.afiche-tienda small { font-size: .72rem; color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .afiche-tipo { margin: -14px -10px 6px; font-size: .66rem; padding: 6px 8px; } .afiche-tienda { padding: 4px 8px; height: 40px; } .afiche-eti { font-size: .66rem; letter-spacing: .12em; } .afiche-marca { font-size: .9rem; } .afiche-etiqueta span { font-size: .66rem; } .afiche-tienda b { font-size: .78rem; } }

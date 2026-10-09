@@ -61,12 +61,13 @@
     const t = tiendaDe.get(a.tiendaId) || {}, d = descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
     const cifra = d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>` : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">S/ ${Number(a.precioOferta).toLocaleString("es-PE")}</div><div class="afiche-sub">precio de oferta</div>` : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? "S/ " + Number(a.precio).toLocaleString("es-PE") : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
     return `<a class="afiche tipo-${S.esc(tipo?.id || "oferta")}" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
-      <div class="afiche-tipo">${S.esc(tipo?.icono || "🔥")} ${S.esc(tipo?.nombre || "Oferta")}${a.etiquetaOferta ? ` · ${S.esc(a.etiquetaOferta)}` : ""}</div>
-      <div class="afiche-eti">${S.esc(c?.nombre || "")}</div>
+      <div class="afiche-tipo">${S.esc(tipo?.icono || "🔥")} ${S.esc(tipo?.nombre || "Oferta")}</div>
+      <div class="afiche-etiqueta">${a.etiquetaOferta ? `<span>${S.esc(a.etiquetaOferta)}</span>` : ""}</div>
+      <div class="afiche-eti">${S.esc(c?.nombre || "\u00a0")}</div>
       ${cifra}
       <div class="afiche-marca">${S.esc(a.nombre)}</div>
-      ${d && Number(a.precioOferta) > 0 ? `<div class="afiche-precios"><b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s></div>` : ""}
-      <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b>${t.stand ? `<small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · "))}</small>` : ""}</span></div>
+      <div class="afiche-precios">${d && Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b> <s>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</s>` : Number(a.precioOferta) > 0 ? `<b>S/ ${Number(a.precioOferta).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>` : Number(a.precio) > 0 ? `<b>S/ ${Number(a.precio).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>` : "\u00a0"}</div>
+      <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · ") || "\u00a0")}</small></span></div>
       <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(c?.icono || "🛍️")}</span>`}</div>
     </a>`;
   }
@@ -112,7 +113,7 @@
     const t = tiendaDe.get(a.tiendaId) || {};
     return `<article class="art">
       <div class="art-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span>${S.esc(cat.get(a.categoriaId)?.icono || "🛍️")}</span>`}${S.pill(a, sitio.tiposOferta)}</div>
-      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}${a.descripcion ? `<div class="vende">${S.esc(a.descripcion).slice(0, 90)}</div>` : ""}<div class="vende">Vende: <b>${S.esc(t.nombre || "—")}</b>${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
+      <div class="art-cuerpo"><h3>${S.esc(a.nombre)}</h3>${S.precio(a)}<div class="desc">${S.esc(a.descripcion || "").slice(0, 90)}</div><div class="vende">Vende: <b>${S.esc(t.nombre || "—")}</b>${t.stand ? ` · ${S.esc(t.stand)}` : ""}</div>
       <a class="btn btn-primario btn-sm" href="/tienda/${encodeURIComponent(a.tiendaId)}${a.id ? `?art=${encodeURIComponent(a.id)}` : ""}">Contactar</a></div>
     </article>`;
   }
