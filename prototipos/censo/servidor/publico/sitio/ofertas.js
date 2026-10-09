@@ -35,6 +35,7 @@
     const u = new URLSearchParams(); if (f.cat) u.set("cat", f.cat); if (f.tipo) u.set("tipo", f.tipo); if (f.tienda) u.set("tienda", f.tienda); if (f.orden !== "descuento") u.set("orden", f.orden); if (f.q) u.set("q", f.q);
     history.replaceState(null, "", location.pathname + (u.toString() ? "?" + u : ""));
   }
+  S.afichesInteractivos($("#lista-ofertas"));
   $("#f-cat").onchange = (e) => { f.cat = e.target.value; pintar(); };
   $("#f-tipo").onchange = (e) => { f.tipo = e.target.value; pintar(); };
   $("#f-tienda").onchange = (e) => { f.tienda = e.target.value; pintar(); };

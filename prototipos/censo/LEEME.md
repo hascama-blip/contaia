@@ -157,8 +157,14 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   (tipos: oferta, liquidación, campaña, **2 x 1**, **3 x 1**, combo, precio por mayor, lanzamiento;
   2 x 1 / 3 x 1 muestran la cifra “2x1” y cuentan como 50 % / 67 % al ordenar por descuento).
   El precio normal de etiqueta va en el catálogo de la tienda (en el artículo es opcional, sirve
-  para el % de descuento). Lo compartido (afiche, tarjeta de tienda, burbuja, modal, cabecera)
-  vive en `comun.js` (`S.afiche`, `S.tarjetaTienda`, `S.burbujaMas`, `S.modalTienda`, `S.cabecera`).
+  para el % de descuento). **El afiche tiene dos caras**: el frente muestra la oferta (banda del
+  tipo, % o “2x1”, nombre, precios, foto con la pastilla “Ver tienda”); al tocarlo gira y el dorso
+  muestra el **perfil de la tienda** (logo, nombre, stand, horario, categorías, descripción) con
+  **Preguntar por WhatsApp** (mensaje ya escrito con el nombre, tipo y precio de la oferta) y
+  **Ver perfil de la tienda** (o su perfil digital externo). Volver: botón, clic en el dorso o Esc.
+  El carrusel se detiene mientras haya un afiche volteado. Lo compartido (afiche, tarjeta de
+  tienda, burbuja, modal, cabecera) vive en `comun.js` (`S.afiche`, `S.afichesInteractivos`,
+  `S.tarjetaTienda`, `S.burbujaMas`, `S.modalTienda`, `S.cabecera`).
 - **Visitas al perfil** (colección `visitas`, solo la escribe el servidor): cada `GET /tienda/:id`
   cuenta una visita por visitante (hash ip+navegador) y hora; los clics al perfil digital externo
   avisan con `POST /api/publico/visita/:id` (beacon). Se guarda total + conteo por día (90 días);

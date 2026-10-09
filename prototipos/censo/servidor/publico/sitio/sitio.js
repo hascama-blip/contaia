@@ -97,7 +97,7 @@
     $("#of-ant").hidden = $("#of-sig").hidden = paginas < 2;
   };
   const reducir = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const arrancar = () => { clearInterval(autoOf); if (reducir || !visible || total() <= porPantalla()) return; autoOf = setInterval(() => irA(indice + 1), 4000); };
+  const arrancar = () => { clearInterval(autoOf); if (reducir || !visible || total() <= porPantalla() || carril.querySelector(".afiche.volteado")) return; autoOf = setInterval(() => irA(indice + 1), 4000); }; // no avanza mientras un afiche esté volteado
   const parar = () => clearInterval(autoOf);
   const flechas = () => { irA(Math.min(indice, ultimo()), false); };
   // Si el visitante desliza con el dedo, se toma la tarjeta en la que quedó.
@@ -137,5 +137,6 @@
   }
   addEventListener("resize", () => { clearTimeout(S.ajustarVerMas.t); S.ajustarVerMas.t = setTimeout(S.ajustarVerMas, 150); });
   S.modalTienda(ctx);
+  S.afichesInteractivos(carril); carril.addEventListener("volteo", (e) => (e.detail ? parar() : arrancar()));
   pintar();
 })();

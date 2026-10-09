@@ -65,25 +65,59 @@ window.S = {
     return [...lista].sort(orden === "precio-asc" ? (x, y) => S.precioVigente(x) - S.precioVigente(y) : orden === "precio-desc" ? (x, y) => S.precioVigente(y) - S.precioVigente(x) : orden === "reciente" ? porFecha : (x, y) => Number(!!y.destacado) - Number(!!x.destacado) || S.descuentoEquivalente(y) - S.descuentoEquivalente(x) || porFecha(x, y));
   },
   pen: (v, dec = 2) => "S/ " + Number(v).toLocaleString("es-PE", { minimumFractionDigits: dec, maximumFractionDigits: dec }),
-  // Afiche de oferta (estilo tienda por departamentos): banda del tipo, % o "2x1", precios, tienda y foto.
+  // Afiche de oferta (estilo tienda por departamentos). Tiene dos caras: el frente muestra la oferta y, al
+  // tocarlo, se voltea y aparece el perfil de la tienda con "Preguntar por WhatsApp" (mensaje ya escrito con
+  // el artículo) y el enlace a su perfil. S.afichesInteractivos(raíz) activa el volteo.
   afiche: (a, { tiendaDe, cat, sitio }) => {
-    const t = tiendaDe.get(a.tiendaId) || {}, d = S.descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
+    const t = tiendaDe.get(a.tiendaId) || { id: a.tiendaId, nombre: "" }, d = S.descuento(a), c = cat.get(a.categoriaId), tipo = S.tipo(a, sitio.tiposOferta);
     const promo = tipo?.id === "dosxuno" ? ["2", "1", "lleva 2, paga 1"] : tipo?.id === "tresxuno" ? ["3", "1", "lleva 3, paga 1"] : null;
     const cifra = promo ? `<div class="afiche-cifra promo">${promo[0]}<small>x</small>${promo[1]}</div><div class="afiche-sub">${promo[2]}</div>`
       : d ? `<div class="afiche-cifra">${d}<small>%</small></div><div class="afiche-sub">de descuento</div>`
       : Number(a.precioOferta) > 0 ? `<div class="afiche-cifra precio-cifra">${S.pen(a.precioOferta, 0)}</div><div class="afiche-sub">precio de oferta</div>`
       : `<div class="afiche-cifra precio-cifra">${Number(a.precio) > 0 ? S.pen(a.precio, 0) : "Oferta"}</div><div class="afiche-sub">${Number(a.precio) > 0 ? "precio especial" : "consulta por WhatsApp"}</div>`;
     const precios = d && Number(a.precioOferta) > 0 ? `<b>${S.pen(a.precioOferta)}</b> <s>${S.pen(a.precio)}</s>` : Number(a.precioOferta) > 0 ? `<b>${S.pen(a.precioOferta)}</b>${promo ? " c/u" : ""}` : Number(a.precio) > 0 ? `<b>${S.pen(a.precio)}</b>${promo ? " c/u" : ""}` : " ";
-    return `<a class="afiche tipo-${S.esc(tipo?.id || "oferta")}" href="/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}">
-      <div class="afiche-tipo">${S.esc(tipo?.nombre || "Oferta")}</div>
-      <div class="afiche-etiqueta">${a.etiquetaOferta ? `<span>${S.esc(a.etiquetaOferta)}</span>` : ""}</div>
-      <div class="afiche-eti">${S.esc(c?.nombre || " ")}</div>
-      ${cifra}
-      <div class="afiche-marca">${S.esc(a.nombre)}</div>
-      <div class="afiche-precios">${precios}</div>
-      <div class="afiche-tienda">${S.logo(t, "afiche-logo")}<span><b>${S.esc(t.nombre || "")}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · ") || " ")}</small></span></div>
-      <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}</div>
-    </a>`;
+    const precioTxt = Number(a.precioOferta) > 0 ? S.pen(a.precioOferta) + (promo ? " c/u" : "") : Number(a.precio) > 0 ? S.pen(a.precio) : "";
+    const mensaje = `Hola ${t.nombre}, vi en la web de ${sitio.nombre} su oferta "${a.nombre}"${tipo ? ` (${tipo.nombre}${precioTxt ? `, ${precioTxt}` : ""})` : ""}. ¿Sigue disponible?`;
+    const wa = t.whatsapp ? S.wa(t.whatsapp, mensaje) : "";
+    const perfil = S.contacto(t, `/tienda/${encodeURIComponent(a.tiendaId)}?art=${encodeURIComponent(a.id)}`);
+    const cats = (t.categorias || []).map((id) => cat.get(id)).filter(Boolean).slice(0, 3).map((x) => `<span class="etiqueta">${S.esc(x.nombre)}</span>`).join("");
+    return `<article class="afiche tipo-${S.esc(tipo?.id || "oferta")}" data-art="${S.esc(a.id)}" data-tienda="${S.esc(a.tiendaId)}">
+      <div class="afiche-caras">
+        <div class="afiche-frente" role="button" tabindex="0" aria-expanded="false" aria-label="Ver la tienda que vende ${S.esc(a.nombre)}">
+          <div class="afiche-tipo">${S.esc(tipo?.nombre || "Oferta")}</div>
+          <div class="afiche-etiqueta">${a.etiquetaOferta ? `<span>${S.esc(a.etiquetaOferta)}</span>` : ""}</div>
+          <div class="afiche-eti">${S.esc(c?.nombre || " ")}</div>
+          ${cifra}
+          <div class="afiche-marca">${S.esc(a.nombre)}</div>
+          <div class="afiche-precios">${precios}</div>
+          <div class="afiche-foto">${a.foto ? `<img src="${S.blob(a.foto)}" alt="${S.esc(a.nombre)}" loading="lazy">` : `<span class="sin-foto">${S.icono("foto")}</span>`}<span class="afiche-voltear">${S.icono("tienda")} Ver tienda</span></div>
+        </div>
+        <div class="afiche-dorso">
+          <div class="afiche-tipo">${S.esc(tipo?.nombre || "Oferta")}</div>
+          <div class="dorso-tienda">${S.logo(t, "dorso-logo")}<div><b>${S.esc(t.nombre)}</b><small>${S.esc([t.stand, t.piso].filter(Boolean).join(" · ") || " ")}</small></div></div>
+          ${t.horario ? `<div class="dorso-dato">Horario: ${S.esc(t.horario)}</div>` : ""}
+          ${cats ? `<div class="etiquetas dorso-cats">${cats}</div>` : ""}
+          <p class="dorso-desc">${S.esc(t.descripcion || "")}</p>
+          <div class="dorso-art">Oferta: <b>${S.esc(a.nombre)}</b>${precioTxt ? ` · ${S.esc(precioTxt)}` : ""}</div>
+          <div class="dorso-botones">
+            ${wa ? `<a class="btn btn-wa" href="${S.esc(wa)}" target="_blank" rel="noopener">${S.icono("whatsapp")} <span class="largo">Preguntar por </span>WhatsApp</a>` : `<span class="dorso-sinwa">Esta tienda aún no registró WhatsApp.</span>`}
+            <a class="btn btn-borde" href="${S.esc(perfil.href)}"${perfil.externo ? ` target="_blank" rel="noopener" data-visita="${S.esc(t.id || "")}"` : ""}>${perfil.externo ? S.esc(perfil.texto === "Contactar" ? "Ver perfil digital" : perfil.texto) : `Ver perfil<span class="largo"> de la tienda</span>`}</a>
+            <button type="button" class="afiche-volver">Volver a la oferta</button>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  },
+  // Volteo de los afiches dentro de una raíz (carrusel o rejilla). Avisa con el evento "volteo" (detail = cuántos están volteados).
+  afichesInteractivos: (raiz) => {
+    if (!raiz || raiz.dataset.volteo) return; raiz.dataset.volteo = "1";
+    const voltear = (art, abierto) => { art.classList.toggle("volteado", abierto); art.querySelector(".afiche-frente")?.setAttribute("aria-expanded", String(abierto)); raiz.dispatchEvent(new CustomEvent("volteo", { detail: raiz.querySelectorAll(".afiche.volteado").length })); };
+    raiz.addEventListener("click", (e) => {
+      const art = e.target.closest(".afiche"); if (!art || e.target.closest("a")) return;
+      if (e.target.closest(".afiche-frente")) voltear(art, true);
+      else if (e.target.closest(".afiche-volver") || e.target.closest(".afiche-dorso")) voltear(art, false);
+    });
+    raiz.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("afiche-frente")) { e.preventDefault(); voltear(e.target.closest(".afiche"), true); } if (e.key === "Escape") { for (const a of raiz.querySelectorAll(".afiche.volteado")) voltear(a, false); } });
   },
   // Tarjeta de tienda: logo, nombre (con sello "Más visitada" si corresponde), descripción con "Ver más", ofertas y botones.
   tarjetaTienda: (t, { cat, sello }) => `<article class="tienda" data-id="${S.esc(t.id)}">

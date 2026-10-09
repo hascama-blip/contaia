@@ -167,8 +167,32 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 
 /* Afiches de ofertas */
 .afiches { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.afiche { background: #fff; border-radius: 22px; padding: 22px 18px 0; text-align: center; color: var(--texto); display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--borde); box-shadow: var(--sombra); transition: transform .15s, box-shadow .15s; overflow: hidden; height: 100%; }
-.afiche:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(15,23,42,.12); text-decoration: none; }
+/* El afiche tiene dos caras (frente: oferta; dorso: perfil de la tienda) y gira al tocarlo */
+.afiche { perspective: 1400px; height: 100%; color: var(--texto); }
+.afiche-caras { display: grid; height: 100%; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+.afiche:not(.volteado):hover .afiche-caras { transform: translateY(-4px); }
+.afiche.volteado .afiche-caras { transform: rotateY(180deg); }
+.afiche-frente, .afiche-dorso { grid-area: 1 / 1; background: #fff; border-radius: 22px; padding: 22px 18px 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--borde); box-shadow: var(--sombra); overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; min-width: 0; }
+.afiche-frente { cursor: pointer; }
+.afiche:not(.volteado):hover .afiche-frente { box-shadow: 0 18px 40px rgba(15,23,42,.12); }
+.afiche-dorso { transform: rotateY(180deg); padding-bottom: 16px; text-align: left; align-items: stretch; gap: 8px; cursor: pointer; }
+.afiche-voltear { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,.94); color: var(--brand-700); font-size: .74rem; font-weight: 700; padding: 5px 10px; border-radius: 999px; box-shadow: 0 4px 12px rgba(15,23,42,.18); }
+.afiche-voltear .ico-svg { width: 1.1em; height: 1.1em; }
+.dorso-tienda { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.dorso-tienda .dorso-logo { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; background: var(--brand-50); display: grid; place-items: center; font-weight: 800; color: var(--brand-700); flex: 0 0 auto; }
+.dorso-tienda b { display: block; font-size: 1.02rem; line-height: 1.2; color: var(--texto); }
+.dorso-tienda small { display: block; font-size: .8rem; color: var(--texto-3); }
+.dorso-dato { font-size: .8rem; color: var(--texto-3); }
+.dorso-cats { gap: 5px; }
+.dorso-desc { margin: 0; font-size: .86rem; line-height: 1.45; color: var(--texto-2); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.dorso-art { font-size: .82rem; color: var(--texto-2); background: var(--superficie-2); border-radius: 12px; padding: 8px 10px; margin-top: auto; }
+.dorso-art b { color: var(--brand-700); }
+.dorso-botones { display: flex; flex-direction: column; gap: 8px; }
+.dorso-botones .btn { width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dorso-sinwa { font-size: .8rem; color: var(--texto-3); text-align: center; }
+.afiche-volver { border: 0; background: none; color: var(--brand-600); font-weight: 700; font-size: .85rem; padding: 4px; cursor: pointer; }
+.afiche-volver:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .afiche-caras { transition: none; } }
 .afiche-eti { font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--texto-2); min-height: 1.3em; line-height: 1.3; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .afiche-etiqueta { min-height: 24px; display: flex; align-items: center; justify-content: center; margin: 2px 0; max-width: 100%; }
 .afiche-etiqueta span { font-size: .74rem; font-weight: 700; color: var(--texto-2); background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 2px 10px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -178,7 +202,7 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .afiche-sub { display: inline-block; background: var(--accent-400); color: #2b2300; font-weight: 800; padding: 2px 10px; border-radius: 6px; font-size: 1rem; line-height: 1.4; margin-top: 6px; white-space: nowrap; }
 .afiche-marca { margin-top: 8px; font-weight: 700; font-size: 1rem; line-height: 1.25; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .afiche-vende { font-size: .8rem; color: var(--texto-3); }
-.afiche-foto { width: 100%; aspect-ratio: 5 / 4; margin-top: auto; padding-top: 12px; display: grid; place-items: center; font-size: 4rem; }
+.afiche-foto { width: 100%; aspect-ratio: 5 / 4; margin-top: auto; padding-top: 12px; display: grid; place-items: center; font-size: 4rem; position: relative; }
 .afiche-foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px 16px 0 0; }
 
 /* Carril horizontal (novedades) */
@@ -201,7 +225,8 @@ dialog.modal::backdrop { background: rgba(8,40,50,.55); backdrop-filter: blur(2p
 .pie-links a:hover { color: var(--accent-400); text-decoration: none; }
 @media (max-width: 640px) {
   .afiches { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .afiche { padding: 14px 10px 0; border-radius: 16px; }
+  .afiche-frente, .afiche-dorso { padding: 14px 10px 0; border-radius: 16px; } .afiche-dorso { padding-bottom: 12px; }
+  .afiche-voltear { font-size: .66rem; padding: 4px 8px; right: 6px; bottom: 6px; } .dorso-tienda .dorso-logo { width: 42px; height: 42px; } .dorso-tienda b { font-size: .92rem; } .dorso-desc { -webkit-line-clamp: 3; font-size: .8rem; } .dorso-botones .btn { padding: 8px 10px; font-size: .82rem; gap: 5px; } .dorso-botones .largo { display: none; }
   .afiche-cifra { font-size: 2.6rem; } .afiche-cifra.precio-cifra { font-size: 1.7rem; }
   .afiche-sub { font-size: .8rem; } .afiche-eti { font-size: .68rem; letter-spacing: .14em; } .afiche-marca { font-size: .9rem; }
   .carril { grid-auto-columns: minmax(150px, 170px); }
