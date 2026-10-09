@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jubilaciones AMSP</title>
+<meta name="description" content="Asociados del padrón AMSP que cumplen la edad de jubilación (mujeres 65, hombres 70) el próximo mes y en los meses siguientes, calculados desde FECNAC a la fecha de corte.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cabecera compacta · una fila de filtros que gobierna todo · indicadores (héroe + tiles)
+   · gráficos (meses a lo ancho; edad y departamento lado a lado) · tabla de detalle con pestañas. */
+:root {
+  color-scheme: light;
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #eaeef5;
+  --ink: #0f1a2b;
+  --ink-2: #44506a;
+  --muted: #7c879b;
+  --line: #d9dfe9;
+  --grid: #e8ecf3;
+  --brand: #102b4d;
+  --brand-2: #234d82;
+  --on-brand: #ffffff;
+  --serie-f: #3f6ca8;
+  --serie-m: #b98600;
+  --serie-f-soft: #c9d8ec;
+  --serie-m-soft: #ecdca8;
+  --hilite: rgba(63, 108, 168, 0.09);
+  --focus: #3f6ca8;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --shadow: 0 1px 2px rgba(15, 26, 43, 0.06), 0 6px 20px rgba(15, 26, 43, 0.08);
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1117; --surface: #15181f; --surface-2: #1c212b;
+    --ink: #eef1f6; --ink-2: #c1c8d4; --muted: #8b95a7;
+    --line: #2a303c; --grid: #232933;
+    --brand: #9dbde6; --brand-2: #7fa6d9; --on-brand: #0e1117;
+    --serie-f: #4f80c4; --serie-m: #c98500;
+    --serie-f-soft: #2a4062; --serie-m-soft: #55400f;
+    --hilite: rgba(79, 128, 196, 0.16); --focus: #7fa6d9;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1117; --surface: #15181f; --surface-2: #1c212b;
+  --ink: #eef1f6; --ink-2: #c1c8d4; --muted: #8b95a7;
+  --line: #2a303c; --grid: #232933;
+  --brand: #9dbde6; --brand-2: #7fa6d9; --on-brand: #0e1117;
+  --serie-f: #4f80c4; --serie-m: #c98500;
+  --serie-f-soft: #2a4062; --serie-m-soft: #55400f;
+  --hilite: rgba(79, 128, 196, 0.16); --focus: #7fa6d9;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.pagina { max-width: 1320px; margin: 0 auto; padding-inline: clamp(16px, 3vw, 32px); padding-block: 20px 40px; display: grid; gap: 18px; }
+
+/* Cabecera */
+.cabecera { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.marca { font-weight: 700; letter-spacing: 0.04em; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.marca b { color: var(--brand); } .marca span { color: var(--ink); }
+.marca em { font-style: normal; font-weight: 500; letter-spacing: 0.02em; margin-left: 8px; }
+h1 { font-size: clamp(22px, 2.6vw, 28px); line-height: 1.15; margin: 2px 0 4px; font-weight: 600; text-wrap: balance; }
+.fuente { color: var(--muted); font-size: 13px; margin: 0; }
+.fuente span + span::before { content: " · "; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { font: inherit; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; line-height: 1.2; }
+.btn:hover { background: var(--surface-2); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.chico { padding: 4px 9px; font-size: 12px; }
+.campo-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.campo-inline select, .herr select, .controles select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+
+/* Avisos (estado, con icono + texto) */
+.aviso { font-size: 13px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.aviso::before { font-weight: 700; margin-right: 8px; }
+.aviso.info::before { content: "…"; }
+.aviso.ok { border-color: var(--good); } .aviso.ok::before { content: "✓"; color: var(--good); }
+.aviso.error { border-color: var(--crit); } .aviso.error::before { content: "!"; color: var(--crit); }
+
+/* Filtros: una sola fila que gobierna todo lo de abajo */
+.filtros { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+.campo { display: grid; gap: 4px; min-width: 0; }
+.campo label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.campo input, .campo select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-height: 34px; max-width: 100%; }
+.campo input[type="number"] { width: 78px; }
+.campo input[type="date"] { width: 150px; }
+.campo select { max-width: 240px; }
+.filtros .btn { margin-left: auto; }
+
+/* Indicadores */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.tile .label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+.tile .valor { font-size: 30px; font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; }
+.tile .sub { font-size: 12px; color: var(--muted); }
+.tile.hero { grid-column: span 2; background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.tile.hero .label, .tile.hero .sub { color: inherit; opacity: 0.85; }
+.tile.hero .valor { font-size: 56px; }
+@media (max-width: 480px) { .tile.hero { grid-column: span 1; } .tile.hero .valor { font-size: 48px; } }
+.verif { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; color: var(--ink-2); margin: -6px 0 0; }
+.verif-icon { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 12px; font-weight: 700; color: #0f1a2b; background: var(--warn); }
+.verif.ok .verif-icon { background: var(--good); color: #fff; }
+
+/* Tarjetas y gráficos */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.card > header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: flex-start; margin-bottom: 10px; }
+.card h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.card .desc { color: var(--muted); font-size: 12px; margin: 2px 0 0; max-width: 72ch; }
+.leyenda { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); align-items: center; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.sw.serie-f, .leyenda i.serie-f { background: var(--serie-f); }
+.sw.serie-m, .leyenda i.serie-m { background: var(--serie-m); }
+.leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.graficos { display: grid; gap: 16px; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.graficos .ancho { grid-column: 1 / -1; }
+@media (max-width: 900px) { .graficos { grid-template-columns: minmax(0, 1fr); } }
+.g { min-width: 0; }
+.paneles { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.panel { flex: 1 1 260px; min-width: 0; }
+.panel h3 { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--ink); }
+.panel .desc { margin-bottom: 4px; }
+.vacio { color: var(--muted); font-size: 13px; padding: 18px 0; margin: 0; text-align: center; }
+
+svg.chart { display: block; width: 100%; height: auto; overflow: visible; font-family: var(--sans); }
+.chart .grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .eje { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .etq { fill: var(--ink-2); font-size: 11px; }
+.chart .valor { fill: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .anota { fill: var(--brand-2); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.chart .banda { fill: var(--hilite); }
+.chart .serie-f { fill: var(--serie-f); } .chart .serie-m { fill: var(--serie-m); }
+.chart .serie-f-soft { fill: var(--serie-f-soft); } .chart .serie-m-soft { fill: var(--serie-m-soft); }
+.chart .gap { stroke: var(--surface); stroke-width: 2; }
+.chart .umbral { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .hit { fill: transparent; pointer-events: all; }
+.chart .marca { outline: none; cursor: default; }
+.chart .marca:hover .serie-f, .chart .marca:hover .serie-m, .chart .marca:hover .serie-f-soft, .chart .marca:hover .serie-m-soft,
+.chart .marca:focus-visible .serie-f, .chart .marca:focus-visible .serie-m, .chart .marca:focus-visible .serie-f-soft, .chart .marca:focus-visible .serie-m-soft { filter: brightness(1.15) saturate(1.1); }
+.chart .marca:focus-visible .hit { fill: var(--hilite); }
+
+/* Tablas */
+.tabla-card .barra { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 6px; cursor: pointer; }
+.tab:hover { background: var(--surface-2); }
+.tab[aria-selected="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.tab b { font-variant-numeric: tabular-nums; margin-left: 6px; font-weight: 600; }
+.herr { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.herr input[type="search"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 240px; max-width: 100%; }
+.check { font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+.tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 70vh; }
+.tabla-wrap.chica { max-height: none; margin-top: 12px; max-width: 640px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); vertical-align: top; }
+thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); color: var(--ink-2); font-weight: 600; font-size: 12px; user-select: none; }
+#t-detalle thead th { cursor: pointer; }
+#t-detalle thead th:hover { color: var(--ink); }
+th .ord { color: var(--muted); margin-left: 4px; font-size: 10px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.mono { font-family: var(--mono); font-size: 12px; }
+td.nom { white-space: normal; min-width: 220px; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.prox td { background: var(--hilite); }
+tfoot th { background: var(--surface-2); font-weight: 600; }
+.badge-dif { display: inline-block; font-size: 10px; font-weight: 700; color: var(--crit); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; line-height: 1.3; }
+td.vacio { text-align: center; }
+.paginacion { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.controles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.metodo { color: var(--muted); font-size: 12px; max-width: 80ch; }
+.metodo p { margin: 0 0 6px; }
+
+/* Tooltip único para todos los gráficos */
+.tooltip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); padding: 8px 10px; font-size: 12px; min-width: 150px; }
+.tip-titulo { font-weight: 600; margin-bottom: 4px; }
+.tip-fila { display: flex; gap: 8px; align-items: center; padding: 1px 0; }
+.tip-fila strong { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.tip-key { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.tip-label { color: var(--ink-2); }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .acciones, .tooltip, .controles, .herr, .filtros .btn, #btn-tabla-meses { display: none !important; }
+  .pagina { max-width: none; padding: 0; gap: 12px; }
+  .card, .tile { break-inside: avoid; box-shadow: none; }
+  .tabla-wrap { max-height: none; overflow: visible; }
+  .tile.hero { background: #fff; color: #000; border-color: #000; }
+}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header class="cabecera">
+    <div>
+      <div class="marca"><b>ASENCO</b><span>IA</span><em>Padrón de asociados activos</em></div>
+      <h1>Jubilaciones AMSP</h1>
+      <p class="fuente"><span id="fuente"></span><span id="archivo"></span></p>
+    </div>
+    <div class="acciones">
+      <label class="btn" for="archivo-input" tabindex="0" id="archivo-label">Cargar otro reporte (.xlsx)</label>
+      <input id="archivo-input" type="file" accept=".xlsx,.xlsm,.xls" hidden>
+      <button class="btn" id="btn-print" type="button">Imprimir</button>
+      <label class="campo-inline" for="tema">Tema
+        <select id="tema"><option value="sistema">Sistema</option><option value="claro">Claro</option><option value="oscuro">Oscuro</option></select>
+      </label>
+    </div>
+  </header>
+
+  <div id="aviso" class="aviso" role="status" hidden></div>
+
+  <section class="filtros" aria-label="Filtros">
+    <div class="campo"><label for="f-corte">Fecha de corte</label><input id="f-corte" type="date"></div>
+    <div class="campo"><label for="f-edadF">Edad jub. mujeres</label><input id="f-edadF" type="number" min="40" max="90" inputmode="numeric"></div>
+    <div class="campo"><label for="f-edadM">Edad jub. hombres</label><input id="f-edadM" type="number" min="40" max="90" inputmode="numeric"></div>
+    <div class="campo"><label for="f-horizonte">Horizonte</label>
+      <select id="f-horizonte"><option value="6">6 meses</option><option value="12">12 meses</option><option value="18">18 meses</option><option value="24">24 meses</option><option value="36">36 meses</option></select>
+    </div>
+    <div class="campo"><label for="f-sexo">Sexo</label>
+      <select id="f-sexo"><option value="">Ambos</option><option value="F">Mujeres</option><option value="M">Hombres</option></select>
+    </div>
+    <div class="campo"><label for="f-depa">Departamento</label><select id="f-depa"></select></div>
+    <div class="campo"><label for="f-fnd">Escala / fondo</label><select id="f-fnd"></select></div>
+    <div class="campo"><label for="f-sta">Estado del asociado</label><select id="f-sta"></select></div>
+    <button class="btn" id="f-reset" type="button">Restablecer</button>
+  </section>
+
+  <section class="kpis" aria-label="Indicadores">
+    <div class="tile hero"><div class="label" id="k-prox-label"></div><div class="valor" id="k-prox"></div><div class="sub" id="k-prox-sub"></div></div>
+    <div class="tile"><div class="label" id="k-este-label"></div><div class="valor" id="k-este"></div><div class="sub" id="k-este-sub"></div></div>
+    <div class="tile"><div class="label" id="k-hor-label"></div><div class="valor" id="k-hor"></div><div class="sub" id="k-hor-sub"></div></div>
+    <div class="tile"><div class="label" id="k-ya-label"></div><div class="valor" id="k-ya"></div><div class="sub" id="k-ya-sub"></div></div>
+    <div class="tile"><div class="label">Asociados en el padrón (filtro actual)</div><div class="valor" id="k-total"></div><div class="sub" id="k-total-sub"></div></div>
+  </section>
+  <p class="verif" id="verif"><span class="verif-icon" aria-hidden="true"></span><span id="verif-texto"></span><button class="btn chico" id="verif-ver" type="button">Ver en la tabla</button></p>
+
+  <section class="graficos">
+    <article class="card ancho">
+      <header>
+        <div><h2>Cumplen la edad de jubilación por mes</h2><p class="desc" id="g-meses-desc"></p></div>
+        <div class="leyenda"><span><i class="serie-f"></i>Mujeres</span><span><i class="serie-m"></i>Hombres</span>
+          <button class="btn chico" id="btn-tabla-meses" type="button" aria-expanded="false" aria-controls="t-meses-wrap">Ver tabla</button></div>
+      </header>
+      <div id="g-meses" class="g"></div>
+      <div id="t-meses-wrap" class="tabla-wrap chica" hidden>
+        <table id="t-meses"><thead><tr><th>Mes</th><th class="num">Mujeres</th><th class="num">Hombres</th><th class="num">Total</th><th class="num">Acumulado</th></tr></thead><tbody></tbody><tfoot></tfoot></table>
+      </div>
+    </article>
+    <article class="card">
+      <header><div><h2>Edad actual del padrón y umbral de jubilación</h2><p class="desc">Barras intensas: ya alcanzaron la edad de jubilación. Barras claras: todavía no. Una barra por año de edad a la fecha de corte.</p></div></header>
+      <div id="g-edad" class="paneles"></div>
+    </article>
+    <article class="card">
+      <header>
+        <div><h2>Por departamento</h2><p class="desc" id="g-depa-desc"></p></div>
+        <div class="leyenda"><span><i class="serie-f"></i>Mujeres</span><span><i class="serie-m"></i>Hombres</span></div>
+      </header>
+      <div id="g-depa" class="g"></div>
+    </article>
+  </section>
+
+  <section class="card tabla-card" aria-label="Detalle de asociados">
+    <header><div><h2>Detalle de asociados</h2><p class="desc">Haga clic en el encabezado de una columna para ordenar. La exportación CSV incluye todas las filas de la pestaña activa con los filtros aplicados.</p></div></header>
+    <div class="barra">
+      <div class="tabs" id="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="prox" type="button"></button>
+        <button class="tab" role="tab" data-tab="hor" type="button"></button>
+        <button class="tab" role="tab" data-tab="este" type="button"></button>
+        <button class="tab" role="tab" data-tab="ya" type="button"></button>
+        <button class="tab" role="tab" data-tab="todos" type="button"></button>
+      </div>
+      <div class="herr">
+        <input id="t-buscar" type="search" placeholder="Buscar nombre, código, DNI o unidad…" aria-label="Buscar en la tabla">
+        <label class="check"><input id="t-dif" type="checkbox"> Solo edad distinta al reporte</label>
+        <button class="btn" id="btn-csv" type="button">Exportar CSV</button>
+      </div>
+    </div>
+    <div class="tabla-wrap"><table id="t-detalle"><thead></thead><tbody></tbody></table></div>
+    <div class="paginacion">
+      <span id="pag-info"></span>
+      <div class="controles">
+        <label class="campo-inline" for="pag-tam">Filas <select id="pag-tam"><option>50</option><option>100</option><option>200</option></select></label>
+        <button class="btn chico" id="pag-prev" type="button">Anterior</button>
+        <span id="pag-num"></span>
+        <button class="btn chico" id="pag-next" type="button">Siguiente</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="metodo">
+    <p><strong>Método.</strong> Edad = años cumplidos entre FECNAC y la fecha de corte. Fecha en que cumple la edad de jubilación = FECNAC + 65 años (mujeres) o + 70 años (hombres); los nacidos el 29 de febrero cumplen el 28 en años no bisiestos. "Próximo mes" es el mes calendario siguiente al de la fecha de corte; "ya tienen la edad" son quienes la cumplieron en o antes de esa fecha.</p>
+    <p>El reporte AMSP clasifica a sus asociados con 70 años para ambos sexos (columna "Clasif. AMSP"). Aquí se aplica el criterio 65 / 70 y puede ajustarse en los filtros. El dashboard no envía datos a ningún servidor: todo se calcula en este navegador.</p>
+  </footer>
+</div>
+<div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+<script>/*__DATOS__*/</script>
+<script>
+(function () {
+'use strict';
+const $ = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const fmt = new Intl.NumberFormat('es-PE');
+const num = v => fmt.format(v);
+const pct = (a, b) => b ? (100 * a / b).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' %' : '—';
+const pad = x => String(x).padStart(2, '0');
+const r2 = v => Math.round(v * 100) / 100;
+const fmtFecha = d => d ? `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` : '—';
+const mesCorto = idx => `${MESES[idx % 12]} ${Math.floor(idx / 12)}`;
+const mesLargo = idx => `${MESES_L[idx % 12]} de ${Math.floor(idx / 12)}`;
+const SEXO = { F: 'Mujeres', M: 'Hombres' };
+const SEXO_1 = { F: 'Mujer', M: 'Hombre' };
+const setT = (sel, t) => { $(sel).textContent = t; };
+const titulo = s => String(s || '').toLowerCase().replace(/(^|[\s(/-])\S/g, c => c.toUpperCase());
+const recortar = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+const normalizar = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function hoy() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function fechaDesdeInt(n) { return new Date(Math.floor(n / 10000), Math.floor(n / 100) % 100 - 1, n % 100); }
+function edadEn(nac, corte) {
+  let e = corte.getFullYear() - nac.getFullYear();
+  if (corte.getMonth() < nac.getMonth() || (corte.getMonth() === nac.getMonth() && corte.getDate() < nac.getDate())) e--;
+  return e;
+}
+function sumarAnios(nac, n) {
+  const y = nac.getFullYear() + n, m = nac.getMonth();
+  const ultimo = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(nac.getDate(), ultimo));
+}
+function isoDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function parseIso(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function compacto(t) { return t >= 1000 ? (t / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' K' : num(t); }
+function pasoLimpio(x) { const p = Math.pow(10, Math.floor(Math.log10(Math.max(1, x)))); const r = x / p; return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p; }
+function ticksLimpios(max, n) { const paso = pasoLimpio(max / n); const out = []; for (let v = 0; v < max; v += paso) out.push(v); out.push(out.length ? out[out.length - 1] + paso : paso); return out; }
+
+// ---------- estado ----------
+const estado = {
+  corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12,
+  tab: 'prox', buscar: '', soloDif: false, orden: { col: 'fjub', dir: 1 }, pagina: 1, porPagina: 50, verTablaMeses: false,
+};
+let BASE = null, REG = [], VIS = [], AGG = null;
+
+// ---------- helpers DOM ----------
+function el(tag, attrs, ...hijos) {
+  const e = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') { if (v) e.className = v; }
+    else if (k === 'text') e.textContent = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'dataset') Object.assign(e.dataset, v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const h of hijos.flat()) if (h != null) e.append(h instanceof Node ? h : document.createTextNode(String(h)));
+  return e;
+}
+const NS = 'http://www.w3.org/2000/svg';
+function svg(tag, attrs, ...hijos) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const h of hijos.flat()) if (h != null) e.append(h);
+  return e;
+}
+function vaciar(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function aviso(msg, tipo) { const a = $('#aviso'); a.className = 'aviso ' + (tipo || 'info'); a.textContent = msg; a.hidden = !msg; }
+
+// ---------- tooltip ----------
+const tip = $('#tooltip');
+function mostrarTip(x, y, filas) {
+  vaciar(tip);
+  filas.forEach((f, i) => {
+    if (i === 0) { tip.append(el('div', { class: 'tip-titulo', text: f.k })); return; }
+    const row = el('div', { class: 'tip-fila' });
+    const key = el('span', { class: 'tip-key' }); key.style.background = f.color || 'transparent'; row.append(key);
+    row.append(el('strong', { text: f.v }), el('span', { class: 'tip-label', text: f.k }));
+    tip.append(row);
+  });
+  tip.hidden = false; posTip(x, y);
+}
+function posTip(x, y) {
+  const r = tip.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if (left + r.width > window.innerWidth - 8) left = x - r.width - 14;
+  if (top + r.height > window.innerHeight - 8) top = y - r.height - 14;
+  tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+}
+function ocultarTip() { tip.hidden = true; }
+function enlazarTip(g, filasFn) {
+  g.addEventListener('pointerenter', e => mostrarTip(e.clientX, e.clientY, filasFn()));
+  g.addEventListener('pointermove', e => posTip(e.clientX, e.clientY));
+  g.addEventListener('pointerleave', ocultarTip);
+  g.addEventListener('focus', () => { const b = g.getBoundingClientRect(); mostrarTip(b.left + b.width / 2, b.top, filasFn()); });
+  g.addEventListener('blur', ocultarTip);
+}
+
+// ---------- datos ----------
+function cargarBase(datos) {
+  BASE = datos;
+  const ix = Object.fromEntries(datos.cols.map((c, i) => [c, i]));
+  const dic = datos.dic;
+  REG = datos.filas.map(f => ({
+    cod: f[ix.cod] || '', nom: f[ix.nom] || '', dni: f[ix.dni] || '',
+    s: f[ix.s] === 'F' ? 'F' : f[ix.s] === 'M' ? 'M' : '',
+    nac: f[ix.nac] ? fechaDesdeInt(f[ix.nac]) : null, edadRep: f[ix.edadRep] == null ? null : f[ix.edadRep],
+    depa: dic.depa[f[ix.depa]] || '', eje: dic.eje[f[ix.eje]] || '', fnd: dic.fnd[f[ix.fnd]] || '',
+    sta: dic.sta[f[ix.sta]] || '', ann: dic.ann[f[ix.ann]] || '',
+  }));
+  setT('#fuente', datos.fuente || `${datos.entidad || 'Padrón'}`);
+  setT('#archivo', datos.archivo ? `Archivo: ${datos.archivo}` : '');
+  poblarSelect($('#f-depa'), dic.depa, 'Todos los departamentos', titulo);
+  poblarSelect($('#f-fnd'), dic.fnd, 'Todas las escalas');
+  poblarSelect($('#f-sta'), dic.sta, 'Todos los estados');
+  estado.depa = estado.fnd = estado.sta = ''; estado.pagina = 1;
+  recalcular();
+}
+function poblarSelect(sel, valores, todos, fmtEtq) {
+  vaciar(sel);
+  sel.append(el('option', { value: '', text: todos }));
+  [...valores].sort((a, b) => a.localeCompare(b, 'es')).forEach(v => sel.append(el('option', { value: v, text: fmtEtq ? fmtEtq(v) : v })));
+  sel.value = '';
+}
+
+function recalcular() {
+  const corte = estado.corte;
+  const mesCorte = corte.getFullYear() * 12 + corte.getMonth();
+  for (const r of REG) {
+    r.edadJub = r.s === 'F' ? estado.edadF : r.s === 'M' ? estado.edadM : null;
+    if (!r.nac || r.edadJub == null) { r.edad = null; r.fjub = null; r.mesJub = null; r.rel = null; r.cat = 'sin'; r.dif = false; continue; }
+    r.edad = edadEn(r.nac, corte);
+    r.fjub = sumarAnios(r.nac, r.edadJub);
+    r.mesJub = r.fjub.getFullYear() * 12 + r.fjub.getMonth();
+    r.rel = r.mesJub - mesCorte;
+    r.cat = r.fjub <= corte ? 'ya' : r.rel === 0 ? 'esteMes' : 'futuro';
+    r.dif = r.edadRep != null && r.edadRep !== r.edad;
+  }
+  VIS = REG.filter(r => (!estado.sexo || r.s === estado.sexo) && (!estado.depa || r.depa === estado.depa) && (!estado.fnd || r.fnd === estado.fnd) && (!estado.sta || r.sta === estado.sta));
+  agregar(mesCorte);
+  renderTodo();
+}
+
+function agregar(mesCorte) {
+  const H = estado.horizonte;
+  const A = {
+    total: VIS.length, F: 0, M: 0, sin: 0, dif: 0, mesCorte,
+    ya: { n: 0, F: 0, M: 0 }, esteMes: { n: 0, F: 0, M: 0 }, prox: { n: 0, F: 0, M: 0 }, hor: { n: 0, F: 0, M: 0 },
+    porMes: Array.from({ length: H }, (_, i) => ({ idx: mesCorte + 1 + i, F: 0, M: 0, n: 0 })),
+    porEdad: { F: new Map(), M: new Map() }, porDepa: new Map(),
+  };
+  for (const r of VIS) {
+    if (r.s) A[r.s]++;
+    if (r.cat === 'sin') { A.sin++; continue; }
+    if (r.dif) A.dif++;
+    const e = A.porEdad[r.s]; e.set(r.edad, (e.get(r.edad) || 0) + 1);
+    if (r.cat === 'ya') { A.ya.n++; A.ya[r.s]++; }
+    else if (r.cat === 'esteMes') { A.esteMes.n++; A.esteMes[r.s]++; }
+    else {
+      if (r.rel === 1) { A.prox.n++; A.prox[r.s]++; }
+      if (r.rel >= 1 && r.rel <= H) {
+        A.hor.n++; A.hor[r.s]++;
+        const pm = A.porMes[r.rel - 1]; pm[r.s]++; pm.n++;
+        const d = A.porDepa.get(r.depa) || { F: 0, M: 0, n: 0 }; d[r.s]++; d.n++; A.porDepa.set(r.depa, d);
+      }
+    }
+  }
+  AGG = A;
+}
+
+// ---------- render ----------
+function renderTodo() { renderKpis(); renderGraficos(); renderTablaMeses(); renderTabla(); }
+function renderGraficos() { if (!AGG) return; renderGraficoMeses(); renderGraficoEdad(); renderGraficoDepa(); }
+
+function renderKpis() {
+  const A = AGG, c = estado.corte, H = estado.horizonte;
+  setT('#k-prox-label', `Cumplen la edad de jubilación en ${mesLargo(A.mesCorte + 1)}`);
+  setT('#k-prox', num(A.prox.n));
+  setT('#k-prox-sub', `${num(A.prox.F)} mujeres (${estado.edadF} años) · ${num(A.prox.M)} hombres (${estado.edadM} años)`);
+  setT('#k-este-label', `Resto de ${mesLargo(A.mesCorte)} (después del ${fmtFecha(c)})`);
+  setT('#k-este', num(A.esteMes.n)); setT('#k-este-sub', `${num(A.esteMes.F)} mujeres · ${num(A.esteMes.M)} hombres`);
+  setT('#k-hor-label', `Próximos ${H} meses (${mesCorto(A.mesCorte + 1)} – ${mesCorto(A.mesCorte + H)})`);
+  setT('#k-hor', num(A.hor.n));
+  setT('#k-hor-sub', `${num(A.hor.F)} mujeres · ${num(A.hor.M)} hombres · promedio ${num(Math.round(A.hor.n / H))} por mes`);
+  setT('#k-ya-label', `Ya tienen la edad de jubilación al ${fmtFecha(c)}`);
+  setT('#k-ya', num(A.ya.n)); setT('#k-ya-sub', `${num(A.ya.F)} mujeres · ${num(A.ya.M)} hombres · ${pct(A.ya.n, A.total)} del padrón filtrado`);
+  setT('#k-total', num(A.total));
+  setT('#k-total-sub', `${num(A.F)} mujeres · ${num(A.M)} hombres${A.sin ? ` · ${num(A.sin)} sin fecha de nacimiento` : ''}`);
+  const verif = $('#verif'); verif.className = 'verif ' + (A.dif ? 'warn' : 'ok');
+  $('.verif-icon', verif).textContent = A.dif ? '!' : '✓';
+  setT('#verif-texto', A.dif
+    ? `Verificación con FECNAC: ${num(A.dif)} asociados tienen una edad recalculada al ${fmtFecha(c)} distinta a la columna "edad" del reporte (el reporte la calcula a su fecha de emisión).`
+    : `Verificación con FECNAC: la columna "edad" del reporte coincide con la edad recalculada al ${fmtFecha(c)} en todos los asociados.`);
+  $('#verif-ver').hidden = !A.dif;
+  setT('#g-meses-desc', `Asociados que cumplen ${estado.edadF} años (mujeres) o ${estado.edadM} años (hombres) entre ${mesCorto(A.mesCorte + 1)} y ${mesCorto(A.mesCorte + H)}. El mes resaltado es el próximo.`);
+  setT('#g-depa-desc', `Mismo horizonte de ${H} meses. Se muestran los 12 departamentos con más casos; el resto se agrupa en "Otros".`);
+}
+
+function barra(x, y, w, h, cls, redondaTop) {
+  if (!redondaTop || h < 4) return svg('rect', { x: r2(x), y: r2(y), width: r2(w), height: r2(h), class: cls });
+  const r = Math.min(4, w / 2, h);
+  return svg('path', { d: `M${r2(x)},${r2(y + h)} V${r2(y + r)} Q${r2(x)},${r2(y)} ${r2(x + r)},${r2(y)} H${r2(x + w - r)} Q${r2(x + w)},${r2(y)} ${r2(x + w)},${r2(y + r)} V${r2(y + h)} Z`, class: cls });
+}
+function barraH(x, y, w, h, cls, redondaFin) {
+  if (!redondaFin || w < 4) return svg('rect', { x: r2(x), y: r2(y), width: r2(w), height: r2(h), class: cls });
+  const r = Math.min(4, h / 2, w);
+  return svg('path', { d: `M${r2(x)},${r2(y)} H${r2(x + w - r)} Q${r2(x + w)},${r2(y)} ${r2(x + w)},${r2(y + r)} V${r2(y + h - r)} Q${r2(x + w)},${r2(y + h)} ${r2(x + w - r)},${r2(y + h)} H${r2(x)} Z`, class: cls });
+}
+
+function renderGraficoMeses() {
+  const cont = $('#g-meses'); vaciar(cont);
+  const datos = AGG.porMes, H = datos.length;
+  const W = Math.max(320, Math.floor(cont.clientWidth || 800));
+  const ml = 40, mr = 12, mt = 34, mb = 38, altoPlot = 230, Hh = mt + altoPlot + mb;
+  const max = Math.max(1, ...datos.map(d => d.n));
+  const ticks = ticksLimpios(max, 4), yMax = ticks[ticks.length - 1];
+  const plotW = W - ml - mr, slot = plotW / H, barW = Math.min(24, Math.max(6, slot * 0.62));
+  const y = v => mt + altoPlot - (v / yMax) * altoPlot;
+  const xc = i => ml + slot * (i + 0.5);
+  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': `Asociados que cumplen la edad de jubilación por mes, próximos ${H} meses` });
+  for (const t of ticks) {
+    s.append(svg('line', { x1: ml, x2: W - mr, y1: r2(y(t)), y2: r2(y(t)), class: t === 0 ? 'eje' : 'grid' }));
+    s.append(svg('text', { x: ml - 6, y: r2(y(t) + 4), class: 'tick', 'text-anchor': 'end', text: compacto(t) }));
+  }
+  s.append(svg('rect', { x: r2(xc(0) - slot / 2 + 1), y: mt - 10, width: r2(Math.max(0, slot - 2)), height: altoPlot + 10, rx: 4, class: 'banda' }));
+  s.append(svg('text', { x: r2(xc(0) - slot / 2 + 2), y: mt - 18, class: 'anota', text: 'próximo mes' }));
+  const etiquetarTodo = slot >= 30;
+  const iMax = datos.reduce((b, d, i) => d.n > datos[b].n ? i : b, 0);
+  const cada = slot >= 26 ? 1 : slot >= 14 ? 2 : 3;
+  datos.forEach((d, i) => {
+    const cx = xc(i), x = cx - barW / 2;
+    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${mesLargo(d.idx)}: ${d.n} asociados (${d.F} mujeres, ${d.M} hombres)` });
+    g.append(svg('rect', { x: r2(cx - slot / 2), y: mt - 10, width: r2(slot), height: altoPlot + 10, class: 'hit' }));
+    if (d.F > 0) g.append(barra(x, y(d.F), barW, y(0) - y(d.F), 'serie-f', d.M === 0));
+    if (d.M > 0) g.append(barra(x, y(d.n), barW, y(d.F) - y(d.n), 'serie-m', true));
+    if (d.F > 0 && d.M > 0) g.append(svg('line', { x1: r2(x), x2: r2(x + barW), y1: r2(y(d.F)), y2: r2(y(d.F)), class: 'gap' }));
+    if (d.n > 0 && (etiquetarTodo || i === 0 || i === iMax)) g.append(svg('text', { x: r2(cx), y: r2(y(d.n) - 5), class: 'valor', 'text-anchor': 'middle', text: num(d.n) }));
+    const m = d.idx % 12, yy = Math.floor(d.idx / 12);
+    if (i % cada === 0) {
+      g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 15, class: 'etq', 'text-anchor': 'middle', text: MESES[m] }));
+      if (i === 0 || m === 0) g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 29, class: 'tick', 'text-anchor': 'middle', text: String(yy) }));
+    }
+    enlazarTip(g, () => [{ k: mesLargo(d.idx) }, { k: 'total', v: num(d.n) }, { k: 'mujeres', v: num(d.F), color: 'var(--serie-f)' }, { k: 'hombres', v: num(d.M), color: 'var(--serie-m)' }]);
+    s.append(g);
+  });
+  cont.append(s);
+}
+
+function renderGraficoEdad() {
+  const cont = $('#g-edad'); vaciar(cont);
+  const sexos = ['F', 'M'].filter(s => !estado.sexo || estado.sexo === s);
+  const minE = Math.min(estado.edadF, estado.edadM) - 10, maxE = Math.max(estado.edadF, estado.edadM) + 5;
+  // Primero se crean todos los paneles (para que el ancho de cada uno sea el definitivo) y luego se dibujan.
+  const paneles = sexos.map(sx => {
+    const umbral = sx === 'F' ? estado.edadF : estado.edadM, mapa = AGG.porEdad[sx];
+    const cls = sx === 'F' ? 'serie-f' : 'serie-m';
+    const datos = []; for (let e = minE; e <= maxE; e++) datos.push({ e, n: mapa.get(e) || 0, etq: String(e) });
+    let mas = 0, menos = 0, totalS = 0, enAdelante = 0;
+    for (const [e, n] of mapa) { totalS += n; if (e >= umbral) enAdelante += n; if (e > maxE) mas += n; else if (e < minE) menos += n; }
+    datos.push({ e: maxE + 1, n: mas, etq: `${maxE + 1}+` });
+    const panel = el('div', { class: 'panel' });
+    panel.append(el('h3', {}, el('i', { class: `sw ${cls}` }), `${SEXO[sx]} · jubilación a los ${umbral} años`));
+    panel.append(el('p', { class: 'desc', text: `${num(enAdelante)} con ${umbral} años o más · ${num(totalS - enAdelante)} por debajo${menos ? ` (${num(menos)} menores de ${minE} años no se grafican)` : ''}` }));
+    cont.append(panel);
+    return { sx, umbral, cls, datos, panel };
+  });
+  for (const { sx, umbral, cls, datos, panel } of paneles) {
+    const W = Math.max(240, Math.floor(panel.clientWidth || 400));
+    const ml = 34, mr = 8, mt = 32, mb = 32, altoPlot = 150, Hh = mt + altoPlot + mb;
+    const max = Math.max(1, ...datos.map(d => d.n));
+    const ticks = ticksLimpios(max, 3), yMax = ticks[ticks.length - 1];
+    const slot = (W - ml - mr) / datos.length, barW = Math.min(24, Math.max(3, slot - 2));
+    const y = v => mt + altoPlot - (v / yMax) * altoPlot, xc = i => ml + slot * (i + 0.5);
+    const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': `${SEXO[sx]} por edad actual; umbral ${umbral} años` });
+    for (const t of ticks) {
+      s.append(svg('line', { x1: ml, x2: W - mr, y1: r2(y(t)), y2: r2(y(t)), class: t === 0 ? 'eje' : 'grid' }));
+      s.append(svg('text', { x: ml - 6, y: r2(y(t) + 4), class: 'tick', 'text-anchor': 'end', text: compacto(t) }));
+    }
+    const iU = Math.max(0, datos.findIndex(d => d.e === umbral)), xU = r2(ml + slot * iU);
+    s.append(svg('rect', { x: xU, y: mt - 10, width: r2(W - mr - xU), height: altoPlot + 10, class: 'banda' }));
+    s.append(svg('line', { x1: xU, x2: xU, y1: mt - 10, y2: mt + altoPlot, class: 'umbral' }));
+    s.append(svg('text', { x: xU + 4, y: mt - 16, class: 'anota', text: `${umbral} años o más` }));
+    const iMax = datos.reduce((b, d, i) => d.n > datos[b].n ? i : b, 0);
+    datos.forEach((d, i) => {
+      const cx = xc(i);
+      const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${d.etq} años: ${d.n}` });
+      g.append(svg('rect', { x: r2(cx - slot / 2), y: mt - 10, width: r2(slot), height: altoPlot + 10, class: 'hit' }));
+      if (d.n > 0) g.append(barra(cx - barW / 2, y(d.n), barW, y(0) - y(d.n), d.e >= umbral ? cls : cls + '-soft', true));
+      if (d.n > 0 && (i === iU || i === iMax)) g.append(svg('text', { x: r2(cx), y: r2(y(d.n) - 4), class: 'valor', 'text-anchor': 'middle', text: num(d.n) }));
+      if ((d.e % 5 === 0 && i < datos.length - 2) || i === datos.length - 1) g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 15, class: 'etq', 'text-anchor': 'middle', text: d.etq }));
+      enlazarTip(g, () => [{ k: `${d.etq} años` }, { k: SEXO[sx].toLowerCase(), v: num(d.n), color: `var(--${cls})` }]);
+      s.append(g);
+    });
+    s.append(svg('text', { x: W - mr, y: mt + altoPlot + 29, class: 'tick', 'text-anchor': 'end', text: 'edad a la fecha de corte (años)' }));
+    panel.append(s);
+  }
+}
+
+function renderGraficoDepa() {
+  const cont = $('#g-depa'); vaciar(cont);
+  const filas = [...AGG.porDepa.entries()].map(([k, v]) => ({ k, F: v.F, M: v.M, n: v.n })).sort((a, b) => b.n - a.n || a.k.localeCompare(b.k, 'es'));
+  const TOP = 12, top = filas.slice(0, TOP), resto = filas.slice(TOP);
+  if (resto.length) top.push(resto.reduce((a, r) => ({ k: a.k, F: a.F + r.F, M: a.M + r.M, n: a.n + r.n }), { k: `Otros (${resto.length})`, F: 0, M: 0, n: 0 }));
+  if (!top.length) { cont.append(el('p', { class: 'vacio', text: 'Ningún asociado cumple la edad de jubilación en el horizonte seleccionado.' })); return; }
+  const W = Math.max(280, Math.floor(cont.clientWidth || 400)), ml = 118, mr = 46, mt = 6, mb = 6, fila = 26, barH = 18;
+  const Hh = mt + mb + fila * top.length;
+  const max = Math.max(1, ...top.map(d => d.n));
+  const x = v => ml + (v / max) * (W - ml - mr);
+  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': 'Asociados por departamento en el horizonte seleccionado' });
+  s.append(svg('line', { x1: ml, x2: ml, y1: mt, y2: Hh - mb, class: 'eje' }));
+  top.forEach((d, i) => {
+    const yc = mt + fila * i + fila / 2, yT = yc - barH / 2;
+    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${titulo(d.k)}: ${d.n} (${d.F} mujeres, ${d.M} hombres)` });
+    g.append(svg('rect', { x: 0, y: r2(yc - fila / 2), width: W, height: fila, class: 'hit' }));
+    g.append(svg('text', { x: ml - 8, y: r2(yc + 4), class: 'etq', 'text-anchor': 'end', text: recortar(titulo(d.k), 16) }));
+    if (d.F > 0) g.append(barraH(ml, yT, x(d.F) - ml, barH, 'serie-f', d.M === 0));
+    if (d.M > 0) g.append(barraH(x(d.F), yT, x(d.n) - x(d.F), barH, 'serie-m', true));
+    if (d.F > 0 && d.M > 0) g.append(svg('line', { x1: r2(x(d.F)), x2: r2(x(d.F)), y1: r2(yT), y2: r2(yT + barH), class: 'gap' }));
+    g.append(svg('text', { x: r2(x(d.n) + 6), y: r2(yc + 4), class: 'valor', text: num(d.n) }));
+    enlazarTip(g, () => [{ k: titulo(d.k) }, { k: 'total', v: num(d.n) }, { k: 'mujeres', v: num(d.F), color: 'var(--serie-f)' }, { k: 'hombres', v: num(d.M), color: 'var(--serie-m)' }]);
+    s.append(g);
+  });
+  cont.append(s);
+}
+
+function renderTablaMeses() {
+  const tb = $('#t-meses tbody'); vaciar(tb); let acum = 0;
+  for (const d of AGG.porMes) {
+    acum += d.n;
+    tb.append(el('tr', {}, el('td', { text: mesLargo(d.idx) }), el('td', { class: 'num', text: num(d.F) }), el('td', { class: 'num', text: num(d.M) }), el('td', { class: 'num', text: num(d.n) }), el('td', { class: 'num', text: num(acum) })));
+  }
+  const tf = $('#t-meses tfoot'); vaciar(tf);
+  tf.append(el('tr', {}, el('th', { text: 'Total' }), el('th', { class: 'num', text: num(AGG.hor.F) }), el('th', { class: 'num', text: num(AGG.hor.M) }), el('th', { class: 'num', text: num(AGG.hor.n) }), el('th', {})));
+}
+
+const COLS = [
+  { k: 'fjub', t: 'Cumple la edad el', f: r => fmtFecha(r.fjub), cls: 'num', ord: r => r.fjub ? r.fjub.getTime() : Infinity },
+  { k: 'cod', t: 'Código', f: r => r.cod, cls: 'mono' },
+  { k: 'nom', t: 'Apellidos y nombres', f: r => r.nom, cls: 'nom' },
+  { k: 'dni', t: 'DNI', f: r => r.dni, cls: 'mono' },
+  { k: 's', t: 'Sexo', f: r => SEXO_1[r.s] || '—' },
+  { k: 'nac', t: 'Fecha nac.', f: r => fmtFecha(r.nac), cls: 'num', ord: r => r.nac ? r.nac.getTime() : Infinity },
+  { k: 'edad', t: 'Edad al corte', f: r => r.edad == null ? '—' : r.edad, cls: 'num', ord: r => r.edad == null ? -1 : r.edad },
+  { k: 'edadRep', t: 'Edad reporte', f: r => r.edadRep == null ? '—' : r.edadRep, cls: 'num', ord: r => r.edadRep == null ? -1 : r.edadRep },
+  { k: 'edadJub', t: 'Edad jub.', f: r => r.edadJub == null ? '—' : r.edadJub, cls: 'num', ord: r => r.edadJub == null ? -1 : r.edadJub },
+  { k: 'depa', t: 'Departamento', f: r => titulo(r.depa) },
+  { k: 'eje', t: 'Unidad ejecutora', f: r => r.eje },
+  { k: 'fnd', t: 'Escala', f: r => r.fnd },
+  { k: 'sta', t: 'Estado', f: r => r.sta },
+  { k: 'ann', t: 'Clasif. AMSP', f: r => r.ann },
+];
+
+function filasTab() {
+  const H = estado.horizonte; let f;
+  switch (estado.tab) {
+    case 'prox': f = VIS.filter(r => r.cat === 'futuro' && r.rel === 1); break;
+    case 'hor': f = VIS.filter(r => r.cat === 'futuro' && r.rel >= 1 && r.rel <= H); break;
+    case 'este': f = VIS.filter(r => r.cat === 'esteMes'); break;
+    case 'ya': f = VIS.filter(r => r.cat === 'ya'); break;
+    default: f = VIS.slice();
+  }
+  if (estado.soloDif) f = f.filter(r => r.dif);
+  const q = normalizar(estado.buscar).trim();
+  if (q) f = f.filter(r => normalizar(r.nom).includes(q) || r.cod.includes(q) || r.dni.includes(q) || normalizar(r.eje).includes(q));
+  const col = COLS.find(c => c.k === estado.orden.col) || COLS[0];
+  const ord = col.ord || (r => col.f(r)), dir = estado.orden.dir;
+  f.sort((a, b) => {
+    const va = ord(a), vb = ord(b);
+    if (va === vb) return 0;
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), 'es') * dir;
+  });
+  return f;
+}
+
+function renderTabla() {
+  const A = AGG, H = estado.horizonte;
+  const cuentas = { prox: A.prox.n, hor: A.hor.n, este: A.esteMes.n, ya: A.ya.n, todos: A.total };
+  const titulos = { prox: `Próximo mes (${mesCorto(A.mesCorte + 1)})`, hor: `Próximos ${H} meses`, este: `Resto de ${mesCorto(A.mesCorte)}`, ya: 'Ya con edad de jubilación', todos: 'Todo el padrón' };
+  $$('#tabs .tab').forEach(b => { const k = b.dataset.tab; b.setAttribute('aria-selected', String(k === estado.tab)); vaciar(b); b.append(titulos[k], el('b', { text: num(cuentas[k]) })); });
+  const filas = filasTab();
+  const total = filas.length, pp = estado.porPagina, paginas = Math.max(1, Math.ceil(total / pp));
+  estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
+  const ini = (estado.pagina - 1) * pp, pagina = filas.slice(ini, ini + pp);
+  const thead = $('#t-detalle thead'); vaciar(thead);
+  const trh = el('tr');
+  for (const c of COLS) {
+    const activa = estado.orden.col === c.k;
+    const th = el('th', { class: c.cls === 'num' ? 'num' : '', scope: 'col', 'aria-sort': activa ? (estado.orden.dir === 1 ? 'ascending' : 'descending') : 'none',
+      onclick: () => { if (estado.orden.col === c.k) estado.orden.dir = -estado.orden.dir; else estado.orden = { col: c.k, dir: 1 }; renderTabla(); } });
+    th.append(c.k === 'edad' ? `Edad al ${fmtFecha(estado.corte).slice(0, 5)}` : c.t);
+    if (activa) th.append(el('span', { class: 'ord', 'aria-hidden': 'true', text: estado.orden.dir === 1 ? '▲' : '▼' }));
+    trh.append(th);
+  }
+  thead.append(trh);
+  const tbody = $('#t-detalle tbody'); vaciar(tbody);
+  if (!pagina.length) tbody.append(el('tr', {}, el('td', { colspan: COLS.length, class: 'vacio', text: 'No hay asociados que cumplan con los criterios.' })));
+  for (const r of pagina) {
+    const tr = el('tr', { class: (estado.tab === 'hor' || estado.tab === 'todos') && r.cat === 'futuro' && r.rel === 1 ? 'prox' : '' });
+    for (const c of COLS) {
+      const td = el('td', { class: c.cls || '' }, c.f(r));
+      if (c.k === 'edadRep' && r.dif) td.append(el('span', { class: 'badge-dif', title: 'Difiere de la edad recalculada a la fecha de corte', text: '≠' }));
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  setT('#pag-info', total ? `Mostrando ${num(ini + 1)}–${num(Math.min(ini + pp, total))} de ${num(total)} asociados` : 'Sin registros');
+  $('#pag-prev').disabled = estado.pagina <= 1; $('#pag-next').disabled = estado.pagina >= paginas;
+  setT('#pag-num', `Página ${num(estado.pagina)} de ${num(paginas)}`);
+}
+
+function exportarCsv() {
+  const filas = filasTab();
+  const esc = v => { const s = String(v == null ? '' : v); return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lineas = [COLS.map(c => esc(c.k === 'edad' ? `Edad al ${fmtFecha(estado.corte)}` : c.t)).join(';')];
+  for (const r of filas) lineas.push(COLS.map(c => esc(c.f(r))).join(';'));
+  const blob = new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: `jubilaciones_${estado.tab}_${isoDate(estado.corte)}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  aviso(`CSV exportado: ${num(filas.length)} filas de la pestaña activa.`, 'ok');
+}
+
+// ---------- carga de otro reporte (.xlsx) en el navegador ----------
+function cargarSheetJS() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = () => rej(new Error('no se pudo descargar la librería de lectura de Excel (se necesita conexión a internet la primera vez).'));
+    document.head.appendChild(s);
+  });
+}
+function aFechaInt(v) {
+  if (v instanceof Date) { if (isNaN(v)) return 0; return v.getFullYear() * 10000 + (v.getMonth() + 1) * 100 + v.getDate(); }
+  if (typeof v === 'number') { if (v < 1000) return 0; const d = new Date(Math.round((v - 25569) * 86400000)); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); }
+  if (typeof v === 'string') {
+    let m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(v.trim()); if (m) return +m[3] * 10000 + +m[2] * 100 + +m[1];
+    m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v.trim()); if (m) return +m[1] * 10000 + +m[2] * 100 + +m[3];
+  }
+  return 0;
+}
+function parsearLibro(wb) {
+  const nombres = wb.Sheets.DetMaeSituAct ? ['DetMaeSituAct', ...wb.SheetNames.filter(n => n !== 'DetMaeSituAct')] : wb.SheetNames;
+  for (const nombre of nombres) {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, raw: true, defval: null });
+    const low = f => (f || []).map(c => String(c == null ? '' : c).trim().toLowerCase());
+    const hIdx = filas.findIndex(f => { const l = low(f); return l.includes('codsoc') && l.includes('fecnac'); });
+    if (hIdx < 0) continue;
+    const hdr = low(filas[hIdx]);
+    const ix = n => hdr.indexOf(n);
+    const col = { cod: ix('codsoc'), nom: ix('nombre'), dni: ix('ele'), s: ix('s'), nac: ix('fecnac'), edad: ix('edad'), depa: ix('dscdepa'), eje: ix('dsceje'), fnd: ix('dscfnd'), sta: ix('dscstaacso'), ann: ix('dscann70') };
+    const dic = { depa: [], eje: [], fnd: [], sta: [], ann: [] }, idx = { depa: new Map(), eje: new Map(), fnd: new Map(), sta: new Map(), ann: new Map() };
+    const codigo = (k, v) => { const t = (v == null ? '' : String(v).trim()) || '(sin dato)'; if (!idx[k].has(t)) { idx[k].set(t, dic[k].length); dic[k].push(t); } return idx[k].get(t); };
+    const cel = (f, i) => (i >= 0 && f[i] != null ? f[i] : '');
+    const out = [];
+    for (let i = hIdx + 1; i < filas.length; i++) {
+      const f = filas[i]; if (!f || f.every(c => c == null || c === '')) continue;
+      const edad = parseInt(cel(f, col.edad), 10);
+      out.push([String(cel(f, col.cod)).trim(), String(cel(f, col.nom)).trim(), String(cel(f, col.dni)).trim(), String(cel(f, col.s)).trim().toUpperCase(), aFechaInt(cel(f, col.nac)), isNaN(edad) ? null : edad,
+        codigo('depa', cel(f, col.depa)), codigo('eje', cel(f, col.eje)), codigo('fnd', cel(f, col.fnd)), codigo('sta', cel(f, col.sta)), codigo('ann', cel(f, col.ann))]);
+    }
+    let fuente = '';
+    for (let i = 0; i < hIdx; i++) for (const c of (filas[i] || [])) if (typeof c === 'string' && /^fuente/i.test(c.trim())) fuente = c.trim();
+    return { cols: ['cod', 'nom', 'dni', 's', 'nac', 'edadRep', 'depa', 'eje', 'fnd', 'sta', 'ann'], dic, filas: out, fuente, entidad: BASE && BASE.entidad };
+  }
+  throw new Error('no se encontró una hoja con las columnas "codsoc" y "fecnac" (se esperaba la hoja DetMaeSituAct del Reporte Control Maestra Estatus).');
+}
+async function cargarArchivo(ev) {
+  const file = ev.target.files && ev.target.files[0]; if (!file) return;
+  aviso(`Leyendo ${file.name}…`, 'info');
+  try {
+    await cargarSheetJS();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const datos = parsearLibro(wb); datos.archivo = file.name;
+    if (!datos.filas.length) throw new Error('la hoja no tiene filas de asociados.');
+    cargarBase(datos);
+    aviso(`Reporte cargado: ${file.name} · ${num(datos.filas.length)} asociados.`, 'ok');
+  } catch (e) { aviso(`No se pudo leer el archivo: ${e.message}`, 'error'); }
+  ev.target.value = '';
+}
+
+// ---------- tema ----------
+function aplicarTema(v) { const root = document.documentElement; if (v === 'claro') root.dataset.theme = 'light'; else if (v === 'oscuro') root.dataset.theme = 'dark'; else delete root.dataset.theme; }
+
+// ---------- inicio ----------
+function init() {
+  const sel = $('#tema'); let guardado = null; try { guardado = localStorage.getItem('jubilaciones-tema'); } catch (e) { /* sin almacenamiento */ }
+  aplicarTema(guardado || 'sistema'); sel.value = guardado || 'sistema';
+  sel.addEventListener('change', () => { aplicarTema(sel.value); try { localStorage.setItem('jubilaciones-tema', sel.value); } catch (e) { /* sin almacenamiento */ } });
+
+  $('#f-corte').value = isoDate(estado.corte);
+  $('#f-corte').addEventListener('change', e => { estado.corte = parseIso(e.target.value) || hoy(); e.target.value = isoDate(estado.corte); estado.pagina = 1; recalcular(); });
+  $('#f-edadF').value = estado.edadF; $('#f-edadM').value = estado.edadM;
+  for (const [id, k] of [['#f-edadF', 'edadF'], ['#f-edadM', 'edadM']]) $(id).addEventListener('change', e => {
+    const v = Math.min(90, Math.max(40, parseInt(e.target.value, 10) || estado[k])); estado[k] = v; e.target.value = v; estado.pagina = 1; recalcular();
+  });
+  for (const [id, k] of [['#f-sexo', 'sexo'], ['#f-depa', 'depa'], ['#f-fnd', 'fnd'], ['#f-sta', 'sta']]) $(id).addEventListener('change', e => { estado[k] = e.target.value; estado.pagina = 1; recalcular(); });
+  $('#f-horizonte').value = String(estado.horizonte);
+  $('#f-horizonte').addEventListener('change', e => { estado.horizonte = parseInt(e.target.value, 10) || 12; estado.pagina = 1; recalcular(); });
+  $('#f-reset').addEventListener('click', () => {
+    Object.assign(estado, { corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12, buscar: '', soloDif: false, pagina: 1 });
+    $('#f-corte').value = isoDate(estado.corte); $('#f-edadF').value = 65; $('#f-edadM').value = 70;
+    for (const id of ['#f-sexo', '#f-depa', '#f-fnd', '#f-sta']) $(id).value = '';
+    $('#f-horizonte').value = '12'; $('#t-buscar').value = ''; $('#t-dif').checked = false; aviso('', '');
+    recalcular();
+  });
+  $$('#tabs .tab').forEach(b => b.addEventListener('click', () => { estado.tab = b.dataset.tab; estado.pagina = 1; renderTabla(); }));
+  let tb; $('#t-buscar').addEventListener('input', e => { clearTimeout(tb); tb = setTimeout(() => { estado.buscar = e.target.value; estado.pagina = 1; renderTabla(); }, 150); });
+  $('#t-dif').addEventListener('change', e => { estado.soloDif = e.target.checked; estado.pagina = 1; renderTabla(); });
+  $('#pag-prev').addEventListener('click', () => { estado.pagina--; renderTabla(); });
+  $('#pag-next').addEventListener('click', () => { estado.pagina++; renderTabla(); });
+  $('#pag-tam').addEventListener('change', e => { estado.porPagina = parseInt(e.target.value, 10) || 50; estado.pagina = 1; renderTabla(); });
+  $('#btn-csv').addEventListener('click', exportarCsv);
+  $('#verif-ver').addEventListener('click', () => {
+    estado.tab = 'todos'; estado.soloDif = true; $('#t-dif').checked = true; estado.pagina = 1; renderTabla();
+    $('.tabla-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('#btn-print').addEventListener('click', () => window.print());
+  $('#btn-tabla-meses').addEventListener('click', e => {
+    estado.verTablaMeses = !estado.verTablaMeses; $('#t-meses-wrap').hidden = !estado.verTablaMeses;
+    e.currentTarget.textContent = estado.verTablaMeses ? 'Ocultar tabla' : 'Ver tabla'; e.currentTarget.setAttribute('aria-expanded', String(estado.verTablaMeses));
+  });
+  $('#archivo-input').addEventListener('change', cargarArchivo);
+  $('#archivo-label').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#archivo-input').click(); } });
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderGraficos, 120); });
+
+  if (window.DATOS_INICIALES && window.DATOS_INICIALES.filas) cargarBase(window.DATOS_INICIALES);
+  else aviso('Este archivo no trae datos incrustados. Use "Cargar otro reporte" para leer el Excel del padrón.', 'error');
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>

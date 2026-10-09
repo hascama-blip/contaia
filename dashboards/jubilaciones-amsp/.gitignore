@@ -1,0 +1,3 @@
+# HTML generado con datos personales del padrón: no versionar (se regenera con build.py)
+*.html
+!plantilla.html

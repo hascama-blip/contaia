@@ -62,6 +62,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - `src/components/DeclaracionesPanel.tsx` — subir PDF de declaración → confirmar montos → comparar vs SIRE.
 - `src/app/clientes/[id]/informe/page.tsx` — informe imprimible (dashboard, contingencias, buzón, SIRE, declaración vs SIRE).
 - API: `src/app/api/clientes/[id]/{sire,buzon,sunat,declaraciones,diagnostico}/route.ts`.
+- `dashboards/jubilaciones-amsp/` — **dashboard HTML independiente** (sin servidor) de jubilaciones del
+  padrón AMSP: `build.py` lee el "Reporte Control Maestra Estatus" (hoja `DetMaeSituAct`) y lo incrusta en
+  `plantilla.html`; calcula edad con `fecnac` vs fecha de corte, quiénes cumplen 65 (M) / 70 (H) el próximo
+  mes y en adelante. El HTML generado trae datos personales: **no se versiona** (gitignore) ni va en `public/`.
 
 ### Declaraciones mensuales vs SIRE (`declaracion.ts`)
 - **unpdf** (pdf.js serverless) extrae el texto del PDF — solo sirve si el PDF trae capa de
