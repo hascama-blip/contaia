@@ -70,6 +70,27 @@ def leer(ruta):
     return fuente, datos
 
 
+def numero(v):
+    """Número o None (celdas vacías, '/  /', espacios)."""
+    if v is None:
+        return None
+    try:
+        s = str(v).strip()
+        return float(s) if s not in ("", "/  /") else None
+    except ValueError:
+        return None
+
+
+def texto(v):
+    """Texto limpio; conserva el 0 numérico como "0" (p. ej. estasep)."""
+    return "" if v is None else str(v).strip()
+
+
+def entero_o_none(v):
+    n = numero(v)
+    return int(n) if n is not None and n == int(n) else n
+
+
 def compactar(datos):
     dic = {k: [] for k in CAMPOS_DIC.values()}
     idx = {k: {} for k in CAMPOS_DIC.values()}
@@ -95,9 +116,22 @@ def compactar(datos):
             str(d.get("s") or "").strip().upper(),
             fecha_int(d.get("fecnac")),
             edad,
-        ] + [cod(clave, d.get(col)) for col, clave in CAMPOS_DIC.items()])
+        ] + [cod(clave, d.get(col)) for col, clave in CAMPOS_DIC.items()] + [
+            # Campos para estimar el beneficio (ver plantilla.html, función estimarBeneficio)
+            fecha_int(d.get("ingreso")),            # ing: fecha de ingreso (inicio de aportes)
+            fecha_int(d.get("fecingact")),          # fia: fecha de ingreso al régimen actual
+            numero(d.get("estacuo")),               # cuo: cuota mensual vigente (18, 12, 51.5, ...)
+            texto(d.get("tescala")),                # esc: escala vigente (4=ESCALA 2017, 3=ESCALA 98, 7=1% UIT)
+            fecha_int(d.get("anivapofc")),          # afc: fecha de cambio a 1% UIT (si aplica)
+            numero(d.get("anivapocuo")),            # acuo: cuota de la escala anterior (1% UIT)
+            texto(d.get("anivapoesc")),             # aesc: escala anterior (1% UIT)
+            entero_o_none(d.get("anivapotm")),      # atm: meses aportados calculados por AMSP
+            numero(d.get("impben")),                # imp: importe oficial del beneficio (AMSP)
+            texto(d.get("estasep")),                # sep: estado de aporte (0 / 9 ...), calibra la brecha
+        ])
     return {
-        "cols": ["cod", "nom", "dni", "s", "nac", "edadRep"] + list(CAMPOS_DIC.values()),
+        "cols": ["cod", "nom", "dni", "s", "nac", "edadRep"] + list(CAMPOS_DIC.values())
+                + ["ing", "fia", "cuo", "esc", "afc", "acuo", "aesc", "atm", "imp", "sep"],
         "dic": dic,
         "filas": filas,
     }

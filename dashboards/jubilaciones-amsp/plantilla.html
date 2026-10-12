@@ -110,6 +110,11 @@ h1 { font-size: clamp(22px, 2.6vw, 28px); line-height: 1.15; margin: 2px 0 4px; 
 .tile .label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
 .tile .valor { font-size: 30px; font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; }
 .tile .sub { font-size: 12px; color: var(--muted); }
+.tile .importe { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(127, 127, 127, 0.3); display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.tile .importe b { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.tile .importe small { font-size: 12px; color: var(--muted); }
+.tile.hero .importe b { font-size: 28px; }
+.tile.hero .importe small { color: inherit; opacity: 0.85; }
 .tile.hero { grid-column: span 2; background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .tile.hero .label, .tile.hero .sub { color: inherit; opacity: 0.85; }
 .tile.hero .valor { font-size: 56px; }
@@ -167,7 +172,7 @@ svg.chart { display: block; width: 100%; height: auto; overflow: visible; font-f
 .herr input[type="search"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 240px; max-width: 100%; }
 .check { font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
 .tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; max-height: 70vh; }
-.tabla-wrap.chica { max-height: none; margin-top: 12px; max-width: 640px; }
+.tabla-wrap.chica { max-height: none; margin-top: 12px; max-width: 960px; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td { padding: 7px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); vertical-align: top; }
 thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); color: var(--ink-2); font-weight: 600; font-size: 12px; user-select: none; }
@@ -176,6 +181,8 @@ thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); c
 th .ord { color: var(--muted); margin-left: 4px; font-size: 10px; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.mono { font-family: var(--mono); font-size: 12px; }
+td.imp { font-weight: 600; }
+td.fuente-ofi { color: var(--brand-2); font-weight: 600; }
 td.nom { white-space: normal; min-width: 220px; }
 tbody tr:last-child td { border-bottom: 0; }
 tr.prox td { background: var(--hilite); }
@@ -233,6 +240,9 @@ td.vacio { text-align: center; }
     <div class="campo"><label for="f-horizonte">Horizonte</label>
       <select id="f-horizonte"><option value="6">6 meses</option><option value="12">12 meses</option><option value="18">18 meses</option><option value="24">24 meses</option><option value="36">36 meses</option></select>
     </div>
+    <div class="campo"><label for="f-medida">Medida en gráficos</label>
+      <select id="f-medida"><option value="n">Personas</option><option value="imp">Importe a pagar (S/)</option></select>
+    </div>
     <div class="campo"><label for="f-sexo">Sexo</label>
       <select id="f-sexo"><option value="">Ambos</option><option value="F">Mujeres</option><option value="M">Hombres</option></select>
     </div>
@@ -243,24 +253,30 @@ td.vacio { text-align: center; }
   </section>
 
   <section class="kpis" aria-label="Indicadores">
-    <div class="tile hero"><div class="label" id="k-prox-label"></div><div class="valor" id="k-prox"></div><div class="sub" id="k-prox-sub"></div></div>
-    <div class="tile"><div class="label" id="k-este-label"></div><div class="valor" id="k-este"></div><div class="sub" id="k-este-sub"></div></div>
-    <div class="tile"><div class="label" id="k-hor-label"></div><div class="valor" id="k-hor"></div><div class="sub" id="k-hor-sub"></div></div>
-    <div class="tile"><div class="label" id="k-ya-label"></div><div class="valor" id="k-ya"></div><div class="sub" id="k-ya-sub"></div></div>
-    <div class="tile"><div class="label">Asociados en el padrón (filtro actual)</div><div class="valor" id="k-total"></div><div class="sub" id="k-total-sub"></div></div>
+    <div class="tile hero"><div class="label" id="k-prox-label"></div><div class="valor" id="k-prox"></div><div class="sub" id="k-prox-sub"></div>
+      <div class="importe"><b id="k-prox-imp"></b><small id="k-prox-imp-sub"></small></div></div>
+    <div class="tile"><div class="label" id="k-este-label"></div><div class="valor" id="k-este"></div><div class="sub" id="k-este-sub"></div>
+      <div class="importe"><b id="k-este-imp"></b><small id="k-este-imp-sub"></small></div></div>
+    <div class="tile"><div class="label" id="k-hor-label"></div><div class="valor" id="k-hor"></div><div class="sub" id="k-hor-sub"></div>
+      <div class="importe"><b id="k-hor-imp"></b><small id="k-hor-imp-sub"></small></div></div>
+    <div class="tile"><div class="label" id="k-ya-label"></div><div class="valor" id="k-ya"></div><div class="sub" id="k-ya-sub"></div>
+      <div class="importe"><b id="k-ya-imp"></b><small id="k-ya-imp-sub"></small></div></div>
+    <div class="tile"><div class="label">Asociados en el padrón (filtro actual)</div><div class="valor" id="k-total"></div><div class="sub" id="k-total-sub"></div>
+      <div class="importe"><b id="k-total-imp"></b><small id="k-total-imp-sub"></small></div></div>
   </section>
   <p class="verif" id="verif"><span class="verif-icon" aria-hidden="true"></span><span id="verif-texto"></span><button class="btn chico" id="verif-ver" type="button">Ver en la tabla</button></p>
+  <p class="verif" id="verif-ben"><span class="verif-icon" aria-hidden="true"></span><span id="verif-ben-texto"></span></p>
 
   <section class="graficos">
     <article class="card ancho">
       <header>
-        <div><h2>Cumplen la edad de jubilación por mes</h2><p class="desc" id="g-meses-desc"></p></div>
+        <div><h2 id="g-meses-titulo">Cumplen la edad de jubilación por mes</h2><p class="desc" id="g-meses-desc"></p></div>
         <div class="leyenda"><span><i class="serie-f"></i>Mujeres</span><span><i class="serie-m"></i>Hombres</span>
           <button class="btn chico" id="btn-tabla-meses" type="button" aria-expanded="false" aria-controls="t-meses-wrap">Ver tabla</button></div>
       </header>
       <div id="g-meses" class="g"></div>
       <div id="t-meses-wrap" class="tabla-wrap chica" hidden>
-        <table id="t-meses"><thead><tr><th>Mes</th><th class="num">Mujeres</th><th class="num">Hombres</th><th class="num">Total</th><th class="num">Acumulado</th></tr></thead><tbody></tbody><tfoot></tfoot></table>
+        <table id="t-meses"><thead><tr><th>Mes</th><th class="num">Mujeres</th><th class="num">Hombres</th><th class="num">Total</th><th class="num">Acumulado</th><th class="num">S/ mujeres</th><th class="num">S/ hombres</th><th class="num">S/ total</th><th class="num">S/ acumulado</th></tr></thead><tbody></tbody><tfoot></tfoot></table>
       </div>
     </article>
     <article class="card">
@@ -269,7 +285,7 @@ td.vacio { text-align: center; }
     </article>
     <article class="card">
       <header>
-        <div><h2>Por departamento</h2><p class="desc" id="g-depa-desc"></p></div>
+        <div><h2 id="g-depa-titulo">Por departamento</h2><p class="desc" id="g-depa-desc"></p></div>
         <div class="leyenda"><span><i class="serie-f"></i>Mujeres</span><span><i class="serie-m"></i>Hombres</span></div>
       </header>
       <div id="g-depa" class="g"></div>
@@ -307,6 +323,7 @@ td.vacio { text-align: center; }
   <footer class="metodo">
     <p><strong>Método.</strong> Edad = años cumplidos entre FECNAC y la fecha de corte. Fecha en que cumple la edad de jubilación = FECNAC + 65 años (mujeres) o + 70 años (hombres); los nacidos el 29 de febrero cumplen el 28 en años no bisiestos. "Próximo mes" es el mes calendario siguiente al de la fecha de corte; "ya tienen la edad" son quienes la cumplieron en o antes de esa fecha.</p>
     <p>El reporte AMSP clasifica a sus asociados con 70 años para ambos sexos (columna "Clasif. AMSP"). Aquí se aplica el criterio 65 / 70 y puede ajustarse en los filtros. El dashboard no envía datos a ningún servidor: todo se calcula en este navegador.</p>
+    <p><strong>Importe a pagar.</strong> Cuando el reporte ya trae el importe calculado por AMSP (columna <em>impben</em>, asociados en edad de jubilación según su criterio de 70 años) se usa ese valor ("Oficial AMSP"). Para el resto se estima con la escala de beneficios reconstruida a partir de esos importes oficiales: una tabla por años completos de aporte y escala (ESCALA 2017 con cuota S/ 18 llega a S/ 8,040 con 45 años; con cuota S/ 12, a S/ 5,225 con 41 años; ESCALA 98 tope S/ 6,000 con 30 años). Los asociados que pasaron a 1% UIT reciben la tabla completa de su escala anterior si no tienen fecha de cambio registrada; con fecha de cambio, 25 % de esa tabla más la devolución de sus cuotas 1% UIT (solo la devolución si llevan menos de 18 meses); los nuevos asociados 1% UIT, la devolución de sus cuotas. Los años de aporte se estiman desde la fecha de ingreso hasta la fecha de jubilación indicada, descontando la brecha mediana observada (meses no aportados) según estado de aporte y cohorte de ingreso; el importe exacto depende de los meses realmente aportados, que el reporte no trae para los activos. Pase el cursor sobre el importe en la tabla para ver la regla aplicada.</p>
   </footer>
 </div>
 <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
@@ -320,7 +337,9 @@ const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const fmt = new Intl.NumberFormat('es-PE');
+const fmtSol = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 0 });
 const num = v => fmt.format(v);
+const sol = v => v == null ? '—' : 'S/ ' + fmtSol.format(Math.round(v));
 const pct = (a, b) => b ? (100 * a / b).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' %' : '—';
 const pad = x => String(x).padStart(2, '0');
 const r2 = v => Math.round(v * 100) / 100;
@@ -346,18 +365,91 @@ function sumarAnios(nac, n) {
   const ultimo = new Date(y, m + 1, 0).getDate();
   return new Date(y, m, Math.min(nac.getDate(), ultimo));
 }
+function mesesEntre(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); }
 function isoDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function parseIso(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
 function compacto(t) { return t >= 1000 ? (t / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' K' : num(t); }
+function compactoSol(t) { return t >= 1e6 ? (t / 1e6).toLocaleString('es-PE', { maximumFractionDigits: 2 }) + ' M' : t >= 1000 ? Math.round(t / 1000).toLocaleString('es-PE') + ' K' : fmtSol.format(t); }
 function pasoLimpio(x) { const p = Math.pow(10, Math.floor(Math.log10(Math.max(1, x)))); const r = x / p; return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p; }
 function ticksLimpios(max, n) { const paso = pasoLimpio(max / n); const out = []; for (let v = 0; v < max; v += paso) out.push(v); out.push(out.length ? out[out.length - 1] + paso : paso); return out; }
 
+// ---------- beneficio: tablas reconstruidas de los importes oficiales del reporte ----------
+// Importe (S/) por años completos de aporte. Los años no observados se interpolan; por encima del último se aplica el tope.
+const TABLA_BENEFICIO = {
+  '4|18': { 2: 110, 5: 550, 6: 660, 7: 770, 8: 880, 9: 990, 10: 1100, 12: 1540, 13: 1760, 14: 1980, 15: 2200, 16: 2420, 17: 2640, 18: 2860, 19: 3080, 20: 3300, 21: 3520, 22: 3740, 23: 4010, 24: 4290, 25: 4570, 26: 4860, 27: 5190, 28: 5520, 29: 5850, 30: 6180, 31: 6260, 32: 6340, 33: 6440, 34: 6540, 35: 6650, 36: 6760, 37: 6890, 38: 7020, 39: 7150, 40: 7280, 41: 7420, 42: 7560, 43: 7720, 44: 7880, 45: 8040 },
+  '4|12': { 11: 905, 16: 1655, 17: 1805, 20: 2255, 21: 2405, 22: 2555, 23: 2755, 24: 2965, 25: 3175, 26: 3395, 27: 3635, 28: 3875, 29: 4115, 30: 4355, 31: 4410, 32: 4465, 33: 4535, 34: 4605, 35: 4685, 36: 4765, 37: 4855, 40: 5125, 41: 5225 },
+  '3': { 1: 100, 8: 800, 14: 1800, 15: 2000, 16: 2200, 20: 3000, 24: 3800, 25: 4000, 26: 4400, 27: 4800, 28: 5200, 29: 5600, 30: 6000 },
+};
+const NOMBRE_ESCALA = { '4': 'ESCALA 2017', '3': 'ESCALA 98', '2': 'ESCALA (cuota 8.4)', '7': '1% UIT' };
+function tablaBeneficio(esc, cuo, anios) {
+  let T;
+  if (esc === '4') T = TABLA_BENEFICIO[Number(cuo) === 12 ? '4|12' : '4|18'];
+  else if (esc === '3') T = TABLA_BENEFICIO['3'];
+  else if (esc === '2') return 70 * Math.min(Math.max(anios, 0), 30);
+  else return null;
+  if (anios <= 0) return 0;
+  if (T[anios] != null) return T[anios];
+  const ks = Object.keys(T).map(Number).sort((a, b) => a - b);
+  if (anios > ks[ks.length - 1]) return T[ks[ks.length - 1]];
+  const lo = ks.filter(k => k < anios).pop(), hi = ks.find(k => k > anios);
+  if (lo == null) return Math.round(T[hi] * anios / hi);
+  return Math.round(T[lo] + (T[hi] - T[lo]) * (anios - lo) / (hi - lo));
+}
+// Brecha (meses) entre el calendario desde la fecha de ingreso y los meses realmente aportados: medianas
+// observadas en los 1,425 casos con importe oficial, por estado de aporte (estasep) y cohorte de ingreso.
+const BRECHA = { '0|lote84': 86, '0|<=1984': 77, '0|1985-89': 74, '0|1990-94': 53, '0|1995-99': 65, '0|2000-09': 14, '0|2010+': 6, '9|lote84': 20, '9|<=1984': 12, '9|1985-89': 17, '9|1990-94': 16, '9|1995-99': 25 };
+const BRECHA_SEP = { '0': 73, '9': 16, '3': 31, '22': 64 };
+const BRECHA_COH = { 'lote84': 42, '<=1984': 30, '1985-89': 27, '1990-94': 27, '1995-99': 38, '2000-09': 14, '2010+': 6 };
+function cohorte(ing) {
+  const y = ing.getFullYear();
+  if (y === 1984 && ing.getMonth() === 5 && ing.getDate() === 1) return 'lote84';
+  return y <= 1984 ? '<=1984' : y <= 1989 ? '1985-89' : y <= 1994 ? '1990-94' : y <= 1999 ? '1995-99' : y <= 2009 ? '2000-09' : '2010+';
+}
+function brecha(r) {
+  const c = cohorte(r.ingD), k = `${r.sep}|${c}`;
+  if (BRECHA[k] != null) return BRECHA[k];
+  return Math.min(BRECHA_SEP[r.sep] != null ? BRECHA_SEP[r.sep] : 33, BRECHA_COH[c] != null ? BRECHA_COH[c] : 33);
+}
+function baseTexto(r) {
+  if (r.esc === '7' && r.aesc && r.aesc !== '7') return `1% UIT (antes ${NOMBRE_ESCALA[r.aesc] || 'escala ' + r.aesc} · S/ ${r.acuo || r.cuo})`;
+  return `${NOMBRE_ESCALA[r.esc] || 'Escala ' + (r.esc || '?')} · S/ ${r.cuo == null ? '?' : r.cuo}`;
+}
+// Devuelve { imp, fuente: 'oficial'|'estimado'|'sin datos', anios, base, regla }.
+function estimarBeneficio(r, fjub, forzarEstimacion) {
+  const base = baseTexto(r);
+  if (!forzarEstimacion && r.impOficial > 0) return { imp: r.impOficial, fuente: 'oficial', anios: r.atm ? Math.floor(r.atm / 12) : null, base, regla: `Importe calculado por AMSP en el reporte${r.atm ? ` (${r.atm} meses aportados)` : ''}` };
+  if (!fjub || !r.ingD) return { imp: null, fuente: 'sin datos', anios: null, base, regla: 'Sin fecha de ingreso o de jubilación' };
+  const escAnt = r.aesc && r.aesc !== '7' ? r.aesc : '', cuoAnt = r.acuo || r.cuo;
+  if (r.esc === '7') {
+    const cuota = r.cuo || 55;
+    if (r.afcD) {
+      const mNuevo = Math.max(0, mesesEntre(r.afcD, fjub)), dev = Math.round(mNuevo * cuota);
+      if (escAnt) {
+        const mViejo = Math.max(0, mesesEntre(r.ingD, r.afcD) - brecha(r)), anios = Math.floor(mViejo / 12);
+        const tabla = tablaBeneficio(escAnt, cuoAnt, anios) || 0, conBase = mNuevo >= 18;
+        return { imp: (conBase ? Math.round(0.25 * tabla) : 0) + dev, fuente: 'estimado', anios, base,
+          regla: conBase ? `25 % de ${NOMBRE_ESCALA[escAnt]} con ${anios} años (S/ ${fmtSol.format(tabla)}) + devolución de ${mNuevo} cuotas 1% UIT (S/ ${fmtSol.format(dev)})` : `Devolución de ${mNuevo} cuotas 1% UIT; con menos de 18 meses en 1% UIT no se añade base de la escala anterior` };
+      }
+      return { imp: dev, fuente: 'estimado', anios: Math.floor(mNuevo / 12), base, regla: `Devolución de ${mNuevo} cuotas 1% UIT de S/ ${cuota}` };
+    }
+    if (escAnt) {
+      const m = Math.max(0, mesesEntre(r.ingD, fjub) - brecha(r)), anios = Math.floor(m / 12);
+      return { imp: tablaBeneficio(escAnt, cuoAnt, anios), fuente: 'estimado', anios, base, regla: `Tabla ${NOMBRE_ESCALA[escAnt]} completa con ${anios} años de aporte estimados (sin fecha de cambio a 1% UIT; brecha ${brecha(r)} meses)` };
+    }
+    const desde = r.fiaD || r.ingD, mNuevo = Math.max(0, mesesEntre(desde, fjub));
+    return { imp: Math.round(mNuevo * cuota), fuente: 'estimado', anios: Math.floor(mNuevo / 12), base, regla: `Devolución de ${mNuevo} cuotas 1% UIT de S/ ${cuota} desde ${fmtFecha(desde)}` };
+  }
+  const m = Math.max(0, mesesEntre(r.ingD, fjub) - brecha(r)), anios = Math.floor(m / 12);
+  const imp = tablaBeneficio(r.esc, r.cuo, anios);
+  return { imp, fuente: imp == null ? 'sin datos' : 'estimado', anios, base, regla: imp == null ? `Escala ${r.esc || '?'} sin tabla conocida` : `Tabla ${NOMBRE_ESCALA[r.esc]} cuota S/ ${r.cuo} con ${anios} años de aporte estimados (ingreso ${fmtFecha(r.ingD)}, brecha ${brecha(r)} meses)` };
+}
+
 // ---------- estado ----------
 const estado = {
-  corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12,
+  corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12, medida: 'n',
   tab: 'prox', buscar: '', soloDif: false, orden: { col: 'fjub', dir: 1 }, pagina: 1, porPagina: 50, verTablaMeses: false,
 };
-let BASE = null, REG = [], VIS = [], AGG = null;
+let BASE = null, REG = [], VIS = [], AGG = null, CAL = null;
 
 // ---------- helpers DOM ----------
 function el(tag, attrs, ...hijos) {
@@ -423,12 +515,18 @@ function cargarBase(datos) {
   BASE = datos;
   const ix = Object.fromEntries(datos.cols.map((c, i) => [c, i]));
   const dic = datos.dic;
+  const fechaCol = (f, k) => ix[k] != null && f[ix[k]] ? fechaDesdeInt(f[ix[k]]) : null;
+  const numCol = (f, k) => ix[k] != null && f[ix[k]] != null && f[ix[k]] !== '' ? Number(f[ix[k]]) : null;
+  const txtCol = (f, k) => ix[k] != null && f[ix[k]] != null ? String(f[ix[k]]).trim() : '';
   REG = datos.filas.map(f => ({
     cod: f[ix.cod] || '', nom: f[ix.nom] || '', dni: f[ix.dni] || '',
     s: f[ix.s] === 'F' ? 'F' : f[ix.s] === 'M' ? 'M' : '',
     nac: f[ix.nac] ? fechaDesdeInt(f[ix.nac]) : null, edadRep: f[ix.edadRep] == null ? null : f[ix.edadRep],
     depa: dic.depa[f[ix.depa]] || '', eje: dic.eje[f[ix.eje]] || '', fnd: dic.fnd[f[ix.fnd]] || '',
     sta: dic.sta[f[ix.sta]] || '', ann: dic.ann[f[ix.ann]] || '',
+    ingD: fechaCol(f, 'ing'), fiaD: fechaCol(f, 'fia'), cuo: numCol(f, 'cuo'), esc: txtCol(f, 'esc'),
+    afcD: fechaCol(f, 'afc'), acuo: numCol(f, 'acuo'), aesc: txtCol(f, 'aesc'), atm: numCol(f, 'atm'),
+    impOficial: numCol(f, 'imp') || 0, sep: txtCol(f, 'sep'),
   }));
   setT('#fuente', datos.fuente || `${datos.entidad || 'Padrón'}`);
   setT('#archivo', datos.archivo ? `Archivo: ${datos.archivo}` : '');
@@ -436,6 +534,7 @@ function cargarBase(datos) {
   poblarSelect($('#f-fnd'), dic.fnd, 'Todas las escalas');
   poblarSelect($('#f-sta'), dic.sta, 'Todos los estados');
   estado.depa = estado.fnd = estado.sta = ''; estado.pagina = 1;
+  CAL = calibrar();
   recalcular();
 }
 function poblarSelect(sel, valores, todos, fmtEtq) {
@@ -444,46 +543,70 @@ function poblarSelect(sel, valores, todos, fmtEtq) {
   [...valores].sort((a, b) => a.localeCompare(b, 'es')).forEach(v => sel.append(el('option', { value: v, text: fmtEtq ? fmtEtq(v) : v })));
   sel.value = '';
 }
+// Calibración: en los asociados con importe oficial, ¿qué tan bien lo reproduce el estimador (a los 70 años, criterio AMSP)?
+function calibrar() {
+  const errs = []; let n = 0, ok = 0, cerca = 0, te = 0, to = 0;
+  for (const r of REG) {
+    if (!(r.impOficial > 0) || !r.nac) continue;
+    const e = estimarBeneficio(r, sumarAnios(r.nac, 70), true);
+    if (e.imp == null) continue;
+    n++; te += e.imp; to += r.impOficial;
+    const d = Math.abs(e.imp - r.impOficial); errs.push(d); if (d === 0) ok++; if (d <= 350) cerca++;
+  }
+  errs.sort((a, b) => a - b);
+  return { n, ok, cerca, mediana: n ? errs[Math.floor(n / 2)] : 0, te, to, oficiales: REG.filter(r => r.impOficial > 0).length };
+}
 
 function recalcular() {
   const corte = estado.corte;
   const mesCorte = corte.getFullYear() * 12 + corte.getMonth();
   for (const r of REG) {
     r.edadJub = r.s === 'F' ? estado.edadF : r.s === 'M' ? estado.edadM : null;
-    if (!r.nac || r.edadJub == null) { r.edad = null; r.fjub = null; r.mesJub = null; r.rel = null; r.cat = 'sin'; r.dif = false; continue; }
+    if (!r.nac || r.edadJub == null) {
+      r.edad = null; r.fjub = null; r.mesJub = null; r.rel = null; r.cat = 'sin'; r.dif = false;
+      const b = estimarBeneficio(r, null); r.imp = b.imp; r.fuente = b.fuente; r.anios = b.anios; r.base = b.base; r.regla = b.regla;
+      continue;
+    }
     r.edad = edadEn(r.nac, corte);
     r.fjub = sumarAnios(r.nac, r.edadJub);
     r.mesJub = r.fjub.getFullYear() * 12 + r.fjub.getMonth();
     r.rel = r.mesJub - mesCorte;
     r.cat = r.fjub <= corte ? 'ya' : r.rel === 0 ? 'esteMes' : 'futuro';
     r.dif = r.edadRep != null && r.edadRep !== r.edad;
+    const b = estimarBeneficio(r, r.fjub); r.imp = b.imp; r.fuente = b.fuente; r.anios = b.anios; r.base = b.base; r.regla = b.regla;
   }
   VIS = REG.filter(r => (!estado.sexo || r.s === estado.sexo) && (!estado.depa || r.depa === estado.depa) && (!estado.fnd || r.fnd === estado.fnd) && (!estado.sta || r.sta === estado.sta));
   agregar(mesCorte);
   renderTodo();
 }
 
+function grupo(extra) { return Object.assign({ n: 0, F: 0, M: 0, imp: 0, impF: 0, impM: 0, ofi: 0, sinImp: 0 }, extra || {}); }
+function sumar(g, r) {
+  g.n++; if (r.s) g[r.s]++;
+  if (r.imp != null) { g.imp += r.imp; if (r.s) g['imp' + r.s] += r.imp; if (r.fuente === 'oficial') g.ofi += r.imp; }
+  else g.sinImp++;
+}
 function agregar(mesCorte) {
   const H = estado.horizonte;
   const A = {
-    total: VIS.length, F: 0, M: 0, sin: 0, dif: 0, mesCorte,
-    ya: { n: 0, F: 0, M: 0 }, esteMes: { n: 0, F: 0, M: 0 }, prox: { n: 0, F: 0, M: 0 }, hor: { n: 0, F: 0, M: 0 },
-    porMes: Array.from({ length: H }, (_, i) => ({ idx: mesCorte + 1 + i, F: 0, M: 0, n: 0 })),
+    total: VIS.length, F: 0, M: 0, sin: 0, dif: 0, mesCorte, ofiTotal: 0, ofiN: 0,
+    ya: grupo(), esteMes: grupo(), prox: grupo(), hor: grupo(),
+    porMes: Array.from({ length: H }, (_, i) => grupo({ idx: mesCorte + 1 + i })),
     porEdad: { F: new Map(), M: new Map() }, porDepa: new Map(),
   };
   for (const r of VIS) {
     if (r.s) A[r.s]++;
+    if (r.impOficial > 0) { A.ofiTotal += r.impOficial; A.ofiN++; }
     if (r.cat === 'sin') { A.sin++; continue; }
     if (r.dif) A.dif++;
     const e = A.porEdad[r.s]; e.set(r.edad, (e.get(r.edad) || 0) + 1);
-    if (r.cat === 'ya') { A.ya.n++; A.ya[r.s]++; }
-    else if (r.cat === 'esteMes') { A.esteMes.n++; A.esteMes[r.s]++; }
+    if (r.cat === 'ya') sumar(A.ya, r);
+    else if (r.cat === 'esteMes') sumar(A.esteMes, r);
     else {
-      if (r.rel === 1) { A.prox.n++; A.prox[r.s]++; }
+      if (r.rel === 1) sumar(A.prox, r);
       if (r.rel >= 1 && r.rel <= H) {
-        A.hor.n++; A.hor[r.s]++;
-        const pm = A.porMes[r.rel - 1]; pm[r.s]++; pm.n++;
-        const d = A.porDepa.get(r.depa) || { F: 0, M: 0, n: 0 }; d[r.s]++; d.n++; A.porDepa.set(r.depa, d);
+        sumar(A.hor, r); sumar(A.porMes[r.rel - 1], r);
+        let d = A.porDepa.get(r.depa); if (!d) { d = grupo(); A.porDepa.set(r.depa, d); } sumar(d, r);
       }
     }
   }
@@ -493,29 +616,50 @@ function agregar(mesCorte) {
 // ---------- render ----------
 function renderTodo() { renderKpis(); renderGraficos(); renderTablaMeses(); renderTabla(); }
 function renderGraficos() { if (!AGG) return; renderGraficoMeses(); renderGraficoEdad(); renderGraficoDepa(); }
+const esImp = () => estado.medida === 'imp';
 
+function importeSub(g) {
+  const partes = [`${sol(g.impF)} mujeres`, `${sol(g.impM)} hombres`];
+  if (g.ofi) partes.push(`${sol(g.ofi)} ya calculado por AMSP`);
+  if (g.sinImp) partes.push(`${num(g.sinImp)} sin datos para estimar`);
+  return partes.join(' · ');
+}
 function renderKpis() {
   const A = AGG, c = estado.corte, H = estado.horizonte;
   setT('#k-prox-label', `Cumplen la edad de jubilación en ${mesLargo(A.mesCorte + 1)}`);
   setT('#k-prox', num(A.prox.n));
   setT('#k-prox-sub', `${num(A.prox.F)} mujeres (${estado.edadF} años) · ${num(A.prox.M)} hombres (${estado.edadM} años)`);
+  setT('#k-prox-imp', sol(A.prox.imp)); setT('#k-prox-imp-sub', `a pagar en beneficios · ${importeSub(A.prox)}`);
   setT('#k-este-label', `Resto de ${mesLargo(A.mesCorte)} (después del ${fmtFecha(c)})`);
   setT('#k-este', num(A.esteMes.n)); setT('#k-este-sub', `${num(A.esteMes.F)} mujeres · ${num(A.esteMes.M)} hombres`);
+  setT('#k-este-imp', sol(A.esteMes.imp)); setT('#k-este-imp-sub', 'a pagar');
   setT('#k-hor-label', `Próximos ${H} meses (${mesCorto(A.mesCorte + 1)} – ${mesCorto(A.mesCorte + H)})`);
   setT('#k-hor', num(A.hor.n));
   setT('#k-hor-sub', `${num(A.hor.F)} mujeres · ${num(A.hor.M)} hombres · promedio ${num(Math.round(A.hor.n / H))} por mes`);
+  setT('#k-hor-imp', sol(A.hor.imp)); setT('#k-hor-imp-sub', `a pagar · promedio ${sol(A.hor.imp / H)} por mes`);
   setT('#k-ya-label', `Ya tienen la edad de jubilación al ${fmtFecha(c)}`);
   setT('#k-ya', num(A.ya.n)); setT('#k-ya-sub', `${num(A.ya.F)} mujeres · ${num(A.ya.M)} hombres · ${pct(A.ya.n, A.total)} del padrón filtrado`);
+  setT('#k-ya-imp', sol(A.ya.imp)); setT('#k-ya-imp-sub', A.ya.ofi ? `a pagar · ${sol(A.ya.ofi)} ya calculado por AMSP` : 'a pagar');
   setT('#k-total', num(A.total));
   setT('#k-total-sub', `${num(A.F)} mujeres · ${num(A.M)} hombres${A.sin ? ` · ${num(A.sin)} sin fecha de nacimiento` : ''}`);
+  setT('#k-total-imp', sol(A.ofiTotal)); setT('#k-total-imp-sub', `importe oficial ya calculado por AMSP (${num(A.ofiN)} asociados en edad de jubilación según su criterio de 70 años)`);
   const verif = $('#verif'); verif.className = 'verif ' + (A.dif ? 'warn' : 'ok');
   $('.verif-icon', verif).textContent = A.dif ? '!' : '✓';
   setT('#verif-texto', A.dif
     ? `Verificación con FECNAC: ${num(A.dif)} asociados tienen una edad recalculada al ${fmtFecha(c)} distinta a la columna "edad" del reporte (el reporte la calcula a su fecha de emisión).`
     : `Verificación con FECNAC: la columna "edad" del reporte coincide con la edad recalculada al ${fmtFecha(c)} en todos los asociados.`);
   $('#verif-ver').hidden = !A.dif;
-  setT('#g-meses-desc', `Asociados que cumplen ${estado.edadF} años (mujeres) o ${estado.edadM} años (hombres) entre ${mesCorto(A.mesCorte + 1)} y ${mesCorto(A.mesCorte + H)}. El mes resaltado es el próximo.`);
-  setT('#g-depa-desc', `Mismo horizonte de ${H} meses. Se muestran los 12 departamentos con más casos; el resto se agrupa en "Otros".`);
+  const vb = $('#verif-ben');
+  if (CAL && CAL.n) {
+    const desv = CAL.te / CAL.to - 1;
+    vb.className = 'verif ' + (Math.abs(desv) <= 0.15 ? 'ok' : 'warn');
+    $('.verif-icon', vb).textContent = Math.abs(desv) <= 0.15 ? '✓' : '!';
+    setT('#verif-ben-texto', `Calibración del estimador de importes: en los ${num(CAL.n)} asociados con importe oficial AMSP, el estimador (recalculado a los 70 años) da ${sol(CAL.te)} frente a ${sol(CAL.to)} oficial (${(100 * desv).toLocaleString('es-PE', { maximumFractionDigits: 1, signDisplay: 'always' })} %); por persona, la mitad de los casos difiere menos de ${sol(CAL.mediana)} y el ${pct(CAL.cerca, CAL.n)} difiere menos de S/ 350.`);
+  } else { vb.className = 'verif warn'; $('.verif-icon', vb).textContent = '!'; setT('#verif-ben-texto', 'El archivo cargado no trae importes oficiales (impben); todos los importes son estimados.'); }
+  setT('#g-meses-titulo', esImp() ? 'Importe a pagar por mes (S/)' : 'Cumplen la edad de jubilación por mes');
+  setT('#g-meses-desc', `${esImp() ? 'Importe estimado de los beneficios de quienes cumplen' : 'Asociados que cumplen'} ${estado.edadF} años (mujeres) o ${estado.edadM} años (hombres) entre ${mesCorto(A.mesCorte + 1)} y ${mesCorto(A.mesCorte + H)}. El mes resaltado es el próximo.`);
+  setT('#g-depa-titulo', esImp() ? 'Importe a pagar por departamento (S/)' : 'Por departamento');
+  setT('#g-depa-desc', `Mismo horizonte de ${H} meses. Se muestran los 12 departamentos con más ${esImp() ? 'importe' : 'casos'}; el resto se agrupa en "Otros".`);
 }
 
 function barra(x, y, w, h, cls, redondaTop) {
@@ -528,41 +672,47 @@ function barraH(x, y, w, h, cls, redondaFin) {
   const r = Math.min(4, h / 2, w);
   return svg('path', { d: `M${r2(x)},${r2(y)} H${r2(x + w - r)} Q${r2(x + w)},${r2(y)} ${r2(x + w)},${r2(y + r)} V${r2(y + h - r)} Q${r2(x + w)},${r2(y + h)} ${r2(x + w - r)},${r2(y + h)} H${r2(x)} Z`, class: cls });
 }
+function filasTipGrupo(tituloTip, d) {
+  return [{ k: tituloTip }, { k: 'asociados', v: num(d.n) }, { k: 'importe a pagar', v: sol(d.imp) },
+    { k: 'mujeres', v: `${num(d.F)} · ${sol(d.impF)}`, color: 'var(--serie-f)' }, { k: 'hombres', v: `${num(d.M)} · ${sol(d.impM)}`, color: 'var(--serie-m)' }];
+}
 
 function renderGraficoMeses() {
   const cont = $('#g-meses'); vaciar(cont);
-  const datos = AGG.porMes, H = datos.length;
+  const datos = AGG.porMes, H = datos.length, M = esImp();
+  const v = d => M ? d.imp : d.n, vF = d => M ? d.impF : d.F, vM = d => M ? d.impM : d.M;
+  const fTick = M ? compactoSol : compacto, fEtq = M ? compactoSol : num;
   const W = Math.max(320, Math.floor(cont.clientWidth || 800));
-  const ml = 40, mr = 12, mt = 34, mb = 38, altoPlot = 230, Hh = mt + altoPlot + mb;
-  const max = Math.max(1, ...datos.map(d => d.n));
+  const ml = M ? 52 : 40, mr = 12, mt = 34, mb = 38, altoPlot = 230, Hh = mt + altoPlot + mb;
+  const max = Math.max(1, ...datos.map(v));
   const ticks = ticksLimpios(max, 4), yMax = ticks[ticks.length - 1];
   const plotW = W - ml - mr, slot = plotW / H, barW = Math.min(24, Math.max(6, slot * 0.62));
-  const y = v => mt + altoPlot - (v / yMax) * altoPlot;
+  const y = val => mt + altoPlot - (val / yMax) * altoPlot;
   const xc = i => ml + slot * (i + 0.5);
-  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': `Asociados que cumplen la edad de jubilación por mes, próximos ${H} meses` });
+  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': `${M ? 'Importe a pagar' : 'Asociados que cumplen la edad de jubilación'} por mes, próximos ${H} meses` });
   for (const t of ticks) {
     s.append(svg('line', { x1: ml, x2: W - mr, y1: r2(y(t)), y2: r2(y(t)), class: t === 0 ? 'eje' : 'grid' }));
-    s.append(svg('text', { x: ml - 6, y: r2(y(t) + 4), class: 'tick', 'text-anchor': 'end', text: compacto(t) }));
+    s.append(svg('text', { x: ml - 6, y: r2(y(t) + 4), class: 'tick', 'text-anchor': 'end', text: fTick(t) }));
   }
   s.append(svg('rect', { x: r2(xc(0) - slot / 2 + 1), y: mt - 10, width: r2(Math.max(0, slot - 2)), height: altoPlot + 10, rx: 4, class: 'banda' }));
   s.append(svg('text', { x: r2(xc(0) - slot / 2 + 2), y: mt - 18, class: 'anota', text: 'próximo mes' }));
-  const etiquetarTodo = slot >= 30;
-  const iMax = datos.reduce((b, d, i) => d.n > datos[b].n ? i : b, 0);
+  const etiquetarTodo = slot >= (M ? 44 : 30);
+  const iMax = datos.reduce((b, d, i) => v(d) > v(datos[b]) ? i : b, 0);
   const cada = slot >= 26 ? 1 : slot >= 14 ? 2 : 3;
   datos.forEach((d, i) => {
-    const cx = xc(i), x = cx - barW / 2;
-    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${mesLargo(d.idx)}: ${d.n} asociados (${d.F} mujeres, ${d.M} hombres)` });
+    const cx = xc(i), x = cx - barW / 2, tot = v(d), f = vF(d), m = vM(d);
+    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${mesLargo(d.idx)}: ${d.n} asociados, ${sol(d.imp)}` });
     g.append(svg('rect', { x: r2(cx - slot / 2), y: mt - 10, width: r2(slot), height: altoPlot + 10, class: 'hit' }));
-    if (d.F > 0) g.append(barra(x, y(d.F), barW, y(0) - y(d.F), 'serie-f', d.M === 0));
-    if (d.M > 0) g.append(barra(x, y(d.n), barW, y(d.F) - y(d.n), 'serie-m', true));
-    if (d.F > 0 && d.M > 0) g.append(svg('line', { x1: r2(x), x2: r2(x + barW), y1: r2(y(d.F)), y2: r2(y(d.F)), class: 'gap' }));
-    if (d.n > 0 && (etiquetarTodo || i === 0 || i === iMax)) g.append(svg('text', { x: r2(cx), y: r2(y(d.n) - 5), class: 'valor', 'text-anchor': 'middle', text: num(d.n) }));
-    const m = d.idx % 12, yy = Math.floor(d.idx / 12);
+    if (f > 0) g.append(barra(x, y(f), barW, y(0) - y(f), 'serie-f', m === 0));
+    if (m > 0) g.append(barra(x, y(tot), barW, y(f) - y(tot), 'serie-m', true));
+    if (f > 0 && m > 0) g.append(svg('line', { x1: r2(x), x2: r2(x + barW), y1: r2(y(f)), y2: r2(y(f)), class: 'gap' }));
+    if (tot > 0 && (etiquetarTodo || i === 0 || i === iMax)) g.append(svg('text', { x: r2(cx), y: r2(y(tot) - 5), class: 'valor', 'text-anchor': 'middle', text: fEtq(tot) }));
+    const mes = d.idx % 12, yy = Math.floor(d.idx / 12);
     if (i % cada === 0) {
-      g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 15, class: 'etq', 'text-anchor': 'middle', text: MESES[m] }));
-      if (i === 0 || m === 0) g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 29, class: 'tick', 'text-anchor': 'middle', text: String(yy) }));
+      g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 15, class: 'etq', 'text-anchor': 'middle', text: MESES[mes] }));
+      if (i === 0 || mes === 0) g.append(svg('text', { x: r2(cx), y: mt + altoPlot + 29, class: 'tick', 'text-anchor': 'middle', text: String(yy) }));
     }
-    enlazarTip(g, () => [{ k: mesLargo(d.idx) }, { k: 'total', v: num(d.n) }, { k: 'mujeres', v: num(d.F), color: 'var(--serie-f)' }, { k: 'hombres', v: num(d.M), color: 'var(--serie-m)' }]);
+    enlazarTip(g, () => filasTipGrupo(mesLargo(d.idx), d));
     s.append(g);
   });
   cont.append(s);
@@ -620,41 +770,49 @@ function renderGraficoEdad() {
 
 function renderGraficoDepa() {
   const cont = $('#g-depa'); vaciar(cont);
-  const filas = [...AGG.porDepa.entries()].map(([k, v]) => ({ k, F: v.F, M: v.M, n: v.n })).sort((a, b) => b.n - a.n || a.k.localeCompare(b.k, 'es'));
+  const M = esImp(), v = d => M ? d.imp : d.n, vF = d => M ? d.impF : d.F, vM = d => M ? d.impM : d.M, fEtq = M ? compactoSol : num;
+  const filas = [...AGG.porDepa.entries()].map(([k, g]) => Object.assign({ k }, g)).sort((a, b) => v(b) - v(a) || a.k.localeCompare(b.k, 'es'));
   const TOP = 12, top = filas.slice(0, TOP), resto = filas.slice(TOP);
-  if (resto.length) top.push(resto.reduce((a, r) => ({ k: a.k, F: a.F + r.F, M: a.M + r.M, n: a.n + r.n }), { k: `Otros (${resto.length})`, F: 0, M: 0, n: 0 }));
+  if (resto.length) {
+    const o = grupo({ k: `Otros (${resto.length})` });
+    for (const r of resto) { o.n += r.n; o.F += r.F; o.M += r.M; o.imp += r.imp; o.impF += r.impF; o.impM += r.impM; o.ofi += r.ofi; o.sinImp += r.sinImp; }
+    top.push(o);
+  }
   if (!top.length) { cont.append(el('p', { class: 'vacio', text: 'Ningún asociado cumple la edad de jubilación en el horizonte seleccionado.' })); return; }
-  const W = Math.max(280, Math.floor(cont.clientWidth || 400)), ml = 118, mr = 46, mt = 6, mb = 6, fila = 26, barH = 18;
+  const W = Math.max(280, Math.floor(cont.clientWidth || 400)), ml = 118, mr = M ? 56 : 46, mt = 6, mb = 6, fila = 26, barH = 18;
   const Hh = mt + mb + fila * top.length;
-  const max = Math.max(1, ...top.map(d => d.n));
-  const x = v => ml + (v / max) * (W - ml - mr);
-  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': 'Asociados por departamento en el horizonte seleccionado' });
+  const max = Math.max(1, ...top.map(v));
+  const x = val => ml + (val / max) * (W - ml - mr);
+  const s = svg('svg', { class: 'chart', width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, role: 'group', 'aria-label': `${M ? 'Importe a pagar' : 'Asociados'} por departamento en el horizonte seleccionado` });
   s.append(svg('line', { x1: ml, x2: ml, y1: mt, y2: Hh - mb, class: 'eje' }));
   top.forEach((d, i) => {
-    const yc = mt + fila * i + fila / 2, yT = yc - barH / 2;
-    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${titulo(d.k)}: ${d.n} (${d.F} mujeres, ${d.M} hombres)` });
+    const yc = mt + fila * i + fila / 2, yT = yc - barH / 2, tot = v(d), f = vF(d), m = vM(d);
+    const g = svg('g', { class: 'marca', tabindex: 0, role: 'img', 'aria-label': `${titulo(d.k)}: ${d.n} asociados, ${sol(d.imp)}` });
     g.append(svg('rect', { x: 0, y: r2(yc - fila / 2), width: W, height: fila, class: 'hit' }));
     g.append(svg('text', { x: ml - 8, y: r2(yc + 4), class: 'etq', 'text-anchor': 'end', text: recortar(titulo(d.k), 16) }));
-    if (d.F > 0) g.append(barraH(ml, yT, x(d.F) - ml, barH, 'serie-f', d.M === 0));
-    if (d.M > 0) g.append(barraH(x(d.F), yT, x(d.n) - x(d.F), barH, 'serie-m', true));
-    if (d.F > 0 && d.M > 0) g.append(svg('line', { x1: r2(x(d.F)), x2: r2(x(d.F)), y1: r2(yT), y2: r2(yT + barH), class: 'gap' }));
-    g.append(svg('text', { x: r2(x(d.n) + 6), y: r2(yc + 4), class: 'valor', text: num(d.n) }));
-    enlazarTip(g, () => [{ k: titulo(d.k) }, { k: 'total', v: num(d.n) }, { k: 'mujeres', v: num(d.F), color: 'var(--serie-f)' }, { k: 'hombres', v: num(d.M), color: 'var(--serie-m)' }]);
+    if (f > 0) g.append(barraH(ml, yT, x(f) - ml, barH, 'serie-f', m === 0));
+    if (m > 0) g.append(barraH(x(f), yT, x(tot) - x(f), barH, 'serie-m', true));
+    if (f > 0 && m > 0) g.append(svg('line', { x1: r2(x(f)), x2: r2(x(f)), y1: r2(yT), y2: r2(yT + barH), class: 'gap' }));
+    g.append(svg('text', { x: r2(x(tot) + 6), y: r2(yc + 4), class: 'valor', text: fEtq(tot) }));
+    enlazarTip(g, () => filasTipGrupo(titulo(d.k), d));
     s.append(g);
   });
   cont.append(s);
 }
 
 function renderTablaMeses() {
-  const tb = $('#t-meses tbody'); vaciar(tb); let acum = 0;
+  const tb = $('#t-meses tbody'); vaciar(tb); let acum = 0, acumImp = 0;
   for (const d of AGG.porMes) {
-    acum += d.n;
-    tb.append(el('tr', {}, el('td', { text: mesLargo(d.idx) }), el('td', { class: 'num', text: num(d.F) }), el('td', { class: 'num', text: num(d.M) }), el('td', { class: 'num', text: num(d.n) }), el('td', { class: 'num', text: num(acum) })));
+    acum += d.n; acumImp += d.imp;
+    tb.append(el('tr', {}, el('td', { text: mesLargo(d.idx) }), el('td', { class: 'num', text: num(d.F) }), el('td', { class: 'num', text: num(d.M) }), el('td', { class: 'num', text: num(d.n) }), el('td', { class: 'num', text: num(acum) }),
+      el('td', { class: 'num', text: fmtSol.format(d.impF) }), el('td', { class: 'num', text: fmtSol.format(d.impM) }), el('td', { class: 'num', text: fmtSol.format(d.imp) }), el('td', { class: 'num', text: fmtSol.format(acumImp) })));
   }
   const tf = $('#t-meses tfoot'); vaciar(tf);
-  tf.append(el('tr', {}, el('th', { text: 'Total' }), el('th', { class: 'num', text: num(AGG.hor.F) }), el('th', { class: 'num', text: num(AGG.hor.M) }), el('th', { class: 'num', text: num(AGG.hor.n) }), el('th', {})));
+  tf.append(el('tr', {}, el('th', { text: 'Total' }), el('th', { class: 'num', text: num(AGG.hor.F) }), el('th', { class: 'num', text: num(AGG.hor.M) }), el('th', { class: 'num', text: num(AGG.hor.n) }), el('th', {}),
+    el('th', { class: 'num', text: fmtSol.format(AGG.hor.impF) }), el('th', { class: 'num', text: fmtSol.format(AGG.hor.impM) }), el('th', { class: 'num', text: fmtSol.format(AGG.hor.imp) }), el('th', {})));
 }
 
+const FUENTE_TXT = { oficial: 'Oficial AMSP', estimado: 'Estimado', 'sin datos': 'Sin datos' };
 const COLS = [
   { k: 'fjub', t: 'Cumple la edad el', f: r => fmtFecha(r.fjub), cls: 'num', ord: r => r.fjub ? r.fjub.getTime() : Infinity },
   { k: 'cod', t: 'Código', f: r => r.cod, cls: 'mono' },
@@ -665,6 +823,11 @@ const COLS = [
   { k: 'edad', t: 'Edad al corte', f: r => r.edad == null ? '—' : r.edad, cls: 'num', ord: r => r.edad == null ? -1 : r.edad },
   { k: 'edadRep', t: 'Edad reporte', f: r => r.edadRep == null ? '—' : r.edadRep, cls: 'num', ord: r => r.edadRep == null ? -1 : r.edadRep },
   { k: 'edadJub', t: 'Edad jub.', f: r => r.edadJub == null ? '—' : r.edadJub, cls: 'num', ord: r => r.edadJub == null ? -1 : r.edadJub },
+  { k: 'imp', t: 'Importe a pagar S/', f: r => r.imp == null ? '—' : fmtSol.format(r.imp), csv: r => r.imp == null ? '' : r.imp, cls: 'num imp', ord: r => r.imp == null ? -1 : r.imp, title: r => r.regla },
+  { k: 'fuente', t: 'Fuente', f: r => FUENTE_TXT[r.fuente] || '—', title: r => r.regla },
+  { k: 'anios', t: 'Años aporte', f: r => r.anios == null ? '—' : r.anios, cls: 'num', ord: r => r.anios == null ? -1 : r.anios, title: r => r.regla },
+  { k: 'base', t: 'Escala base', f: r => r.base || '—' },
+  { k: 'ing', t: 'Ingreso', f: r => fmtFecha(r.ingD), cls: 'num', ord: r => r.ingD ? r.ingD.getTime() : Infinity },
   { k: 'depa', t: 'Departamento', f: r => titulo(r.depa) },
   { k: 'eje', t: 'Unidad ejecutora', f: r => r.eje },
   { k: 'fnd', t: 'Escala', f: r => r.fnd },
@@ -708,7 +871,7 @@ function renderTabla() {
   const trh = el('tr');
   for (const c of COLS) {
     const activa = estado.orden.col === c.k;
-    const th = el('th', { class: c.cls === 'num' ? 'num' : '', scope: 'col', 'aria-sort': activa ? (estado.orden.dir === 1 ? 'ascending' : 'descending') : 'none',
+    const th = el('th', { class: (c.cls || '').includes('num') ? 'num' : '', scope: 'col', 'aria-sort': activa ? (estado.orden.dir === 1 ? 'ascending' : 'descending') : 'none',
       onclick: () => { if (estado.orden.col === c.k) estado.orden.dir = -estado.orden.dir; else estado.orden = { col: c.k, dir: 1 }; renderTabla(); } });
     th.append(c.k === 'edad' ? `Edad al ${fmtFecha(estado.corte).slice(0, 5)}` : c.t);
     if (activa) th.append(el('span', { class: 'ord', 'aria-hidden': 'true', text: estado.orden.dir === 1 ? '▲' : '▼' }));
@@ -721,12 +884,16 @@ function renderTabla() {
     const tr = el('tr', { class: (estado.tab === 'hor' || estado.tab === 'todos') && r.cat === 'futuro' && r.rel === 1 ? 'prox' : '' });
     for (const c of COLS) {
       const td = el('td', { class: c.cls || '' }, c.f(r));
+      if (c.title) { const t = c.title(r); if (t) td.title = t; }
+      if (c.k === 'fuente' && r.fuente === 'oficial') td.className = 'fuente-ofi';
       if (c.k === 'edadRep' && r.dif) td.append(el('span', { class: 'badge-dif', title: 'Difiere de la edad recalculada a la fecha de corte', text: '≠' }));
       tr.append(td);
     }
     tbody.append(tr);
   }
-  setT('#pag-info', total ? `Mostrando ${num(ini + 1)}–${num(Math.min(ini + pp, total))} de ${num(total)} asociados` : 'Sin registros');
+  let totImp = 0, totOfi = 0, sinImp = 0;
+  for (const r of filas) { if (r.imp == null) sinImp++; else { totImp += r.imp; if (r.fuente === 'oficial') totOfi += r.imp; } }
+  setT('#pag-info', total ? `Mostrando ${num(ini + 1)}–${num(Math.min(ini + pp, total))} de ${num(total)} asociados · importe a pagar ${sol(totImp)}${totOfi ? ` (${sol(totOfi)} oficial AMSP)` : ''}${sinImp ? ` · ${num(sinImp)} sin datos para estimar` : ''}` : 'Sin registros');
   $('#pag-prev').disabled = estado.pagina <= 1; $('#pag-next').disabled = estado.pagina >= paginas;
   setT('#pag-num', `Página ${num(estado.pagina)} de ${num(paginas)}`);
 }
@@ -734,8 +901,9 @@ function renderTabla() {
 function exportarCsv() {
   const filas = filasTab();
   const esc = v => { const s = String(v == null ? '' : v); return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const lineas = [COLS.map(c => esc(c.k === 'edad' ? `Edad al ${fmtFecha(estado.corte)}` : c.t)).join(';')];
-  for (const r of filas) lineas.push(COLS.map(c => esc(c.f(r))).join(';'));
+  const cols = COLS.concat([{ k: 'regla', t: 'Regla del importe', f: r => r.regla || '' }]);
+  const lineas = [cols.map(c => esc(c.k === 'edad' ? `Edad al ${fmtFecha(estado.corte)}` : c.t)).join(';')];
+  for (const r of filas) lineas.push(cols.map(c => esc(c.csv ? c.csv(r) : c.f(r))).join(';'));
   const blob = new Blob(['﻿' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = el('a', { href: url, download: `jubilaciones_${estado.tab}_${isoDate(estado.corte)}.csv` });
@@ -763,6 +931,7 @@ function aFechaInt(v) {
   }
   return 0;
 }
+function aNumero(v) { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).trim()); return isNaN(n) ? null : n; }
 function parsearLibro(wb) {
   const nombres = wb.Sheets.DetMaeSituAct ? ['DetMaeSituAct', ...wb.SheetNames.filter(n => n !== 'DetMaeSituAct')] : wb.SheetNames;
   for (const nombre of nombres) {
@@ -772,7 +941,8 @@ function parsearLibro(wb) {
     if (hIdx < 0) continue;
     const hdr = low(filas[hIdx]);
     const ix = n => hdr.indexOf(n);
-    const col = { cod: ix('codsoc'), nom: ix('nombre'), dni: ix('ele'), s: ix('s'), nac: ix('fecnac'), edad: ix('edad'), depa: ix('dscdepa'), eje: ix('dsceje'), fnd: ix('dscfnd'), sta: ix('dscstaacso'), ann: ix('dscann70') };
+    const col = { cod: ix('codsoc'), nom: ix('nombre'), dni: ix('ele'), s: ix('s'), nac: ix('fecnac'), edad: ix('edad'), depa: ix('dscdepa'), eje: ix('dsceje'), fnd: ix('dscfnd'), sta: ix('dscstaacso'), ann: ix('dscann70'),
+      ing: ix('ingreso'), fia: ix('fecingact'), cuo: ix('estacuo'), esc: ix('tescala'), afc: ix('anivapofc'), acuo: ix('anivapocuo'), aesc: ix('anivapoesc'), atm: ix('anivapotm'), imp: ix('impben'), sep: ix('estasep') };
     const dic = { depa: [], eje: [], fnd: [], sta: [], ann: [] }, idx = { depa: new Map(), eje: new Map(), fnd: new Map(), sta: new Map(), ann: new Map() };
     const codigo = (k, v) => { const t = (v == null ? '' : String(v).trim()) || '(sin dato)'; if (!idx[k].has(t)) { idx[k].set(t, dic[k].length); dic[k].push(t); } return idx[k].get(t); };
     const cel = (f, i) => (i >= 0 && f[i] != null ? f[i] : '');
@@ -781,11 +951,12 @@ function parsearLibro(wb) {
       const f = filas[i]; if (!f || f.every(c => c == null || c === '')) continue;
       const edad = parseInt(cel(f, col.edad), 10);
       out.push([String(cel(f, col.cod)).trim(), String(cel(f, col.nom)).trim(), String(cel(f, col.dni)).trim(), String(cel(f, col.s)).trim().toUpperCase(), aFechaInt(cel(f, col.nac)), isNaN(edad) ? null : edad,
-        codigo('depa', cel(f, col.depa)), codigo('eje', cel(f, col.eje)), codigo('fnd', cel(f, col.fnd)), codigo('sta', cel(f, col.sta)), codigo('ann', cel(f, col.ann))]);
+        codigo('depa', cel(f, col.depa)), codigo('eje', cel(f, col.eje)), codigo('fnd', cel(f, col.fnd)), codigo('sta', cel(f, col.sta)), codigo('ann', cel(f, col.ann)),
+        aFechaInt(cel(f, col.ing)), aFechaInt(cel(f, col.fia)), aNumero(cel(f, col.cuo)), String(cel(f, col.esc)).trim(), aFechaInt(cel(f, col.afc)), aNumero(cel(f, col.acuo)), String(cel(f, col.aesc)).trim(), aNumero(cel(f, col.atm)), aNumero(cel(f, col.imp)), String(cel(f, col.sep)).trim()]);
     }
     let fuente = '';
     for (let i = 0; i < hIdx; i++) for (const c of (filas[i] || [])) if (typeof c === 'string' && /^fuente/i.test(c.trim())) fuente = c.trim();
-    return { cols: ['cod', 'nom', 'dni', 's', 'nac', 'edadRep', 'depa', 'eje', 'fnd', 'sta', 'ann'], dic, filas: out, fuente, entidad: BASE && BASE.entidad };
+    return { cols: ['cod', 'nom', 'dni', 's', 'nac', 'edadRep', 'depa', 'eje', 'fnd', 'sta', 'ann', 'ing', 'fia', 'cuo', 'esc', 'afc', 'acuo', 'aesc', 'atm', 'imp', 'sep'], dic, filas: out, fuente, entidad: BASE && BASE.entidad };
   }
   throw new Error('no se encontró una hoja con las columnas "codsoc" y "fecnac" (se esperaba la hoja DetMaeSituAct del Reporte Control Maestra Estatus).');
 }
@@ -822,11 +993,13 @@ function init() {
   for (const [id, k] of [['#f-sexo', 'sexo'], ['#f-depa', 'depa'], ['#f-fnd', 'fnd'], ['#f-sta', 'sta']]) $(id).addEventListener('change', e => { estado[k] = e.target.value; estado.pagina = 1; recalcular(); });
   $('#f-horizonte').value = String(estado.horizonte);
   $('#f-horizonte').addEventListener('change', e => { estado.horizonte = parseInt(e.target.value, 10) || 12; estado.pagina = 1; recalcular(); });
+  $('#f-medida').value = estado.medida;
+  $('#f-medida').addEventListener('change', e => { estado.medida = e.target.value === 'imp' ? 'imp' : 'n'; renderKpis(); renderGraficos(); });
   $('#f-reset').addEventListener('click', () => {
-    Object.assign(estado, { corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12, buscar: '', soloDif: false, pagina: 1 });
+    Object.assign(estado, { corte: hoy(), edadF: 65, edadM: 70, sexo: '', depa: '', fnd: '', sta: '', horizonte: 12, medida: 'n', buscar: '', soloDif: false, pagina: 1 });
     $('#f-corte').value = isoDate(estado.corte); $('#f-edadF').value = 65; $('#f-edadM').value = 70;
     for (const id of ['#f-sexo', '#f-depa', '#f-fnd', '#f-sta']) $(id).value = '';
-    $('#f-horizonte').value = '12'; $('#t-buscar').value = ''; $('#t-dif').checked = false; aviso('', '');
+    $('#f-horizonte').value = '12'; $('#f-medida').value = 'n'; $('#t-buscar').value = ''; $('#t-dif').checked = false; aviso('', '');
     recalcular();
   });
   $$('#tabs .tab').forEach(b => b.addEventListener('click', () => { estado.tab = b.dataset.tab; estado.pagina = 1; renderTabla(); }));

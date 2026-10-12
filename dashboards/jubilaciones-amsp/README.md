@@ -10,7 +10,9 @@ Perú (hoja `DetMaeSituAct`) y responde:
   por sexo y por departamento;
 - cuántos **ya** tienen la edad de jubilación a la fecha de corte;
 - verificación: edad recalculada con `fecnac` y la fecha de corte vs la
-  columna `edad` del reporte.
+  columna `edad` del reporte;
+- **cuánto se pagará**: importe del beneficio por asociado y totales por mes,
+  sexo y departamento (selector "Medida en gráficos": personas o S/).
 
 ## Archivos
 
@@ -43,6 +45,26 @@ Dos caminos, el primero no necesita nada instalado:
 - "Próximo mes" = mes calendario siguiente al de la fecha de corte.
 - El reporte AMSP clasifica con 70 años para ambos sexos (`dscann70`); el
   dashboard aplica 65/70 y la columna *Clasif. AMSP* queda como referencia.
+
+## Importe del beneficio
+
+- Si el reporte trae el importe calculado por AMSP (`impben`, asociados que ya
+  clasifica en edad de jubilación a los 70) se usa tal cual ("Oficial AMSP").
+- Para el resto se estima con la escala de beneficios reconstruida a partir de
+  esos importes oficiales (`TABLA_BENEFICIO` en `plantilla.html`): tabla por
+  años completos de aporte y escala. ESCALA 2017 cuota 18 → S/ 8,040 con 45
+  años (tope); cuota 12 → S/ 5,225 con 41 años; ESCALA 98 → tope S/ 6,000 con
+  30 años. Pasados a 1% UIT: tabla completa de la escala anterior si no hay
+  fecha de cambio (`anivapofc`); con fecha de cambio, 25 % de esa tabla +
+  devolución de cuotas 1% UIT (solo devolución con menos de 18 meses); nuevos
+  asociados 1% UIT: devolución de cuotas.
+- Años de aporte = meses desde `ingreso` hasta la fecha de jubilación menos la
+  brecha mediana observada (meses no aportados) por `estasep` y cohorte de
+  ingreso (`BRECHA*` en la plantilla, calibradas con el reporte del
+  09/10/2026). El dashboard muestra la calibración: sobre los 1,425 importes
+  oficiales el estimador da +2.5 % en total y la mitad de los casos difiere
+  menos de S/ 210.
+- Si AMSP cambia la escala, basta actualizar `TABLA_BENEFICIO`.
 
 > El HTML generado contiene datos personales del padrón (nombres, DNI, fechas
 > de nacimiento). No publicarlo en la carpeta `public/` ni en un sitio sin
