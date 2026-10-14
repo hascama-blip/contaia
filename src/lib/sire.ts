@@ -142,6 +142,9 @@ function trunc(s: string, n = 600): string {
 
 // Marcador interno: periodo terminado pero sin comprobantes (mes sin movimiento).
 const VACIO = "__VACIO__";
+// SUNAT aún está generando el reporte (ticket "En proceso") cuando se agotó el
+// tiempo de espera. No es error: el front reintenta (reusa el ticket vía 42209).
+const PENDIENTE = "__PENDIENTE__";
 
 // ---- Autenticación oficial (OAuth2 password) -------------------------------
 
@@ -267,7 +270,10 @@ async function esperarArchivo(
   descargarSiempre = false,
   // Opcional: recibe metadatos del ticket (codProceso, codTipoArchivoReporte,
   // numTicket, nº comprobantes) para la descarga (servicio 5.17 del manual).
-  outMeta?: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number }
+  outMeta?: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number },
+  // true: si al agotar el tiempo SUNAT sigue "En proceso", devuelve PENDIENTE
+  // (para que el front reintente) en vez de lanzar error.
+  permitirPendiente = false
 ): Promise<string> {
   const url = buildUrl(cfg, cfg.estadoPath, { periodo, ticket });
   // SUNAT puede tardar en generar el archivo (estado "05 = En proceso").
@@ -365,6 +371,9 @@ async function esperarArchivo(
     ok: false,
     respuesta: trunc(ultima, 2500),
   });
+  // SUNAT sigue generando el reporte. Si el llamador lo permite, devolvemos
+  // PENDIENTE (el front reintentará y reusará este ticket); si no, es error.
+  if (permitirPendiente) return PENDIENTE;
   throw new Error(
     `estado ${etiqueta}: SUNAT aún genera el reporte (En proceso). Espera unos segundos y vuelve a Consultar.`
   );
@@ -910,6 +919,8 @@ export interface SireDetalleResultado {
   periodo: string;
   ventas?: SireDetalleBloque;
   compras?: SireDetalleBloque;
+  /** SUNAT aún genera el reporte (ticket "En proceso"): reintentar en unos seg. */
+  pendiente?: boolean;
   diag?: SireDiag;
 }
 
@@ -970,8 +981,9 @@ async function exportarPropuesta(
     // vacía (cntCPInformados=0) se trata como periodo sin movimiento (no error).
     const bajarPorTicket = async (ticket: string): Promise<string> => {
       const meta: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number } = {};
-      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta, true);
       if (nombre === VACIO) return "";
+      if (nombre === PENDIENTE) return PENDIENTE; // SUNAT sigue generando → el front reintenta
       try {
         return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta, etiqueta, diag);
       } catch (e) {
@@ -1146,6 +1158,12 @@ export async function consultarDetalleSire(
     : undefined;
 
   if (params.diagnostico) return { periodo, diag };
+
+  // PENDIENTE: SUNAT sigue generando el reporte del tipo pedido → el front
+  // reintentará (al reintentar, el pedido devuelve 42209 y se reusa el ticket).
+  if ((incluirVentas && tV === PENDIENTE) || (incluirCompras && tC === PENDIENTE)) {
+    return { periodo, pendiente: true, diag };
+  }
 
   // Falla solo si TODO lo pedido falló (null). "" = sin movimiento (válido).
   const pedidos = [tV, tC].filter((_x, i) => (i === 0 ? incluirVentas : incluirCompras));

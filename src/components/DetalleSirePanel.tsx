@@ -29,26 +29,46 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
     // Con caché no hace falta la Clave SOL; sin caché (o refrescar) sí.
     const periodo = `${anio}${String(mes).padStart(2, "0")}`;
     setBusy(true);
+    // La propuesta SIRE es ASÍNCRONA: SUNAT genera el reporte en segundo plano
+    // (ticket "En proceso"). Si aún no está, el backend responde { pendiente } y
+    // acá reintentamos solo (cada intento reusa el mismo ticket vía 42209).
+    // Cada intento ya espera ~95 s en el backend (poll del ticket); con esto
+    // aguantamos hasta que SUNAT termine (en la práctica 1–3 intentos).
+    const MAX_REINTENTOS = 8;
+    const ESPERA_MS = 8000;
     try {
-      const res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-      if (res.status === 400 && !solPass && !data.desdeCache) {
-        setError("No hay datos guardados de este periodo. Carga tus accesos SOL (arriba) para extraerlo de SUNAT.");
+      for (let intento = 0; intento <= MAX_REINTENTOS; intento++) {
+        const res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+        if (res.status === 400 && !solPass && !data.desdeCache) {
+          setError("No hay datos guardados de este periodo. Carga tus accesos SOL (arriba) para extraerlo de SUNAT.");
+          return;
+        }
+        if (!res.ok) { setError(data.error ?? "No se pudo extraer el detalle."); return; }
+        // SUNAT aún genera el reporte → reintentar (reusa el ticket en curso).
+        if (data.pendiente) {
+          if (intento < MAX_REINTENTOS) {
+            setInfo(`⏳ SUNAT está generando la propuesta de ${libro}… reintentando automáticamente (${intento + 1}/${MAX_REINTENTOS}).`);
+            await new Promise((r) => setTimeout(r, ESPERA_MS));
+            continue;
+          }
+          setError("SUNAT sigue generando el reporte tras varios minutos. Su ticket ya está en curso: espera un momento y vuelve a pulsar Extraer (lo retomará).");
+          return;
+        }
+        const b = esVentas ? data.ventas : data.compras;
+        setBloque(b ?? null);
+        if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); return; }
+        const desde = data.desdeCache
+          ? ` · guardado (${new Date(data.cacheAt).toLocaleString("es-PE")}) — no se reconsultó SUNAT`
+          : " · recién extraído de SUNAT (guardado en caché)";
+        setInfo(`${b?.comprobantes ?? 0} comprobante(s) de ${libro}${desde}.`);
         return;
       }
-      if (!res.ok) { setError(data.error ?? "No se pudo extraer el detalle."); return; }
-      const b = esVentas ? data.ventas : data.compras;
-      setBloque(b ?? null);
-      if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); return; }
-      const desde = data.desdeCache
-        ? ` · guardado (${new Date(data.cacheAt).toLocaleString("es-PE")}) — no se reconsultó SUNAT`
-        : " · recién extraído de SUNAT (guardado en caché)";
-      setInfo(`${b?.comprobantes ?? 0} comprobante(s) de ${libro}${desde}.`);
     } catch {
       setError("Error de red al extraer el detalle.");
     } finally {

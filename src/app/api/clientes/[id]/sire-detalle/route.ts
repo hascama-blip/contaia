@@ -58,6 +58,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       diagnostico: body.diagnostico === true,
     });
     if (body.diagnostico) return NextResponse.json({ diag: r.diag });
+    // SUNAT aún genera el reporte: no es error ni se cachea; el front reintenta.
+    if (r.pendiente) {
+      return NextResponse.json({ periodo: r.periodo, pendiente: true });
+    }
     // Guarda en caché el bloque obtenido (para no reconsultar la próxima vez).
     const bloque = tipo === "ventas" ? r.ventas : r.compras;
     if (bloque) await setSireDetalleCache(cliente.id, tipo, periodo, bloque);
