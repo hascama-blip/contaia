@@ -966,8 +966,33 @@ async function exportarPropuesta(
     if (res.status === 429) {
       throw new Error(`${etiqueta}: SUNAT limitó las solicitudes (429 Too Many Requests). Espera 1–2 minutos y reintenta.`);
     }
+    // Baja el archivo por un ticket asíncrono (esperar → descargar). La propuesta
+    // vacía (cntCPInformados=0) se trata como periodo sin movimiento (no error).
+    const bajarPorTicket = async (ticket: string): Promise<string> => {
+      const meta: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number } = {};
+      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
+      if (nombre === VACIO) return "";
+      try {
+        return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta, etiqueta, diag);
+      } catch (e) {
+        if ((meta.comprobantes ?? 0) === 0) {
+          diag.pasos.push({ paso: `propuesta-${etiqueta}`, ok: true, respuesta: "Periodo sin comprobantes (cntCPInformados=0): no hay archivo de propuesta que descargar." });
+          return "";
+        }
+        throw e;
+      }
+    };
+
     if (!res.ok) {
       if (/1070|no se ha encontrado/i.test(txt)) return "";
+      // 42209: ya hay un proceso de "Generar archivo exportar propuesta" EN CURSO.
+      // SUNAT no deja lanzar otro y devuelve el Ticket en el mensaje → reusamos
+      // ESE ticket (esperar + descargar) en vez de fallar.
+      const mTicket = txt.match(/Ticket:\s*(\d{6,})/i);
+      if (/42209/.test(txt) && mTicket) {
+        diag.pasos.push({ paso: `propuesta-${etiqueta}`, ok: true, respuesta: `Ya había un proceso en curso; reuso el Ticket ${mTicket[1]}.` });
+        return await bajarPorTicket(mTicket[1]);
+      }
       throw new Error(`${etiqueta} (HTTP ${res.status}): ${trunc(txt, 150)}`);
     }
     // ¿Ticket asíncrono o contenido directo?
@@ -978,22 +1003,7 @@ async function exportarPropuesta(
     } catch {
       /* contenido directo */
     }
-    if (ticket) {
-      const meta: { codProceso?: string; codTipo?: string; numTicket?: string; comprobantes?: number } = {};
-      const nombre = await esperarArchivo(cfg, token, periodo, ticket, etiqueta, diag, true, meta);
-      if (nombre === VACIO) return "";
-      try {
-        return await descargarPropuesta(cfg, token, periodo, nombre, codLibro, meta, etiqueta, diag);
-      } catch (e) {
-        // La propuesta vacía (cntCPInformados=0) suele dar 500 al descargar:
-        // se trata como periodo sin movimiento, no como error.
-        if ((meta.comprobantes ?? 0) === 0) {
-          diag.pasos.push({ paso: `propuesta-${etiqueta}`, ok: true, respuesta: "Periodo sin comprobantes (cntCPInformados=0): no hay archivo de propuesta que descargar." });
-          return "";
-        }
-        throw e;
-      }
-    }
+    if (ticket) return await bajarPorTicket(ticket);
     return txt;
   } catch (err) {
     diag.pasos.push({
