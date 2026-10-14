@@ -31,6 +31,8 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [genBusy, setGenBusy] = useState(false);
   // Modo API: baja el XML por el endpoint interno de SUNAT (sin PDF, más rápido).
   const [apiMode, setApiMode] = useState(false);
+  // Modo PDF masivo: baja el PDF OFICIAL (API /01 + scraping de respaldo).
+  const [pdfMode, setPdfMode] = useState(false);
   const [diagModo, setDiagModo] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
 
@@ -176,6 +178,57 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     finally { setAuto(false); }
   }
 
+  // MODO PDF MASIVO — baja el PDF OFICIAL de toda la relación en UNA llamada
+  // (API /01 en paralelo + scraping de respaldo). Al terminar arma el ZIP de PDF.
+  async function extraerLotePdf() {
+    const solPass = getSolPass(clienteId);
+    const solUser = getSolUser(clienteId);
+    if (!solPass) { setError("Carga tu Clave SOL (arriba) para extraer."); return; }
+    setError(null); setInfo(null); setDiag(null);
+    setAuto(true);
+    setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado !== "ok") n[i] = { estado: "extrayendo" }; }); return n; });
+    try {
+      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-pdf`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solUser, solPass, relacion, periodo: periodoSire, diagnostico: diagModo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
+      if (res.status === 401) { setError(data.error ?? "Login SOL falló"); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "error", motivo: data.error }; }); return n; }); return; }
+      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas({}); return; }
+      const comps: any[] = Array.isArray(data.comprobantes) ? data.comprobantes : [];
+      if (!res.ok && !comps.length) { setError(data.error ?? "No se pudo extraer el PDF."); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "pendiente" }; }); return n; }); return; }
+      // Mapear PDFs devueltos a sus filas por serie-número.
+      const norm = (s: any, num: any) => `${String(s || "").toUpperCase()}-${String(num || "").replace(/^0+/, "")}`;
+      const mapa = new Map<string, any>();
+      for (const c of comps) { const [s, ...rest] = String(c.serieNumero || `${c.serie}-${c.numero}`).split("-"); mapa.set(norm(s, rest.join("-")), c); }
+      setFilas(() => {
+        const n: Record<number, EstadoFila> = {};
+        relacion.forEach((it, i) => {
+          const c = mapa.get(norm(it.serie, it.numero));
+          if (c) n[i] = { estado: "ok", factura: c };
+          else n[i] = { estado: "error", motivo: "SUNAT no entregó el PDF de este comprobante" };
+        });
+        return n;
+      });
+      setConsumido(true);
+      // Descarga automática del ZIP con todos los PDF extraídos.
+      if (comps.length) {
+        const files: Record<string, Uint8Array> = {};
+        const usados: Record<string, number> = {};
+        for (const c of comps) {
+          if (!c.pdfBase64) continue;
+          let base = claveDe(c);
+          if (usados[base] != null) { usados[base]++; base = `${base}_${usados[base]}`; } else usados[base] = 0;
+          files[`${base}.pdf`] = b64ToU8(c.pdfBase64);
+        }
+        if (Object.keys(files).length) bajarBlob(new Blob([zipSync(files, { level: 0 })], { type: "application/zip" }), periodoSire ? `pdf-comprobantes-${periodoSire}.zip` : "pdf-comprobantes.zip");
+      }
+      setInfo(`PDF masivo: ${comps.length}/${relacion.length} descargados${data.error ? ` · ${data.error}` : ""}.`);
+    } catch { setError("Error de red al extraer los PDF."); }
+    finally { setAuto(false); }
+  }
+
   // Extrae TODAS las pendientes, una por una con una pausa (ritmo humano).
   async function extraerTodas() {
     setAuto(true); setError(null);
@@ -295,15 +348,20 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       {/* Modo de extracción */}
       <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
         <label className="flex items-center gap-2" title="Baja el XML por el endpoint interno de SUNAT (sin PDF) — más rápido">
-          <input type="checkbox" checked={apiMode} onChange={(e) => { setApiMode(e.target.checked); setDiag(null); }} />
+          <input type="checkbox" checked={apiMode} onChange={(e) => { setApiMode(e.target.checked); if (e.target.checked) setPdfMode(false); setDiag(null); }} />
           <span>⚡ <strong>Modo API</strong> (XML, sin PDF)</span>
         </label>
-        {apiMode && (
+        <label className="flex items-center gap-2" title="Baja el PDF OFICIAL de SUNAT en masa (API /01 + scraping de respaldo)">
+          <input type="checkbox" checked={pdfMode} onChange={(e) => { setPdfMode(e.target.checked); if (e.target.checked) setApiMode(false); setDiag(null); }} />
+          <span>📄 <strong>PDF masivo</strong> (PDF oficial)</span>
+        </label>
+        {(apiMode || pdfMode) && (
           <label className="flex items-center gap-2" title="Captura las llamadas de red internas de SUNAT para identificar el endpoint">
             <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
           </label>
         )}
         {apiMode && <span className="text-slate-400">Solo XML — no descarga el PDF.</span>}
+        {pdfMode && <span className="text-slate-400">PDF oficial — rápido por API, con scraping de respaldo.</span>}
       </div>
 
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
@@ -314,7 +372,11 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         <>
           {/* Acciones globales */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            {apiMode ? (
+            {pdfMode ? (
+              <button className="btn-primary text-sm" onClick={extraerLotePdf} disabled={auto || filaBusy !== null}>
+                {auto ? "Extrayendo PDF…" : "📄 Extraer TODO en PDF (masivo)"}
+              </button>
+            ) : apiMode ? (
               <button className="btn-primary text-sm" onClick={extraerLoteApi} disabled={auto || filaBusy !== null}>
                 {auto ? "Extrayendo por API…" : "⚡ Extraer TODO por API (rápido, en paralelo)"}
               </button>
@@ -362,7 +424,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
                       <td className="px-3 py-1 text-right">
                         {e.estado === "ok" ? (
                           <span className="inline-flex gap-1">
-                            <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarXml(e.factura)}>XML</button>
+                            {!pdfMode && (
+                              <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarXml(e.factura)}>XML</button>
+                            )}
                             {!apiMode && (
                               <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
                             )}

@@ -1236,3 +1236,231 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
     if (browser) await browser.close().catch(() => {});
   }
 }
+
+// ============================================================
+//  MÓDULO PDF MASIVO — PDF oficial de SUNAT de comprobantes recibidos
+// ============================================================
+// Baja el PDF OFICIAL (la representación impresa) de cada comprobante recibido,
+// en masa. Estrategia híbrida (rápido + confiable):
+//   1) API-first: mismo endpoint interno de ConsultaCPE pero con sufijo /01
+//      (PDF) en vez de /02 (XML). Se piden EN PARALELO (como el XML) → masivo.
+//   2) Scraping de respaldo (método "de la versión anterior"): para los que el
+//      API no entregue, abre el formulario y usa el ícono PDF del modal.
+// El /01 para PDF es la hipótesis (el /02 ya confirmado = XML); si SUNAT lo
+// cambia, se calibra con el Modo diagnóstico (devuelve apiCalls) o por env
+// CPE_PDF_API_URL. La Clave SOL viaja en el body y NO se persiste.
+
+/** Endpoint interno de PDF (hipótesis: /01). Overridable por env. */
+const ENDPOINT_CPE_PDF_DEFAULT =
+  "https://api-cpe.sunat.gob.pe/v1/contribuyente/consultacpe/comprobantes/{rucEmisor}-{tipo}-{serie}-{numeroSc}-2/01";
+
+/** De la respuesta del endpoint saca el/los PDF (base64). El api-cpe devuelve
+ *  JSON { valArchivo } con un ZIP (o el PDF) en base64; también acepta ZIP/PDF
+ *  directo. Solo devuelve lo que realmente empiece con "%PDF-". */
+function pdfsDeRespuesta(
+  b64: string,
+  esZip: (b: Buffer) => boolean,
+  extraerTodo: (b: Buffer) => { name: string; data: Buffer }[],
+): { nombre: string; pdf: string }[] {
+  if (!b64) return [];
+  const esPdf = (b: Buffer) => b.length > 4 && b.slice(0, 5).toString("latin1") === "%PDF-";
+  const out: { nombre: string; pdf: string }[] = [];
+  const empujar = (nombre: string, b: Buffer) => { if (esPdf(b)) out.push({ nombre, pdf: b.toString("base64") }); };
+  const buf = Buffer.from(b64, "base64");
+  if (buf[0] === 0x7b /* '{' → JSON { valArchivo } */) {
+    try {
+      const j = JSON.parse(buf.toString("utf-8"));
+      const val = j.valArchivo || j.arch || j.archivo || j.contenido;
+      const nom = j.nomArchivo || "";
+      if (typeof val === "string" && val) {
+        const z = Buffer.from(val, "base64");
+        if (esZip(z)) for (const it of extraerTodo(z)) empujar(it.name, it.data);
+        else empujar(nom, z);
+      }
+    } catch { /* */ }
+    return out;
+  }
+  if (esZip(buf)) for (const it of extraerTodo(buf)) empujar(it.name, it.data);
+  else empujar("", buf);
+  return out;
+}
+
+/** Un comprobante con su PDF oficial (para descargar en masa). */
+export interface ComprobantePdf {
+  rucEmisor: string;
+  tipoDoc: string;
+  serie: string;
+  numero: string;
+  serieNumero: string;
+  razonSocialEmisor?: string;
+  nomArchivo?: string;
+  pdfBase64: string;
+  via: "api" | "scraping";
+}
+export interface PdfResultado {
+  comprobantes?: ComprobantePdf[];
+  descargados?: number;
+  fallidos?: { item: ItemRelacion; motivo: string }[];
+  loginError?: boolean;
+  sunatCaido?: boolean;
+  error?: string;
+  diag?: { pasos: any[]; apiCalls?: LlamadaApi[] };
+}
+
+/**
+ * Extrae el PDF oficial de SUNAT de cada comprobante de la relación. API-first
+ * (en paralelo) + scraping de respaldo. `soloScraping` fuerza el método viejo.
+ */
+export async function extraerComprobantesPdf(
+  params: ComprobantesParams & { soloScraping?: boolean },
+): Promise<PdfResultado> {
+  const pasos: any[] = [];
+  const apiCalls: LlamadaApi[] = [];
+  let browser: any = null;
+  let cerradoPorTiempo = false;
+  const tope = setTimeout(() => { cerradoPorTiempo = true; if (browser) browser.close().catch(() => {}); }, 220000);
+  try {
+    const s = await loginSol(params, pasos);
+    browser = s.browser;
+    if (s.loginError) {
+      return { loginError: true, error: "SUNAT rechazó el inicio de sesión (Usuario/Clave SOL incorrectos o bloqueo temporal). Espera ~10 min y reintenta.", diag: { pasos } };
+    }
+    grabarRedSunat(s.ctx, apiCalls);
+
+    const relacionTotal = params.relacion ?? [];
+    if (!relacionTotal.length) {
+      return { comprobantes: [], descargados: 0, error: "Sube una relación de comprobantes para descargar.", diag: { pasos } };
+    }
+
+    const { esZip, extraerTodo } = await import("./zip");
+    const TIPOS_SOPORTADOS = new Set(["01", "03", "07", "08", "14"]);
+    const comprobantes: ComprobantePdf[] = [];
+    const fallidos: { item: ItemRelacion; motivo: string }[] = [];
+    const hechos = new Set<string>();
+    const clave = (it: ItemRelacion) => `${it.serie}-${it.numero}`;
+
+    // ---- 1) API-first: PDF por /01, en paralelo ------------------------------
+    const endpointPdf = (process.env.CPE_PDF_API_URL || ENDPOINT_CPE_PDF_DEFAULT).trim();
+    if (!params.soloScraping && endpointPdf) {
+      const tokRef = { token: "" };
+      let frameRun: any = s.page;
+      capturarTokenCpe(s.ctx, tokRef);
+      await s.page.goto(APP_URL_CONSULTA, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+      for (let i = 0; i < 20 && !tokRef.token; i++) await s.page.waitForTimeout(1000).catch(() => {});
+      const fApp = frameEFactura(s.ctx);
+      if (fApp) frameRun = fApp;
+      if (!tokRef.token) tokRef.token = await tokenDesdeStorage(fApp || s.page);
+      pasos.push({ paso: "api-token", capturado: !!tokRef.token, frameApp: !!fApp });
+
+      if (tokRef.token) {
+        const headersBase = { authorization: tokRef.token, accept: "application/json, text/plain, */*" };
+        const conc = Math.max(1, Math.min(Number(process.env.CPE_XML_CONCURRENCIA || 12), 30));
+        const t0 = Date.now();
+        const reintentable = (st: number) => st <= 0 || st === 429 || st >= 500;
+        const agregar = (it: ItemRelacion, b64resp: string): boolean => {
+          const pdfs = pdfsDeRespuesta(b64resp, esZip, extraerTodo);
+          if (!pdfs.length) return false;
+          const p = pdfs[0];
+          comprobantes.push({ rucEmisor: it.rucEmisor, tipoDoc: it.tipo, serie: it.serie, numero: it.numero, serieNumero: `${it.serie}-${it.numero}`, nomArchivo: p.nombre, pdfBase64: p.pdf, via: "api" });
+          hechos.add(clave(it));
+          return true;
+        };
+        const correrPasada = async (items: ItemRelacion[], c: number, reint: number): Promise<ItemRelacion[]> => {
+          const pend: ItemRelacion[] = [];
+          const TAM = 200;
+          for (let ini = 0; ini < items.length && !cerradoPorTiempo; ini += TAM) {
+            const bloque = items.slice(ini, ini + TAM);
+            const peticiones: PeticionXml[] = bloque.map((it) => ({ url: urlComprobante(endpointPdf, params.ruc, it, params.periodo), metodo: "GET", headers: headersBase }));
+            const res = await fetchXmlLote(frameRun, peticiones, c, "omit", reint);
+            for (let j = 0; j < bloque.length; j++) {
+              const it = bloque[j];
+              const { b64, status } = res[j];
+              if (b64 && agregar(it, b64)) continue;
+              if (!b64 && reintentable(status)) pend.push(it); // 500/red → reintenta
+              // 404/sin-pdf → queda pendiente para el scraping de respaldo
+            }
+          }
+          return pend;
+        };
+        const pend1 = await correrPasada(relacionTotal, conc, 2);
+        if (pend1.length && !cerradoPorTiempo) await correrPasada(pend1, Math.min(3, conc), 3);
+        pasos.push({ paso: "api-pdf", endpoint: endpointPdf.replace(/\{[^}]+\}/g, "•"), pedidos: relacionTotal.length, ok: comprobantes.length, segundos: Math.round((Date.now() - t0) / 1000) });
+      }
+    }
+
+    // ---- 2) Scraping de respaldo (método anterior: ícono PDF del modal) ------
+    let faltantes = relacionTotal.filter((it) => !hechos.has(clave(it)));
+    if (faltantes.length && !cerradoPorTiempo) {
+      await abrirFormulario(s.page, s.ctx);
+      await cerrarAnuncios(s.ctx);
+      const MAX = 25; // tope por tanda (el navegador corta a 220s); el resto se reintenta
+      const aScrapear = faltantes.slice(0, MAX);
+      let serverSeguidos = 0;
+      for (let i = 0; i < aScrapear.length && !cerradoPorTiempo; i++) {
+        const item = aScrapear[i];
+        try {
+          if (!TIPOS_SOPORTADOS.has(item.tipo)) { fallidos.push({ item, motivo: `Tipo ${item.tipo} no se descarga en la Consulta individual de SUNAT.` }); continue; }
+          const fr = frameForm(s.ctx);
+          if (!fr) { for (let j = i; j < aScrapear.length; j++) fallidos.push({ item: aScrapear[j], motivo: "el navegador se cerró (reintentar)" }); break; }
+          let estado: "resultado" | "error" | "nada" = "nada";
+          let ultimoAviso = "";
+          for (let intento = 0; intento < 2; intento++) {
+            if (i > 0 || intento > 0) { await fr.getByText("Limpiar", { exact: false }).first().click({ timeout: 3000 }).catch(() => {}); await s.page.waitForTimeout(1200).catch(() => {}); }
+            await llenarYConsultar(fr, s.page, item);
+            const r = await esperarResultado(fr, s.page);
+            estado = r.estado;
+            if (r.aviso) ultimoAviso = r.aviso;
+            if (estado === "resultado") break;
+            await fr.getByText("Aceptar", { exact: false }).first().click({ timeout: 2000 }).catch(() => {});
+            await s.page.waitForTimeout(ES_SERVIDOR_CAIDO.test(ultimoAviso || "") ? 3000 : 1200).catch(() => {});
+          }
+          if (estado !== "resultado") {
+            if (ES_SERVIDOR_CAIDO.test(ultimoAviso)) {
+              serverSeguidos++;
+              fallidos.push({ item, motivo: "SUNAT respondió “Error del Servidor”. Reintenta en unos minutos." });
+              if (serverSeguidos >= 4) { for (let j = i + 1; j < aScrapear.length; j++) fallidos.push({ item: aScrapear[j], motivo: "SUNAT respondió “Error del Servidor” varias veces." }); break; }
+            } else {
+              serverSeguidos = 0;
+              fallidos.push({ item, motivo: estado === "error" ? "SUNAT no devolvió el comprobante (revisa RUC/tipo/serie/número o no existe)." : "no apareció el resultado (tiempo agotado)." });
+            }
+            continue;
+          }
+          serverSeguidos = 0;
+          const pdfBuf = await descargarPdfResultado(fr, s.page).catch(() => null);
+          if (pdfBuf && pdfBuf.slice(0, 5).toString("latin1") === "%PDF-") {
+            comprobantes.push({ rucEmisor: item.rucEmisor, tipoDoc: item.tipo, serie: item.serie, numero: item.numero, serieNumero: `${item.serie}-${item.numero}`, pdfBase64: pdfBuf.toString("base64"), via: "scraping" });
+            hechos.add(clave(item));
+          } else {
+            fallidos.push({ item, motivo: "salió la factura pero no se pudo bajar el PDF (revisar ícono)." });
+          }
+          await cerrarModal(fr);
+          await s.page.waitForTimeout(1000).catch(() => {});
+        } catch (e: any) {
+          fallidos.push({ item, motivo: String(e?.message ?? e).slice(0, 120) });
+        }
+      }
+      const sobran = faltantes.slice(MAX);
+      for (const it of sobran) fallidos.push({ item: it, motivo: "pendiente: el scraping va de a ~25 por tanda; reintenta esta fila." });
+      pasos.push({ paso: "scraping-pdf", intentados: aScrapear.length, ok: comprobantes.filter((c) => c.via === "scraping").length, pendientes: sobran.length });
+    }
+
+    const descargados = comprobantes.length;
+    const faltan = relacionTotal.length - descargados;
+    const viaApi = comprobantes.filter((c) => c.via === "api").length;
+    return {
+      comprobantes,
+      descargados,
+      fallidos,
+      error: descargados
+        ? (faltan > 0 ? `PDF descargados ${descargados} de ${relacionTotal.length} (${viaApi} por API, ${descargados - viaApi} por scraping). ${faltan} pendientes/no disponibles — reintenta.` : undefined)
+        : "No se descargó ningún PDF. Si el modo API no entrega PDF, revisa el Modo diagnóstico para calibrar el endpoint /01.",
+      diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
+    };
+  } catch (err: any) {
+    if (cerradoPorTiempo) return { error: "La consulta tardó demasiado y se canceló. Reintenta.", diag: { pasos } };
+    return { error: err?.message ?? "Error extrayendo los PDF.", diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined } };
+  } finally {
+    clearTimeout(tope);
+    if (browser) await browser.close().catch(() => {});
+  }
+}
