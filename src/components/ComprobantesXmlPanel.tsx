@@ -40,6 +40,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const facturasOk = () =>
     relacion.map((_, i) => filas[i]).filter((f) => f?.estado === "ok" && f.factura).map((f) => f!.factura);
   const nOk = relacion.filter((_, i) => filas[i]?.estado === "ok").length;
+  const nErr = relacion.filter((_, i) => filas[i]?.estado === "error").length;
 
   async function subirRelacion(file: File) {
     setError(null); setInfo(null); setBusyRel(true);
@@ -286,6 +287,23 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     bajarBlob(new Blob([zipped], { type: "application/zip" }), periodoSire ? `comprobantes-${periodoSire}.zip` : "comprobantes-xml.zip");
   }
 
+  // Relación (Excel, formato plantilla) de los comprobantes que NO se bajaron o
+  // no se pudieron bajar, para revisarlos o volver a subirlos y reintentar.
+  async function descargarRelacionFaltantes() {
+    const items = relacion.filter((_, i) => estadoDe(i).estado === "error");
+    if (!items.length) { setError("No hay comprobantes pendientes o con error que listar."); return; }
+    setError(null);
+    try {
+      const nombre = periodoSire ? `no-descargados-${periodoSire}` : "no-descargados";
+      const res = await fetch("/api/comprobantes-xml/relacion", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, nombre }),
+      });
+      if (!res.ok) { setError("No se pudo generar la relación de no descargados."); return; }
+      bajarBlob(await res.blob(), `${nombre}.xlsx`);
+    } catch { setError("Error de red al generar la relación."); }
+  }
+
   async function descargarExcel(resumen: boolean) {
     const fs = facturasOk();
     if (!fs.length) { setError("Aún no has extraído comprobantes."); return; }
@@ -386,6 +404,11 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
               </button>
             )}
             <span className="text-xs text-slate-500">{nOk}/{relacion.length} extraídos</span>
+            {nErr > 0 && (
+              <button className="btn-ghost text-sm" onClick={descargarRelacionFaltantes} title="Excel (formato plantilla) con los comprobantes que NO se bajaron, para revisarlos o volver a subirlos y reintentar">
+                ⬇ Relación no descargados ({nErr})
+              </button>
+            )}
             {nOk > 0 && (
               <>
                 <button className="btn-ghost text-sm" onClick={() => descargarExcel(true)} disabled={genBusy}>⬇ Excel consolidado</button>
