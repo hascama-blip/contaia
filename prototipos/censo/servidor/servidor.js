@@ -18,6 +18,7 @@
 //   GET  /api/reniec/:dni                              consulta DNI (token en el servidor)
 //   POST /api/instalacion                              primer admin (código CENSO_CODIGO_INSTALACION, solo sin usuarios)
 //   GET  /administracion · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
+//   POST /api/importar-expedientes                     ZIP con una carpeta por socio nuevo y sus documentos (admin)
 //   GET/POST /api/verificacion · POST /api/verificacion/ejecutar · POST /api/verificacion/detener   (admin: DNI automático)
 import http from "node:http";
 import crypto from "node:crypto";
@@ -31,6 +32,8 @@ import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
 import { SitioPublico, validarPublico } from "./lib/sitio.js";
 import { aplicarMigraciones } from "./lib/migraciones.js";
+import { importarExpedientes } from "./lib/expedientes.js";
+import { PLANO } from "../src/plano.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +67,7 @@ const verificacion = new Verificacion({ almacen, reniec, dir: DATOS, guardarArch
   borrarArchivo: (id) => { try { fs.unlinkSync(path.join(DATOS, "archivos", id)); } catch { /* ya no estaba */ } metaArchivos.del(id); } });
 verificacion.programar();
 const sitio = new SitioPublico({ almacen, existeArchivo: (id) => !!metaArchivos.get(id) });
+const GALERIAS = Object.fromEntries((PLANO.stands || []).map(([codigo, galeria]) => [String(codigo), galeria])); // stand → galería, para crear stands desde un expediente
 
 // ---- Avisos en vivo (SSE) ----
 const oyentes = new Set();
@@ -249,7 +253,7 @@ async function manejar(req, res) {
 
   // ---- Administración (solo admin): respaldo, importación, dominio ----
   if (ruta === "/admin.html") return redirigir(res, "/administracion");
-  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
+  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/importar-expedientes" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
     if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/portal") : json(res, 403, { error: "Solo un administrador." });
     if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
     if (ruta === "/api/exportar" && metodo === "GET") {
@@ -275,6 +279,15 @@ async function manejar(req, res) {
       for (const col of COLECCIONES) almacen.establecerVarios(col, porCol[col].map((d) => [d.id, d.data]));
       almacen.vaciar();
       return json(res, 200, { modo, importado: conteo });
+    }
+    if (ruta === "/api/importar-expedientes" && metodo === "POST") {
+      // Expedientes de socios nuevos: un ZIP con una carpeta por persona ("Nombres Apellidos - Puesto 1234") y sus PDF.
+      const cuerpo = await leerCuerpo(req, 200 * 1048576);
+      const informe = importarExpedientes(cuerpo, { almacen, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, yo.id), por: yo.id, galerias: GALERIAS });
+      almacen.vaciar();
+      const t = informe.totales;
+      console.log(`expedientes (${yo.usuario}): ${t.personas} carpetas · ${t.fichasNuevas} fichas nuevas · ${t.fichasExistentes} existentes · ${t.documentosNuevos} documentos nuevos · ${t.documentosRepetidos} repetidos`);
+      return json(res, 200, informe);
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });
     const estadoDni = () => ({ configurado: reniec.real, url: reniec.url, pista: reniec.token ? reniec.token.slice(0, 3) + "…" + reniec.token.slice(-3) : "", consumo: reniec.resumenConsumo() });

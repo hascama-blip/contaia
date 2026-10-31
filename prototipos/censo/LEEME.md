@@ -129,6 +129,19 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   cookie firmada, roles admin/edicion/lectura/seguridad; `seguridad` solo escribe en
   `incidencias` y nunca borra), `lib/reniec.js` (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- **Expedientes de socios nuevos (ZIP)**: Administración → "Expedientes de socios nuevos (ZIP)" →
+  `POST /api/importar-expedientes` (admin; `servidor/lib/expedientes.js`, lector ZIP propio sin
+  dependencias: directorio central + `inflateRaw`). El ZIP trae **una carpeta por persona**
+  llamada `Nombres Apellidos - Puesto 1234` (o `Puestos 1234, 1235 y 1236` / `Puesto sin indicar`;
+  puede haber una carpeta raíz encima) con sus PDF/imágenes. Por persona: si ya está en el padrón
+  (mismo nombre sin importar orden ni tildes, o apellidos + primer nombre) se le **agregan los
+  documentos** con el nombre de cada archivo (sin extensión, p. ej. `01 - Contrato…`); si no, se
+  **crea la ficha por revisar** (`revisar:true`, sin N° ni DNI, `origen.expediente`; apellidos = las
+  dos últimas palabras agrupando partículas como "del", "Vda. de"). Puestos: sin dueño → se asignan
+  (se crea el stand si falta, con la galería del plano); con otro dueño → **no se tocan** y queda la
+  observación "registrar el traspaso desde la ficha del stand" (así el comprador hereda el N°).
+  Idempotente: repetir un ZIP o subir partes no duplica fichas ni documentos (mismo nombre). Hasta
+  200 MB por ZIP y 64 MB por documento. Se ignoran `INDICE.md`, `__MACOSX`, `.DS_Store`.
 - Primera configuración sin SSH: con cero usuarios, `login.html` pide el **código de instalación**
   (`CENSO_CODIGO_INSTALACION`) y crea el admin (`POST /api/instalacion`). `publico/admin.html`
   (solo admin): usuarios, dominio (`dominio.txt` → `censo-dominio.path` regenera Caddy), respaldo
