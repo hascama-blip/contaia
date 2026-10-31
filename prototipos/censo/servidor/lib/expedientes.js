@@ -132,14 +132,15 @@ function fichaNueva(nombre, carpeta, ahora, por) {
 /**
  * Importa un ZIP de expedientes. Devuelve el informe por persona (sin tocar nada que ya tenga dueño).
  * @param {Buffer} zipBuf
- * @param {{ almacen, guardarArchivo:(buf:Buffer,tipo:string,nombre:string)=>string, por?:string|null, galerias?:Record<string,string>, ahora?:string, maxArchivo?:number }} op
+ * Con `simular: true` solo revisa (quién ya está, qué se crearía, qué puestos chocan) y no guarda nada.
+ * @param {{ almacen, guardarArchivo:(buf:Buffer,tipo:string,nombre:string)=>string, por?:string|null, galerias?:Record<string,string>, ahora?:string, maxArchivo?:number, simular?:boolean }} op
  */
-export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = null, galerias = {}, ahora = new Date().toISOString(), maxArchivo = 64 * 1048576 }) {
+export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = null, galerias = {}, ahora = new Date().toISOString(), maxArchivo = 64 * 1048576, simular = false }) {
   const { personas, sueltos } = agruparPorPersona(leerZip(zipBuf));
   if (!personas.length) throw errorZip("El ZIP no tiene carpetas de personas (una carpeta por socio con sus documentos dentro).");
   const asociados = almacen.listar("asociados");
   const totales = { personas: personas.length, fichasNuevas: 0, fichasExistentes: 0, omitidas: 0, documentosNuevos: 0, documentosRepetidos: 0, documentosOmitidos: 0, standsAsignados: 0, standsPendientes: 0 };
-  const informe = { totales, sueltos, personas: [] };
+  const informe = { simulado: simular, totales, sueltos, personas: [] };
   for (const p of personas) {
     const { nombre, puestos, sinPuesto } = interpretarCarpeta(p.carpeta);
     const r = { carpeta: p.carpeta, nombre, puestos, accion: "", asociadoId: null, ficha: "", documentos: { nuevos: 0, repetidos: 0, omitidos: 0 }, stands: [], avisos: [] };
@@ -158,7 +159,7 @@ export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = nul
     }
     let id, ficha;
     if (candidatos.length === 1) { id = candidatos[0].id; ficha = candidatos[0].data; r.accion = "existente"; totales.fichasExistentes++; }
-    else { id = nuevoId(); ficha = fichaNueva(nombre, p.carpeta, ahora, por); almacen.establecer("asociados", id, ficha); asociados.push({ id, data: ficha }); r.accion = "creada"; totales.fichasNuevas++; }
+    else { id = nuevoId(); ficha = fichaNueva(nombre, p.carpeta, ahora, por); if (!simular) almacen.establecer("asociados", id, ficha); asociados.push({ id, data: ficha }); r.accion = "creada"; totales.fichasNuevas++; }
     r.asociadoId = id; r.ficha = `${nombreCompleto(ficha)} (${etiqueta(ficha)})`;
     // 2) Documentos: se agregan con el nombre del archivo; los que ya están (mismo nombre) no se repiten.
     const docs = [...(ficha.documentos || [])];
@@ -168,10 +169,11 @@ export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = nul
       if (!tipo) { r.documentos.omitidos++; r.avisos.push(`"${archivo}": tipo no admitido (solo PDF e imágenes).`); continue; }
       const nombreDoc = nombreDocumento(archivo);
       if (yaEstan.has(normal(nombreDoc))) { r.documentos.repetidos++; continue; }
-      let datos; try { datos = entrada.leer(); } catch { r.documentos.omitidos++; r.avisos.push(`"${archivo}": no se pudo leer del ZIP.`); continue; }
-      if (datos.length > maxArchivo) { r.documentos.omitidos++; r.avisos.push(`"${archivo}": pesa ${(datos.length / 1048576).toFixed(0)} MB (máximo ${Math.round(maxArchivo / 1048576)} MB).`); continue; }
-      const archivoId = guardarArchivo(datos, tipo, archivo);
-      docs.push({ id: archivoId, nombre: nombreDoc, archivo, tipo, tamano: datos.length, subidoAt: ahora, por });
+      if (entrada.tamano > maxArchivo) { r.documentos.omitidos++; r.avisos.push(`"${archivo}": pesa ${(entrada.tamano / 1048576).toFixed(0)} MB (máximo ${Math.round(maxArchivo / 1048576)} MB).`); continue; }
+      let datos = null;
+      if (!simular) { try { datos = entrada.leer(); } catch { r.documentos.omitidos++; r.avisos.push(`"${archivo}": no se pudo leer del ZIP.`); continue; } }
+      const archivoId = simular ? "simulado" : guardarArchivo(datos, tipo, archivo);
+      docs.push({ id: archivoId, nombre: nombreDoc, archivo, tipo, tamano: simular ? entrada.tamano : datos.length, subidoAt: ahora, por });
       yaEstan.add(normal(nombreDoc)); r.documentos.nuevos++;
     }
     totales.documentosNuevos += r.documentos.nuevos; totales.documentosRepetidos += r.documentos.repetidos; totales.documentosOmitidos += r.documentos.omitidos;
@@ -181,11 +183,11 @@ export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = nul
       const s = almacen.obtener("stands", codigo);
       if (!s) {
         if (!galerias[codigo]) { r.stands.push({ codigo, resultado: "no está en el plano: revisar el número" }); r.avisos.push(`El puesto ${codigo} no está en el plano.`); continue; }
-        almacen.establecer("stands", codigo, { codigo, galeria: galerias[codigo], area: null, giro: "", propietarioId: id, propietarioDesde: ahora.slice(0, 10), inquilino: null, estado: "propietario", historial: [], creadoAt: ahora, actualizadoAt: ahora });
-        r.stands.push({ codigo, resultado: "creado y asignado" }); totales.standsAsignados++; continue;
+        if (!simular) almacen.establecer("stands", codigo, { codigo, galeria: galerias[codigo], area: null, giro: "", propietarioId: id, propietarioDesde: ahora.slice(0, 10), inquilino: null, estado: "propietario", historial: [], creadoAt: ahora, actualizadoAt: ahora });
+        r.stands.push({ codigo, resultado: simular ? "se crearía y asignaría" : "creado y asignado" }); totales.standsAsignados++; continue;
       }
       const dueno = s.data.propietarioId;
-      if (!dueno) { almacen.actualizar("stands", codigo, { propietarioId: id, propietarioDesde: ahora.slice(0, 10), actualizadoAt: ahora }); r.stands.push({ codigo, resultado: "asignado (estaba sin dueño)" }); totales.standsAsignados++; continue; }
+      if (!dueno) { if (!simular) almacen.actualizar("stands", codigo, { propietarioId: id, propietarioDesde: ahora.slice(0, 10), actualizadoAt: ahora }); r.stands.push({ codigo, resultado: simular ? "se asignaría (está sin dueño)" : "asignado (estaba sin dueño)" }); totales.standsAsignados++; continue; }
       if (dueno === id) { r.stands.push({ codigo, resultado: "ya era suyo" }); continue; }
       const actual = asociados.find((a) => a.id === dueno);
       const quien = actual ? `${nombreCompleto(actual.data)} (${etiqueta(actual.data)})` : `otra ficha (${dueno})`;
@@ -199,7 +201,7 @@ export function importarExpedientes(zipBuf, { almacen, guardarArchivo, por = nul
       cambios.revisar = true;
       cambios.observaciones = [String(ficha.observaciones || "").trim(), `Expediente importado el ${ahora.slice(0, 10)}: ${obs.join(" ")}`].filter(Boolean).join("\n");
     }
-    almacen.actualizar("asociados", id, cambios);
+    if (!simular) almacen.actualizar("asociados", id, cambios);
     informe.personas.push(r);
   }
   return informe;

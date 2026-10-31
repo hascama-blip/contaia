@@ -282,11 +282,12 @@ async function manejar(req, res) {
     }
     if (ruta === "/api/importar-expedientes" && metodo === "POST") {
       // Expedientes de socios nuevos: un ZIP con una carpeta por persona ("Nombres Apellidos - Puesto 1234") y sus PDF.
+      const simular = url.searchParams.get("simular") === "1"; // ?simular=1: solo revisar quién ya está en el padrón, sin guardar nada
       const cuerpo = await leerCuerpo(req, 200 * 1048576);
-      const informe = importarExpedientes(cuerpo, { almacen, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, yo.id), por: yo.id, galerias: GALERIAS });
-      almacen.vaciar();
+      const informe = importarExpedientes(cuerpo, { almacen, guardarArchivo: (b, t, n) => guardarArchivo(b, t, n, yo.id), por: yo.id, galerias: GALERIAS, simular });
+      if (!simular) almacen.vaciar();
       const t = informe.totales;
-      console.log(`expedientes (${yo.usuario}): ${t.personas} carpetas · ${t.fichasNuevas} fichas nuevas · ${t.fichasExistentes} existentes · ${t.documentosNuevos} documentos nuevos · ${t.documentosRepetidos} repetidos`);
+      console.log(`expedientes (${yo.usuario}${simular ? ", revisión" : ""}): ${t.personas} carpetas · ${t.fichasNuevas} fichas nuevas · ${t.fichasExistentes} existentes · ${t.documentosNuevos} documentos nuevos · ${t.documentosRepetidos} repetidos`);
       return json(res, 200, informe);
     }
     if (ruta === "/api/dominio" && metodo === "GET") return json(res, 200, { dominio: leerDominio() });

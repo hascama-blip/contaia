@@ -79,7 +79,8 @@
   <section class="card"><div class="card-cuerpo">
     <h2>Expedientes de socios nuevos (ZIP)</h2>
     <p class="ayuda" style="margin:0 0 10px">Sube un ZIP con <b>una carpeta por persona</b>, llamada <i>Nombres Apellidos - Puesto 1234</i> (o <i>Puestos 1234, 1235 y 1236</i>, o <i>Puesto sin indicar</i>), con sus documentos PDF dentro. Si la persona ya está en el padrón, los documentos se agregan a su ficha con el nombre de cada archivo; si no, se crea la ficha <b>por revisar</b> (sin N° ni DNI, se completan después). Los puestos sin dueño se le asignan; los que ya tienen dueño <b>no se cambian</b>: queda una observación para registrar el traspaso desde la ficha del stand. Puedes subir varias partes: lo que ya está no se duplica.</p>
-    <div class="fila" style="align-items:center"><label class="btn btn-primary" style="cursor:pointer">Subir expedientes (ZIP)… <input id="expedientes" type="file" accept=".zip,application/zip,application/x-zip-compressed" multiple class="sr"></label><span id="exp-estado" class="ayuda"></span></div>
+    <div class="fila" style="align-items:center"><label class="btn btn-ghost" style="cursor:pointer">Revisar sin guardar… <input id="expedientes-revisar" type="file" accept=".zip,application/zip,application/x-zip-compressed" multiple class="sr"></label><label class="btn btn-primary" style="cursor:pointer">Subir expedientes (ZIP)… <input id="expedientes" type="file" accept=".zip,application/zip,application/x-zip-compressed" multiple class="sr"></label><span id="exp-estado" class="ayuda"></span></div>
+    <p class="ayuda" style="margin:6px 0 0"><b>Revisar sin guardar</b> muestra quién ya está en el padrón, qué fichas se crearían y qué puestos chocan con otro dueño, sin cambiar nada (si una persona viene repartida en dos partes, en la revisión aparece dos veces). Cuando la tabla esté conforme, usa <b>Subir expedientes</b>.</p>
     <div id="exp-informe" style="margin-top:10px"></div>
   </div></section>
 
@@ -112,23 +113,27 @@
   };
   $("#f-usuario").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { await pedir("POST", "/api/usuarios", { usuario: f.usuario.value, nombre: f.nombre.value, clave: f.clave.value, rol: f.rol.value }); f.reset(); await cargarUsuarios(); } catch (err) { alert(err.message); } };
   $("#f-dominio").onsubmit = async (e) => { e.preventDefault(); const f = e.target; try { const j = await pedir("POST", "/api/dominio", { dominio: f.dominio.value, correo: f.correo.value }); $("#dominio-estado").innerHTML = `<span class="ok">${esc(j.aviso)}</span>`; } catch (err) { $("#dominio-estado").innerHTML = `<span class="mal">${esc(err.message)}</span>`; } };
-  $("#expedientes").onchange = async (e) => {
+  const subirExpedientes = async (e, simular) => {
     const archivos = [...e.target.files]; if (!archivos.length) return;
     const estado = $("#exp-estado"), caja = $("#exp-informe"); caja.innerHTML = ""; const filas = []; const tot = { fichasNuevas: 0, fichasExistentes: 0, omitidas: 0, documentosNuevos: 0, documentosRepetidos: 0, documentosOmitidos: 0, standsAsignados: 0, standsPendientes: 0 };
     for (const [i, a] of archivos.entries()) {
-      estado.textContent = `Subiendo ${a.name} (${i + 1} de ${archivos.length}, ${(a.size / 1048576).toFixed(0)} MB)… puede tardar un minuto.`;
+      estado.textContent = `${simular ? "Revisando" : "Subiendo"} ${a.name} (${i + 1} de ${archivos.length}, ${(a.size / 1048576).toFixed(0)} MB)… puede tardar un minuto.`;
       try {
-        const r = await fetch("/api/importar-expedientes", { method: "POST", body: a, headers: { "Content-Type": "application/zip" } });
+        const r = await fetch("/api/importar-expedientes" + (simular ? "?simular=1" : ""), { method: "POST", body: a, headers: { "Content-Type": "application/zip" } });
         const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
         for (const k of Object.keys(tot)) tot[k] += j.totales[k] || 0;
-        for (const p of j.personas) filas.push(`<tr><td><b>${esc(p.nombre)}</b><br><small>${esc(p.carpeta)}</small></td><td>${p.accion === "creada" ? '<span class="ok">Ficha nueva (por revisar)</span>' : p.accion === "existente" ? `Ya estaba: ${esc(p.ficha)}` : `<span class="mal">Omitida</span>`}</td><td>${p.documentos.nuevos} nuevos${p.documentos.repetidos ? ` · ${p.documentos.repetidos} ya estaban` : ""}${p.documentos.omitidos ? ` · <span class="mal">${p.documentos.omitidos} omitidos</span>` : ""}</td><td>${p.stands.map((s) => `${esc(s.codigo)}: ${esc(s.resultado)}`).join("<br>") || "—"}${p.avisos.length ? `<br><span class="mal">${p.avisos.map(esc).join("<br>")}</span>` : ""}</td></tr>`);
+        for (const p of j.personas) filas.push(`<tr><td><b>${esc(p.nombre)}</b><br><small>${esc(p.carpeta)}</small></td><td>${p.accion === "creada" ? `<span class="${simular ? "mal" : "ok"}">${simular ? "NO está en el padrón: se crearía (por revisar)" : "Ficha nueva (por revisar)"}</span>` : p.accion === "existente" ? `<span class="ok">Ya está:</span> ${esc(p.ficha)}` : `<span class="mal">Omitida</span>`}</td><td>${p.documentos.nuevos} ${simular ? "por cargar" : "nuevos"}${p.documentos.repetidos ? ` · ${p.documentos.repetidos} ya estaban` : ""}${p.documentos.omitidos ? ` · <span class="mal">${p.documentos.omitidos} omitidos</span>` : ""}</td><td>${p.stands.map((s) => `${esc(s.codigo)}: ${esc(s.resultado)}`).join("<br>") || "—"}${p.avisos.length ? `<br><span class="mal">${p.avisos.map(esc).join("<br>")}</span>` : ""}</td></tr>`);
         if (j.sueltos?.length) filas.push(`<tr><td colspan="4"><span class="mal">Archivos fuera de carpeta (no se cargaron): ${j.sueltos.map(esc).join(", ")}</span></td></tr>`);
       } catch (err) { filas.push(`<tr><td colspan="4"><span class="mal">${esc(a.name)}: ${esc(err.message)}</span></td></tr>`); }
       caja.innerHTML = `<table><thead><tr><th>Persona</th><th>Ficha</th><th>Documentos</th><th>Puestos / avisos</th></tr></thead><tbody>${filas.join("")}</tbody></table>`;
     }
-    estado.innerHTML = `<span class="ok">Listo: ${tot.fichasNuevas} fichas nuevas · ${tot.fichasExistentes} existentes · ${tot.documentosNuevos} documentos nuevos${tot.documentosRepetidos ? ` · ${tot.documentosRepetidos} ya estaban` : ""}${tot.documentosOmitidos ? ` · ${tot.documentosOmitidos} omitidos` : ""} · ${tot.standsAsignados} puestos asignados${tot.standsPendientes ? ` · ${tot.standsPendientes} puestos pendientes de traspaso` : ""}${tot.omitidas ? ` · ${tot.omitidas} personas omitidas` : ""}.</span> Las fichas nuevas aparecen en el padrón como "por revisar".`;
+    estado.innerHTML = simular
+      ? `<span class="ok">Revisión terminada (nada se guardó):</span> ${tot.fichasExistentes} ya están en el padrón · ${tot.fichasNuevas} NO están (se crearían) · ${tot.documentosNuevos} documentos por cargar · ${tot.standsAsignados} puestos se asignarían${tot.standsPendientes ? ` · ${tot.standsPendientes} puestos con otro dueño (traspaso pendiente)` : ""}${tot.omitidas ? ` · ${tot.omitidas} personas omitidas` : ""}.`
+      : `<span class="ok">Listo: ${tot.fichasNuevas} fichas nuevas · ${tot.fichasExistentes} existentes · ${tot.documentosNuevos} documentos nuevos${tot.documentosRepetidos ? ` · ${tot.documentosRepetidos} ya estaban` : ""}${tot.documentosOmitidos ? ` · ${tot.documentosOmitidos} omitidos` : ""} · ${tot.standsAsignados} puestos asignados${tot.standsPendientes ? ` · ${tot.standsPendientes} puestos pendientes de traspaso` : ""}${tot.omitidas ? ` · ${tot.omitidas} personas omitidas` : ""}.</span> Las fichas nuevas aparecen en el padrón como "por revisar".`;
     e.target.value = "";
   };
+  $("#expedientes-revisar").onchange = (e) => subirExpedientes(e, true);
+  $("#expedientes").onchange = (e) => subirExpedientes(e, false);
   $("#importar").onchange = async (e) => {
     const a = e.target.files[0]; if (!a) return;
     $("#importar-estado").textContent = "Importando…";
