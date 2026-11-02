@@ -3,6 +3,7 @@ import path from "path";
 import { promises as fs } from "fs";
 import * as XLSX from "xlsx";
 import { DATA_DIR } from "./db";
+import { consultarSunat, rucValido } from "./sunat";
 
 // ============================================================
 //  ISSOSOMA — costo por proyecto, relación de gastos y costo/beneficio
@@ -27,6 +28,11 @@ const ARCH_PATH = path.join(DATA_DIR, "issosoma-archivos.json");
 type ArchivoCache = Record<string, { mt: string; tipo: string; data: any }>;
 async function leerArchCache(): Promise<ArchivoCache> { try { return JSON.parse(await fs.readFile(ARCH_PATH, "utf-8")); } catch { return {}; } }
 async function guardarArchCache(c: ArchivoCache): Promise<void> { try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(ARCH_PATH, JSON.stringify(c)); } catch { /* */ } }
+// Caché RUC → razón social (para nombrar proveedores de forma UNIFORME aunque la
+// foto/OCR no traiga el nombre). Se resuelve una sola vez por RUC vía SUNAT.
+const RUC_PATH = path.join(DATA_DIR, "issosoma-rucs.json");
+async function leerRucCache(): Promise<Record<string, string>> { try { return JSON.parse(await fs.readFile(RUC_PATH, "utf-8")); } catch { return {}; } }
+async function guardarRucCache(c: Record<string, string>): Promise<void> { try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(RUC_PATH, JSON.stringify(c)); } catch { /* */ } }
 
 export interface IssosomaConfig { folderId: string; ventasId: string; configurado: boolean; faltan: string[] }
 export function issosomaConfig(): IssosomaConfig {
@@ -190,8 +196,13 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
 
 // --- Factura de venta (ingresos) --------------------------------------------
 export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string; tipo: "FE" | "NC"; mes: string }
-/** Factura de COMPRA recibida de un proveedor (egreso general de la empresa). */
-export interface EgresoRecibido { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string }
+/** Factura/boleta/comprobante de COMPRA recibido (egreso general de la empresa).
+ *  Campos UNIFORMES para el Excel: proveedor (razón social, resuelta por RUC),
+ *  RUC, tipo de comprobante, número, fecha, importe. */
+export interface EgresoRecibido {
+  emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string;
+  tipoComprobante: string; numero: string;
+}
 async function parseFacturaPdf(id: string, nombre: string, token: string, mes = ""): Promise<FacturaVenta | null> {
   let texto = "";
   try {
@@ -234,11 +245,26 @@ function egresoDeTexto(texto: string, nombre: string, mes: string, permitirMax: 
     importe = montos.length ? Math.max(...montos) : 0;
   }
   if (!importe) return null;
-  const ruc = (texto.match(/\b\d{11}\b/g) || []).find((r) => r !== "20600460812") || "";
+  // RUC del PROVEEDOR: cualquiera de 11 dígitos que no sea el de ISSOSOMA (cliente).
+  const ruc = (texto.match(/\b(?:10|15|16|17|20)\d{9}\b/g) || []).find((r) => r !== "20600460812") || "";
   const mEmi = texto.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .,&'-]{4,69}?)\s+(?:AV\.|CAL\.|CALLE|AVENIDA|JR\.|R\.?U\.?C)/);
-  const emisor = (mEmi ? mEmi[1] : texto.trim().split(/\s{2,}|\n/)[0] || "").replace(/\s+/g, " ").trim().slice(0, 70);
+  let emisor = (mEmi ? mEmi[1] : texto.trim().split(/\s{2,}|\n/)[0] || "").replace(/\s+/g, " ").trim().slice(0, 70);
+  // Si capturó el nombre del CLIENTE (ISSOSOMA) o un trozo de dirección, no sirve
+  // como proveedor: se deja vacío y lo resuelve el RUC → razón social (SUNAT).
+  if (/ISO?SSOMA|ISOLUCION/i.test(emisor) || /^(CAL\.?|AV\.?|JR\.?|CALLE|AVENIDA|URB\.?|MZ\.?|LT\.?|PSJE\.?)\b/i.test(emisor)) emisor = "";
   const fecha = (texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || texto.match(/\b\d{2}-\d{2}-\d{4}\b/) || [""])[0];
-  return { emisor, ruc, importe, fecha, archivo: nombre, mes };
+  // Tipo de comprobante y número (serie-número), uniformes para el Excel.
+  const U = texto.toUpperCase();
+  const tipoComprobante =
+    /NOTA\s*DE\s*CR[EÉ]DITO/.test(U) ? "Nota de crédito" :
+    /FACTURA/.test(U) ? "Factura" :
+    /BOLETA/.test(U) ? "Boleta" :
+    /YAPE|PLIN/.test(U) ? "Yape/Plin" :
+    /TRANSFERENCIA|DEP[OÓ]SITO|CONSTANCIA/.test(U) ? "Transferencia/Depósito" :
+    /TICKET|RECIBO/.test(U) ? "Ticket/Recibo" : "Otro";
+  const mNum = texto.match(/\b([A-Z]{1,2}\d{2,3})\s*[- ]\s*(\d{4,8})\b/) || texto.match(/\b([A-Z]\d{3})\s+(\d{5,8})\b/);
+  const numero = mNum ? `${mNum[1]}-${mNum[2]}` : "";
+  return { emisor, ruc, importe, fecha, archivo: nombre, mes, tipoComprobante, numero };
 }
 const RX_IMG = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
 /** OCR de un PDF ESCANEADO: extrae la imagen de cada página (unpdf), la codifica
@@ -366,7 +392,7 @@ export async function recalcularIssosoma(opts?: { completo?: boolean }): Promise
     // Tope de imágenes NUEVAS a OCR por corrida (las ya leídas se reutilizan y no
     // cuentan). Así cada recálculo termina a tiempo y el progreso se acumula:
     // volvé a pulsar Recalcular hasta que los avisos digan "0 nuevas".
-    const OCR_MAX = Math.max(0, Number(process.env.ISSOSOMA_OCR_MAX || 200));
+    const OCR_MAX = Math.max(0, Number(process.env.ISSOSOMA_OCR_MAX || 300));
     for (const mes of meses) {
       const hijos = await listar(mes.id, token);
       // Comprobantes de VENTA (FE emitidas y NC notas de crédito).
@@ -410,8 +436,27 @@ export async function recalcularIssosoma(opts?: { completo?: boolean }): Promise
   }
   base.facturas = facturas;
   // Dedupe de egresos por (ruc|importe|fecha) para no contar dos veces el mismo.
+  // (Rellena campos uniformes faltantes en egresos cacheados por versiones previas.)
   const vistosE = new Set<string>();
-  base.egresosGenerales = egresos.filter((e) => { const k = `${e.ruc}|${e.importe}|${e.fecha}`; if (vistosE.has(k)) return false; vistosE.add(k); return true; });
+  base.egresosGenerales = egresos
+    .map((e) => ({ ...e, tipoComprobante: e.tipoComprobante || "Otro", numero: e.numero || "" }))
+    .filter((e) => { const k = `${e.ruc}|${e.importe}|${e.fecha}`; if (vistosE.has(k)) return false; vistosE.add(k); return true; });
+
+  // PROVEEDOR UNIFORME: si hay RUC, el nombre se toma de SUNAT (razón social) y
+  // se cachea; así todas las compras quedan con el mismo criterio para el Excel.
+  const rucs = await leerRucCache();
+  const RUC_MAX = Math.max(0, Number(process.env.ISSOSOMA_RUC_MAX || 60)); // consultas nuevas por corrida
+  let rucNuevos = 0;
+  const pendientesRuc = Array.from(new Set(base.egresosGenerales.map((e) => e.ruc).filter((r) => r && rucValido(r) && !rucs[r])));
+  for (const r of pendientesRuc) {
+    if (rucNuevos >= RUC_MAX) break;
+    rucNuevos++;
+    try { const info = await consultarSunat(r); if (info?.razonSocial) rucs[r] = String(info.razonSocial).trim(); } catch { /* se reintenta en otra corrida */ }
+  }
+  await guardarRucCache(rucs);
+  for (const e of base.egresosGenerales) if (e.ruc && rucs[e.ruc]) e.emisor = rucs[e.ruc];
+  const sinNombre = base.egresosGenerales.filter((e) => !e.emisor).length;
+  avisos.push(`Proveedores: ${pendientesRuc.length} RUC nuevo(s) por resolver, ${rucNuevos} consultado(s) a SUNAT en esta corrida${pendientesRuc.length > rucNuevos ? ` (el resto en la próxima)` : ""}; ${sinNombre} egreso(s) aún sin nombre.`);
   const totalEgresos = base.egresosGenerales.reduce((a, e) => a + e.importe, 0);
 
   // 3) MATCH por código → costo/beneficio.
@@ -493,10 +538,11 @@ export async function excelIssosoma(a: IssosomaAnalisis): Promise<Buffer> {
   // 2) COMPRAS (recibidas) por egreso
   const wsC = wb.addWorksheet("Compras (egresos)");
   wsC.columns = [
-    { header: "Mes", key: "mes", width: 14 }, { header: "Proveedor", key: "prov", width: 44 },
-    { header: "RUC", key: "ruc", width: 14 }, { header: "Fecha", key: "fecha", width: 12 }, { header: "Importe", key: "imp", width: 14 },
+    { header: "Mes", key: "mes", width: 14 }, { header: "Proveedor (razón social)", key: "prov", width: 44 },
+    { header: "RUC", key: "ruc", width: 14 }, { header: "Tipo comprobante", key: "tipo", width: 20 }, { header: "Número", key: "num", width: 16 },
+    { header: "Fecha", key: "fecha", width: 12 }, { header: "Importe", key: "imp", width: 14 }, { header: "Archivo", key: "arch", width: 36 },
   ] as any;
-  for (const e of a.egresosGenerales) wsC.addRow({ mes: e.mes, prov: e.emisor, ruc: e.ruc, fecha: e.fecha, imp: e.importe });
+  for (const e of a.egresosGenerales) wsC.addRow({ mes: e.mes, prov: e.emisor, ruc: e.ruc, tipo: e.tipoComprobante, num: e.numero, fecha: e.fecha, imp: e.importe, arch: e.archivo });
   wsC.getColumn("imp").numFmt = MONEY; head(wsC);
 
   // 3) GASTOS de proyecto (detalle de bitácora)

@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 type Proyecto = { codigo: string; cliente: string; carpeta: string; responsable: string; venta: number; importeFacturado: number; costo: number; costoLogistica: number; utilidad: number; margen: number; saldo: number; nFacturas: number };
 type Factura = { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string };
 type Gasto = { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number };
-type Egreso = { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string };
+type Egreso = { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string; tipoComprobante?: string; numero?: string };
 type Analisis = {
   configurado: boolean; faltan?: string[]; cuentaServicio?: string;
   kpis: { venta: number; costo: number; utilidad: number; margen: number; egresosGenerales: number; resultado: number; proyectos: number; proyectosConVenta: number };
@@ -248,8 +248,8 @@ export default function IssosomaDashboard() {
                         {m.egresos.length > 0 && (
                           <div className="sub-bloque"><h3>Compras recibidas ({m.egresos.length})</h3>
                             <div className="tbl-wrap flat"><table>
-                              <thead><tr><th>Proveedor</th><th>RUC</th><th>Fecha</th><th className="num">Importe</th></tr></thead>
-                              <tbody>{m.egresos.map((e, i) => (<tr key={i}><td className="wrapc">{e.emisor || "—"}</td><td className="cd">{e.ruc || "—"}</td><td className="cd">{e.fecha || "—"}</td><td className="num">{S(e.importe)}</td></tr>))}</tbody>
+                              <thead><tr><th>Proveedor (razón social)</th><th>RUC</th><th>Tipo</th><th>N°</th><th>Fecha</th><th className="num">Importe</th></tr></thead>
+                              <tbody>{m.egresos.map((e, i) => (<tr key={i}><td className="wrapc">{e.emisor || "—"}</td><td className="cd">{e.ruc || "—"}</td><td className="cd">{e.tipoComprobante || "—"}</td><td className="cd">{e.numero || "—"}</td><td className="cd">{e.fecha || "—"}</td><td className="num">{S(e.importe)}</td></tr>))}</tbody>
                             </table></div>
                           </div>
                         )}
