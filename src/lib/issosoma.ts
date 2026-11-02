@@ -62,7 +62,7 @@ async function listar(folderId: string, token: string): Promise<DFile[]> {
   let pageToken = "";
   do {
     const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives${pageToken ? `&pageToken=${pageToken}` : ""}`;
     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) throw new Error(`No se pudo listar la carpeta (${r.status}). ¿La compartiste con la cuenta de servicio?`);
     const j: any = await r.json();
@@ -111,11 +111,14 @@ export interface ProyectoCosto {
 }
 function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archivo"> {
   const wb = XLSX.read(buf, { type: "buffer" });
-  const filas: any[][] = [];
-  for (const nombre of wb.SheetNames) {
-    const m: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, blankrows: false, defval: "" });
-    for (const r of m) filas.push(r.map((c) => (c == null ? "" : c)));
-  }
+  // raw:false → valores FORMATEADOS como texto (fechas "24-Oct-26", montos
+  // "S/ 265.50"); así se reconocen las filas de gasto. Se conservan las hojas
+  // por separado (la plantilla nueva pone los gastos en hojas aparte).
+  const hojas = wb.SheetNames.map((nombre) => ({
+    nombre,
+    filas: (XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, blankrows: false, defval: "", raw: false }) as any[][]).map((r) => r.map((c) => (c == null ? "" : c))),
+  }));
+  const filas: any[][] = hojas.flatMap((h) => h.filas);
   const texto = (r: any[]) => r.map((c) => String(c).trim());
   // Valor numérico a la derecha de la 1ª celda que casa el regex.
   const valorEtiqueta = (rx: RegExp): number => {
@@ -148,19 +151,23 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
     const personal = filas.filter((r) => texto(r).some((c) => /PAGO A PERSONAL/i.test(c))).reduce((a, r) => a + Math.max(...texto(r).map(toNum)), 0);
     costoTotal = costoLogistica + personal;
   }
-  // Relación de gastos operativos (fecha, descripción, monto).
+  // Relación de gastos operativos: en la plantilla nueva van en hojas aparte
+  // ("GASTOS OPERATIVOS"/"GASTOS INFORMES"); en la vieja, inline en la bitácora.
+  const esFecha = (c: string) => /^\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}$|^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(c);
   const gastos: { fecha: string; descripcion: string; monto: number }[] = [];
-  const iniG = filas.findIndex((r) => texto(r).some((c) => /GASTOS OPERATIVOS/i.test(c)));
-  if (iniG >= 0) {
-    for (let k = iniG; k < filas.length; k++) {
+  const empujar = (t: string[], fi: number) => {
+    const desc = (t[fi + 1] || "").trim();
+    const monto = toNum(t[fi + 2] ?? "");
+    if (desc && monto && !/^total/i.test(desc)) gastos.push({ fecha: t[fi], descripcion: desc, monto });
+  };
+  for (const h of hojas) if (/GASTOS?\s*(OPERATIV|INFORME)/i.test(h.nombre)) for (const r of h.filas) { const t = texto(r); const fi = t.findIndex(esFecha); if (fi >= 0) empujar(t, fi); }
+  if (!gastos.length) {
+    const iniG = filas.findIndex((r) => texto(r).some((c) => /GASTOS OPERATIVOS/i.test(c)));
+    if (iniG >= 0) for (let k = iniG; k < filas.length; k++) {
       const t = texto(filas[k]);
       if (t.some((c) => /GASTOS?\s*TOTAL\s*LOGISTICA/i.test(c))) break;
-      // Busca patrón [fecha, descripción, monto] en la fila.
-      const fi = t.findIndex((c) => /\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4}/.test(c));
-      if (fi >= 0 && t[fi + 1] && /\d/.test(t[fi + 2] || "")) {
-        const monto = toNum(t[fi + 2]);
-        if (monto) gastos.push({ fecha: t[fi], descripcion: t[fi + 1], monto });
-      }
+      const fi = t.findIndex(esFecha);
+      if (fi >= 0) empujar(t, fi);
     }
   }
   const cliente = textoEtiqueta(/^CLIENTE:?$/i) || carpeta.replace(/INF[- ]?\d{3,4}-\d{2}-?\w*/i, "").trim();
@@ -185,7 +192,12 @@ async function parseFacturaPdf(id: string, nombre: string, token: string): Promi
     const r = await extractText(pdf, { mergePages: true });
     texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
   } catch { return null; }
-  const codigo = codigoInf(nombre) || codigoInf(texto);
+  // Código del proyecto: en el NOMBRE va entre paréntesis "(4173-26-..)"; en el
+  // texto, tras "UNIDAD 4173-26". Evita confundir con la serie "FE001-...".
+  const codigo = nombre.match(/\((\d{3,4})-\d{2}/)?.[1]
+    || texto.match(/UNIDAD\s+(\d{3,4})-\d{2}/i)?.[1]
+    || texto.match(/C[oó]digo[\s:]*(\d{3,4})-\d{2}/i)?.[1]
+    || "";
   const mVV = texto.match(/Valor\s*Venta\s*:?\s*S\/\.?\s*([\d.,]+)/i) || texto.match(/Sub\s*Total\s*Ventas\s*:?\s*S\/\.?\s*([\d.,]+)/i);
   const mIT = texto.match(/Importe\s*Total\s*:?\s*S\/\.?\s*([\d.,]+)/i);
   const mCli = texto.match(/Se[ñn]or\(es\)\s*:?\s*(.+?)\s*RUC/i);
@@ -233,7 +245,9 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   base.cuentaServicio = email;
 
   // 1) COSTOS: carpetas de proyecto → bitácora.
-  const raiz = (await listar(cfg.folderId, token)).filter((f) => f.mimeType === MIME_FOLDER && /INF[- ]?\d{3,4}/i.test(f.name));
+  const raizTodo = await listar(cfg.folderId, token);
+  const raiz = raizTodo.filter((f) => f.mimeType === MIME_FOLDER && /INF[- ]?\d{3,4}/i.test(f.name));
+  avisos.push(`Proyectos: ${raizTodo.length} elemento(s) en la carpeta; ${raiz.length} con patrón INF.`);
   const costos = await pool(raiz, 6, async (proj): Promise<ProyectoCosto | null> => {
     const hijos = await listar(proj.id, token);
     const bitFolder = hijos.find((h) => h.mimeType === MIME_FOLDER && /bitacora|rendicion/i.test(h.name));
@@ -245,16 +259,21 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
     return { ...parseBitacora(buf, proj.name), archivo: xlsx.name };
   });
   const costosOk = costos.filter(Boolean) as ProyectoCosto[];
+  avisos.push(`Bitácoras con datos leídas: ${costosOk.length}.`);
 
   // 2) VENTAS: meses → facturas PDF.
   const facturas: FacturaVenta[] = [];
   if (cfg.ventasId) {
-    const meses = (await listar(cfg.ventasId, token)).filter((f) => f.mimeType === MIME_FOLDER);
+    const ventasTodo = await listar(cfg.ventasId, token);
+    const meses = ventasTodo.filter((f) => f.mimeType === MIME_FOLDER);
+    let pdfTotal = 0;
     for (const mes of meses) {
       const archivos = (await listar(mes.id, token)).filter((f) => /\.pdf$/i.test(f.name) && /^FE|factura|\(\d{3,4}-\d{2}/i.test(f.name));
+      pdfTotal += archivos.length;
       const fs2 = await pool(archivos, 6, (f) => parseFacturaPdf(f.id, f.name, token));
       for (const f of fs2) if (f) facturas.push(f);
     }
+    avisos.push(`Ventas: ${ventasTodo.length} elemento(s), ${meses.length} carpeta(s) de mes, ${pdfTotal} PDF candidatos, ${facturas.length} factura(s) parseada(s).`);
   } else {
     avisos.push("No se configuró ISSOSOMA_VENTAS_FOLDER_ID: no se pudo calcular la venta/beneficio (solo costos).");
   }
