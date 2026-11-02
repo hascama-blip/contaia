@@ -21,9 +21,8 @@ const VISTAS = [
   { id: "resumen", label: "Resumen" },
   { id: "empresas", label: "Por empresa" },
   { id: "proyectos", label: "Costo / Beneficio" },
-  { id: "gastos", label: "Relación de gastos" },
+  { id: "movimientos", label: "Gastos y egresos (por mes)" },
   { id: "facturas", label: "Facturas (ventas)" },
-  { id: "egresos", label: "Egresos (compras)" },
   { id: "conexion", label: "Conexión / Recalcular" },
 ] as const;
 type VistaId = (typeof VISTAS)[number]["id"];
@@ -49,6 +48,33 @@ function agruparEmpresas(proyectos: Proyecto[]) {
       utilidad: ps.reduce((a, p) => a + p.utilidad, 0),
     }))
     .sort((a, b) => b.proyectos.length - a.proyectos.length || b.venta - a.venta);
+}
+
+// --- Mes unificado (para juntar gastos de bitácora + egresos por mes) --------
+const MESNOM = ["(sin mes)", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+const ABBR: Record<string, number> = { ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6, jul: 7, ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12 };
+function mesDeGasto(fecha: string): number {
+  const s = String(fecha || "");
+  const m = s.match(/[-/ ]([A-Za-z]{3})[A-Za-z]*[-/ ]/) || s.match(/^([A-Za-z]{3})/);
+  if (m) return ABBR[m[1].toLowerCase()] || 0;
+  const m2 = s.match(/^\d{1,2}[-/](\d{1,2})[-/]/);
+  return m2 ? Number(m2[1]) : 0;
+}
+function mesDeEgreso(mes: string): number { const m = String(mes || "").match(/\d+/); return m ? Number(m[0]) : 0; }
+// Agrupa gastos (bitácora) + egresos (compras) por número de mes (1..12, 0=sin).
+function agruparMovimientos(gastos: Gasto[], egresos: Egreso[]) {
+  const map = new Map<number, { gastos: Gasto[]; egresos: Egreso[] }>();
+  const get = (n: number) => { const o = map.get(n) ?? { gastos: [], egresos: [] }; map.set(n, o); return o; };
+  for (const g of gastos) get(mesDeGasto(g.fecha)).gastos.push(g);
+  for (const e of egresos) get(mesDeEgreso(e.mes)).egresos.push(e);
+  return Array.from(map.entries())
+    .map(([num, o]) => ({
+      num, label: MESNOM[num] ?? "(sin mes)",
+      gastos: o.gastos, egresos: o.egresos,
+      totalGastos: o.gastos.reduce((a, g) => a + g.monto, 0),
+      totalEgresos: o.egresos.reduce((a, e) => a + e.importe, 0),
+    }))
+    .sort((a, b) => (a.num || 99) - (b.num || 99));
 }
 
 export default function IssosomaDashboard() {
@@ -120,6 +146,7 @@ export default function IssosomaDashboard() {
             <button className="menu-btn" onClick={() => setMenu(true)}>☰ Menú</button>
             <div className="crumbs"><span>ISSOSOMA</span> · <span>{vistaActual.label}</span></div>
             <div className="tb-right">
+              {data?.configurado && <a className="tb-btn" href="/api/issosoma/excel" download title="Descargar Excel: Ventas, Compras, Gastos, Por proyecto y Resumen mensual">⬇ Excel</a>}
               <span className="conn"><span className="sdot" data-st={data?.configurado ? "" : "off"} />
                 <span><b>{data?.configurado ? "Conectado a Drive" : "Sin conectar"}</b>
                   <small>{data?.cuentaServicio || (cargando ? "cargando…" : "configura el acceso")}</small></span></span>
@@ -200,15 +227,35 @@ export default function IssosomaDashboard() {
                   </div>
                 )}
 
-                {vista === "gastos" && (
+                {vista === "movimientos" && (
                   <div className="view">
-                    <div className="page-head"><h1>Relación de gastos operativos</h1><p className="sub-desc">Gastos de las bitácoras por proyecto.</p></div>
-                    <div className="card"><div className="tbl-wrap tall"><table>
-                      <thead><tr><th>Código</th><th>Cliente</th><th>Fecha</th><th>Descripción</th><th className="num">Monto</th></tr></thead>
-                      <tbody>{(data.gastos ?? []).map((g, i) => (
-                        <tr key={i}><td className="cd">{g.codigo}</td><td>{g.cliente}</td><td className="cd">{g.fecha}</td><td className="wrapc">{g.descripcion}</td><td className="num">{S(g.monto)}</td></tr>
-                      ))}{!data.gastos?.length && <tr><td colSpan={5}>Sin gastos operativos detallados.</td></tr>}</tbody>
-                    </table></div></div>
+                    <div className="page-head"><h1>Gastos y egresos por mes</h1>
+                      <p className="sub-desc">Gastos de proyecto (bitácoras) + compras recibidas, agrupados por mes. Clic en cada mes para desplegar/ocultar.</p></div>
+                    {agruparMovimientos(data.gastos, data.egresosGenerales).map((m) => (
+                      <details className="card mes" key={m.num}>
+                        <summary>
+                          <span className="mes-nom">{m.label}</span>
+                          <span className="mes-tot">Gastos {S(m.totalGastos)} · Compras {S(m.totalEgresos)} · Total {S(m.totalGastos + m.totalEgresos)}</span>
+                        </summary>
+                        {m.gastos.length > 0 && (
+                          <div className="sub-bloque"><h3>Gastos de proyecto ({m.gastos.length})</h3>
+                            <div className="tbl-wrap flat"><table>
+                              <thead><tr><th>Código</th><th>Cliente</th><th>Fecha</th><th>Descripción</th><th className="num">Monto</th></tr></thead>
+                              <tbody>{m.gastos.map((g, i) => (<tr key={i}><td className="cd">{g.codigo}</td><td>{g.cliente}</td><td className="cd">{g.fecha}</td><td className="wrapc">{g.descripcion}</td><td className="num">{S(g.monto)}</td></tr>))}</tbody>
+                            </table></div>
+                          </div>
+                        )}
+                        {m.egresos.length > 0 && (
+                          <div className="sub-bloque"><h3>Compras recibidas ({m.egresos.length})</h3>
+                            <div className="tbl-wrap flat"><table>
+                              <thead><tr><th>Proveedor</th><th>RUC</th><th>Fecha</th><th className="num">Importe</th></tr></thead>
+                              <tbody>{m.egresos.map((e, i) => (<tr key={i}><td className="wrapc">{e.emisor || "—"}</td><td className="cd">{e.ruc || "—"}</td><td className="cd">{e.fecha || "—"}</td><td className="num">{S(e.importe)}</td></tr>))}</tbody>
+                            </table></div>
+                          </div>
+                        )}
+                      </details>
+                    ))}
+                    {!data.gastos.length && !data.egresosGenerales.length && <div className="card">Sin gastos ni egresos (recalcula desde Drive).</div>}
                   </div>
                 )}
 
@@ -220,19 +267,6 @@ export default function IssosomaDashboard() {
                       <tbody>{data.facturas.map((f, i) => (
                         <tr key={i}><td className="cd">{f.codigo || "—"}</td><td>{f.cliente || "—"}</td><td className="wrapc">{f.proyecto || "—"}</td><td className="cd">{f.detalle}</td><td className="num">{S(f.valorVenta)}</td><td className="num">{S(f.importeTotal)}</td></tr>
                       ))}{!data.facturas.length && <tr><td colSpan={6}>Sin facturas (revisa ISSOSOMA_VENTAS_FOLDER_ID).</td></tr>}</tbody>
-                    </table></div></div>
-                  </div>
-                )}
-
-                {vista === "egresos" && (
-                  <div className="view">
-                    <div className="page-head"><h1>Egresos (compras recibidas)</h1>
-                      <p className="sub-desc">Facturas de proveedores de las carpetas "recibidas" · total {S(k.egresosGenerales)} · {data.egresosGenerales.length} comprobante(s). Son gastos generales de la empresa (no se reparten por proyecto); los escaneados sin texto quedan fuera.</p></div>
-                    <div className="card"><div className="tbl-wrap tall"><table>
-                      <thead><tr><th>Proveedor</th><th>RUC</th><th>Mes</th><th>Fecha</th><th className="num">Importe</th></tr></thead>
-                      <tbody>{data.egresosGenerales.map((e, i) => (
-                        <tr key={i}><td className="wrapc">{e.emisor || "—"}</td><td className="cd">{e.ruc || "—"}</td><td className="cd">{e.mes}</td><td className="cd">{e.fecha || "—"}</td><td className="num">{S(e.importe)}</td></tr>
-                      ))}{!data.egresosGenerales.length && <tr><td colSpan={5}>Sin egresos leídos (o las carpetas "recibidas" tienen solo PDFs escaneados sin texto).</td></tr>}</tbody>
                     </table></div></div>
                   </div>
                 )}
@@ -347,5 +381,15 @@ const CSS = `
 .iss .hlbl{font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .iss .htrack{background:var(--grid);border-radius:5px;height:12px;overflow:hidden}.iss .htrack i{display:block;height:100%;border-radius:5px}
 .iss .hval{font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.iss .tb-btn{background:var(--exe);color:#fff;border:0;border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap}
+.iss details.mes{padding:0;overflow:hidden}
+.iss details.mes>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;font-weight:600}
+.iss details.mes>summary::-webkit-details-marker{display:none}
+.iss details.mes>summary::before{content:"▸";color:var(--muted);margin-right:6px;display:inline-block;transition:transform .15s}
+.iss details.mes[open]>summary::before{transform:rotate(90deg)}
+.iss .mes-nom{font-size:15px;flex:1}
+.iss .mes-tot{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+.iss .sub-bloque{padding:0 18px 14px}
+.iss .sub-bloque h3{font-size:13px;margin:8px 0 6px;color:var(--ink2)}
 @media(max-width:900px){.iss .app{grid-template-columns:1fr}.iss .side{position:fixed;left:0;top:0;z-index:60;width:252px;transform:translateX(-100%);transition:transform .2s}.iss .side.open{transform:none}.iss .side-close{display:grid;place-items:center}.iss .menu-btn{display:inline-flex;align-items:center;gap:6px}.iss .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.iss .hbar{grid-template-columns:140px minmax(0,1fr) 100px}}
 `;

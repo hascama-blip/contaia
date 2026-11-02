@@ -183,10 +183,10 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
 }
 
 // --- Factura de venta (ingresos) --------------------------------------------
-export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string; tipo: "FE" | "NC" }
+export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string; tipo: "FE" | "NC"; mes: string }
 /** Factura de COMPRA recibida de un proveedor (egreso general de la empresa). */
 export interface EgresoRecibido { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string }
-async function parseFacturaPdf(id: string, nombre: string, token: string): Promise<FacturaVenta | null> {
+async function parseFacturaPdf(id: string, nombre: string, token: string, mes = ""): Promise<FacturaVenta | null> {
   let texto = "";
   try {
     const buf = await bajar(id, token);
@@ -212,7 +212,7 @@ async function parseFacturaPdf(id: string, nombre: string, token: string): Promi
   const proyecto = mDesc ? mDesc[1].replace(/\s+/g, " ").replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, "").trim().slice(0, 160) : "";
   if (!codigo && !valorVenta && !importeTotal) return null;
   const tipo: "FE" | "NC" = /^NC|nota.?de.?cr[eé]dito/i.test(nombre) ? "NC" : "FE";
-  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre, tipo };
+  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre, tipo, mes };
 }
 
 /** Lee una factura de COMPRA (carpeta "recibidas") → egreso de proveedor.
@@ -305,7 +305,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
       // Comprobantes de VENTA (FE emitidas y NC notas de crédito).
       const comp = hijos.filter((f) => /\.pdf$/i.test(f.name) && /^FE|^NC|factura|\(\d{3,4}-\d{2}/i.test(f.name));
       compTotal += comp.length;
-      const fs2 = await pool(comp, 6, (f) => parseFacturaPdf(f.id, f.name, token));
+      const fs2 = await pool(comp, 6, (f) => parseFacturaPdf(f.id, f.name, token, mes.name));
       for (const f of fs2) if (f) facturas.push(f);
       // Carpeta "recibidas": facturas de COMPRA (egresos de proveedores).
       for (const rf of hijos.filter((h) => h.mimeType === MIME_FOLDER && /recib/i.test(h.name))) {
@@ -379,4 +379,79 @@ export async function analizarIssosoma(opts?: { refrescar?: boolean }): Promise<
     if (c) return c;
   }
   return recalcularIssosoma();
+}
+
+// --- Exportación a Excel (Ventas / Compras / Por proyecto / Mensual) ---------
+const mesKey = (m: string) => parseInt(String(m).match(/\d+/)?.[0] || "99", 10);
+
+export async function excelIssosoma(a: IssosomaAnalisis): Promise<Buffer> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  const MONEY = "#,##0.00";
+  const head = (ws: any) => { ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F4A3B" } }; ws.views = [{ state: "frozen", ySplit: 1 }]; };
+
+  // 1) VENTAS (FE y NC) por factura
+  const wsV = wb.addWorksheet("Ventas");
+  wsV.columns = [
+    { header: "Mes", key: "mes", width: 14 }, { header: "Tipo", key: "tipo", width: 7 },
+    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
+    { header: "Proyecto", key: "proy", width: 44 }, { header: "Valor Venta", key: "vv", width: 14 }, { header: "Importe Total", key: "it", width: 14 },
+  ] as any;
+  for (const f of a.facturas) { const s = f.tipo === "NC" ? -1 : 1; wsV.addRow({ mes: f.mes, tipo: f.tipo, cod: f.codigo, cli: f.cliente, proy: f.proyecto, vv: s * f.valorVenta, it: s * f.importeTotal }); }
+  wsV.getColumn("vv").numFmt = MONEY; wsV.getColumn("it").numFmt = MONEY; head(wsV);
+
+  // 2) COMPRAS (recibidas) por egreso
+  const wsC = wb.addWorksheet("Compras (egresos)");
+  wsC.columns = [
+    { header: "Mes", key: "mes", width: 14 }, { header: "Proveedor", key: "prov", width: 44 },
+    { header: "RUC", key: "ruc", width: 14 }, { header: "Fecha", key: "fecha", width: 12 }, { header: "Importe", key: "imp", width: 14 },
+  ] as any;
+  for (const e of a.egresosGenerales) wsC.addRow({ mes: e.mes, prov: e.emisor, ruc: e.ruc, fecha: e.fecha, imp: e.importe });
+  wsC.getColumn("imp").numFmt = MONEY; head(wsC);
+
+  // 3) GASTOS de proyecto (detalle de bitácora)
+  const wsG = wb.addWorksheet("Gastos proyecto");
+  wsG.columns = [
+    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
+    { header: "Fecha", key: "fecha", width: 12 }, { header: "Descripción", key: "desc", width: 50 }, { header: "Monto", key: "monto", width: 14 },
+  ] as any;
+  for (const g of a.gastos) wsG.addRow({ cod: g.codigo, cli: g.cliente, fecha: g.fecha, desc: g.descripcion, monto: g.monto });
+  wsG.getColumn("monto").numFmt = MONEY; head(wsG);
+
+  // 4) POR PROYECTO (costo/beneficio)
+  const wsP = wb.addWorksheet("Por proyecto");
+  wsP.columns = [
+    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
+    { header: "Proyecto", key: "proy", width: 44 }, { header: "Responsable", key: "resp", width: 22 },
+    { header: "Venta", key: "venta", width: 14 }, { header: "Costo", key: "costo", width: 14 }, { header: "Utilidad", key: "util", width: 14 }, { header: "Margen", key: "mg", width: 10 },
+  ] as any;
+  for (const p of a.proyectos) wsP.addRow({ cod: p.codigo, cli: p.cliente, proy: p.carpeta, resp: p.responsable, venta: p.venta, costo: p.costo, util: p.utilidad, mg: p.margen });
+  ["venta", "costo", "util"].forEach((c) => (wsP.getColumn(c).numFmt = MONEY)); wsP.getColumn("mg").numFmt = "0.0%"; head(wsP);
+
+  // 5) RESUMEN MENSUAL (utilidad por mes). El costo de proyecto se atribuye al
+  //    mes de facturación en proporción a la venta de ese mes.
+  const ventaMes = new Map<string, number>(), egresoMes = new Map<string, number>(), costoMes = new Map<string, number>();
+  const ventaCodMes = new Map<string, Map<string, number>>();
+  const ventaProy = new Map<string, number>(), costoProy = new Map<string, number>();
+  for (const p of a.proyectos) { ventaProy.set(p.codigo, p.venta); costoProy.set(p.codigo, p.costo); }
+  for (const f of a.facturas) {
+    const v = (f.tipo === "NC" ? -1 : 1) * f.valorVenta; const m = f.mes || "(sin mes)";
+    ventaMes.set(m, (ventaMes.get(m) || 0) + v);
+    if (f.codigo) { const mm = ventaCodMes.get(f.codigo) || new Map<string, number>(); mm.set(m, (mm.get(m) || 0) + v); ventaCodMes.set(f.codigo, mm); }
+  }
+  for (const e of a.egresosGenerales) { const m = e.mes || "(sin mes)"; egresoMes.set(m, (egresoMes.get(m) || 0) + e.importe); }
+  for (const [cod, mm] of ventaCodMes) { const tot = ventaProy.get(cod) || 0; const costo = costoProy.get(cod) || 0; if (!tot) continue; for (const [m, v] of mm) costoMes.set(m, (costoMes.get(m) || 0) + costo * (v / tot)); }
+  const meses = Array.from(new Set([...ventaMes.keys(), ...egresoMes.keys(), ...costoMes.keys()])).sort((x, y) => mesKey(x) - mesKey(y));
+  const wsM = wb.addWorksheet("Resumen mensual");
+  wsM.columns = [
+    { header: "Mes", key: "mes", width: 16 }, { header: "Venta neta", key: "venta", width: 15 },
+    { header: "Costo proyectos", key: "costo", width: 16 }, { header: "Compras (egresos)", key: "egr", width: 17 }, { header: "Utilidad", key: "util", width: 15 },
+  ] as any;
+  for (const m of meses) { const venta = ventaMes.get(m) || 0, costo = costoMes.get(m) || 0, egr = egresoMes.get(m) || 0; wsM.addRow({ mes: m, venta, costo, egr, util: venta - costo - egr }); }
+  wsM.addRow({});
+  const tV = a.kpis.venta, tC = a.kpis.costo, tE = a.kpis.egresosGenerales;
+  const rowT = wsM.addRow({ mes: "TOTAL", venta: tV, costo: tC, egr: tE, util: tV - tC - tE }); rowT.font = { bold: true };
+  ["venta", "costo", "egr", "util"].forEach((c) => (wsM.getColumn(c).numFmt = MONEY)); head(wsM);
+
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
