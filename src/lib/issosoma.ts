@@ -215,9 +215,26 @@ async function parseFacturaPdf(id: string, nombre: string, token: string, mes = 
   return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre, tipo, mes };
 }
 
-/** Lee una factura de COMPRA (carpeta "recibidas") → egreso de proveedor.
- *  Best-effort: solo las que tienen capa de texto (las escaneadas sin OCR se
- *  omiten). Excluye el RUC de ISSOSOMA para quedarse con el del proveedor. */
+/** De un texto (de PDF o de OCR) arma el egreso. `permitirMax`: para fotos/Yape
+ *  sin "Importe Total" explícito, toma el mayor monto con decimales. */
+function egresoDeTexto(texto: string, nombre: string, mes: string, permitirMax: boolean): EgresoRecibido | null {
+  const mImp = texto.match(/Importe\s*Total\s*:?\s*S?\/?\.?\s*([\d.,]+)/i)
+    || texto.match(/\bTotal\s*(?:a\s*pagar)?\s*:?\s*S\/?\.?\s*([\d.,]+)/i)
+    || texto.match(/\bMonto\s*:?\s*S\/?\.?\s*([\d.,]+)/i);
+  let importe = mImp ? toNum(mImp[1]) : 0;
+  if (!importe && permitirMax) {
+    const montos = [...texto.matchAll(/S\/\s*([\d.,]+)|(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})/g)]
+      .map((m) => toNum(m[1] || m[2])).filter((n) => n > 0 && n < 1_000_000);
+    importe = montos.length ? Math.max(...montos) : 0;
+  }
+  if (!importe) return null;
+  const ruc = (texto.match(/\b\d{11}\b/g) || []).find((r) => r !== "20600460812") || "";
+  const mEmi = texto.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .,&'-]{4,69}?)\s+(?:AV\.|CAL\.|CALLE|AVENIDA|JR\.|R\.?U\.?C)/);
+  const emisor = (mEmi ? mEmi[1] : texto.trim().split(/\s{2,}|\n/)[0] || "").replace(/\s+/g, " ").trim().slice(0, 70);
+  const fecha = (texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || texto.match(/\b\d{2}-\d{2}-\d{4}\b/) || [""])[0];
+  return { emisor, ruc, importe, fecha, archivo: nombre, mes };
+}
+/** Factura de compra en PDF (capa de texto). */
 async function parseRecibidaPdf(id: string, nombre: string, token: string, mes: string): Promise<EgresoRecibido | null> {
   let texto = "";
   try {
@@ -228,14 +245,18 @@ async function parseRecibidaPdf(id: string, nombre: string, token: string, mes: 
     texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
   } catch { return null; }
   if (!texto.trim()) return null;
-  const mImp = texto.match(/Importe\s*Total\s*:?\s*S?\/?\.?\s*([\d.,]+)/i) || texto.match(/\bTotal\b\s*:?\s*S\/\.?\s*([\d.,]+)/i);
-  const importe = mImp ? toNum(mImp[1]) : 0;
-  if (!importe) return null;
-  const ruc = (texto.match(/\b\d{11}\b/g) || []).find((r) => r !== "20600460812") || "";
-  const mEmi = texto.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .,&'-]{4,69}?)\s+(?:AV\.|CAL\.|CALLE|AVENIDA|JR\.|R\.?U\.?C)/);
-  const emisor = (mEmi ? mEmi[1] : texto.trim().split(/\s{2,}|\n/)[0] || "").replace(/\s+/g, " ").trim().slice(0, 70);
-  const fecha = (texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || [""])[0];
-  return { emisor, ruc, importe, fecha, archivo: nombre, mes };
+  return egresoDeTexto(texto, nombre, mes, false);
+}
+/** Foto/boleta/captura (imagen) → OCR (tesseract) → egreso. */
+async function parseRecibidaImagen(id: string, nombre: string, token: string, mes: string, mimeType: string): Promise<EgresoRecibido | null> {
+  let texto = "";
+  try {
+    const buf = await bajar(id, token);
+    const { ocrImagen } = await import("./ocr");
+    texto = await ocrImagen(buf, mimeType || "image/png");
+  } catch { return null; }
+  if (!texto.trim()) return null;
+  return egresoDeTexto(texto, nombre, mes, true);
 }
 
 // --- Análisis completo (costo/beneficio por proyecto) -----------------------
@@ -299,7 +320,8 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   if (cfg.ventasId) {
     const ventasTodo = await listar(cfg.ventasId, token);
     const meses = ventasTodo.filter((f) => f.mimeType === MIME_FOLDER);
-    let compTotal = 0, recTotal = 0;
+    let compTotal = 0, recPdfN = 0, recImgN = 0, ocrN = 0, ocrOmit = 0;
+    const OCR_MAX = Math.max(0, Number(process.env.ISSOSOMA_OCR_MAX || 80));
     for (const mes of meses) {
       const hijos = await listar(mes.id, token);
       // Comprobantes de VENTA (FE emitidas y NC notas de crédito).
@@ -307,15 +329,24 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
       compTotal += comp.length;
       const fs2 = await pool(comp, 6, (f) => parseFacturaPdf(f.id, f.name, token, mes.name));
       for (const f of fs2) if (f) facturas.push(f);
-      // Carpeta "recibidas": facturas de COMPRA (egresos de proveedores).
+      // Carpeta "recibidas": facturas de COMPRA (egresos de proveedores). PDFs con
+      // texto en paralelo; fotos/capturas (imágenes) por OCR secuencial (tope).
       for (const rf of hijos.filter((h) => h.mimeType === MIME_FOLDER && /recib/i.test(h.name))) {
-        const recArch = (await listar(rf.id, token)).filter((f) => /\.pdf$/i.test(f.name));
-        recTotal += recArch.length;
-        const rs = await pool(recArch, 6, (f) => parseRecibidaPdf(f.id, f.name, token, mes.name));
+        const recAll = await listar(rf.id, token);
+        const recPdf = recAll.filter((f) => /\.pdf$/i.test(f.name));
+        const recImg = recAll.filter((f) => /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(f.name) || /^image\//i.test(f.mimeType));
+        recPdfN += recPdf.length; recImgN += recImg.length;
+        const rs = await pool(recPdf, 6, (f) => parseRecibidaPdf(f.id, f.name, token, mes.name));
         for (const r of rs) if (r) egresos.push(r);
+        for (const img of recImg) {
+          if (ocrN >= OCR_MAX) { ocrOmit++; continue; }
+          ocrN++;
+          const r = await parseRecibidaImagen(img.id, img.name, token, mes.name, img.mimeType);
+          if (r) egresos.push(r);
+        }
       }
     }
-    avisos.push(`Ventas: ${meses.length} mes(es), ${compTotal} comprobante(s) de venta (${facturas.length} leídos). Egresos recibidos: ${recTotal} PDF (${egresos.length} leídos; los escaneados sin texto se omiten).`);
+    avisos.push(`Ventas: ${meses.length} mes(es), ${compTotal} comprobante(s) de venta (${facturas.length} leídos). Egresos: ${recPdfN} PDF + ${recImgN} imagen(es); OCR a ${ocrN}${ocrOmit ? ` (${ocrOmit} sobre el tope ISSOSOMA_OCR_MAX=${OCR_MAX})` : ""}. Egresos leídos: ${egresos.length}.`);
   } else {
     avisos.push("No se configuró ISSOSOMA_VENTAS_FOLDER_ID: no se pudo calcular la venta/beneficio (solo costos).");
   }
