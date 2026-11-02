@@ -104,7 +104,7 @@ const codigoInf = (s: string): string => { const m = String(s || "").match(/(\d{
 
 // --- Bitácora (costos) ------------------------------------------------------
 export interface ProyectoCosto {
-  codigo: string; carpeta: string; cliente: string;
+  codigo: string; carpeta: string; cliente: string; responsable: string;
   costoLogistica: number; costoTotal: number; montoDepositado: number; saldo: number;
   gastos: { fecha: string; descripcion: string; monto: number }[];
   archivo: string;
@@ -171,9 +171,10 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
     }
   }
   const cliente = textoEtiqueta(/^CLIENTE:?$/i) || carpeta.replace(/INF[- ]?\d{3,4}-\d{2}-?\w*/i, "").trim();
+  const responsable = textoEtiqueta(/ENCARGAD[OA]\s*DE\s*RENDICI/i);
   return {
     codigo: codigoInf(carpeta),
-    carpeta, cliente,
+    carpeta, cliente, responsable,
     costoLogistica, costoTotal,
     montoDepositado: valorEtiqueta(/MONTO\s*DEPOSITADO/i),
     saldo: valorEtiqueta(/^SALDO/i),
@@ -209,7 +210,7 @@ async function parseFacturaPdf(id: string, nombre: string, token: string): Promi
 
 // --- Análisis completo (costo/beneficio por proyecto) -----------------------
 export interface ProyectoAnalisis {
-  codigo: string; cliente: string; carpeta: string;
+  codigo: string; cliente: string; carpeta: string; responsable: string;
   venta: number; importeFacturado: number; costo: number; costoLogistica: number;
   utilidad: number; margen: number; saldo: number; nFacturas: number;
 }
@@ -293,7 +294,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
     vistos.add(c.codigo);
     const utilidad = v.venta - c.costoTotal;
     proyectos.push({
-      codigo: c.codigo, cliente: c.cliente, carpeta: c.carpeta,
+      codigo: c.codigo, cliente: c.cliente, carpeta: c.carpeta, responsable: c.responsable,
       venta: v.venta, importeFacturado: v.importe, costo: c.costoTotal, costoLogistica: c.costoLogistica,
       utilidad, margen: v.venta ? utilidad / v.venta : 0, saldo: c.saldo, nFacturas: v.n,
     });
@@ -303,7 +304,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   for (const [cod, v] of ventaPorCod) {
     if (vistos.has(cod)) continue;
     const f = facturas.find((x) => x.codigo === cod);
-    proyectos.push({ codigo: cod, cliente: f?.cliente || "", carpeta: "", venta: v.venta, importeFacturado: v.importe, costo: 0, costoLogistica: 0, utilidad: v.venta, margen: v.venta ? 1 : 0, saldo: 0, nFacturas: v.n });
+    proyectos.push({ codigo: cod, cliente: f?.cliente || "", carpeta: "", responsable: "", venta: v.venta, importeFacturado: v.importe, costo: 0, costoLogistica: 0, utilidad: v.venta, margen: v.venta ? 1 : 0, saldo: 0, nFacturas: v.n });
   }
   proyectos.sort((a, b) => b.venta - a.venta);
   base.proyectos = proyectos;

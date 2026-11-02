@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 // análisis de /api/issosoma: costo por proyecto (bitácoras) + venta (facturas) =
 // costo/beneficio. El recálculo (POST) recorre Drive y puede tardar; se cachea.
 
-type Proyecto = { codigo: string; cliente: string; carpeta: string; venta: number; importeFacturado: number; costo: number; costoLogistica: number; utilidad: number; margen: number; saldo: number; nFacturas: number };
+type Proyecto = { codigo: string; cliente: string; carpeta: string; responsable: string; venta: number; importeFacturado: number; costo: number; costoLogistica: number; utilidad: number; margen: number; saldo: number; nFacturas: number };
 type Factura = { codigo: string; cliente: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string };
 type Gasto = { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number };
 type Analisis = {
@@ -18,6 +18,7 @@ type Analisis = {
 
 const VISTAS = [
   { id: "resumen", label: "Resumen" },
+  { id: "empresas", label: "Por empresa" },
   { id: "proyectos", label: "Costo / Beneficio" },
   { id: "gastos", label: "Relación de gastos" },
   { id: "facturas", label: "Facturas (ventas)" },
@@ -28,6 +29,25 @@ type VistaId = (typeof VISTAS)[number]["id"];
 const S = (n: number) => "S/ " + (n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const PCT = (n: number) => (n * 100).toFixed(1) + "%";
 const claseMargen = (m: number) => (m >= 0.3 ? "st-good" : m >= 0.1 ? "st-warn" : "st-crit");
+
+// Agrupa los proyectos por empresa (cliente) para la vista "Por empresa".
+function agruparEmpresas(proyectos: Proyecto[]) {
+  const map = new Map<string, Proyecto[]>();
+  for (const p of proyectos) {
+    const emp = (p.cliente || "Sin cliente identificado").trim();
+    const arr = map.get(emp) ?? [];
+    arr.push(p); map.set(emp, arr);
+  }
+  return Array.from(map.entries())
+    .map(([empresa, ps]) => ({
+      empresa,
+      proyectos: ps.slice().sort((a, b) => b.venta - a.venta),
+      venta: ps.reduce((a, p) => a + p.venta, 0),
+      costo: ps.reduce((a, p) => a + p.costo, 0),
+      utilidad: ps.reduce((a, p) => a + p.utilidad, 0),
+    }))
+    .sort((a, b) => b.proyectos.length - a.proyectos.length || b.venta - a.venta);
+}
 
 export default function IssosomaDashboard() {
   const [data, setData] = useState<Analisis | null>(null);
@@ -114,16 +134,43 @@ export default function IssosomaDashboard() {
                   </div>
                 )}
 
+                {vista === "empresas" && (() => {
+                  const ql = q.trim().toLowerCase();
+                  const grupos = agruparEmpresas(data.proyectos).filter((g) =>
+                    !ql || g.empresa.toLowerCase().includes(ql) || g.proyectos.some((p) => `${p.codigo} ${p.carpeta}`.toLowerCase().includes(ql)));
+                  return (
+                    <div className="view">
+                      <div className="page-head"><h1>Proyectos por empresa</h1>
+                        <p className="sub-desc">Qué proyectos tiene cada empresa, con su código y nombre, para identificarlos.</p></div>
+                      <div className="filters"><input type="search" placeholder="Buscar empresa, código o proyecto…" value={q} onChange={(e) => setQ(e.target.value)} /><span className="count"><b>{grupos.length}</b> empresa(s)</span></div>
+                      {grupos.map((g) => (
+                        <div className="card" key={g.empresa}>
+                          <div className="card-head"><div><h2>{g.empresa}</h2>
+                            <div className="hint">{g.proyectos.length} proyecto(s) · venta {S(g.venta)} · utilidad {S(g.utilidad)}</div></div></div>
+                          <div className="tbl-wrap flat"><table>
+                            <thead><tr><th>Código</th><th>Nombre del proyecto</th><th>Responsable</th><th className="num">Venta</th><th className="num">Costo</th><th className="num">Utilidad</th></tr></thead>
+                            <tbody>{g.proyectos.map((p) => (
+                              <tr key={p.codigo + p.carpeta}><td className="cd">{p.codigo || "—"}</td><td>{p.carpeta || "—"}</td><td>{p.responsable || "—"}</td><td className="num">{S(p.venta)}</td><td className="num">{S(p.costo)}</td><td className="num">{S(p.utilidad)}</td></tr>
+                            ))}</tbody>
+                          </table></div>
+                        </div>
+                      ))}
+                      {!grupos.length && <div className="card">Sin empresas (recalcula desde Drive).</div>}
+                    </div>
+                  );
+                })()}
+
                 {vista === "proyectos" && (
                   <div className="view">
                     <div className="page-head"><h1>Costo / Beneficio por proyecto</h1></div>
                     <div className="filters"><input type="search" placeholder="Buscar código, cliente…" value={q} onChange={(e) => setQ(e.target.value)} /><span className="count"><b>{proyectos.length}</b> proyecto(s)</span></div>
                     <div className="card"><div className="tbl-wrap tall"><table>
-                      <thead><tr><th>Código</th><th>Cliente / carpeta</th><th className="num">Venta</th><th className="num">Costo</th><th className="num">Utilidad</th><th className="num">Margen</th><th className="num">Saldo</th><th className="num">FE</th></tr></thead>
+                      <thead><tr><th>Código</th><th>Cliente / carpeta</th><th>Responsable</th><th className="num">Venta</th><th className="num">Costo</th><th className="num">Utilidad</th><th className="num">Margen</th><th className="num">Saldo</th><th className="num">FE</th></tr></thead>
                       <tbody>{proyectos.map((p) => (
                         <tr key={p.codigo + p.carpeta}>
                           <td className="cd">{p.codigo}</td>
                           <td>{p.cliente || p.carpeta || "—"}</td>
+                          <td>{p.responsable || "—"}</td>
                           <td className="num">{S(p.venta)}</td>
                           <td className="num">{S(p.costo)}</td>
                           <td className="num">{S(p.utilidad)}</td>
@@ -131,7 +178,7 @@ export default function IssosomaDashboard() {
                           <td className="num">{S(p.saldo)}</td>
                           <td className="num">{p.nFacturas || "—"}</td>
                         </tr>
-                      ))}{!proyectos.length && <tr><td colSpan={8}>Sin proyectos (recalcula desde Drive).</td></tr>}</tbody>
+                      ))}{!proyectos.length && <tr><td colSpan={9}>Sin proyectos (recalcula desde Drive).</td></tr>}</tbody>
                     </table></div></div>
                   </div>
                 )}
