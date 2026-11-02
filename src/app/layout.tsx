@@ -26,7 +26,10 @@ export default async function RootLayout({
   // Sitio público de la Asociación Mutualista: se renderiza SIN el chrome de
   // Radar (sin header/menú/footer), como un sitio independiente.
   const pathname = headers().get("x-pathname") || "";
-  if (pathname.startsWith("/asociacionmutualista")) {
+  // Páginas INDEPENDIENTES a pantalla completa (sin header/menú/footer de Radar):
+  // el sitio público de la Mutualista y el dashboard ISSOSOMA (este sí requiere
+  // sesión, que impone el middleware; solo se omite el chrome).
+  if (pathname.startsWith("/asociacionmutualista") || pathname.startsWith("/issosoma")) {
     return (
       <html lang="es">
         <body>{children}</body>
