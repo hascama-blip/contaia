@@ -183,7 +183,7 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
 }
 
 // --- Factura de venta (ingresos) --------------------------------------------
-export interface FacturaVenta { codigo: string; cliente: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string }
+export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string }
 async function parseFacturaPdf(id: string, nombre: string, token: string): Promise<FacturaVenta | null> {
   let texto = "";
   try {
@@ -204,8 +204,12 @@ async function parseFacturaPdf(id: string, nombre: string, token: string): Promi
   const mCli = texto.match(/Se[ñn]or\(es\)\s*:?\s*(.+?)\s*RUC/i);
   const valorVenta = mVV ? toNum(mVV[1]) : 0;
   const importeTotal = mIT ? toNum(mIT[1]) : 0;
+  // Nombre del proyecto: la DESCRIPCIÓN de la línea de la factura (tras "UNIDAD
+  // <codigo>-<yy>", hasta los totales). Se limpia el valor unitario/ICBPER final.
+  const mDesc = texto.match(/UNIDAD\s+\d{3,4}-\d{2}\s+([\s\S]+?)\s+(?:Valor de Venta de Operaciones|Sub\s*Total\s*Ventas)/i);
+  const proyecto = mDesc ? mDesc[1].replace(/\s+/g, " ").replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, "").trim().slice(0, 160) : "";
   if (!codigo && !valorVenta && !importeTotal) return null;
-  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre };
+  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre };
 }
 
 // --- Análisis completo (costo/beneficio por proyecto) -----------------------
@@ -303,8 +307,8 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   // Facturas de proyectos sin bitácora (venta sin costo todavía).
   for (const [cod, v] of ventaPorCod) {
     if (vistos.has(cod)) continue;
-    const f = facturas.find((x) => x.codigo === cod);
-    proyectos.push({ codigo: cod, cliente: f?.cliente || "", carpeta: "", responsable: "", venta: v.venta, importeFacturado: v.importe, costo: 0, costoLogistica: 0, utilidad: v.venta, margen: v.venta ? 1 : 0, saldo: 0, nFacturas: v.n });
+    const f = facturas.find((x) => x.codigo === cod && x.proyecto) || facturas.find((x) => x.codigo === cod);
+    proyectos.push({ codigo: cod, cliente: f?.cliente || "", carpeta: f?.proyecto || "", responsable: "", venta: v.venta, importeFacturado: v.importe, costo: 0, costoLogistica: 0, utilidad: v.venta, margen: v.venta ? 1 : 0, saldo: 0, nFacturas: v.n });
   }
   proyectos.sort((a, b) => b.venta - a.venta);
   base.proyectos = proyectos;

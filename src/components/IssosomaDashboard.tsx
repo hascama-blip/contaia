@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 // costo/beneficio. El recálculo (POST) recorre Drive y puede tardar; se cachea.
 
 type Proyecto = { codigo: string; cliente: string; carpeta: string; responsable: string; venta: number; importeFacturado: number; costo: number; costoLogistica: number; utilidad: number; margen: number; saldo: number; nFacturas: number };
-type Factura = { codigo: string; cliente: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string };
+type Factura = { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string };
 type Gasto = { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number };
 type Analisis = {
   configurado: boolean; faltan?: string[]; cuentaServicio?: string;
@@ -199,10 +199,10 @@ export default function IssosomaDashboard() {
                   <div className="view">
                     <div className="page-head"><h1>Facturas de venta</h1><p className="sub-desc">{data.facturas.length} factura(s) electrónica(s) leídas de la carpeta de ventas.</p></div>
                     <div className="card"><div className="tbl-wrap tall"><table>
-                      <thead><tr><th>Código</th><th>Cliente</th><th>Detalle</th><th className="num">Valor venta</th><th className="num">Importe total</th></tr></thead>
+                      <thead><tr><th>Código</th><th>Cliente</th><th>Proyecto (descripción)</th><th>Archivo</th><th className="num">Valor venta</th><th className="num">Importe total</th></tr></thead>
                       <tbody>{data.facturas.map((f, i) => (
-                        <tr key={i}><td className="cd">{f.codigo || "—"}</td><td>{f.cliente || "—"}</td><td className="wrapc">{f.detalle}</td><td className="num">{S(f.valorVenta)}</td><td className="num">{S(f.importeTotal)}</td></tr>
-                      ))}{!data.facturas.length && <tr><td colSpan={5}>Sin facturas (revisa ISSOSOMA_VENTAS_FOLDER_ID).</td></tr>}</tbody>
+                        <tr key={i}><td className="cd">{f.codigo || "—"}</td><td>{f.cliente || "—"}</td><td className="wrapc">{f.proyecto || "—"}</td><td className="cd">{f.detalle}</td><td className="num">{S(f.valorVenta)}</td><td className="num">{S(f.importeTotal)}</td></tr>
+                      ))}{!data.facturas.length && <tr><td colSpan={6}>Sin facturas (revisa ISSOSOMA_VENTAS_FOLDER_ID).</td></tr>}</tbody>
                     </table></div></div>
                   </div>
                 )}
