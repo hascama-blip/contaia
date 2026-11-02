@@ -1,38 +1,39 @@
 import crypto from "crypto";
+import path from "path";
+import { promises as fs } from "fs";
 import * as XLSX from "xlsx";
+import { DATA_DIR } from "./db";
 
 // ============================================================
-//  ISSOSOMA — rendición de viáticos + ingresos/egresos/utilidad
+//  ISSOSOMA — costo por proyecto, relación de gastos y costo/beneficio
 // ============================================================
-// Se conecta a una carpeta de Google Drive por CUENTA DE SERVICIO (lectura),
-// lee las hojas (Google Sheets y Excel .xlsx) y arma el análisis financiero
-// para el dashboard. Config por entorno:
-//   - GOOGLE_SERVICE_ACCOUNT_JSON : el JSON de la cuenta de servicio (una línea).
-//   - ISSOSOMA_DRIVE_FOLDER_ID    : el ID de la carpeta de Drive de ISSOSOMA.
-// La carpeta debe estar COMPARTIDA (lector) con el client_email del service
-// account. No se guarda nada: se lee en vivo y se agrega en memoria.
+// Lee DOS carpetas de Google Drive por CUENTA DE SERVICIO (solo lectura):
+//   - PROYECTOS (costos): cada subcarpeta es un proyecto "INF-####-26-.. CLIENTE".
+//       Dentro: "3. BITACORA_RENDICION/BITACORA-RENDICION-####.xlsx" con los gastos.
+//   - VENTAS (ingresos): subcarpetas por mes; dentro, facturas electrónicas PDF
+//       "FE001-####-(####-26 CLIENTE)-% .pdf". El código #### vincula al proyecto.
+// Config por entorno:
+//   GOOGLE_SERVICE_ACCOUNT_JSON  — JSON de la cuenta de servicio.
+//   ISSOSOMA_DRIVE_FOLDER_ID     — carpeta de PROYECTOS (bitácoras).
+//   ISSOSOMA_VENTAS_FOLDER_ID    — carpeta de VENTAS (facturas).
+// El resultado se cachea en DATA_DIR/issosoma-cache.json (recálculo bajo demanda).
 
 const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
-const MIME_SHEET_GOOGLE = "application/vnd.google-apps.spreadsheet";
-const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const MIME_FOLDER = "application/vnd.google-apps.folder";
+const CACHE_PATH = path.join(DATA_DIR, "issosoma-cache.json");
 
-export interface IssosomaConfig {
-  folderId: string;
-  configurado: boolean;   // hay credenciales + carpeta
-  faltan: string[];       // qué variables de entorno faltan
-}
-
+export interface IssosomaConfig { folderId: string; ventasId: string; configurado: boolean; faltan: string[] }
 export function issosomaConfig(): IssosomaConfig {
   const faltan: string[] = [];
   if (!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "").trim()) faltan.push("GOOGLE_SERVICE_ACCOUNT_JSON");
   const folderId = (process.env.ISSOSOMA_DRIVE_FOLDER_ID || "").trim();
   if (!folderId) faltan.push("ISSOSOMA_DRIVE_FOLDER_ID");
-  return { folderId, configurado: faltan.length === 0, faltan };
+  const ventasId = (process.env.ISSOSOMA_VENTAS_FOLDER_ID || "").trim();
+  return { folderId, ventasId, configurado: faltan.length === 0, faltan };
 }
 
-// --- Autenticación de la cuenta de servicio (JWT RS256 → access token) -------
+// --- Cuenta de servicio (JWT RS256 → access token) --------------------------
 const b64url = (s: Buffer | string) => Buffer.from(s).toString("base64url");
-
 async function tokenServicio(): Promise<{ token: string; email: string }> {
   const raw = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "").trim();
   if (!raw) throw new Error("Falta GOOGLE_SERVICE_ACCOUNT_JSON");
@@ -41,236 +42,273 @@ async function tokenServicio(): Promise<{ token: string; email: string }> {
   if (!sa.client_email || !sa.private_key) throw new Error("El JSON del service account no trae client_email/private_key");
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(JSON.stringify({
-    iss: sa.client_email, scope: SCOPE,
-    aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
-  }));
+  const claim = b64url(JSON.stringify({ iss: sa.client_email, scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const signer = crypto.createSign("RSA-SHA256");
   signer.update(`${header}.${claim}`);
-  const sig = b64url(signer.sign(sa.private_key));
-  const assertion = `${header}.${claim}.${sig}`;
+  const assertion = `${header}.${claim}.${b64url(signer.sign(sa.private_key))}`;
   const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
   });
   const j: any = await res.json().catch(() => ({}));
-  if (!j.access_token) throw new Error(`No se pudo autenticar la cuenta de servicio (${res.status}): ${JSON.stringify(j).slice(0, 180)}`);
+  if (!j.access_token) throw new Error(`No se pudo autenticar la cuenta de servicio (${res.status})`);
   return { token: j.access_token, email: sa.client_email };
 }
 
-// --- Drive: listar carpeta y bajar bytes ------------------------------------
-export interface DriveFile { id: string; name: string; mimeType: string; modifiedTime?: string; size?: string }
-
-async function listarCarpeta(folderId: string, token: string): Promise<DriveFile[]> {
-  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,modifiedTime,size)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`No se pudo listar la carpeta Drive (${r.status}). ¿La compartiste con la cuenta de servicio?`);
-  const j: any = await r.json();
-  return (j.files ?? []) as DriveFile[];
+// --- Drive ------------------------------------------------------------------
+interface DFile { id: string; name: string; mimeType: string; modifiedTime?: string }
+async function listar(folderId: string, token: string): Promise<DFile[]> {
+  const out: DFile[] = [];
+  let pageToken = "";
+  do {
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error(`No se pudo listar la carpeta (${r.status}). ¿La compartiste con la cuenta de servicio?`);
+    const j: any = await r.json();
+    for (const f of (j.files ?? [])) out.push(f);
+    pageToken = j.nextPageToken || "";
+  } while (pageToken);
+  return out;
 }
-
-async function bajarBytes(file: DriveFile, token: string): Promise<Buffer> {
-  const esGoogle = file.mimeType === MIME_SHEET_GOOGLE;
-  const url = esGoogle
-    ? `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=${encodeURIComponent(MIME_XLSX)}`
-    : `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&supportsAllDrives=true`;
+async function bajar(id: string, token: string): Promise<Buffer> {
+  const url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`No se pudo bajar ${file.name} (${r.status})`);
+  if (!r.ok) throw new Error(`descarga ${id} (${r.status})`);
   return Buffer.from(await r.arrayBuffer());
 }
-
-// --- Lectura de un libro (Google Sheet exportado o .xlsx) → filas ------------
-interface HojaLeida { hoja: string; headers: string[]; filas: Record<string, any>[] }
-
-function leerLibro(buf: Buffer): HojaLeida[] {
-  const wb = XLSX.read(buf, { type: "buffer" });
-  const out: HojaLeida[] = [];
-  for (const nombre of wb.SheetNames) {
-    const ws = wb.Sheets[nombre];
-    const matriz: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
-    if (!matriz.length) continue;
-    // Fila de encabezados = primera fila con ≥2 celdas de texto no vacías.
-    let hIdx = matriz.findIndex((f) => f.filter((c) => String(c).trim()).length >= 2);
-    if (hIdx < 0) hIdx = 0;
-    const headers = (matriz[hIdx] ?? []).map((c) => String(c).trim());
-    const filas: Record<string, any>[] = [];
-    for (let i = hIdx + 1; i < matriz.length; i++) {
-      const fila = matriz[i];
-      if (!fila || !fila.some((c) => String(c).trim())) continue;
-      const obj: Record<string, any> = {};
-      headers.forEach((h, j) => { if (h) obj[h] = fila[j]; });
-      filas.push(obj);
-    }
-    out.push({ hoja: nombre, headers, filas });
-  }
+// Ejecuta tareas con concurrencia limitada (para no saturar Drive).
+async function pool<T, R>(items: T[], limite: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limite, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; try { out[idx] = await fn(items[idx]); } catch { out[idx] = undefined as any; } }
+  }));
   return out;
 }
 
-// --- Detección flexible de columnas (se calibra con los datos reales) --------
-const RX = {
-  fecha: /fecha|date|d[ií]a|periodo|mes/i,
-  concepto: /concepto|detalle|descrip|glosa|motivo|rubro/i,
-  monto: /monto|importe|total|valor|s\/|soles|monto\s*total/i,
-  ingreso: /ingreso|abono|entrada|venta|cobro|dep[oó]sito|haber/i,
-  egreso: /egreso|gasto|salida|pago|compra|debe|desembolso/i,
-  categoria: /categor|rubro|tipo|partida|clasif|cuenta/i,
-  sede: /sede|proyecto|obra|centro|área|area|unidad/i,
-  persona: /persona|responsable|colaborador|empleado|nombre|solicitante|rendidor/i,
-  estado: /estado|situaci|status/i,
-};
-const hallar = (headers: string[], rx: RegExp) => headers.find((h) => rx.test(h)) || "";
-const num = (v: any): number => {
-  if (typeof v === "number") return v;
-  const s = String(v ?? "").replace(/[^\d,.\-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+// --- Parseo de montos y etiquetas -------------------------------------------
+function toNum(v: any): number {
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  let s = String(v ?? "").trim();
+  if (!s) return 0;
+  const neg = /^-|-\s*S\/|^\(/.test(s);
+  s = s.replace(/[^\d.,-]/g, "");
+  if (s.includes(",") && s.includes(".")) s = s.replace(/,/g, "");
+  else if (s.includes(",")) s = /,\d{1,2}$/.test(s) ? s.replace(",", ".") : s.replace(/,/g, "");
   const n = parseFloat(s);
-  return isFinite(n) ? n : 0;
-};
-const esViatico = (s: string) => /vi[aá]tico|rendici[oó]n|movilidad|per\s*diem/i.test(s || "");
-const mesDe = (v: any): string => {
-  if (v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}`;
-  const s = String(v ?? "");
-  let m = s.match(/(\d{4})[-/](\d{1,2})/);                 // 2026-09 / 2026/9
-  if (m) return `${m[1]}-${m[2].padStart(2, "0")}`;
-  m = s.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);      // dd/mm/aaaa
-  if (m) { const a = m[3].length === 2 ? "20" + m[3] : m[3]; return `${a}-${m[2].padStart(2, "0")}`; }
-  return "";
-};
+  if (!isFinite(n)) return 0;
+  return neg && n > 0 ? -n : n;
+}
+const codigoInf = (s: string): string => { const m = String(s || "").match(/(\d{3,4})-\d{2}/) || String(s || "").match(/INF[- ]?(\d{3,4})/i); return m ? m[1] : ""; };
 
-export interface Movimiento {
-  fecha: string; mes: string; concepto: string; categoria: string; sede: string; persona: string;
-  ingreso: number; egreso: number; viatico: boolean; estado: string; fuente: string;
+// --- Bitácora (costos) ------------------------------------------------------
+export interface ProyectoCosto {
+  codigo: string; carpeta: string; cliente: string;
+  costoLogistica: number; costoTotal: number; montoDepositado: number; saldo: number;
+  gastos: { fecha: string; descripcion: string; monto: number }[];
+  archivo: string;
+}
+function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archivo"> {
+  const wb = XLSX.read(buf, { type: "buffer" });
+  const filas: any[][] = [];
+  for (const nombre of wb.SheetNames) {
+    const m: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, blankrows: false, defval: "" });
+    for (const r of m) filas.push(r.map((c) => (c == null ? "" : c)));
+  }
+  const texto = (r: any[]) => r.map((c) => String(c).trim());
+  // Valor numérico a la derecha de la 1ª celda que casa el regex.
+  const valorEtiqueta = (rx: RegExp): number => {
+    for (const r of filas) {
+      const t = texto(r);
+      const idx = t.findIndex((c) => rx.test(c));
+      if (idx >= 0) for (let j = idx + 1; j < t.length; j++) if (/\d/.test(t[j])) return toNum(t[j]);
+    }
+    return 0;
+  };
+  const textoEtiqueta = (rx: RegExp): string => {
+    for (const r of filas) {
+      const t = texto(r);
+      const idx = t.findIndex((c) => rx.test(c));
+      if (idx >= 0) for (let j = idx + 1; j < t.length; j++) if (t[j]) return t[j];
+    }
+    return "";
+  };
+  const costoLogistica = valorEtiqueta(/GASTOS?\s*TOTAL\s*LOGISTICA/i);
+  // Gran total (logística + personal): un "TOTAL" cercano, con valor ≥ logística.
+  let costoTotal = 0;
+  const idxLog = filas.findIndex((r) => texto(r).some((c) => /GASTOS?\s*TOTAL\s*LOGISTICA/i.test(c)));
+  if (idxLog >= 0) {
+    for (let k = idxLog; k < Math.min(filas.length, idxLog + 8); k++) {
+      const t = texto(filas[k]);
+      if (t.some((c) => /^TOTAL$/i.test(c))) { const n = Math.max(...t.map(toNum)); if (n >= costoLogistica) costoTotal = n; }
+    }
+  }
+  if (!costoTotal) {
+    const personal = filas.filter((r) => texto(r).some((c) => /PAGO A PERSONAL/i.test(c))).reduce((a, r) => a + Math.max(...texto(r).map(toNum)), 0);
+    costoTotal = costoLogistica + personal;
+  }
+  // Relación de gastos operativos (fecha, descripción, monto).
+  const gastos: { fecha: string; descripcion: string; monto: number }[] = [];
+  const iniG = filas.findIndex((r) => texto(r).some((c) => /GASTOS OPERATIVOS/i.test(c)));
+  if (iniG >= 0) {
+    for (let k = iniG; k < filas.length; k++) {
+      const t = texto(filas[k]);
+      if (t.some((c) => /GASTOS?\s*TOTAL\s*LOGISTICA/i.test(c))) break;
+      // Busca patrón [fecha, descripción, monto] en la fila.
+      const fi = t.findIndex((c) => /\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4}/.test(c));
+      if (fi >= 0 && t[fi + 1] && /\d/.test(t[fi + 2] || "")) {
+        const monto = toNum(t[fi + 2]);
+        if (monto) gastos.push({ fecha: t[fi], descripcion: t[fi + 1], monto });
+      }
+    }
+  }
+  const cliente = textoEtiqueta(/^CLIENTE:?$/i) || carpeta.replace(/INF[- ]?\d{3,4}-\d{2}-?\w*/i, "").trim();
+  return {
+    codigo: codigoInf(carpeta),
+    carpeta, cliente,
+    costoLogistica, costoTotal,
+    montoDepositado: valorEtiqueta(/MONTO\s*DEPOSITADO/i),
+    saldo: valorEtiqueta(/^SALDO/i),
+    gastos: gastos.slice(0, 200),
+  };
+}
+
+// --- Factura de venta (ingresos) --------------------------------------------
+export interface FacturaVenta { codigo: string; cliente: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string }
+async function parseFacturaPdf(id: string, nombre: string, token: string): Promise<FacturaVenta | null> {
+  let texto = "";
+  try {
+    const buf = await bajar(id, token);
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const r = await extractText(pdf, { mergePages: true });
+    texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
+  } catch { return null; }
+  const codigo = codigoInf(nombre) || codigoInf(texto);
+  const mVV = texto.match(/Valor\s*Venta\s*:?\s*S\/\.?\s*([\d.,]+)/i) || texto.match(/Sub\s*Total\s*Ventas\s*:?\s*S\/\.?\s*([\d.,]+)/i);
+  const mIT = texto.match(/Importe\s*Total\s*:?\s*S\/\.?\s*([\d.,]+)/i);
+  const mCli = texto.match(/Se[ñn]or\(es\)\s*:?\s*(.+?)\s*RUC/i);
+  const valorVenta = mVV ? toNum(mVV[1]) : 0;
+  const importeTotal = mIT ? toNum(mIT[1]) : 0;
+  if (!codigo && !valorVenta && !importeTotal) return null;
+  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre };
+}
+
+// --- Análisis completo (costo/beneficio por proyecto) -----------------------
+export interface ProyectoAnalisis {
+  codigo: string; cliente: string; carpeta: string;
+  venta: number; importeFacturado: number; costo: number; costoLogistica: number;
+  utilidad: number; margen: number; saldo: number; nFacturas: number;
 }
 export interface IssosomaAnalisis {
-  configurado: boolean;
-  faltan?: string[];
-  cuentaServicio?: string;
-  folderId?: string;
-  archivos: { name: string; mimeType: string; modifiedTime?: string; filas?: number; leido: boolean; nota?: string }[];
-  kpis: { ingresos: number; egresos: number; utilidad: number; margen: number; viaticos: number; movimientos: number };
-  porMes: { mes: string; ingresos: number; egresos: number; utilidad: number }[];
-  porCategoria: { categoria: string; egresos: number; ingresos: number }[];
-  porSede: { sede: string; ingresos: number; egresos: number; utilidad: number }[];
-  porPersona: { persona: string; viaticos: number; movimientos: number }[];
-  viaticos: Movimiento[];
-  error?: string;
+  configurado: boolean; faltan?: string[]; cuentaServicio?: string;
+  kpis: { venta: number; costo: number; utilidad: number; margen: number; proyectos: number; proyectosConVenta: number };
+  proyectos: ProyectoAnalisis[];
+  facturas: FacturaVenta[];
+  gastos: { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number }[];
+  avisos: string[];
   generadoAt: string;
+  error?: string;
 }
 
-/** Lee la carpeta Drive de ISSOSOMA y arma el análisis financiero. */
-export async function analizarIssosoma(): Promise<IssosomaAnalisis> {
+export async function leerCache(): Promise<IssosomaAnalisis | null> {
+  try { return JSON.parse(await fs.readFile(CACHE_PATH, "utf-8")); } catch { return null; }
+}
+async function guardarCache(a: IssosomaAnalisis): Promise<void> {
+  try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(CACHE_PATH, JSON.stringify(a)); } catch { /* */ }
+}
+
+/** Recalcula TODO desde Drive (costoso): bitácoras + facturas. Cachea el resultado. */
+export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   const cfg = issosomaConfig();
+  const avisos: string[] = [];
   const base: IssosomaAnalisis = {
-    configurado: cfg.configurado, faltan: cfg.faltan, folderId: cfg.folderId,
-    archivos: [], viaticos: [], porMes: [], porCategoria: [], porSede: [], porPersona: [],
-    kpis: { ingresos: 0, egresos: 0, utilidad: 0, margen: 0, viaticos: 0, movimientos: 0 },
-    generadoAt: new Date().toISOString(),
+    configurado: cfg.configurado, faltan: cfg.faltan,
+    kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, proyectos: 0, proyectosConVenta: 0 },
+    proyectos: [], facturas: [], gastos: [], avisos, generadoAt: new Date().toISOString(),
   };
   if (!cfg.configurado) return base;
-
   const { token, email } = await tokenServicio();
   base.cuentaServicio = email;
-  const files = await listarCarpeta(cfg.folderId, token);
 
-  const movimientos: Movimiento[] = [];
-  for (const f of files) {
-    const esLibro = f.mimeType === MIME_SHEET_GOOGLE || f.mimeType === MIME_XLSX || /\.xlsx?$/i.test(f.name);
-    if (!esLibro) {
-      base.archivos.push({ name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, leido: false, nota: /pdf/i.test(f.mimeType) ? "PDF (rendición) — pendiente de parseo" : "no es hoja de cálculo" });
-      continue;
+  // 1) COSTOS: carpetas de proyecto → bitácora.
+  const raiz = (await listar(cfg.folderId, token)).filter((f) => f.mimeType === MIME_FOLDER && /INF[- ]?\d{3,4}/i.test(f.name));
+  const costos = await pool(raiz, 6, async (proj): Promise<ProyectoCosto | null> => {
+    const hijos = await listar(proj.id, token);
+    const bitFolder = hijos.find((h) => h.mimeType === MIME_FOLDER && /bitacora|rendicion/i.test(h.name));
+    const cont = bitFolder ? await listar(bitFolder.id, token) : hijos;
+    const xlsx = cont.find((c) => /bitacora|rendicion/i.test(c.name) && /\.xlsx?$/i.test(c.name) && !/^BITACORA-RENDICION-XXXX/i.test(c.name))
+      || cont.find((c) => /bitacora|rendicion/i.test(c.name) && /\.xlsx?$/i.test(c.name));
+    if (!xlsx) return null;
+    const buf = await bajar(xlsx.id, token);
+    return { ...parseBitacora(buf, proj.name), archivo: xlsx.name };
+  });
+  const costosOk = costos.filter(Boolean) as ProyectoCosto[];
+
+  // 2) VENTAS: meses → facturas PDF.
+  const facturas: FacturaVenta[] = [];
+  if (cfg.ventasId) {
+    const meses = (await listar(cfg.ventasId, token)).filter((f) => f.mimeType === MIME_FOLDER);
+    for (const mes of meses) {
+      const archivos = (await listar(mes.id, token)).filter((f) => /\.pdf$/i.test(f.name) && /^FE|factura|\(\d{3,4}-\d{2}/i.test(f.name));
+      const fs2 = await pool(archivos, 6, (f) => parseFacturaPdf(f.id, f.name, token));
+      for (const f of fs2) if (f) facturas.push(f);
     }
-    try {
-      const buf = await bajarBytes(f, token);
-      const hojas = leerLibro(buf);
-      let filasLeidas = 0;
-      for (const h of hojas) {
-        const cFecha = hallar(h.headers, RX.fecha);
-        const cConcepto = hallar(h.headers, RX.concepto);
-        const cIngreso = hallar(h.headers, RX.ingreso);
-        const cEgreso = hallar(h.headers, RX.egreso);
-        const cMonto = hallar(h.headers, RX.monto);
-        const cCat = hallar(h.headers, RX.categoria);
-        const cSede = hallar(h.headers, RX.sede);
-        const cPersona = hallar(h.headers, RX.persona);
-        const cEstado = hallar(h.headers, RX.estado);
-        const hojaEsViatico = esViatico(f.name) || esViatico(h.hoja);
-        for (const r of h.filas) {
-          const concepto = String(cConcepto ? r[cConcepto] : "").trim();
-          const categoria = String(cCat ? r[cCat] : "").trim();
-          let ingreso = cIngreso ? num(r[cIngreso]) : 0;
-          let egreso = cEgreso ? num(r[cEgreso]) : 0;
-          // Sin columnas ingreso/egreso separadas: usar monto + categoría/signo.
-          if (!cIngreso && !cEgreso && cMonto) {
-            const m = num(r[cMonto]);
-            const esIng = RX.ingreso.test(categoria) || RX.ingreso.test(concepto);
-            if (esIng && m > 0) ingreso = m; else egreso = Math.abs(m);
-          }
-          if (!ingreso && !egreso) continue;
-          const viatico = hojaEsViatico || esViatico(categoria) || esViatico(concepto);
-          movimientos.push({
-            fecha: String(cFecha ? r[cFecha] : "").trim(),
-            mes: mesDe(cFecha ? r[cFecha] : ""),
-            concepto, categoria: categoria || (viatico ? "Viáticos" : ""),
-            sede: String(cSede ? r[cSede] : "").trim(),
-            persona: String(cPersona ? r[cPersona] : "").trim(),
-            ingreso, egreso, viatico, estado: String(cEstado ? r[cEstado] : "").trim(),
-            fuente: f.name,
-          });
-          filasLeidas++;
-        }
-      }
-      base.archivos.push({ name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, filas: filasLeidas, leido: true });
-    } catch (e: any) {
-      base.archivos.push({ name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, leido: false, nota: String(e?.message ?? e).slice(0, 120) });
-    }
+  } else {
+    avisos.push("No se configuró ISSOSOMA_VENTAS_FOLDER_ID: no se pudo calcular la venta/beneficio (solo costos).");
   }
+  base.facturas = facturas;
 
-  // --- Agregaciones ----------------------------------------------------------
-  const ingresos = movimientos.reduce((a, m) => a + m.ingreso, 0);
-  const egresos = movimientos.reduce((a, m) => a + m.egreso, 0);
-  const viaticosTot = movimientos.filter((m) => m.viatico).reduce((a, m) => a + m.egreso, 0);
+  // 3) MATCH por código → costo/beneficio.
+  const ventaPorCod = new Map<string, { venta: number; importe: number; n: number }>();
+  for (const f of facturas) {
+    if (!f.codigo) continue;
+    const o = ventaPorCod.get(f.codigo) ?? { venta: 0, importe: 0, n: 0 };
+    o.venta += f.valorVenta; o.importe += f.importeTotal; o.n++; ventaPorCod.set(f.codigo, o);
+  }
+  const proyectos: ProyectoAnalisis[] = [];
+  const vistos = new Set<string>();
+  for (const c of costosOk) {
+    const v = ventaPorCod.get(c.codigo) ?? { venta: 0, importe: 0, n: 0 };
+    vistos.add(c.codigo);
+    const utilidad = v.venta - c.costoTotal;
+    proyectos.push({
+      codigo: c.codigo, cliente: c.cliente, carpeta: c.carpeta,
+      venta: v.venta, importeFacturado: v.importe, costo: c.costoTotal, costoLogistica: c.costoLogistica,
+      utilidad, margen: v.venta ? utilidad / v.venta : 0, saldo: c.saldo, nFacturas: v.n,
+    });
+    for (const g of c.gastos) base.gastos.push({ codigo: c.codigo, cliente: c.cliente, ...g });
+  }
+  // Facturas de proyectos sin bitácora (venta sin costo todavía).
+  for (const [cod, v] of ventaPorCod) {
+    if (vistos.has(cod)) continue;
+    const f = facturas.find((x) => x.codigo === cod);
+    proyectos.push({ codigo: cod, cliente: f?.cliente || "", carpeta: "", venta: v.venta, importeFacturado: v.importe, costo: 0, costoLogistica: 0, utilidad: v.venta, margen: v.venta ? 1 : 0, saldo: 0, nFacturas: v.n });
+  }
+  proyectos.sort((a, b) => b.venta - a.venta);
+  base.proyectos = proyectos;
+
+  const venta = proyectos.reduce((a, p) => a + p.venta, 0);
+  const costo = proyectos.reduce((a, p) => a + p.costo, 0);
   base.kpis = {
-    ingresos, egresos, utilidad: ingresos - egresos,
-    margen: ingresos ? (ingresos - egresos) / ingresos : 0,
-    viaticos: viaticosTot, movimientos: movimientos.length,
+    venta, costo, utilidad: venta - costo, margen: venta ? (venta - costo) / venta : 0,
+    proyectos: proyectos.length, proyectosConVenta: proyectos.filter((p) => p.venta > 0).length,
   };
-
-  const agr = <T extends string>(key: (m: Movimiento) => T) => {
-    const map = new Map<T, { ingresos: number; egresos: number; n: number }>();
-    for (const m of movimientos) {
-      const k = key(m); if (!k) continue;
-      const o = map.get(k) ?? { ingresos: 0, egresos: 0, n: 0 };
-      o.ingresos += m.ingreso; o.egresos += m.egreso; o.n++;
-      map.set(k, o);
-    }
-    return map;
-  };
-
-  base.porMes = Array.from(agr((m) => m.mes).entries())
-    .filter(([k]) => k)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([mes, o]) => ({ mes, ingresos: o.ingresos, egresos: o.egresos, utilidad: o.ingresos - o.egresos }));
-
-  base.porCategoria = Array.from(agr((m) => m.categoria || "Sin categoría").entries())
-    .map(([categoria, o]) => ({ categoria, egresos: o.egresos, ingresos: o.ingresos }))
-    .sort((a, b) => b.egresos - a.egresos).slice(0, 20);
-
-  base.porSede = Array.from(agr((m) => m.sede).entries())
-    .filter(([k]) => k)
-    .map(([sede, o]) => ({ sede, ingresos: o.ingresos, egresos: o.egresos, utilidad: o.ingresos - o.egresos }))
-    .sort((a, b) => b.utilidad - a.utilidad).slice(0, 20);
-
-  const perMap = new Map<string, { viaticos: number; n: number }>();
-  for (const m of movimientos) {
-    if (!m.viatico || !m.persona) continue;
-    const o = perMap.get(m.persona) ?? { viaticos: 0, n: 0 };
-    o.viaticos += m.egreso; o.n++; perMap.set(m.persona, o);
-  }
-  base.porPersona = Array.from(perMap.entries())
-    .map(([persona, o]) => ({ persona, viaticos: o.viaticos, movimientos: o.n }))
-    .sort((a, b) => b.viaticos - a.viaticos).slice(0, 30);
-
-  base.viaticos = movimientos.filter((m) => m.viatico).slice(0, 500);
+  base.gastos = base.gastos.slice(0, 1000);
+  await guardarCache(base);
   return base;
+}
+
+/** Devuelve el análisis cacheado (rápido). Si no hay caché, intenta recalcular. */
+export async function analizarIssosoma(opts?: { refrescar?: boolean }): Promise<IssosomaAnalisis> {
+  const cfg = issosomaConfig();
+  if (!cfg.configurado) {
+    return { configurado: false, faltan: cfg.faltan, kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, proyectos: 0, proyectosConVenta: 0 }, proyectos: [], facturas: [], gastos: [], avisos: [], generadoAt: new Date().toISOString() };
+  }
+  if (!opts?.refrescar) {
+    const c = await leerCache();
+    if (c) return c;
+  }
+  return recalcularIssosoma();
 }
