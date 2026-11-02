@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { analizarIssosoma, recalcularIssosoma, leerCache, issosomaConfig } from "@/lib/issosoma";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 // GET  → análisis cacheado (rápido). Si no hay caché, intenta calcular.
@@ -23,8 +23,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   if (!(await getCurrentUser())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
   try {
-    const data = await recalcularIssosoma();
+    const data = await recalcularIssosoma({ completo: body?.completo === true });
     return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? "Error recalculando ISSOSOMA" }, { status: 400 });

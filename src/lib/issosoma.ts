@@ -21,6 +21,12 @@ import { DATA_DIR } from "./db";
 const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const MIME_FOLDER = "application/vnd.google-apps.folder";
 const CACHE_PATH = path.join(DATA_DIR, "issosoma-cache.json");
+// Caché POR ARCHIVO (incremental): fileId → lo ya leído (parse/OCR). En cada
+// recálculo se reutiliza y solo se leen los archivos NUEVOS o modificados.
+const ARCH_PATH = path.join(DATA_DIR, "issosoma-archivos.json");
+type ArchivoCache = Record<string, { mt: string; tipo: string; data: any }>;
+async function leerArchCache(): Promise<ArchivoCache> { try { return JSON.parse(await fs.readFile(ARCH_PATH, "utf-8")); } catch { return {}; } }
+async function guardarArchCache(c: ArchivoCache): Promise<void> { try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(ARCH_PATH, JSON.stringify(c)); } catch { /* */ } }
 
 export interface IssosomaConfig { folderId: string; ventasId: string; configurado: boolean; faltan: string[] }
 export function issosomaConfig(): IssosomaConfig {
@@ -234,29 +240,51 @@ function egresoDeTexto(texto: string, nombre: string, mes: string, permitirMax: 
   const fecha = (texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || texto.match(/\b\d{2}-\d{2}-\d{4}\b/) || [""])[0];
   return { emisor, ruc, importe, fecha, archivo: nombre, mes };
 }
-/** Factura de compra en PDF (capa de texto). */
-async function parseRecibidaPdf(id: string, nombre: string, token: string, mes: string): Promise<EgresoRecibido | null> {
-  let texto = "";
+const RX_IMG = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
+/** OCR de un PDF ESCANEADO: extrae la imagen de cada página (unpdf), la codifica
+ *  a PNG (fast-png) y la pasa por tesseract. Hasta 3 páginas (acota tiempo). */
+async function ocrPdfBuffer(buf: Buffer): Promise<string> {
   try {
-    const buf = await bajar(id, token);
-    const { extractText, getDocumentProxy } = await import("unpdf");
-    const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const r = await extractText(pdf, { mergePages: true });
-    texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
-  } catch { return null; }
-  if (!texto.trim()) return null;
-  return egresoDeTexto(texto, nombre, mes, false);
-}
-/** Foto/boleta/captura (imagen) → OCR (tesseract) → egreso. */
-async function parseRecibidaImagen(id: string, nombre: string, token: string, mes: string, mimeType: string): Promise<EgresoRecibido | null> {
-  let texto = "";
-  try {
-    const buf = await bajar(id, token);
+    const { getDocumentProxy, extractImages } = await import("unpdf");
+    const { encode } = await import("fast-png");
     const { ocrImagen } = await import("./ocr");
-    texto = await ocrImagen(buf, mimeType || "image/png");
-  } catch { return null; }
-  if (!texto.trim()) return null;
-  return egresoDeTexto(texto, nombre, mes, true);
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const nPags = Math.min((pdf as any).numPages || 1, 3);
+    let texto = "";
+    for (let p = 1; p <= nPags; p++) {
+      let imgs: any[] = [];
+      try { imgs = (await extractImages(pdf, p)) as any[]; } catch { imgs = []; }
+      const im = imgs.sort((a, b) => b.width * b.height - a.width * a.height)[0];
+      if (!im?.data) continue;
+      let data: Uint8Array = im.data;
+      const n = im.width * im.height;
+      if (im.channels === 3) { const o = new Uint8Array(n * 4); for (let i = 0; i < n; i++) { o[i * 4] = data[i * 3]; o[i * 4 + 1] = data[i * 3 + 1]; o[i * 4 + 2] = data[i * 3 + 2]; o[i * 4 + 3] = 255; } data = o; }
+      else if (im.channels === 1) { const o = new Uint8Array(n * 4); for (let i = 0; i < n; i++) { const v = data[i]; o[i * 4] = v; o[i * 4 + 1] = v; o[i * 4 + 2] = v; o[i * 4 + 3] = 255; } data = o; }
+      const png = encode({ width: im.width, height: im.height, data });
+      texto += " " + await ocrImagen(Buffer.from(png), "image/png");
+    }
+    return texto.trim();
+  } catch { return ""; }
+}
+/** Lee un egreso (compra) de un archivo. PDF con texto → directo; PDF escaneado o
+ *  imagen (foto/boleta/captura Yape) → OCR (si `hacerOcr`). `deferido`=necesitaba
+ *  OCR pero se superó el tope de la corrida (se reintenta en la próxima). */
+async function leerEgreso(file: DFile, token: string, mes: string, hacerOcr: boolean): Promise<{ egreso: EgresoRecibido | null; ocr: boolean; deferido: boolean }> {
+  const esImg = RX_IMG.test(file.name) || /^image\//i.test(file.mimeType);
+  if (esImg && !hacerOcr) return { egreso: null, ocr: false, deferido: true };
+  let buf: Buffer;
+  try { buf = await bajar(file.id, token); } catch { return { egreso: null, ocr: false, deferido: false }; }
+  if (esImg) {
+    const { ocrImagen } = await import("./ocr");
+    const texto = await ocrImagen(buf, file.mimeType || "image/png").catch(() => "");
+    return { egreso: texto.trim() ? egresoDeTexto(texto, file.name, mes, true) : null, ocr: true, deferido: false };
+  }
+  let texto = "";
+  try { const { extractText, getDocumentProxy } = await import("unpdf"); const pdf = await getDocumentProxy(new Uint8Array(buf)); const r = await extractText(pdf, { mergePages: true }); texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || ""); } catch { /* */ }
+  if (texto.trim()) return { egreso: egresoDeTexto(texto, file.name, mes, false), ocr: false, deferido: false };
+  if (!hacerOcr) return { egreso: null, ocr: false, deferido: true }; // escaneado, sin cupo OCR
+  const t2 = await ocrPdfBuffer(buf);
+  return { egreso: t2.trim() ? egresoDeTexto(t2, file.name, mes, true) : null, ocr: true, deferido: false };
 }
 
 // --- Análisis completo (costo/beneficio por proyecto) -----------------------
@@ -284,8 +312,10 @@ async function guardarCache(a: IssosomaAnalisis): Promise<void> {
   try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(CACHE_PATH, JSON.stringify(a)); } catch { /* */ }
 }
 
-/** Recalcula TODO desde Drive (costoso): bitácoras + facturas. Cachea el resultado. */
-export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
+/** Recalcula desde Drive (bitácoras + facturas + egresos). INCREMENTAL: reutiliza
+ *  lo ya leído (caché por archivo) y solo lee los NUEVOS/modificados. `completo`
+ *  fuerza releer todo. Cachea el resultado. */
+export async function recalcularIssosoma(opts?: { completo?: boolean }): Promise<IssosomaAnalisis> {
   const cfg = issosomaConfig();
   const avisos: string[] = [];
   const base: IssosomaAnalisis = {
@@ -296,6 +326,18 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   if (!cfg.configurado) return base;
   const { token, email } = await tokenServicio();
   base.cuentaServicio = email;
+
+  // --- Caché incremental por archivo: solo se leen los NUEVOS/modificados. ---
+  const arch: ArchivoCache = opts?.completo ? {} : await leerArchCache();
+  let reusados = 0, leidos = 0;
+  const memo = async <T>(file: DFile, tipo: string, fn: () => Promise<T>): Promise<T> => {
+    const prev = arch[file.id];
+    if (prev && prev.mt === (file.modifiedTime || "") && prev.tipo === tipo) { reusados++; return prev.data as T; }
+    const data = await fn();
+    arch[file.id] = { mt: file.modifiedTime || "", tipo, data };
+    leidos++;
+    return data;
+  };
 
   // 1) COSTOS: carpetas de proyecto → bitácora.
   const raizTodo = await listar(cfg.folderId, token);
@@ -308,10 +350,10 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
     const xlsx = cont.find((c) => /bitacora|rendicion/i.test(c.name) && /\.xlsx?$/i.test(c.name) && !/^BITACORA-RENDICION-XXXX/i.test(c.name))
       || cont.find((c) => /bitacora|rendicion/i.test(c.name) && /\.xlsx?$/i.test(c.name));
     if (!xlsx) return null;
-    const buf = await bajar(xlsx.id, token);
-    return { ...parseBitacora(buf, proj.name), archivo: xlsx.name };
+    return await memo(xlsx, "bitacora", async () => ({ ...parseBitacora(await bajar(xlsx.id, token), proj.name), archivo: xlsx.name }));
   });
   const costosOk = costos.filter(Boolean) as ProyectoCosto[];
+  await guardarArchCache(arch);
   avisos.push(`Bitácoras con datos leídas: ${costosOk.length}.`);
 
   // 2) VENTAS (FE) + NOTAS DE CRÉDITO (NC) + EGRESOS recibidos (compras).
@@ -320,33 +362,49 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   if (cfg.ventasId) {
     const ventasTodo = await listar(cfg.ventasId, token);
     const meses = ventasTodo.filter((f) => f.mimeType === MIME_FOLDER);
-    let compTotal = 0, recPdfN = 0, recImgN = 0, ocrN = 0, ocrOmit = 0;
-    const OCR_MAX = Math.max(0, Number(process.env.ISSOSOMA_OCR_MAX || 80));
+    let compTotal = 0, egresoTotal = 0, ocrNuevas = 0, ocrOmit = 0;
+    // Tope de imágenes NUEVAS a OCR por corrida (las ya leídas se reutilizan y no
+    // cuentan). Así cada recálculo termina a tiempo y el progreso se acumula:
+    // volvé a pulsar Recalcular hasta que los avisos digan "0 nuevas".
+    const OCR_MAX = Math.max(0, Number(process.env.ISSOSOMA_OCR_MAX || 200));
     for (const mes of meses) {
       const hijos = await listar(mes.id, token);
       // Comprobantes de VENTA (FE emitidas y NC notas de crédito).
       const comp = hijos.filter((f) => /\.pdf$/i.test(f.name) && /^FE|^NC|factura|\(\d{3,4}-\d{2}/i.test(f.name));
       compTotal += comp.length;
-      const fs2 = await pool(comp, 6, (f) => parseFacturaPdf(f.id, f.name, token, mes.name));
+      const fs2 = await pool(comp, 6, (f) => memo(f, "factura", () => parseFacturaPdf(f.id, f.name, token, mes.name)));
       for (const f of fs2) if (f) facturas.push(f);
-      // Carpeta "recibidas": facturas de COMPRA (egresos de proveedores). PDFs con
-      // texto en paralelo; fotos/capturas (imágenes) por OCR secuencial (tope).
+      // EGRESOS (compras): archivos de la(s) carpeta(s) "recibidas" + egresos
+      // sueltos en la RAÍZ del mes (ej. "recibido restaurante.pdf", fotos de
+      // boletas, capturas de Yape), excluyendo los comprobantes de venta (FE/NC).
+      // PDF con texto → directo; escaneado/imagen → OCR (incremental, con tope).
+      const egresoCands: DFile[] = [];
       for (const rf of hijos.filter((h) => h.mimeType === MIME_FOLDER && /recib/i.test(h.name))) {
         const recAll = await listar(rf.id, token);
-        const recPdf = recAll.filter((f) => /\.pdf$/i.test(f.name));
-        const recImg = recAll.filter((f) => /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(f.name) || /^image\//i.test(f.mimeType));
-        recPdfN += recPdf.length; recImgN += recImg.length;
-        const rs = await pool(recPdf, 6, (f) => parseRecibidaPdf(f.id, f.name, token, mes.name));
-        for (const r of rs) if (r) egresos.push(r);
-        for (const img of recImg) {
-          if (ocrN >= OCR_MAX) { ocrOmit++; continue; }
-          ocrN++;
-          const r = await parseRecibidaImagen(img.id, img.name, token, mes.name, img.mimeType);
-          if (r) egresos.push(r);
-        }
+        for (const f of recAll) if (f.mimeType !== MIME_FOLDER && (/\.pdf$/i.test(f.name) || RX_IMG.test(f.name) || /^image\//i.test(f.mimeType))) egresoCands.push(f);
       }
+      const compIds = new Set(comp.map((c) => c.id));
+      for (const f of hijos) {
+        if (f.mimeType === MIME_FOLDER || compIds.has(f.id)) continue;
+        const esImg = RX_IMG.test(f.name) || /^image\//i.test(f.mimeType);
+        const nombreEgreso = /recib|boleta|recibo|ticket|gasto|egreso|compra|yape|dep[oó]sito|transferen/i.test(f.name);
+        if (esImg || (/\.pdf$/i.test(f.name) && nombreEgreso)) egresoCands.push(f);
+      }
+      egresoTotal += egresoCands.length;
+      for (const f of egresoCands) {
+        const prev = arch[f.id];
+        if (prev && prev.mt === (f.modifiedTime || "") && prev.tipo === "egreso") { reusados++; if (prev.data) egresos.push(prev.data); continue; }
+        const res = await leerEgreso(f, token, mes.name, ocrNuevas < OCR_MAX);
+        if (res.deferido) { ocrOmit++; continue; } // necesita OCR pero superó el tope: se reintenta la próxima corrida (no se cachea)
+        if (res.ocr) ocrNuevas++;
+        arch[f.id] = { mt: f.modifiedTime || "", tipo: "egreso", data: res.egreso };
+        leidos++;
+        if (res.egreso) egresos.push(res.egreso);
+        if (leidos % 10 === 0) await guardarArchCache(arch);
+      }
+      await guardarArchCache(arch); // persiste al terminar cada mes
     }
-    avisos.push(`Ventas: ${meses.length} mes(es), ${compTotal} comprobante(s) de venta (${facturas.length} leídos). Egresos: ${recPdfN} PDF + ${recImgN} imagen(es); OCR a ${ocrN}${ocrOmit ? ` (${ocrOmit} sobre el tope ISSOSOMA_OCR_MAX=${OCR_MAX})` : ""}. Egresos leídos: ${egresos.length}.`);
+    avisos.push(`Ventas: ${meses.length} mes(es), ${compTotal} comprobante(s) de venta (${facturas.length} leídos). Egresos candidatos: ${egresoTotal}; leídos: ${egresos.length}; OCR nuevas: ${ocrNuevas}${ocrOmit ? ` · pendientes para la próxima corrida: ${ocrOmit}` : ""}. Reutilizados de caché: ${reusados}; nuevos: ${leidos}.`);
   } else {
     avisos.push("No se configuró ISSOSOMA_VENTAS_FOLDER_ID: no se pudo calcular la venta/beneficio (solo costos).");
   }
@@ -395,6 +453,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
     proyectos: proyectos.length, proyectosConVenta: proyectos.filter((p) => p.venta > 0).length,
   };
   base.gastos = base.gastos.slice(0, 1000);
+  await guardarArchCache(arch);
   await guardarCache(base);
   return base;
 }
