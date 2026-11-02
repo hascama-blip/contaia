@@ -519,75 +519,117 @@ export async function analizarIssosoma(opts?: { refrescar?: boolean }): Promise<
 // --- Exportación a Excel (Ventas / Compras / Por proyecto / Mensual) ---------
 const mesKey = (m: string) => parseInt(String(m).match(/\d+/)?.[0] || "99", 10);
 
+// Nombre de pestaña ÚNICO y válido (≤31 chars, sin []:*?/\): "código + abreviatura del cliente".
+function nombreHoja(codigo: string, cliente: string, carpeta: string, usados: Set<string>): string {
+  let base = (cliente || carpeta || "PROYECTO")
+    .replace(/\b(S\.?A\.?C\.?|S\.?A\.?|S\.?R\.?L\.?|E\.?I\.?R\.?L\.?|SAC|SRL|EIRL|LTDA|INC)\b/gi, "")
+    .replace(/[\[\]:*?/\\]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  base = base.split(" ").slice(0, 3).join(" ");
+  let nombre = `${codigo || "SN"} ${base}`.trim().slice(0, 31);
+  let i = 2;
+  while (usados.has(nombre)) { const suf = ` (${i++})`; nombre = `${nombre.slice(0, 31 - suf.length)}${suf}`; }
+  usados.add(nombre);
+  return nombre;
+}
+
 export async function excelIssosoma(a: IssosomaAnalisis): Promise<Buffer> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   const MONEY = "#,##0.00";
-  const head = (ws: any) => { ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2F4A3B" } }; ws.views = [{ state: "frozen", ySplit: 1 }]; };
+  const VERDE = "FF2F4A3B";
+  const cabecera = (ws: any, fila = 1) => { const r = ws.getRow(fila); r.font = { bold: true, color: { argb: "FFFFFFFF" } }; r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VERDE } }; };
+  const titulo = (ws: any, celda: string, texto: string, hasta: string) => { ws.mergeCells(`${celda}:${hasta}`); const c = ws.getCell(celda); c.value = texto; c.font = { bold: true, size: 14, color: { argb: VERDE } }; };
+  const firmaVenta = (f: FacturaVenta) => (f.tipo === "NC" ? -1 : 1);
 
-  // 1) VENTAS (FE y NC) por factura
-  const wsV = wb.addWorksheet("Ventas");
-  wsV.columns = [
-    { header: "Mes", key: "mes", width: 14 }, { header: "Tipo", key: "tipo", width: 7 },
-    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
-    { header: "Proyecto", key: "proy", width: 44 }, { header: "Valor Venta", key: "vv", width: 14 }, { header: "Importe Total", key: "it", width: 14 },
-  ] as any;
-  for (const f of a.facturas) { const s = f.tipo === "NC" ? -1 : 1; wsV.addRow({ mes: f.mes, tipo: f.tipo, cod: f.codigo, cli: f.cliente, proy: f.proyecto, vv: s * f.valorVenta, it: s * f.importeTotal }); }
-  wsV.getColumn("vv").numFmt = MONEY; wsV.getColumn("it").numFmt = MONEY; head(wsV);
-
-  // 2) COMPRAS (recibidas) por egreso
-  const wsC = wb.addWorksheet("Compras (egresos)");
-  wsC.columns = [
-    { header: "Mes", key: "mes", width: 14 }, { header: "Proveedor (razón social)", key: "prov", width: 44 },
-    { header: "RUC", key: "ruc", width: 14 }, { header: "Tipo comprobante", key: "tipo", width: 20 }, { header: "Número", key: "num", width: 16 },
-    { header: "Fecha", key: "fecha", width: 12 }, { header: "Importe", key: "imp", width: 14 }, { header: "Archivo", key: "arch", width: 36 },
-  ] as any;
-  for (const e of a.egresosGenerales) wsC.addRow({ mes: e.mes, prov: e.emisor, ruc: e.ruc, tipo: e.tipoComprobante, num: e.numero, fecha: e.fecha, imp: e.importe, arch: e.archivo });
-  wsC.getColumn("imp").numFmt = MONEY; head(wsC);
-
-  // 3) GASTOS de proyecto (detalle de bitácora)
-  const wsG = wb.addWorksheet("Gastos proyecto");
-  wsG.columns = [
-    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
-    { header: "Fecha", key: "fecha", width: 12 }, { header: "Descripción", key: "desc", width: 50 }, { header: "Monto", key: "monto", width: 14 },
-  ] as any;
-  for (const g of a.gastos) wsG.addRow({ cod: g.codigo, cli: g.cliente, fecha: g.fecha, desc: g.descripcion, monto: g.monto });
-  wsG.getColumn("monto").numFmt = MONEY; head(wsG);
-
-  // 4) POR PROYECTO (costo/beneficio)
-  const wsP = wb.addWorksheet("Por proyecto");
-  wsP.columns = [
-    { header: "Código", key: "cod", width: 10 }, { header: "Cliente", key: "cli", width: 30 },
-    { header: "Proyecto", key: "proy", width: 44 }, { header: "Responsable", key: "resp", width: 22 },
-    { header: "Venta", key: "venta", width: 14 }, { header: "Costo", key: "costo", width: 14 }, { header: "Utilidad", key: "util", width: 14 }, { header: "Margen", key: "mg", width: 10 },
-  ] as any;
-  for (const p of a.proyectos) wsP.addRow({ cod: p.codigo, cli: p.cliente, proy: p.carpeta, resp: p.responsable, venta: p.venta, costo: p.costo, util: p.utilidad, mg: p.margen });
-  ["venta", "costo", "util"].forEach((c) => (wsP.getColumn(c).numFmt = MONEY)); wsP.getColumn("mg").numFmt = "0.0%"; head(wsP);
-
-  // 5) RESUMEN MENSUAL (utilidad por mes). El costo de proyecto se atribuye al
-  //    mes de facturación en proporción a la venta de ese mes.
-  const ventaMes = new Map<string, number>(), egresoMes = new Map<string, number>(), costoMes = new Map<string, number>();
+  // ---------- 1) INGRESO · EGRESO · UTILIDAD (una sola pestaña, por mes) ----------
+  const ventaMes = new Map<string, number>(), comprasMes = new Map<string, number>(), costoMes = new Map<string, number>();
   const ventaCodMes = new Map<string, Map<string, number>>();
   const ventaProy = new Map<string, number>(), costoProy = new Map<string, number>();
   for (const p of a.proyectos) { ventaProy.set(p.codigo, p.venta); costoProy.set(p.codigo, p.costo); }
   for (const f of a.facturas) {
-    const v = (f.tipo === "NC" ? -1 : 1) * f.valorVenta; const m = f.mes || "(sin mes)";
+    const v = firmaVenta(f) * f.valorVenta; const m = f.mes || "(sin mes)";
     ventaMes.set(m, (ventaMes.get(m) || 0) + v);
     if (f.codigo) { const mm = ventaCodMes.get(f.codigo) || new Map<string, number>(); mm.set(m, (mm.get(m) || 0) + v); ventaCodMes.set(f.codigo, mm); }
   }
-  for (const e of a.egresosGenerales) { const m = e.mes || "(sin mes)"; egresoMes.set(m, (egresoMes.get(m) || 0) + e.importe); }
+  for (const e of a.egresosGenerales) { const m = e.mes || "(sin mes)"; comprasMes.set(m, (comprasMes.get(m) || 0) + e.importe); }
+  // El costo del proyecto se atribuye al mes de facturación, en proporción a la venta de ese mes.
   for (const [cod, mm] of ventaCodMes) { const tot = ventaProy.get(cod) || 0; const costo = costoProy.get(cod) || 0; if (!tot) continue; for (const [m, v] of mm) costoMes.set(m, (costoMes.get(m) || 0) + costo * (v / tot)); }
-  const meses = Array.from(new Set([...ventaMes.keys(), ...egresoMes.keys(), ...costoMes.keys()])).sort((x, y) => mesKey(x) - mesKey(y));
-  const wsM = wb.addWorksheet("Resumen mensual");
-  wsM.columns = [
-    { header: "Mes", key: "mes", width: 16 }, { header: "Venta neta", key: "venta", width: 15 },
-    { header: "Costo proyectos", key: "costo", width: 16 }, { header: "Compras (egresos)", key: "egr", width: 17 }, { header: "Utilidad", key: "util", width: 15 },
-  ] as any;
-  for (const m of meses) { const venta = ventaMes.get(m) || 0, costo = costoMes.get(m) || 0, egr = egresoMes.get(m) || 0; wsM.addRow({ mes: m, venta, costo, egr, util: venta - costo - egr }); }
-  wsM.addRow({});
-  const tV = a.kpis.venta, tC = a.kpis.costo, tE = a.kpis.egresosGenerales;
-  const rowT = wsM.addRow({ mes: "TOTAL", venta: tV, costo: tC, egr: tE, util: tV - tC - tE }); rowT.font = { bold: true };
-  ["venta", "costo", "egr", "util"].forEach((c) => (wsM.getColumn(c).numFmt = MONEY)); head(wsM);
+  const meses = Array.from(new Set([...ventaMes.keys(), ...comprasMes.keys(), ...costoMes.keys()])).sort((x, y) => mesKey(x) - mesKey(y));
+
+  const wsR = wb.addWorksheet("Ingreso-Egreso-Utilidad");
+  titulo(wsR, "A1", "ISSOSOMA — Ingreso · Egreso · Utilidad por mes", "G1");
+  wsR.getCell("A2").value = `Generado: ${new Date(a.generadoAt).toLocaleString("es-PE")} · Ingreso = ventas netas (FE − NC) · Egreso = costo de proyectos (bitácoras) + compras recibidas`;
+  wsR.getCell("A2").font = { italic: true, color: { argb: "FF7A847D" } };
+  const encR = ["Mes", "Ingreso (venta neta)", "Costo de proyectos", "Compras (egresos)", "Egreso total", "Utilidad", "Margen"];
+  wsR.getRow(4).values = encR; cabecera(wsR, 4);
+  wsR.columns = [{ width: 16 }, { width: 20 }, { width: 20 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 10 }] as any;
+  let fila = 5;
+  for (const m of meses) {
+    const ing = ventaMes.get(m) || 0, costo = costoMes.get(m) || 0, comp = comprasMes.get(m) || 0, egr = costo + comp, util = ing - egr;
+    wsR.getRow(fila++).values = [m, ing, costo, comp, egr, util, ing ? util / ing : 0];
+  }
+  const tI = a.kpis.venta, tC = a.kpis.costo, tP = a.kpis.egresosGenerales, tE = tC + tP;
+  fila++;
+  const rT = wsR.getRow(fila); rT.values = ["TOTAL", tI, tC, tP, tE, tI - tE, tI ? (tI - tE) / tI : 0]; rT.font = { bold: true };
+  for (let r = 5; r <= fila; r++) { for (const c of [2, 3, 4, 5, 6]) wsR.getCell(r, c).numFmt = MONEY; wsR.getCell(r, 7).numFmt = "0.0%"; }
+  wsR.views = [{ state: "frozen", ySplit: 4 }];
+
+  // ---------- 2) ÍNDICE DE PROYECTOS (para navegar a cada pestaña) ----------
+  const wsI = wb.addWorksheet("Proyectos");
+  titulo(wsI, "A1", "Índice de proyectos (cada uno tiene su pestaña)", "I1");
+  wsI.getRow(3).values = ["Pestaña", "Código", "Cliente", "Proyecto", "Responsable", "Venta", "Costo", "Utilidad", "Margen"]; cabecera(wsI, 3);
+  wsI.columns = [{ width: 24 }, { width: 10 }, { width: 30 }, { width: 44 }, { width: 22 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 10 }] as any;
+  wsI.views = [{ state: "frozen", ySplit: 3 }];
+
+  // ---------- 3) UNA PESTAÑA POR PROYECTO (abreviatura de cliente) ----------
+  const usados = new Set<string>(["Ingreso-Egreso-Utilidad", "Proyectos"]);
+  const proyectosOrd = [...a.proyectos].sort((x, y) => (x.cliente || x.carpeta).localeCompare(y.cliente || y.carpeta) || x.codigo.localeCompare(y.codigo));
+  let filaI = 4;
+  for (const p of proyectosOrd) {
+    const hoja = nombreHoja(p.codigo, p.cliente, p.carpeta, usados);
+    wsI.getRow(filaI).values = [hoja, p.codigo, p.cliente, p.carpeta, p.responsable, p.venta, p.costo, p.utilidad, p.margen];
+    for (const c of [6, 7, 8]) wsI.getCell(filaI, c).numFmt = MONEY; wsI.getCell(filaI, 9).numFmt = "0.0%";
+    filaI++;
+
+    const ws = wb.addWorksheet(hoja);
+    ws.columns = [{ width: 16 }, { width: 12 }, { width: 18 }, { width: 46 }, { width: 16 }, { width: 16 }] as any;
+    // Título en A1: a qué proyecto pertenece la pestaña.
+    titulo(ws, "A1", `PROYECTO: ${p.carpeta || `INF-${p.codigo}`} — ${p.cliente || "(cliente sin identificar)"}`, "F1");
+    ws.getCell("A2").value = `Código: ${p.codigo || "—"}   ·   Cliente: ${p.cliente || "—"}   ·   Responsable: ${p.responsable || "—"}`;
+    ws.getCell("A2").font = { color: { argb: "FF4F5C55" } };
+
+    // Bloque KPIs.
+    ws.getRow(4).values = ["Venta neta", "Costo", "Utilidad", "Margen", "Saldo rendición", "N° facturas"]; cabecera(ws, 4);
+    ws.getRow(5).values = [p.venta, p.costo, p.utilidad, p.margen, p.saldo, p.nFacturas];
+    for (const c of [1, 2, 3, 5]) ws.getCell(5, c).numFmt = MONEY; ws.getCell(5, 4).numFmt = "0.0%";
+    ws.getRow(5).font = { bold: true, size: 12 };
+
+    // Bloque FACTURAS DE VENTA del proyecto.
+    let r = 7;
+    ws.getCell(r, 1).value = "FACTURAS DE VENTA (FE) Y NOTAS DE CRÉDITO (NC)"; ws.getCell(r, 1).font = { bold: true, color: { argb: VERDE } }; r++;
+    ws.getRow(r).values = ["Mes", "Tipo", "Archivo", "Descripción", "Valor venta", "Importe total"]; cabecera(ws, r); r++;
+    const fsP = a.facturas.filter((f) => f.codigo === p.codigo);
+    let sumVV = 0, sumIT = 0;
+    for (const f of fsP) {
+      const s = firmaVenta(f);
+      ws.getRow(r).values = [f.mes, f.tipo, f.detalle, f.proyecto, s * f.valorVenta, s * f.importeTotal];
+      ws.getCell(r, 5).numFmt = MONEY; ws.getCell(r, 6).numFmt = MONEY; sumVV += s * f.valorVenta; sumIT += s * f.importeTotal; r++;
+    }
+    if (!fsP.length) { ws.getCell(r, 1).value = "(sin facturas registradas para este código)"; ws.getCell(r, 1).font = { italic: true, color: { argb: "FF7A847D" } }; r++; }
+    else { ws.getRow(r).values = ["", "", "", "Total facturado", sumVV, sumIT]; ws.getRow(r).font = { bold: true }; ws.getCell(r, 5).numFmt = MONEY; ws.getCell(r, 6).numFmt = MONEY; r++; }
+
+    // Bloque GASTOS del proyecto (bitácora).
+    r++;
+    ws.getCell(r, 1).value = "GASTOS DEL PROYECTO (bitácora de rendición)"; ws.getCell(r, 1).font = { bold: true, color: { argb: VERDE } }; r++;
+    ws.getRow(r).values = ["Fecha", "", "", "Descripción", "Monto", ""]; cabecera(ws, r); r++;
+    const gsP = a.gastos.filter((g) => g.codigo === p.codigo);
+    let sumG = 0;
+    for (const g of gsP) { ws.getRow(r).values = [g.fecha, "", "", g.descripcion, g.monto, ""]; ws.getCell(r, 5).numFmt = MONEY; sumG += g.monto; r++; }
+    if (!gsP.length) { ws.getCell(r, 1).value = "(sin detalle de gastos; el costo total viene de la bitácora)"; ws.getCell(r, 1).font = { italic: true, color: { argb: "FF7A847D" } }; r++; }
+    else { ws.getRow(r).values = ["", "", "", "Total gastos detallados", sumG, ""]; ws.getRow(r).font = { bold: true }; ws.getCell(r, 5).numFmt = MONEY; r++; }
+    ws.getRow(r + 1).values = ["", "", "", "Costo total del proyecto (bitácora)", p.costo, ""]; ws.getRow(r + 1).font = { bold: true }; ws.getCell(r + 1, 5).numFmt = MONEY;
+    ws.views = [{ state: "frozen", ySplit: 2 }];
+  }
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
