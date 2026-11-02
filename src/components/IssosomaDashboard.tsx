@@ -59,14 +59,29 @@ export default function IssosomaDashboard() {
   const [menu, setMenu] = useState(false);
   const [q, setQ] = useState("");
 
+  // Rellena campos faltantes (p. ej. caché de una versión anterior) para que el
+  // render nunca reviente por un array/kpi ausente.
+  function normaliza(d: any): Analisis {
+    const k = d?.kpis || {};
+    return {
+      configurado: !!d?.configurado, faltan: d?.faltan, cuentaServicio: d?.cuentaServicio,
+      proyectos: Array.isArray(d?.proyectos) ? d.proyectos : [],
+      facturas: Array.isArray(d?.facturas) ? d.facturas : [],
+      egresosGenerales: Array.isArray(d?.egresosGenerales) ? d.egresosGenerales : [],
+      gastos: Array.isArray(d?.gastos) ? d.gastos : [],
+      avisos: Array.isArray(d?.avisos) ? d.avisos : [],
+      kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, egresosGenerales: 0, resultado: 0, proyectos: 0, proyectosConVenta: 0, ...k },
+      generadoAt: d?.generadoAt || new Date().toISOString(), error: d?.error,
+    };
+  }
   async function cargar() {
     setCargando(true);
-    try { const r = await fetch("/api/issosoma", { cache: "no-store" }); setData(await r.json()); }
+    try { const r = await fetch("/api/issosoma", { cache: "no-store" }); setData(normaliza(await r.json())); }
     catch { setData(null); } finally { setCargando(false); }
   }
   async function recalcular() {
     setRecalc(true);
-    try { const r = await fetch("/api/issosoma", { method: "POST" }); const d = await r.json(); if (!d.error) setData(d); else setData((p) => p ? { ...p, error: d.error } : p); }
+    try { const r = await fetch("/api/issosoma", { method: "POST" }); const d = await r.json(); if (!d.error) setData(normaliza(d)); else setData((p) => p ? { ...p, error: d.error } : p); }
     catch { /* */ } finally { setRecalc(false); }
   }
   useEffect(() => { cargar(); }, []);
