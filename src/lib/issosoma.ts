@@ -183,7 +183,9 @@ function parseBitacora(buf: Buffer, carpeta: string): Omit<ProyectoCosto, "archi
 }
 
 // --- Factura de venta (ingresos) --------------------------------------------
-export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string }
+export interface FacturaVenta { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string; tipo: "FE" | "NC" }
+/** Factura de COMPRA recibida de un proveedor (egreso general de la empresa). */
+export interface EgresoRecibido { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string }
 async function parseFacturaPdf(id: string, nombre: string, token: string): Promise<FacturaVenta | null> {
   let texto = "";
   try {
@@ -209,7 +211,31 @@ async function parseFacturaPdf(id: string, nombre: string, token: string): Promi
   const mDesc = texto.match(/UNIDAD\s+\d{3,4}-\d{2}\s+([\s\S]+?)\s+(?:Valor de Venta de Operaciones|Sub\s*Total\s*Ventas)/i);
   const proyecto = mDesc ? mDesc[1].replace(/\s+/g, " ").replace(/\s+[\d.,]+\s+[\d.,]+\s*$/, "").trim().slice(0, 160) : "";
   if (!codigo && !valorVenta && !importeTotal) return null;
-  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre };
+  const tipo: "FE" | "NC" = /^NC|nota.?de.?cr[eé]dito/i.test(nombre) ? "NC" : "FE";
+  return { codigo, cliente: (mCli ? mCli[1].trim() : "").slice(0, 80), proyecto, valorVenta, importeTotal, detalle: nombre.replace(/\.pdf$/i, ""), archivo: nombre, tipo };
+}
+
+/** Lee una factura de COMPRA (carpeta "recibidas") → egreso de proveedor.
+ *  Best-effort: solo las que tienen capa de texto (las escaneadas sin OCR se
+ *  omiten). Excluye el RUC de ISSOSOMA para quedarse con el del proveedor. */
+async function parseRecibidaPdf(id: string, nombre: string, token: string, mes: string): Promise<EgresoRecibido | null> {
+  let texto = "";
+  try {
+    const buf = await bajar(id, token);
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const r = await extractText(pdf, { mergePages: true });
+    texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
+  } catch { return null; }
+  if (!texto.trim()) return null;
+  const mImp = texto.match(/Importe\s*Total\s*:?\s*S?\/?\.?\s*([\d.,]+)/i) || texto.match(/\bTotal\b\s*:?\s*S\/\.?\s*([\d.,]+)/i);
+  const importe = mImp ? toNum(mImp[1]) : 0;
+  if (!importe) return null;
+  const ruc = (texto.match(/\b\d{11}\b/g) || []).find((r) => r !== "20600460812") || "";
+  const mEmi = texto.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .,&'-]{4,69}?)\s+(?:AV\.|CAL\.|CALLE|AVENIDA|JR\.|R\.?U\.?C)/);
+  const emisor = (mEmi ? mEmi[1] : texto.trim().split(/\s{2,}|\n/)[0] || "").replace(/\s+/g, " ").trim().slice(0, 70);
+  const fecha = (texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || [""])[0];
+  return { emisor, ruc, importe, fecha, archivo: nombre, mes };
 }
 
 // --- Análisis completo (costo/beneficio por proyecto) -----------------------
@@ -220,9 +246,10 @@ export interface ProyectoAnalisis {
 }
 export interface IssosomaAnalisis {
   configurado: boolean; faltan?: string[]; cuentaServicio?: string;
-  kpis: { venta: number; costo: number; utilidad: number; margen: number; proyectos: number; proyectosConVenta: number };
+  kpis: { venta: number; costo: number; utilidad: number; margen: number; egresosGenerales: number; resultado: number; proyectos: number; proyectosConVenta: number };
   proyectos: ProyectoAnalisis[];
   facturas: FacturaVenta[];
+  egresosGenerales: EgresoRecibido[];
   gastos: { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number }[];
   avisos: string[];
   generadoAt: string;
@@ -242,8 +269,8 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   const avisos: string[] = [];
   const base: IssosomaAnalisis = {
     configurado: cfg.configurado, faltan: cfg.faltan,
-    kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, proyectos: 0, proyectosConVenta: 0 },
-    proyectos: [], facturas: [], gastos: [], avisos, generadoAt: new Date().toISOString(),
+    kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, egresosGenerales: 0, resultado: 0, proyectos: 0, proyectosConVenta: 0 },
+    proyectos: [], facturas: [], egresosGenerales: [], gastos: [], avisos, generadoAt: new Date().toISOString(),
   };
   if (!cfg.configurado) return base;
   const { token, email } = await tokenServicio();
@@ -266,30 +293,46 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   const costosOk = costos.filter(Boolean) as ProyectoCosto[];
   avisos.push(`Bitácoras con datos leídas: ${costosOk.length}.`);
 
-  // 2) VENTAS: meses → facturas PDF.
+  // 2) VENTAS (FE) + NOTAS DE CRÉDITO (NC) + EGRESOS recibidos (compras).
   const facturas: FacturaVenta[] = [];
+  const egresos: EgresoRecibido[] = [];
   if (cfg.ventasId) {
     const ventasTodo = await listar(cfg.ventasId, token);
     const meses = ventasTodo.filter((f) => f.mimeType === MIME_FOLDER);
-    let pdfTotal = 0;
+    let compTotal = 0, recTotal = 0;
     for (const mes of meses) {
-      const archivos = (await listar(mes.id, token)).filter((f) => /\.pdf$/i.test(f.name) && /^FE|factura|\(\d{3,4}-\d{2}/i.test(f.name));
-      pdfTotal += archivos.length;
-      const fs2 = await pool(archivos, 6, (f) => parseFacturaPdf(f.id, f.name, token));
+      const hijos = await listar(mes.id, token);
+      // Comprobantes de VENTA (FE emitidas y NC notas de crédito).
+      const comp = hijos.filter((f) => /\.pdf$/i.test(f.name) && /^FE|^NC|factura|\(\d{3,4}-\d{2}/i.test(f.name));
+      compTotal += comp.length;
+      const fs2 = await pool(comp, 6, (f) => parseFacturaPdf(f.id, f.name, token));
       for (const f of fs2) if (f) facturas.push(f);
+      // Carpeta "recibidas": facturas de COMPRA (egresos de proveedores).
+      for (const rf of hijos.filter((h) => h.mimeType === MIME_FOLDER && /recib/i.test(h.name))) {
+        const recArch = (await listar(rf.id, token)).filter((f) => /\.pdf$/i.test(f.name));
+        recTotal += recArch.length;
+        const rs = await pool(recArch, 6, (f) => parseRecibidaPdf(f.id, f.name, token, mes.name));
+        for (const r of rs) if (r) egresos.push(r);
+      }
     }
-    avisos.push(`Ventas: ${ventasTodo.length} elemento(s), ${meses.length} carpeta(s) de mes, ${pdfTotal} PDF candidatos, ${facturas.length} factura(s) parseada(s).`);
+    avisos.push(`Ventas: ${meses.length} mes(es), ${compTotal} comprobante(s) de venta (${facturas.length} leídos). Egresos recibidos: ${recTotal} PDF (${egresos.length} leídos; los escaneados sin texto se omiten).`);
   } else {
     avisos.push("No se configuró ISSOSOMA_VENTAS_FOLDER_ID: no se pudo calcular la venta/beneficio (solo costos).");
   }
   base.facturas = facturas;
+  // Dedupe de egresos por (ruc|importe|fecha) para no contar dos veces el mismo.
+  const vistosE = new Set<string>();
+  base.egresosGenerales = egresos.filter((e) => { const k = `${e.ruc}|${e.importe}|${e.fecha}`; if (vistosE.has(k)) return false; vistosE.add(k); return true; });
+  const totalEgresos = base.egresosGenerales.reduce((a, e) => a + e.importe, 0);
 
   // 3) MATCH por código → costo/beneficio.
   const ventaPorCod = new Map<string, { venta: number; importe: number; n: number }>();
   for (const f of facturas) {
     if (!f.codigo) continue;
+    const signo = f.tipo === "NC" ? -1 : 1; // la nota de crédito RESTA de la venta
     const o = ventaPorCod.get(f.codigo) ?? { venta: 0, importe: 0, n: 0 };
-    o.venta += f.valorVenta; o.importe += f.importeTotal; o.n++; ventaPorCod.set(f.codigo, o);
+    o.venta += signo * f.valorVenta; o.importe += signo * f.importeTotal; if (f.tipo !== "NC") o.n++;
+    ventaPorCod.set(f.codigo, o);
   }
   const proyectos: ProyectoAnalisis[] = [];
   const vistos = new Set<string>();
@@ -317,6 +360,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
   const costo = proyectos.reduce((a, p) => a + p.costo, 0);
   base.kpis = {
     venta, costo, utilidad: venta - costo, margen: venta ? (venta - costo) / venta : 0,
+    egresosGenerales: totalEgresos, resultado: venta - costo - totalEgresos,
     proyectos: proyectos.length, proyectosConVenta: proyectos.filter((p) => p.venta > 0).length,
   };
   base.gastos = base.gastos.slice(0, 1000);
@@ -328,7 +372,7 @@ export async function recalcularIssosoma(): Promise<IssosomaAnalisis> {
 export async function analizarIssosoma(opts?: { refrescar?: boolean }): Promise<IssosomaAnalisis> {
   const cfg = issosomaConfig();
   if (!cfg.configurado) {
-    return { configurado: false, faltan: cfg.faltan, kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, proyectos: 0, proyectosConVenta: 0 }, proyectos: [], facturas: [], gastos: [], avisos: [], generadoAt: new Date().toISOString() };
+    return { configurado: false, faltan: cfg.faltan, kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, egresosGenerales: 0, resultado: 0, proyectos: 0, proyectosConVenta: 0 }, proyectos: [], facturas: [], egresosGenerales: [], gastos: [], avisos: [], generadoAt: new Date().toISOString() };
   }
   if (!opts?.refrescar) {
     const c = await leerCache();

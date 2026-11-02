@@ -9,10 +9,11 @@ import { useEffect, useState } from "react";
 type Proyecto = { codigo: string; cliente: string; carpeta: string; responsable: string; venta: number; importeFacturado: number; costo: number; costoLogistica: number; utilidad: number; margen: number; saldo: number; nFacturas: number };
 type Factura = { codigo: string; cliente: string; proyecto: string; valorVenta: number; importeTotal: number; detalle: string; archivo: string };
 type Gasto = { codigo: string; cliente: string; fecha: string; descripcion: string; monto: number };
+type Egreso = { emisor: string; ruc: string; importe: number; fecha: string; archivo: string; mes: string };
 type Analisis = {
   configurado: boolean; faltan?: string[]; cuentaServicio?: string;
-  kpis: { venta: number; costo: number; utilidad: number; margen: number; proyectos: number; proyectosConVenta: number };
-  proyectos: Proyecto[]; facturas: Factura[]; gastos: Gasto[]; avisos: string[];
+  kpis: { venta: number; costo: number; utilidad: number; margen: number; egresosGenerales: number; resultado: number; proyectos: number; proyectosConVenta: number };
+  proyectos: Proyecto[]; facturas: Factura[]; egresosGenerales: Egreso[]; gastos: Gasto[]; avisos: string[];
   generadoAt: string; error?: string;
 };
 
@@ -22,6 +23,7 @@ const VISTAS = [
   { id: "proyectos", label: "Costo / Beneficio" },
   { id: "gastos", label: "Relación de gastos" },
   { id: "facturas", label: "Facturas (ventas)" },
+  { id: "egresos", label: "Egresos (compras)" },
   { id: "conexion", label: "Conexión / Recalcular" },
 ] as const;
 type VistaId = (typeof VISTAS)[number]["id"];
@@ -120,12 +122,12 @@ export default function IssosomaDashboard() {
                 {vista === "resumen" && (
                   <div className="view">
                     <div className="page-head"><h1>Costo / Beneficio — resumen</h1>
-                      <p className="sub-desc">Venta (facturas) vs costo (bitácoras) de {k.proyectos} proyecto(s) · {k.proyectosConVenta} con venta registrada.</p></div>
+                      <p className="sub-desc">Venta (facturas FE − NC) vs costo (bitácoras) de {k.proyectos} proyecto(s) · utilidad de proyectos {S(k.utilidad)} (margen {PCT(k.margen)}). El <b>Resultado real</b> descuenta además los egresos generales (compras recibidas).</p></div>
                     <div className="grid kpis">
-                      <Kpi lbl="Venta" dot="var(--good)" val={S(k.venta)} />
-                      <Kpi lbl="Costo" dot="var(--crit)" val={S(k.costo)} />
-                      <Kpi lbl="Utilidad" dot="var(--exe)" val={S(k.utilidad)} foot={`Margen ${PCT(k.margen)}`} />
-                      <Kpi lbl="Proyectos" dot="var(--warn)" val={String(k.proyectos)} foot={`${k.proyectosConVenta} con venta`} />
+                      <Kpi lbl="Venta neta" dot="var(--good)" val={S(k.venta)} foot={`${k.proyectosConVenta} proyecto(s) con venta`} />
+                      <Kpi lbl="Costo proyectos" dot="var(--crit)" val={S(k.costo)} />
+                      <Kpi lbl="Egresos (compras)" dot="var(--warn)" val={S(k.egresosGenerales)} foot={`${data.egresosGenerales.length} comprobante(s)`} />
+                      <Kpi lbl="Resultado real" dot="var(--exe)" val={S(k.resultado)} foot="Venta − costo − egresos" />
                     </div>
                     <div className="card"><div className="card-head"><div><h2>Top proyectos por utilidad</h2></div></div>
                       <BarrasH filas={[...data.proyectos].sort((a, b) => b.utilidad - a.utilidad).slice(0, 12).map((p) => ({ label: `${p.codigo} ${p.cliente}`.trim(), val: p.utilidad }))} color="var(--exe)" />
@@ -203,6 +205,19 @@ export default function IssosomaDashboard() {
                       <tbody>{data.facturas.map((f, i) => (
                         <tr key={i}><td className="cd">{f.codigo || "—"}</td><td>{f.cliente || "—"}</td><td className="wrapc">{f.proyecto || "—"}</td><td className="cd">{f.detalle}</td><td className="num">{S(f.valorVenta)}</td><td className="num">{S(f.importeTotal)}</td></tr>
                       ))}{!data.facturas.length && <tr><td colSpan={6}>Sin facturas (revisa ISSOSOMA_VENTAS_FOLDER_ID).</td></tr>}</tbody>
+                    </table></div></div>
+                  </div>
+                )}
+
+                {vista === "egresos" && (
+                  <div className="view">
+                    <div className="page-head"><h1>Egresos (compras recibidas)</h1>
+                      <p className="sub-desc">Facturas de proveedores de las carpetas "recibidas" · total {S(k.egresosGenerales)} · {data.egresosGenerales.length} comprobante(s). Son gastos generales de la empresa (no se reparten por proyecto); los escaneados sin texto quedan fuera.</p></div>
+                    <div className="card"><div className="tbl-wrap tall"><table>
+                      <thead><tr><th>Proveedor</th><th>RUC</th><th>Mes</th><th>Fecha</th><th className="num">Importe</th></tr></thead>
+                      <tbody>{data.egresosGenerales.map((e, i) => (
+                        <tr key={i}><td className="wrapc">{e.emisor || "—"}</td><td className="cd">{e.ruc || "—"}</td><td className="cd">{e.mes}</td><td className="cd">{e.fecha || "—"}</td><td className="num">{S(e.importe)}</td></tr>
+                      ))}{!data.egresosGenerales.length && <tr><td colSpan={5}>Sin egresos leídos (o las carpetas "recibidas" tienen solo PDFs escaneados sin texto).</td></tr>}</tbody>
                     </table></div></div>
                   </div>
                 )}

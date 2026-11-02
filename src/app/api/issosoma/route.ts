@@ -17,7 +17,7 @@ export async function GET() {
     const cache = await leerCache();
     if (cache) return NextResponse.json({ ...cache, error: `No se pudo refrescar: ${err?.message ?? err}` });
     const cfg = issosomaConfig();
-    return NextResponse.json({ configurado: cfg.configurado, faltan: cfg.faltan, error: err?.message ?? "Error leyendo ISSOSOMA", proyectos: [], facturas: [], gastos: [], avisos: [], kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, proyectos: 0, proyectosConVenta: 0 }, generadoAt: new Date().toISOString() });
+    return NextResponse.json({ configurado: cfg.configurado, faltan: cfg.faltan, error: err?.message ?? "Error leyendo ISSOSOMA", proyectos: [], facturas: [], egresosGenerales: [], gastos: [], avisos: [], kpis: { venta: 0, costo: 0, utilidad: 0, margen: 0, egresosGenerales: 0, resultado: 0, proyectos: 0, proyectosConVenta: 0 }, generadoAt: new Date().toISOString() });
   }
 }
 
