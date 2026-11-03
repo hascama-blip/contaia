@@ -61,6 +61,31 @@ body {
   .step-num {
     @apply grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-accent-300 to-accent-500 text-base font-bold text-brand-900 shadow-md;
   }
+  /* Tarjeta con "empavonado" en movimiento: al pasar el mouse, un brillo
+     esmerilado recorre la tarjeta LENTAMENTE (1.4 s) y la tarjeta se eleva con
+     una transición suave (0.6 s), sin saltos bruscos. */
+  .sheen {
+    @apply relative overflow-hidden;
+    transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.6s ease, border-color 0.6s ease;
+  }
+  .sheen::after {
+    content: "";
+    @apply pointer-events-none absolute inset-y-0 -left-full w-2/3;
+    background: linear-gradient(105deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.55) 45%, rgba(255, 255, 255, 0) 100%);
+    filter: blur(6px);
+    transform: translateX(-20%) skewX(-12deg);
+    transition: transform 1.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .sheen:hover::after {
+    transform: translateX(320%) skewX(-12deg);
+  }
+  .sheen:hover {
+    transform: translateY(-3px);
+  }
+  /* Variante para fondos oscuros (héroe): brillo más tenue. */
+  .sheen-dark::after {
+    background: linear-gradient(105deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 45%, rgba(255, 255, 255, 0) 100%);
+  }
   /* Título de sección del informe: barra azul marino con degradado y borde
      dorado a la izquierda (mismo diseño del encabezado del informe, para dar
      vida). Autocontenida: se ve bien dentro y fuera de una tarjeta. */

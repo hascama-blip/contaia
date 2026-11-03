@@ -85,6 +85,7 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
     { href: "/cuenta", label: "Cambiar contraseña", clase: "text-slate-100" },
   ];
   const activo = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
+  const inicio = !soloRtp && pathname === "/";
 
   // Cierra el cajón móvil al navegar.
   useEffect(() => { setDrawer(false); }, [pathname]);
@@ -93,6 +94,7 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
     <SidebarContenido
       nav={nav} menu={menu} activo={activo} base={base} nombreCorto={nombreCorto} inicial={inicial}
       busy={busy} onSalir={() => cerrarSesion(setBusy)} homeHref={soloRtp ? "/rtputilitarios" : "/"}
+      nuevoCliente={admin}
     />
   );
 
@@ -137,9 +139,9 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
         </div>
       </header>
 
-      {/* Contenido */}
+      {/* Contenido (fondo claro siempre; el Inicio usa un ancho mayor). */}
       <div className="md:pl-60">
-        <main className="mx-auto max-w-6xl px-3 py-5 sm:px-5 sm:py-6">{children}</main>
+        <main className={`mx-auto px-3 py-5 sm:px-5 sm:py-6 ${inicio ? "max-w-7xl" : "max-w-6xl"}`}>{children}</main>
         <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
           <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
           <br />
@@ -150,9 +152,9 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
   );
 }
 
-function SidebarContenido({ nav, menu, activo, base, nombreCorto, inicial, busy, onSalir, homeHref }: {
+function SidebarContenido({ nav, menu, activo, base, nombreCorto, inicial, busy, onSalir, homeHref, nuevoCliente }: {
   nav: NavLink[]; menu: { href: string; label: string; clase: string }[]; activo: (h: string) => boolean;
-  base: string; nombreCorto: string; inicial: string; busy: boolean; onSalir: () => void; homeHref: string;
+  base: string; nombreCorto: string; inicial: string; busy: boolean; onSalir: () => void; homeHref: string; nuevoCliente: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -222,6 +224,13 @@ function SidebarContenido({ nav, menu, activo, base, nombreCorto, inicial, busy,
           <Icono name="logout" className="h-5 w-5" />
         </button>
       </div>
+      {nuevoCliente && (
+        <div className="px-3 pb-3">
+          <Link href="/clientes/nuevo" className="btn-accent w-full !rounded-xl">
+            <Icono name="plus" className="h-4 w-4" /> Nuevo cliente
+          </Link>
+        </div>
+      )}
     </>
   );
 }
