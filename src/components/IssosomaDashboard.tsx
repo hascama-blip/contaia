@@ -146,7 +146,6 @@ export default function IssosomaDashboard() {
             <button className="menu-btn" onClick={() => setMenu(true)}>☰ Menú</button>
             <div className="crumbs"><span>ISSOSOMA</span> · <span>{vistaActual.label}</span></div>
             <div className="tb-right">
-              {data?.configurado && <a className="tb-btn" href="/api/issosoma/excel" download title="Descargar Excel: Ventas, Compras, Gastos, Por proyecto y Resumen mensual">⬇ Excel</a>}
               <span className="conn"><span className="sdot" data-st={data?.configurado ? "" : "off"} />
                 <span><b>{data?.configurado ? "Conectado a Drive" : "Sin conectar"}</b>
                   <small>{data?.cuentaServicio || (cargando ? "cargando…" : "configura el acceso")}</small></span></span>
@@ -188,16 +187,18 @@ export default function IssosomaDashboard() {
                         <p className="sub-desc">Qué proyectos tiene cada empresa, con su código y nombre, para identificarlos.</p></div>
                       <div className="filters"><input type="search" placeholder="Buscar empresa, código o proyecto…" value={q} onChange={(e) => setQ(e.target.value)} /><span className="count"><b>{grupos.length}</b> empresa(s)</span></div>
                       {grupos.map((g) => (
-                        <div className="card" key={g.empresa}>
-                          <div className="card-head"><div><h2>{g.empresa}</h2>
-                            <div className="hint">{g.proyectos.length} proyecto(s) · venta {S(g.venta)} · utilidad {S(g.utilidad)}</div></div></div>
-                          <div className="tbl-wrap flat"><table>
+                        <details className="card mes" key={g.empresa}>
+                          <summary>
+                            <span className="mes-nom">{g.empresa}<small className="emp-sub">{g.proyectos.length} proyecto(s) · venta {S(g.venta)} · utilidad {S(g.utilidad)}</small></span>
+                            <a className="tb-btn emp-xls" href={`/api/issosoma/excel?empresa=${encodeURIComponent(g.empresa)}`} download onClick={(e) => e.stopPropagation()} title={`Excel de ${g.empresa}: resumen + una pestaña por proyecto`}>⬇ Excel</a>
+                          </summary>
+                          <div className="sub-bloque"><div className="tbl-wrap flat"><table>
                             <thead><tr><th>Código</th><th>Nombre del proyecto</th><th>Responsable</th><th className="num">Venta</th><th className="num">Costo</th><th className="num">Utilidad</th></tr></thead>
                             <tbody>{g.proyectos.map((p) => (
                               <tr key={p.codigo + p.carpeta}><td className="cd">{p.codigo || "—"}</td><td>{p.carpeta || "—"}</td><td>{p.responsable || "—"}</td><td className="num">{S(p.venta)}</td><td className="num">{S(p.costo)}</td><td className="num">{S(p.utilidad)}</td></tr>
                             ))}</tbody>
-                          </table></div>
-                        </div>
+                          </table></div></div>
+                        </details>
                       ))}
                       {!grupos.length && <div className="card">Sin empresas (recalcula desde Drive).</div>}
                     </div>
@@ -391,5 +392,8 @@ const CSS = `
 .iss .mes-tot{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
 .iss .sub-bloque{padding:0 18px 14px}
 .iss .sub-bloque h3{font-size:13px;margin:8px 0 6px;color:var(--ink2)}
+.iss .emp-sub{display:block;font-size:12px;color:var(--ink2);font-weight:500;margin-top:2px}
+.iss .emp-xls{flex:none;font-size:12.5px;padding:6px 11px}
+.iss .emp-xls:hover{filter:brightness(1.1)}
 @media(max-width:900px){.iss .app{grid-template-columns:1fr}.iss .side{position:fixed;left:0;top:0;z-index:60;width:252px;transform:translateX(-100%);transition:transform .2s}.iss .side.open{transform:none}.iss .side-close{display:grid;place-items:center}.iss .menu-btn{display:inline-flex;align-items:center;gap:6px}.iss .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.iss .hbar{grid-template-columns:140px minmax(0,1fr) 100px}}
 `;

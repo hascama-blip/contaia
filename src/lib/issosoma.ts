@@ -532,7 +532,26 @@ function nombreHoja(codigo: string, cliente: string, carpeta: string, usados: Se
   return nombre;
 }
 
-export async function excelIssosoma(a: IssosomaAnalisis): Promise<Buffer> {
+/** Nombre de grupo por empresa (mismo criterio que el dashboard). */
+export const nombreEmpresa = (cliente: string) => (cliente || "Sin cliente identificado").trim();
+
+/** Recorta el análisis a UNA empresa: sus proyectos, sus facturas y sus gastos.
+ *  Las compras generales (sin proyecto) no se pueden atribuir → quedan fuera. */
+function filtrarEmpresa(a: IssosomaAnalisis, empresa: string): IssosomaAnalisis {
+  const proyectos = a.proyectos.filter((p) => nombreEmpresa(p.cliente) === empresa);
+  const codigos = new Set(proyectos.map((p) => p.codigo).filter(Boolean));
+  const venta = proyectos.reduce((s, p) => s + p.venta, 0), costo = proyectos.reduce((s, p) => s + p.costo, 0);
+  return {
+    ...a, proyectos,
+    facturas: a.facturas.filter((f) => codigos.has(f.codigo)),
+    gastos: a.gastos.filter((g) => codigos.has(g.codigo)),
+    egresosGenerales: [],
+    kpis: { ...a.kpis, venta, costo, utilidad: venta - costo, margen: venta ? (venta - costo) / venta : 0, egresosGenerales: 0, resultado: venta - costo, proyectos: proyectos.length, proyectosConVenta: proyectos.filter((p) => p.venta > 0).length },
+  };
+}
+
+export async function excelIssosoma(a0: IssosomaAnalisis, opts?: { empresa?: string }): Promise<Buffer> {
+  const a = opts?.empresa ? filtrarEmpresa(a0, opts.empresa) : a0;
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   const MONEY = "#,##0.00";
@@ -557,8 +576,8 @@ export async function excelIssosoma(a: IssosomaAnalisis): Promise<Buffer> {
   const meses = Array.from(new Set([...ventaMes.keys(), ...comprasMes.keys(), ...costoMes.keys()])).sort((x, y) => mesKey(x) - mesKey(y));
 
   const wsR = wb.addWorksheet("Ingreso-Egreso-Utilidad");
-  titulo(wsR, "A1", "ISSOSOMA — Ingreso · Egreso · Utilidad por mes", "G1");
-  wsR.getCell("A2").value = `Generado: ${new Date(a.generadoAt).toLocaleString("es-PE")} · Ingreso = ventas netas (FE − NC) · Egreso = costo de proyectos (bitácoras) + compras recibidas`;
+  titulo(wsR, "A1", opts?.empresa ? `${opts.empresa} — Ingreso · Egreso · Utilidad por mes` : "ISSOSOMA — Ingreso · Egreso · Utilidad por mes", "G1");
+  wsR.getCell("A2").value = `Generado: ${new Date(a.generadoAt).toLocaleString("es-PE")} · Ingreso = ventas netas (FE − NC) · Egreso = costo de proyectos (bitácoras)${opts?.empresa ? " · (compras generales sin proyecto no incluidas en el reporte por empresa)" : " + compras recibidas"}`;
   wsR.getCell("A2").font = { italic: true, color: { argb: "FF7A847D" } };
   const encR = ["Mes", "Ingreso (venta neta)", "Costo de proyectos", "Compras (egresos)", "Egreso total", "Utilidad", "Margen"];
   wsR.getRow(4).values = encR; cabecera(wsR, 4);
