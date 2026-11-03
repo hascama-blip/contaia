@@ -11,7 +11,8 @@ export async function middleware(req: NextRequest) {
   reqHeaders.set("x-pathname", pathname);
   const pasar = () => NextResponse.next({ request: { headers: reqHeaders } });
   if (
-    pathname === "/" ||           // landing pública (la raíz); el resto sí exige sesión
+    pathname === "/" ||           // la raíz decide sola (login si no hay sesión)
+    pathname.startsWith("/conoce") || // portada pública (presentación)
     pathname.startsWith("/login") ||
     pathname.startsWith("/reset") ||
     pathname.startsWith("/api/auth") ||

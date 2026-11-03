@@ -5,7 +5,6 @@ import { moduloPorHref, PLAN_LABEL } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 import NotificacionesPanel from "@/components/NotificacionesPanel";
 import DescubreMas from "@/components/DescubreMas";
-import Landing from "@/components/Landing";
 
 export const dynamic = "force-dynamic";
 
@@ -182,9 +181,9 @@ function Ilustracion() {
 }
 
 export default async function MenuPage() {
-  // Visitante sin sesión → landing pública.
+  // Visitante sin sesión → directo al login (la portada pública vive en /conoce).
   const user = await getCurrentUser();
-  if (!user) return <Landing />;
+  if (!user) redirect("/login");
   // Usuario restringido "solo RTP": va directo a su hub, sin ver el menú.
   if (esSoloRtp(user)) redirect("/rtputilitarios");
   const mods = await modulosDelEstudio(user);

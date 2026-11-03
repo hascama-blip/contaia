@@ -6,7 +6,8 @@ import HeroWords from "@/components/HeroWords";
 // Landing PÚBLICA (visitantes sin sesión). Describe la plataforma módulo por
 // módulo con una captura de cada uno. El botón "Iniciar" lleva al app público.
 // El login interno de ESTA web no se enlaza aquí (queda oculto en /login).
-const APP_LOGIN = "https://app.radartributaria.com/login";
+// Login de ESTA web (misma dirección, sin dominio fijo: sirve en cualquier host).
+const APP_LOGIN = "/login";
 
 interface Modulo {
   icono: string;

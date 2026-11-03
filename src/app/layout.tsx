@@ -42,7 +42,7 @@ export default async function RootLayout({
   const soloRtp = esSoloRtp(user);
   // Páginas de autenticación: NUNCA muestran el header/menú ni el modal de
   // planes, aunque quede una sesión previa (p. ej. al salir y volver al login).
-  const esAuthPage = pathname.startsWith("/login") || pathname.startsWith("/reset");
+  const esAuthPage = pathname.startsWith("/login") || pathname.startsWith("/reset") || pathname.startsWith("/conoce");
   // Plan del estudio (los operadores heredan el de su admin). El supremo se
   // trata como el plan máximo. Decide el menú "Equipo", el link de planes y
   // si se muestra la ventana de planes (SOLO en el plan gratis = básico).
