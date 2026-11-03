@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, getUserByEmail } from "@/lib/db";
 import { hashPassword, ensureSupremo } from "@/lib/auth";
-import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
+import { enviarCodigo } from "@/lib/codigos";
 
 export const runtime = "nodejs";
 
-// Registro LIBRE: crea la cuenta ya aprobada e INICIA SESIÓN de inmediato
-// (sin aprobación del supremo). El usuario entra directo tras registrarse.
+// Registro con VERIFICACIÓN DE CORREO: crea la cuenta (aprobada) pero SIN
+// iniciar sesión; envía un código de 6 dígitos al correo. La sesión se abre
+// recién cuando el usuario verifica el código (POST /api/auth/verificar).
 export async function POST(req: NextRequest) {
   await ensureSupremo();
   const body = await req.json().catch(() => null);
@@ -23,14 +24,20 @@ export async function POST(req: NextRequest) {
   if (password.length < 6) {
     return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
   }
-  if (await getUserByEmail(email)) {
+  const existente = await getUserByEmail(email);
+  if (existente) {
+    // Si ya existe pero nunca verificó, le reenviamos el código en vez de bloquearlo.
+    if (existente.emailVerificado === false) {
+      const r = await enviarCodigo(existente, "verificacion");
+      return NextResponse.json({ ok: true, verificar: true, email, mensaje: r.ok ? "Esa cuenta ya existe pero no estaba verificada: te reenviamos el código." : r.error });
+    }
     return NextResponse.json({ error: "Ya existe una cuenta con ese correo." }, { status: 409 });
   }
 
-  const user = await createUser({ nombre, email, passHash: hashPassword(password), estado: "aprobado" });
-  const token = await createSessionToken(user.id);
-  const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
-  // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.
-  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
-  return res;
+  const user = await createUser({ nombre, email, passHash: hashPassword(password), estado: "aprobado", emailVerificado: false });
+  const r = await enviarCodigo(user, "verificacion");
+  if (!r.ok) {
+    return NextResponse.json({ error: r.error ?? "No se pudo enviar el código de verificación." }, { status: 502 });
+  }
+  return NextResponse.json({ ok: true, verificar: true, email, mensaje: "Te enviamos un código de 6 dígitos a tu correo. Ingrésalo para activar tu cuenta." });
 }

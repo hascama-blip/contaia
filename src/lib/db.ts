@@ -188,6 +188,8 @@ export async function createUser(data: {
   parentId?: string;
   estado?: "pendiente" | "aprobado" | "rechazado";
   soloRtp?: boolean;
+  /** false = registro con verificación de correo pendiente (no puede entrar aún). */
+  emailVerificado?: boolean;
 }): Promise<Usuario> {
   const store = await readStore();
   if (!store.users) store.users = [];
@@ -201,6 +203,7 @@ export async function createUser(data: {
     parentId: data.parentId,
     estado: data.estado,
     ...(data.soloRtp ? { soloRtp: true } : {}),
+    ...(data.emailVerificado === false ? { emailVerificado: false } : {}),
   };
   store.users.push(user);
   await writeStore(store);
@@ -287,6 +290,46 @@ export async function setPasswordUsuario(userId: string, passHash: string): Prom
   u.passHash = passHash;
   u.resetTokenHash = undefined;
   u.resetTokenExp = undefined;
+  u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
+  await writeStore(store);
+  return u;
+}
+
+// ---- Códigos de 6 dígitos (verificación de correo / cambio de contraseña) ---
+
+/** Guarda un código (hash + vencimiento + tipo) y reinicia intentos. */
+export async function setCodigoUsuario(userId: string, d: { hash: string; exp: string; tipo: "verificacion" | "reset" }): Promise<void> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return;
+  u.codigoHash = d.hash; u.codigoExp = d.exp; u.codigoTipo = d.tipo;
+  u.codigoIntentos = 0; u.codigoEnviadoAt = new Date().toISOString();
+  await writeStore(store);
+}
+/** Invalida el código vigente (conserva la hora del último envío para el throttle). */
+export async function limpiarCodigoUsuario(userId: string): Promise<void> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return;
+  u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
+  await writeStore(store);
+}
+/** Suma un intento fallido y devuelve el total. */
+export async function incIntentosCodigo(userId: string): Promise<number> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return 0;
+  u.codigoIntentos = (u.codigoIntentos ?? 0) + 1;
+  await writeStore(store);
+  return u.codigoIntentos;
+}
+/** Marca el correo como verificado y limpia el código. */
+export async function marcarEmailVerificado(userId: string): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return null;
+  u.emailVerificado = true;
+  u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
   await writeStore(store);
   return u;
 }

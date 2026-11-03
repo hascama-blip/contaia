@@ -36,7 +36,25 @@ export async function enviarCorreo(
   }
 }
 
-/** Plantilla del correo de recuperación de contraseña. */
+/** Plantilla del correo con CÓDIGO de 6 dígitos (verificar correo / cambiar clave). */
+export function htmlCodigo(nombre: string, codigo: string, proposito: "verificacion" | "reset"): string {
+  const titulo = proposito === "verificacion" ? "Verifica tu correo" : "Cambia tu contraseña";
+  const texto = proposito === "verificacion"
+    ? "Gracias por registrarte. Ingresa este código en la pantalla de registro para activar tu cuenta:"
+    : "Recibimos una solicitud para cambiar tu contraseña. Ingresa este código en la pantalla de recuperación:";
+  return `
+  <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:auto;color:#1e293b">
+    <h2 style="color:#102b4d">Radar Tributar IA</h2>
+    <p>Hola ${nombre || ""},</p>
+    <p><b>${titulo}.</b> ${texto}</p>
+    <p style="text-align:center;margin:24px 0">
+      <span style="display:inline-block;font-size:32px;letter-spacing:10px;font-weight:800;background:#f1f5f9;color:#102b4d;padding:14px 22px;border-radius:10px">${codigo}</span>
+    </p>
+    <p style="font-size:13px;color:#64748b">El código vence en 10 minutos y solo sirve una vez. Si no fuiste tú, ignora este correo: nadie puede ${proposito === "verificacion" ? "activar la cuenta" : "cambiar tu contraseña"} sin este código.</p>
+  </div>`;
+}
+
+/** Plantilla del correo de recuperación de contraseña por ENLACE (legacy). */
 export function htmlReset(nombre: string, enlace: string): string {
   return `
   <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:auto;color:#1e293b">

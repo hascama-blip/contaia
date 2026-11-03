@@ -123,9 +123,19 @@ export interface Usuario {
   /** Usuario RESTRINGIDO a los Utilitarios RTP: solo ve /rtputilitarios y sus 4
    *  herramientas; sin menús (Inicio/Dashboard/Clientes/Planes/Equipo/Supremo). */
   soloRtp?: boolean;
-  /** Recuperación de contraseña: hash del token + expiración (un solo uso). */
+  /** Recuperación de contraseña por ENLACE (legacy): hash del token + expiración. */
   resetTokenHash?: string;
   resetTokenExp?: string;
+  /** Verificación del correo al registrarse. undefined = cuenta anterior a la
+   *  verificación (se considera verificada); false = aún no verificó. */
+  emailVerificado?: boolean;
+  /** Código de 6 dígitos vigente (verificación de correo o cambio de clave):
+   *  solo se guarda su hash, con vencimiento, intentos y último envío. */
+  codigoHash?: string;
+  codigoExp?: string;
+  codigoTipo?: "verificacion" | "reset";
+  codigoIntentos?: number;
+  codigoEnviadoAt?: string;
   /** Cupo del módulo gratis: 3 consultas por ventana de 7 días. */
   usosGratis?: { usados: number; desde: string };
 }

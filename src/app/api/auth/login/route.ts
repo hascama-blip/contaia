@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Cuenta registrada pero con el correo SIN verificar: no entra; el front
+  // ofrece ingresar/reenviar el código.
+  if (user.emailVerificado === false) {
+    return NextResponse.json(
+      { error: "Tu correo aún no está verificado. Ingresa el código que te enviamos (o pide uno nuevo).", noVerificado: true, email: user.email },
+      { status: 403 }
+    );
+  }
+
   const token = await createSessionToken(user.id);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
   // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.

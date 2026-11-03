@@ -61,6 +61,7 @@ export function HeaderNav({
         <div className="ml-2 flex items-center gap-2 border-l border-slate-200 pl-3">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{iniciales}</span>
           <span className="hidden text-sm text-slate-600 lg:inline">{nombre}</span>
+          <Link href="/cuenta" className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100" title="Cambiar contraseña">🔑</Link>
           <button onClick={salir} disabled={busy} className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100" title="Cerrar sesión">
             {busy ? "…" : "Salir"}
           </button>
@@ -102,6 +103,9 @@ export function HeaderNav({
                 + Nuevo cliente
               </Link>
             )}
+            <Link href="/cuenta" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-slate-700 hover:bg-slate-100">
+              🔑 Cambiar contraseña
+            </Link>
             <button onClick={salir} disabled={busy} className="mt-1 rounded-lg px-3 py-2.5 text-left text-slate-500 hover:bg-slate-100">
               {busy ? "Saliendo…" : "Salir"}
             </button>

@@ -1,42 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash, randomBytes } from "crypto";
-import { getUserByEmail, setResetTokenUsuario } from "@/lib/db";
-import { enviarCorreo, htmlReset, correoConfigurado } from "@/lib/email";
+import { getUserByEmail } from "@/lib/db";
+import { enviarCodigo } from "@/lib/codigos";
+import { correoConfigurado } from "@/lib/email";
 
 export const runtime = "nodejs";
 
-// Paso 1 del "olvidé mi contraseña": el usuario pone su correo y, si existe,
-// le enviamos un enlace con un token de un solo uso (vence en 1 hora).
+// Paso 1 del "olvidé mi contraseña": envía un CÓDIGO de 6 dígitos al correo.
+// Respuesta genérica SIEMPRE (no revelamos si el correo existe).
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const email = String(body?.email ?? "").trim().toLowerCase();
-  // Respuesta genérica SIEMPRE (no revelamos si el correo existe).
   const generica = NextResponse.json({
     ok: true,
-    mensaje: "Si el correo está registrado, te enviamos un enlace para cambiar la contraseña. Revisa tu bandeja (y spam).",
+    mensaje: "Si el correo está registrado, te enviamos un código de 6 dígitos. Revisa tu bandeja (y spam) e ingrésalo junto con tu nueva contraseña.",
   });
-
   if (!email) return generica;
+  if (!correoConfigurado()) {
+    return NextResponse.json({ ok: false, error: "El envío de correo aún no está configurado. Pide el cambio al administrador de la plataforma." }, { status: 503 });
+  }
   const user = await getUserByEmail(email);
   if (!user) return generica;
-
-  if (!correoConfigurado()) {
-    return NextResponse.json(
-      { ok: false, error: "El envío de correo aún no está configurado. Pide el cambio al administrador de la plataforma." },
-      { status: 503 }
-    );
-  }
-
-  const token = randomBytes(32).toString("hex");
-  const hash = createHash("sha256").update(token).digest("hex");
-  const exp = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hora
-  await setResetTokenUsuario(user.id, hash, exp);
-
-  const base = process.env.APP_URL || req.nextUrl.origin;
-  const enlace = `${base}/reset?uid=${user.id}&token=${token}`;
-  const r = await enviarCorreo(user.email, "Cambiar tu contraseña — Radar Tributar IA", htmlReset(user.nombre, enlace));
-  if (!r.ok) {
-    return NextResponse.json({ ok: false, error: "No se pudo enviar el correo. Intenta más tarde o pide el cambio al administrador." }, { status: 502 });
-  }
+  const r = await enviarCodigo(user, "reset");
+  if (!r.ok && r.esperar) return NextResponse.json({ error: r.error, esperar: r.esperar }, { status: 429 });
+  if (!r.ok) return NextResponse.json({ ok: false, error: "No se pudo enviar el correo. Intenta más tarde o pide el cambio al administrador." }, { status: 502 });
   return generica;
 }
