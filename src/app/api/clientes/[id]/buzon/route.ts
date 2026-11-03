@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setBuzon } from "@/lib/db";
+import { mergeBuzon } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { consultarBuzon } from "@/lib/buzon";
 
@@ -42,15 +42,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       dias: typeof body.dias === "number" ? body.dias : 15,
       diagnostico: body.diagnostico === true,
     });
-    // Persistir los urgentes para el informe (no en modo diagnóstico).
+    // Persistir (no en modo diagnóstico): el buzón es un HISTORIAL acumulado;
+    // cada consulta agrega los mensajes nuevos a los ya guardados.
     if (!resultado.diag) {
-      await setBuzon(cliente.id, {
-        peligrosos: resultado.peligrosos,
-        urgentes: resultado.urgentes,
-        mensajes: resultado.mensajes,
-        totalMensajes: resultado.mensajes.length,
-        consultadoAt: new Date().toISOString(),
-      });
+      const fus = await mergeBuzon(cliente.id, resultado.mensajes).catch(() => null);
+      if (fus) {
+        return NextResponse.json({
+          ...resultado,
+          mensajes: fus.mensajes,
+          peligrosos: fus.mensajes.filter((m) => m.nivel === "peligroso"),
+          urgentes: fus.mensajes.filter((m) => m.nivel === "urgente"),
+          nuevos: fus.nuevos.map((m) => m.id),
+        });
+      }
     }
     return NextResponse.json(resultado);
   } catch (err: any) {

@@ -10,21 +10,29 @@ export function correoConfigurado(): boolean {
   return Boolean(RESEND_API_KEY);
 }
 
-/** Envía un correo. Devuelve {ok} o {ok:false, error}. Nunca lanza. */
+export interface AdjuntoCorreo { filename: string; content: Buffer | string }
+
+/** Envía un correo (con adjuntos opcionales, p. ej. el PDF de SUNAT).
+ *  Devuelve {ok} o {ok:false, error}. Nunca lanza. */
 export async function enviarCorreo(
   to: string,
   subject: string,
-  html: string
+  html: string,
+  adjuntos?: AdjuntoCorreo[]
 ): Promise<{ ok: boolean; error?: string }> {
   if (!RESEND_API_KEY) return { ok: false, error: "Correo no configurado (falta RESEND_API_KEY)." };
   try {
+    const attachments = (adjuntos ?? []).map((a) => ({
+      filename: a.filename,
+      content: Buffer.isBuffer(a.content) ? a.content.toString("base64") : a.content,
+    }));
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html }),
+      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html, ...(attachments.length ? { attachments } : {}) }),
     });
     if (!res.ok) {
       const detalle = await res.text().catch(() => "");

@@ -10,6 +10,7 @@ import type {
   SunatInfo,
   SireResumen,
   BuzonResumen,
+  BuzonMensaje,
   DeclaracionMensual,
   DeclaracionAnual,
   Deuda,
@@ -1602,6 +1603,53 @@ export async function setBuzon(
   cliente.buzon = buzon;
   await writeStore(store);
   return cliente;
+}
+
+// Fecha de un mensaje del buzón ("dd/mm/aaaa hh:mm:ss" o ISO) → epoch, para ordenar.
+function tsMensaje(f: string): number {
+  const s = String(f || "").trim();
+  const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0)).getTime();
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * FUSIONA los mensajes recién consultados con los ya guardados (el buzón es un
+ * HISTORIAL: nunca se pierde lo anterior; cada actualización solo AGREGA los
+ * nuevos). Devuelve los mensajes nuevos (no vistos antes) y el total acumulado.
+ */
+export async function mergeBuzon(
+  clienteId: string,
+  recientes: BuzonMensaje[],
+  consultadoAt = new Date().toISOString()
+): Promise<{ nuevos: BuzonMensaje[]; mensajes: BuzonMensaje[]; cliente: Cliente | null }> {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return { nuevos: [], mensajes: [], cliente: null };
+  const previos = cliente.buzon?.mensajes?.length
+    ? cliente.buzon.mensajes
+    : [...(cliente.buzon?.peligrosos ?? []), ...(cliente.buzon?.urgentes ?? [])];
+  const porId = new Map<string, BuzonMensaje>();
+  for (const m of previos) if (m?.id) porId.set(m.id, m);
+  const nuevos: BuzonMensaje[] = [];
+  for (const m of recientes) {
+    if (!m?.id) continue;
+    if (!porId.has(m.id)) nuevos.push(m);
+    porId.set(m.id, { ...(porId.get(m.id) ?? {}), ...m }); // lo reciente refresca leído/adjuntos
+  }
+  const mensajes = Array.from(porId.values())
+    .sort((a, b) => tsMensaje(b.fecha) - tsMensaje(a.fecha))
+    .slice(0, 1000);
+  cliente.buzon = {
+    mensajes,
+    peligrosos: mensajes.filter((m) => m.nivel === "peligroso"),
+    urgentes: mensajes.filter((m) => m.nivel === "urgente"),
+    totalMensajes: mensajes.length,
+    consultadoAt,
+  };
+  await writeStore(store);
+  return { nuevos, mensajes, cliente };
 }
 
 /** Guarda el estado de presentación SIRE (presentado/no presentado por periodo). */

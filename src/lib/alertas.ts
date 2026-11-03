@@ -35,6 +35,21 @@ export async function telegramEnviar(chatId: string, html: string): Promise<{ ok
   catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Error Telegram" }; }
 }
 
+/** Envía un DOCUMENTO (p. ej. el PDF de SUNAT) por Telegram, con pie opcional. Nunca lanza. */
+export async function telegramEnviarDocumento(chatId: string, archivo: Buffer, nombre: string, captionHtml?: string): Promise<{ ok: boolean; error?: string }> {
+  if (!TOKEN) return { ok: false, error: "Telegram no configurado (falta TELEGRAM_BOT_TOKEN)." };
+  try {
+    const fd = new FormData();
+    fd.append("chat_id", chatId);
+    if (captionHtml) { fd.append("caption", captionHtml.slice(0, 1000)); fd.append("parse_mode", "HTML"); }
+    fd.append("document", new Blob([new Uint8Array(archivo)], { type: "application/pdf" }), nombre || "documento.pdf");
+    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendDocument`, { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) return { ok: false, error: data.description || `Telegram HTTP ${res.status}` };
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Error Telegram" }; }
+}
+
 /** Lee los mensajes pendientes del bot y vincula los códigos "/start CODIGO" que
  *  coincidan con algún usuario. Devuelve cuántos vinculó y, si se pasa `userId`,
  *  si ese usuario quedó vinculado. */
@@ -95,18 +110,37 @@ function htmlCorreo(a: Alerta): string {
   </div>`;
 }
 
-/** Envía una alerta a un usuario por los canales que tenga activos. Nunca lanza. */
-export async function enviarAlerta(u: Usuario, a: Alerta): Promise<{ telegram?: boolean; email?: boolean; errores: string[] }> {
+export interface AdjuntoAlerta { nombre: string; pdf: Buffer }
+export interface ResultadoEnvio { telegram?: boolean; email?: boolean; adjuntoTelegram?: boolean; adjuntoEmail?: boolean; errores: string[] }
+
+/** Envía una alerta a un usuario por los canales que tenga activos, con el PDF
+ *  adjunto si se pasa (Telegram: como documento; correo: como adjunto). Nunca lanza. */
+export async function enviarAlerta(u: Usuario, a: Alerta, adjunto?: AdjuntoAlerta | null): Promise<ResultadoEnvio> {
   const errores: string[] = [];
-  const out: { telegram?: boolean; email?: boolean; errores: string[] } = { errores };
+  const out: ResultadoEnvio = { errores };
   const url = a.href ? `${APP_URL}${a.href}` : APP_URL;
   if (u.alertas?.telegramChatId && TOKEN) {
-    const r = await telegramEnviar(u.alertas.telegramChatId, `<b>${escapar(a.titulo)}</b>\n${escapar(a.texto)}\n<a href="${url}">Ver en Radar</a>`);
-    out.telegram = r.ok; if (!r.ok && r.error) errores.push(`Telegram: ${r.error}`);
+    const texto = `<b>${escapar(a.titulo)}</b>\n${escapar(a.texto)}\n<a href="${url}">Ver en Radar</a>`;
+    if (adjunto?.pdf?.length) {
+      // Con PDF: el documento va con el texto como pie (un solo mensaje).
+      const r = await telegramEnviarDocumento(u.alertas.telegramChatId, adjunto.pdf, adjunto.nombre, texto);
+      out.telegram = r.ok; out.adjuntoTelegram = r.ok;
+      if (!r.ok) {
+        // Si el documento falla (tamaño, formato), al menos va el texto.
+        const r2 = await telegramEnviar(u.alertas.telegramChatId, texto);
+        out.telegram = r2.ok; errores.push(`Telegram adjunto: ${r.error}`);
+        if (!r2.ok && r2.error) errores.push(`Telegram: ${r2.error}`);
+      }
+    } else {
+      const r = await telegramEnviar(u.alertas.telegramChatId, texto);
+      out.telegram = r.ok; if (!r.ok && r.error) errores.push(`Telegram: ${r.error}`);
+    }
   }
   if (u.alertas?.email !== false && correoConfigurado() && u.email) {
-    const r = await enviarCorreo(u.email, `Radar · ${a.titulo}`, htmlCorreo(a));
-    out.email = r.ok; if (!r.ok && r.error) errores.push(`Correo: ${r.error}`);
+    const adj = adjunto?.pdf?.length ? [{ filename: adjunto.nombre || "documento.pdf", content: adjunto.pdf }] : undefined;
+    const r = await enviarCorreo(u.email, `Radar · ${a.titulo}`, htmlCorreo(a), adj);
+    out.email = r.ok; out.adjuntoEmail = r.ok && Boolean(adj);
+    if (!r.ok && r.error) errores.push(`Correo: ${r.error}`);
   }
   return out;
 }

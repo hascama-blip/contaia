@@ -39,6 +39,9 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
   // Seguimientos guardados por mensaje (plazo de atención + comentario).
   const [segs, setSegs] = useState<Record<string, Seguimiento>>({});
   const [guardandoSeg, setGuardandoSeg] = useState<string | null>(null);
+  // Ids de mensajes que llegaron NUEVOS en la última actualización (se resaltan).
+  const [nuevos, setNuevos] = useState<Set<string>>(new Set());
+  const [probando, setProbando] = useState<string | null>(null);
 
   const puedeDiag = usePuedeDiag();
   const cliente = clientes.find((c) => c.id === clienteId);
@@ -122,17 +125,65 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo leer el buzón."); return; }
-      setMensajes(data.mensajes ?? []);
+      const lista: Mensaje[] = data.mensajes ?? [];
+      setMensajes(lista);
+      if (Array.isArray(data.cacheados)) setCacheados(new Set<string>(data.cacheados));
       if (data.limitado) {
         setConsultadoAt(data.consultadoAt ?? null);
         setInfo(data.mensaje ?? "El buzón ya se consultó hoy (límite 1 vez al día).");
       } else {
         setConsultadoAt(new Date().toISOString());
-        setInfo(`Se encontraron ${data.mensajes?.length ?? 0} mensaje(s). Quedaron guardados.`);
+        const nuevosIds: string[] = Array.isArray(data.nuevos) ? data.nuevos : [];
+        setNuevos(new Set(nuevosIds));
+        setInfo(`Se leyeron ${data.leidos ?? lista.length} mensaje(s): ${nuevosIds.length} nuevo(s). Historial guardado: ${lista.length}.`);
+        // Descarga AUTOMÁTICA del PDF de los mensajes nuevos (queda guardado
+        // para abrirlo al instante y para enviarlo por Telegram/correo).
+        const pendientes = lista.filter((m) => nuevosIds.includes(m.id) && m.adjuntos !== 0 && !cacheados.has(m.id)).slice(0, 10);
+        for (let i = 0; i < pendientes.length; i++) {
+          setInfo(`Descargando PDF ${i + 1}/${pendientes.length} de los mensajes nuevos…`);
+          await guardarPdfSilencioso(pendientes[i]);
+        }
+        if (pendientes.length) setInfo(`Listo: ${nuevosIds.length} mensaje(s) nuevo(s) y ${pendientes.length} PDF guardado(s). Historial: ${lista.length}.`);
       }
     } catch {
       setError("Se cortó la conexión con SUNAT. Intenta de nuevo.");
     } finally { setBusy(false); }
+  }
+
+  // Baja el PDF al servidor (caché) sin abrirlo en el navegador.
+  async function guardarPdfSilencioso(m: Mensaje) {
+    try {
+      const res = await fetch("/api/consultas/buzon/adjunto", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, solUser, solPass, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, adjuntos: m.adjuntos }),
+      });
+      if (res.ok) {
+        setCacheados((prev) => new Set(prev).add(m.id));
+        setDescargas((prev) => ({ ...prev, [m.id]: { at: new Date().toISOString(), por: "automático" } }));
+      }
+    } catch { /* se podrá bajar a mano */ }
+  }
+
+  // SOLO SUPREMO: simula que este mensaje "acaba de llegar" y envía la alerta a
+  // sus propios canales (Telegram/correo) con el PDF adjunto.
+  async function probarEnvio(m: Mensaje) {
+    setProbando(m.id); setError(null); setInfo(`Enviando prueba de “${m.asunto.slice(0, 50)}”…`);
+    try {
+      const res = await fetch("/api/consultas/buzon/probar-envio", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId, codMensaje: m.id, solUser, solPass }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(d.error ?? "No se pudo enviar la prueba."); return; }
+      const canales = [d.telegram ? "Telegram ✅" : d.telegram === false ? "Telegram ❌" : null, d.email ? "correo ✅" : d.email === false ? "correo ❌" : null].filter(Boolean).join(" · ");
+      const adj = d.adjunto
+        ? `PDF “${d.adjunto.nombre}” (${d.adjunto.kb} KB, ${d.adjunto.origen === "cache" ? "desde lo guardado" : "descargado de SUNAT"}) → Telegram ${d.adjunto.telegram ? "✅" : "—"} · correo ${d.adjunto.email ? "✅" : "—"}`
+        : `sin PDF (${d.errorAdjunto ?? "no disponible"})`;
+      const extra = [...(d.avisos ?? []), ...(d.errores ?? [])].join(" · ");
+      setInfo(`Prueba enviada: ${canales || "ningún canal activo"} · Adjunto: ${adj}${extra ? ` · ${extra}` : ""}`);
+      if (d.adjunto) setCacheados((prev) => new Set(prev).add(m.id));
+    } catch { setError("Error de red al probar el envío."); }
+    finally { setProbando(null); }
   }
 
   async function descargarPdf(m: Mensaje, forzar = false) {
@@ -254,9 +305,10 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
           <div className="border-b border-slate-100 px-4 py-3">
             <h2 className="font-bold text-slate-800">Mensajes del buzón</h2>
             <p className="text-xs text-slate-400">
-              Últimos 6 de <b>Notificaciones</b> y 6 de <b>Mensajes</b> ({mensajes.length} en total)
-              {consultadoAt ? ` · consultado ${new Date(consultadoAt).toLocaleString("es-PE")}` : ""}
-              {" "}· 📄 descarga el adjunto (verde = ya guardado).
+              <b>Historial acumulado</b>: {mensajes.length} mensaje(s) · cada actualización agrega solo los nuevos
+              {nuevos.size ? <> · <span className="font-semibold text-emerald-700">{nuevos.size} nuevo(s) ahora</span></> : null}
+              {consultadoAt ? ` · última actualización ${new Date(consultadoAt).toLocaleString("es-PE")}` : ""}
+              {" "}· 📄 el PDF de los nuevos se guarda automáticamente (verde = guardado).
             </p>
           </div>
           {mensajes.length === 0 ? (
@@ -277,7 +329,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                 {mensajes.map((m) => {
                   const guardado = cacheados.has(m.id);
                   return (
-                    <tr key={m.id}>
+                    <tr key={m.id} className={nuevos.has(m.id) ? "bg-emerald-50/60" : ""}>
                       <td className="whitespace-nowrap px-4 py-2">
                         <span className={`badge ${m.origen === "mensajes" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
                           {m.origen === "mensajes" ? "Mensajes" : "Notificaciones"}
@@ -293,7 +345,20 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-slate-700">{m.asunto}</td>
+                      <td className="px-4 py-2 text-slate-700">
+                        {nuevos.has(m.id) && <span className="mr-1.5 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">NUEVO</span>}
+                        {m.asunto}
+                        {puedeDiag && (
+                          <button
+                            onClick={() => probarEnvio(m)}
+                            disabled={probando !== null || busy}
+                            title="Solo supremo: simula que este mensaje acaba de llegar y envía la alerta (con el PDF) a tu Telegram/correo"
+                            className="ml-2 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                          >
+                            {probando === m.id ? "Enviando…" : "🧪 Probar envío"}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-center">
                         <div className="inline-flex items-center gap-1">
                           <button

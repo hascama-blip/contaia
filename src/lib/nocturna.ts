@@ -1,4 +1,4 @@
-import { consultarBuzon } from "./buzon";
+import { consultarBuzon, descargarAdjuntoBuzon } from "./buzon";
 import { descifrar } from "./cifrado";
 import { enviarAlerta } from "./alertas";
 import { proximosVencimientos } from "./cronogramaSunat";
@@ -6,8 +6,12 @@ import { planEfectivo, diasParaVencerPlan } from "./auth";
 import { planIncluye, PLAN_LABEL } from "./modulos";
 import {
   listClientesVigilados, patchVigilancia, setVigilancia, getUserById, listAdmins, listClientes,
-  alertaYaEnviada, marcarAlertaEnviada, getEstadoAlertas, setEstadoAlertas,
+  alertaYaEnviada, marcarAlertaEnviada, getEstadoAlertas, setEstadoAlertas, mergeBuzon,
+  getBuzonAdjunto, setBuzonAdjunto,
 } from "./db";
+
+/** Máximo de PDFs a descargar de SUNAT por empresa y noche (cada uno abre sesión). */
+const MAX_PDF_POR_EMPRESA = 5;
 
 // ============================================================
 //  Tarea NOCTURNA de alertas
@@ -90,17 +94,35 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
           }
           continue;
         }
+        // El buzón es un historial: lo leído se AGREGA a lo guardado de la empresa.
+        await mergeBuzon(c.id, res.mensajes).catch(() => null);
         const vistos = new Set(v.vistos ?? []);
         const nuevos = res.mensajes.filter((m) => m.id && !vistos.has(m.id));
         r.mensajesNuevos += nuevos.length;
+        let pdfsBajados = 0;
         for (const m of nuevos) {
+          // PDF adjunto: se descarga automáticamente (y queda guardado) para
+          // enviarlo junto con el aviso por Telegram y correo.
+          let adjunto: { nombre: string; pdf: Buffer } | null = await getBuzonAdjunto(c.id, m.id).catch(() => null);
+          if (!adjunto && m.adjuntos !== 0 && pdfsBajados < MAX_PDF_POR_EMPRESA) {
+            pdfsBajados++;
+            try {
+              const d = await descargarAdjuntoBuzon({ ruc: c.ruc, solUser: v.solUser, solPass, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, adjuntos: m.adjuntos });
+              if (d.ok && d.pdfBase64) {
+                const pdf = Buffer.from(d.pdfBase64, "base64");
+                const nombre = d.filename ?? `mensaje-${m.id}.pdf`;
+                await setBuzonAdjunto(c.id, m.id, pdf, nombre).catch(() => {});
+                adjunto = { nombre, pdf };
+              }
+            } catch (e) { r.errores.push(`${c.razonSocial} · PDF ${m.id}: ${e instanceof Error ? e.message : "error"}`); }
+          }
           const nivel = m.nivel === "peligroso" ? "⚠️ PELIGROSO · " : m.nivel === "urgente" ? "🔴 URGENTE · " : "";
           const env = await enviarAlerta(dueno, {
             tipo: "buzon",
             titulo: `${nivel}${c.razonSocial} (RUC ${c.ruc}) recibió una notificación SUNAT`,
-            texto: `${m.fecha ? `El ${m.fecha}: ` : ""}${m.asunto}. Debe ser atendida.`,
+            texto: `${m.fecha ? `El ${m.fecha}: ` : ""}${m.asunto}. Debe ser atendida.${adjunto ? "" : " (El PDF se podrá abrir desde la web.)"}`,
             href: `/clientes/${c.id}`,
-          });
+          }, adjunto);
           if (env.telegram || env.email) r.alertasBuzon++;
           if (env.errores.length) r.errores.push(`${c.razonSocial}: ${env.errores.join(" · ")}`);
           vistos.add(m.id);

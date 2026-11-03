@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
-import { setBuzon } from "@/lib/db";
+import { mergeBuzon } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
 import { logAccion } from "@/lib/auditoria";
 import { chequearUso, registrarUso } from "@/lib/usos";
@@ -92,21 +92,19 @@ export async function POST(req: NextRequest) {
     if (r.loginError) {
       return NextResponse.json({ error: r.error ?? "Usuario o Clave SOL incorrectos." }, { status: 401 });
     }
-    // Persistir (salvo en modo diagnóstico) para que sobreviva al refresco.
+    // Persistir (salvo en modo diagnóstico): el buzón es un HISTORIAL, cada
+    // actualización AGREGA los mensajes nuevos a los ya guardados.
+    let mensajes = r.mensajes;
+    let nuevos: string[] = [];
     if (!r.diag) {
-      await setBuzon(cliente.id, {
-        peligrosos: r.peligrosos,
-        urgentes: r.urgentes,
-        mensajes: r.mensajes,
-        totalMensajes: r.mensajes.length,
-        consultadoAt: new Date().toISOString(),
-      }).catch(() => {});
+      const fus = await mergeBuzon(cliente.id, r.mensajes).catch(() => null);
+      if (fus) { mensajes = fus.mensajes; nuevos = fus.nuevos.map((m) => m.id); }
       await logAccion({
         area: "Buzón",
         accion: "Consultó el buzón electrónico",
         clienteId: cliente.id,
         clienteNombre: cliente.razonSocial,
-        detalle: `${r.mensajes.length} mensaje(s)`,
+        detalle: `${r.mensajes.length} mensaje(s) leído(s) · ${nuevos.length} nuevo(s) · ${mensajes.length} en historial`,
       });
       // Consumir 1 uso del cupo gratis SOLO tras una extracción exitosa.
       if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
@@ -114,9 +112,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       razonSocial: cliente.razonSocial,
       ruc: cliente.ruc,
-      mensajes: r.mensajes,
+      mensajes,
+      nuevos,
+      leidos: r.mensajes.length,
       peligrosos: r.peligrosos,
       urgentes: r.urgentes,
+      cacheados: Object.keys(cliente.buzonAdjuntos ?? {}),
       diag: r.diag,
     });
   } catch (err: any) {
