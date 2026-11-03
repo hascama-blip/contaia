@@ -58,8 +58,10 @@ export async function inspeccionarPostgres(url: string): Promise<{ version: stri
   }
   try {
     const v = await c.query("select version()");
-    const bd = await c.query("select current_database() as db");
-    const bases = (await c.query("select datname from pg_database where not datistemplate and datname <> 'rdsadmin' order by 1")).rows.map((r: any) => String(r.datname));
+    let baseConectada = "";
+    let bases: string[] = [];
+    try { baseConectada = String((await c.query("select current_database() as db")).rows[0]?.db ?? ""); } catch { /* */ }
+    try { bases = (await c.query("select datname from pg_database where not datistemplate and datname <> 'rdsadmin' order by 1")).rows.map((r: any) => String(r.datname)); } catch { /* */ }
     const t = await c.query(`select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1`);
     const tablas: ResumenTablas[] = [];
     for (const r of t.rows) {
@@ -69,7 +71,7 @@ export async function inspeccionarPostgres(url: string): Promise<{ version: stri
       try { filas = Number((await c.query(`select count(*)::int as n from "${tabla}"`)).rows[0]?.n ?? 0); } catch { /* */ }
       tablas.push({ tabla, filas, columnas: cols.rows.map((x: any) => String(x.column_name)) });
     }
-    return { version: String(v.rows[0]?.version ?? "").split(" on ")[0], baseConectada: String(bd.rows[0]?.db ?? ""), bases, tablas, aviso };
+    return { version: String(v.rows[0]?.version ?? "").split(" on ")[0], baseConectada, bases, tablas, aviso };
   } finally { await c.end().catch(() => {}); }
 }
 
@@ -103,9 +105,21 @@ export async function leerStoreDesdePostgres(url: string): Promise<{ store: any;
       };
       // Columnas que pueden existir en versiones posteriores del esquema.
       for (const k of ["plan", "planVence", "soloRtp", "emailVerificado", "alertas"]) if (r[k] != null) u[k] = r[k];
+      // La web vieja marcaba "puede_crear_equipo"; en la nueva eso es el Plan de Equipo.
+      if (r.puedeCrearEquipo === true) u.plan = "equipo";
       if (u.rol === "supremo") u.estado = "aprobado";
       return u;
     });
+    // Usos gratis por módulo (tabla aparte en la web vieja) → cupo único por estudio.
+    const usos = new Map<string, { usados: number; desde: string }>();
+    for (const r of await tabla("usos_gratis")) {
+      const k = String(r.studioId ?? "");
+      const prev = usos.get(k) ?? { usados: 0, desde: r.desde ?? new Date().toISOString() };
+      prev.usados += num(r.usados);
+      if (r.desde && r.desde < prev.desde) prev.desde = r.desde;
+      usos.set(k, prev);
+    }
+    for (const u of users) { const x = usos.get(u.id); if (x && !u.usosGratis) u.usosGratis = x; }
 
     // ---- Clientes ----
     const clientes: Cliente[] = (await tabla("clientes", "order by created_at")).map((r) => ({
@@ -193,6 +207,35 @@ export async function leerStoreDesdePostgres(url: string): Promise<{ store: any;
       cl.deudasF36 = { tablas: Array.isArray(r.tablas) ? r.tablas : [], at: r.at ?? undefined, generadoAt: r.generadoAt ?? undefined, nota: r.nota ?? undefined, numPedido: r.numPedido ?? undefined, fechaPedido: r.fechaPedido ?? undefined, estado: r.estado ?? undefined, estadoTexto: r.estadoTexto ?? undefined, accion: r.accion ?? undefined, verificadoAt: r.verificadoAt ?? undefined };
     }
 
+    // ---- Caché del Detalle SIRE (propuesta por tipo-periodo) ----
+    for (const r of await tabla("sire_detalle_cache")) {
+      const cl = de(r); if (!cl) continue;
+      if (!cl.sireDetalle) cl.sireDetalle = {};
+      cl.sireDetalle[`${r.tipo}-${String(r.periodo).trim()}`] = {
+        columnas: Array.isArray(r.columnas) ? r.columnas : [], filas: Array.isArray(r.filas) ? r.filas : [],
+        comprobantes: num(r.comprobantes), at: r.at ?? new Date().toISOString(),
+      };
+    }
+
+    // ---- RTT y Rentas (solicitudes + bitácora del webhook) ----
+    const rtt = (await tabla("rtt_solicitudes", "order by creado_en")).map((r) => ({
+      id: String(r.id ?? `${r.clienteId}-${r.ruc}-${r.creadoEn ?? ""}`), ruc: String(r.ruc ?? "").trim(), razonSocial: porId.get(String(r.clienteId))?.razonSocial,
+      emailDestino: r.emailDestino ?? "", estado: r.estado ?? "creado",
+      historial: Array.isArray(r.historial) ? r.historial : [{ estado: r.estado ?? "creado", at: r.creadoEn ?? new Date().toISOString(), nota: "importado de la web anterior" }],
+      creadoEn: r.creadoEn ?? new Date().toISOString(), actualizadoEn: r.actualizadoEn ?? r.creadoEn ?? new Date().toISOString(),
+      rutaPdf: r.rutaPdf ?? undefined, rutaXml: r.rutaXml ?? undefined, error: r.error ?? undefined, solicitadoPor: r.solicitadoPor ?? undefined,
+    }));
+    const rentas = (await tabla("rentas_solicitudes", "order by creado_en")).map((r) => ({
+      id: String(r.id ?? `${r.clienteId}-${r.ruc}-${r.creadoEn ?? ""}`), clienteId: String(r.clienteId ?? ""), ruc: String(r.ruc ?? "").trim(),
+      emailDestino: r.emailDestino ?? "", estado: (["en_proceso", "listo", "error"].includes(r.estado) ? r.estado : "en_proceso"),
+      reporte: r.reporte ?? undefined, rutaPdf: r.rutaPdf ?? undefined, error: r.error ?? undefined,
+      creadoEn: r.creadoEn ?? new Date().toISOString(), actualizadoEn: r.actualizadoEn ?? r.creadoEn ?? new Date().toISOString(), solicitadoPor: r.solicitadoPor ?? undefined,
+    }));
+    const rttWebhookLog = (await tabla("rtt_webhook_log", "order by creado_en desc limit 200")).map((r) => ({
+      at: r.creadoEn ?? new Date().toISOString(), ruc: String(r.ruc ?? ""), tienePdf: Boolean(r.tienePdf), tieneXml: Boolean(r.tieneXml),
+      resultado: r.resultado ?? "", from: r.fromEmail ?? undefined,
+    }));
+
     // ---- Plataforma ----
     const cuentasProveedor: Record<string, any> = {};
     for (const r of await tabla("cuentas_proveedor")) cuentasProveedor[String(r.ruc).trim()] = { ruc: String(r.ruc).trim(), razonSocial: r.razonSocial ?? undefined, rubro: r.rubro ?? undefined, cuenta: r.cuenta ?? "", nombreCuenta: r.nombreCuenta ?? undefined, fuente: r.fuente === "aprendido" ? "aprendido" : "sugerido", actualizadoAt: r.actualizadoAt ?? new Date().toISOString() };
@@ -213,7 +256,12 @@ export async function leerStoreDesdePostgres(url: string): Promise<{ store: any;
     // Registro global de RUCs: completar con los clientes si la tabla no existía.
     for (const cl of clientes) if (cl.ruc && !rucsRegistrados[cl.ruc]) rucsRegistrados[cl.ruc] = { studioId: cl.ownerId ?? "", clienteId: cl.id, at: cl.createdAt };
 
-    const store = { clientes, users, cuentasProveedor, rubrosProveedor, acciones, rucsRegistrados, config };
+    const store = { clientes, users, cuentasProveedor, rubrosProveedor, acciones, rucsRegistrados, config, rtt, rentas, rttWebhookLog };
+    // Tablas de la base vieja que el importador no conoce (para no perder nada sin saberlo).
+    const conocidas = new Set([...leidas, ...ausentes, "_prisma_migrations"]);
+    const desconocidas = Array.from(existentes).filter((t) => !conocidas.has(t));
+    if (desconocidas.length) avisos.push(`Tablas no importadas (no las conoce el importador): ${desconocidas.join(", ")}`);
+    if (rtt.length || rentas.length) avisos.push(`RTT: ${rtt.length} solicitud(es) · Rentas: ${rentas.length} · bitácora webhook: ${rttWebhookLog.length}. Los PDF/XML de RTT y rentas viven en uploads/rtt y uploads/rentas de la web vieja.`);
     return {
       store,
       resumen: {
@@ -266,6 +314,12 @@ export async function aplicarImport(importado: any, modo: "reemplazar" | "fusion
     for (const k of ["cuentasProveedor", "rubrosProveedor", "rucsRegistrados"]) final[k] = { ...(importado[k] ?? {}), ...(actual[k] ?? {}) };
     final.acciones = [...(importado.acciones ?? []), ...(actual.acciones ?? [])].slice(0, 5000);
     final.config = { ...(importado.config ?? {}), ...(actual.config ?? {}) };
+    // Listas por id: se agregan las que no existan.
+    for (const k of ["rtt", "rentas"]) {
+      const ids = new Set((actual[k] ?? []).map((x: any) => x.id));
+      final[k] = [...(actual[k] ?? []), ...((importado[k] ?? []).filter((x: any) => !ids.has(x.id)))];
+    }
+    final.rttWebhookLog = [...(importado.rttWebhookLog ?? []), ...(actual.rttWebhookLog ?? [])].slice(0, 200);
   }
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(STORE_PATH, JSON.stringify(final, null, 2), "utf-8");
