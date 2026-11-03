@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Link from "next/link";
-import { LogoAsenco } from "@/components/Logo";
-import { HeaderNav } from "@/components/HeaderNav";
+import AppShell from "@/components/AppShell";
 import PlanesModal from "@/components/PlanesModal";
 import { SupremoProvider } from "@/components/SupremoContext";
 import { getCurrentUser, esAdmin, esSupremo, esSoloRtp, ensureSupremo, ensureRtpUser, planDelEstudio } from "@/lib/auth";
-import SalirBtn from "@/components/SalirBtn";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -52,46 +49,37 @@ export default async function RootLayout({
   const plan = user && !soloRtp ? (supremo ? "equipo" : await planDelEstudio(user)) : undefined;
   const equipo = plan === "equipo";
   const mostrarHeader = !!user && !esAuthPage;
+  const contenido = <SupremoProvider value={supremo}>{children}</SupremoProvider>;
   return (
     <html lang="es">
       <body>
-        {mostrarHeader && (
-          <header className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-            <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-10">
-              <Link href={soloRtp ? "/rtputilitarios" : "/"} className="mr-2 flex shrink-0 items-center lg:mr-6" translate="no">
-                <LogoAsenco />
-              </Link>
-              {soloRtp ? (
-                // Header MÍNIMO para el usuario restringido: solo su hub, sus
-                // empresas (para el acceso SOL de honorarios) y salir.
-                <div className="flex items-center gap-1.5 text-sm sm:gap-3">
-                  <Link href="/rtputilitarios" className="rounded-lg px-2.5 py-2 hover:bg-slate-100 sm:px-3">Utilitarios RTP</Link>
-                  <Link href="/clientes" className="rounded-lg px-2.5 py-2 hover:bg-slate-100 sm:px-3">Empresas</Link>
-                  <SalirBtn />
-                </div>
-              ) : (
-                <HeaderNav
-                  nombre={user!.nombre + (admin ? "" : " · operador")}
-                  admin={admin}
-                  supremo={supremo}
-                  equipo={equipo}
-                  plan={plan}
-                />
-              )}
-            </div>
-          </header>
-        )}
         {/* Ventana de planes: solo en el plan GRATIS (básico); nunca si ya se
             asignó un plan (regular/premium/equipo), ni al supremo, ni en login. */}
         {mostrarHeader && !soloRtp && plan === "basico" && <PlanesModal />}
-        <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">
-          <SupremoProvider value={supremo}>{children}</SupremoProvider>
-        </main>
-        <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
-          <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
-          <br />
-          <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>
-        </footer>
+        {mostrarHeader ? (
+          // Con sesión: barra lateral + barra superior (el usuario "solo RTP"
+          // ve una navegación mínima: su hub, sus empresas y salir).
+          <AppShell
+            nombre={user!.nombre + (admin ? "" : " · operador")}
+            admin={admin}
+            supremo={supremo}
+            equipo={equipo}
+            soloRtp={soloRtp}
+            plan={plan}
+          >
+            {contenido}
+          </AppShell>
+        ) : (
+          // Sin sesión (landing, login, reset): sin barras, página limpia.
+          <>
+            <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">{contenido}</main>
+            <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
+              <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
+              <br />
+              <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>
+            </footer>
+          </>
+        )}
       </body>
     </html>
   );
