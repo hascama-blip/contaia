@@ -256,6 +256,35 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     } catch { setError("Error de red al generar la relación."); }
   }
 
+  // EXCEL COMPLETO: Resumen + Comprobantes (cabecera, importes, detracción,
+  // glosa) + Ítems + Faltantes. Los comprobantes que NO se bajaron (error o
+  // pendientes) van en la hoja "Faltantes" con su motivo, para reintentarlos.
+  async function extraerEnExcel() {
+    const fs = facturasOk();
+    const faltantes = relacion
+      .map((r, i) => ({ r, e: estadoDe(i) }))
+      .filter(({ e }) => e.estado !== "ok")
+      .map(({ r, e }) => ({
+        rucEmisor: r.rucEmisor, tipo: r.tipo, serie: r.serie, numero: r.numero, fecha: r.fecha, monto: r.monto,
+        razonSocial: r.razonSocial ?? r.razonSocialEmisor ?? "",
+        motivo: e.estado === "error" ? (e.motivo || "SUNAT no devolvió el comprobante") : e.estado === "extrayendo" ? "En extracción" : "No descargado aún",
+      }));
+    if (!fs.length && !faltantes.length) { setError("Aún no has extraído comprobantes."); return; }
+    setGenBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/facturas-xml/excel-completo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ facturas: fs, faltantes, periodo: periodoSire }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "No se pudo generar el Excel."); return; }
+      bajarBlob(await res.blob(), `comprobantes-${periodoSire || "relacion"}${faltantes.length ? "-incompleto" : ""}.xlsx`);
+      setInfo(faltantes.length
+        ? `Excel generado con ${fs.length} comprobante(s) y la hoja "Faltantes" con ${faltantes.length} por descargar.`
+        : `Excel generado: ${fs.length} comprobante(s), relación completa ✅.`);
+    } catch { setError("Error de red al generar el Excel."); }
+    finally { setGenBusy(false); }
+  }
+
   async function descargarExcel(resumen: boolean) {
     const fs = facturasOk();
     if (!fs.length) { setError("Aún no has extraído comprobantes."); return; }
@@ -356,8 +385,17 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
             )}
             {nOk > 0 && (
               <>
+                <button
+                  className={`text-sm ${nOk === relacion.length ? "btn-accent" : "btn-ghost border-amber-300 text-amber-800"}`}
+                  onClick={extraerEnExcel}
+                  disabled={genBusy || auto || filaBusy !== null}
+                  title={nOk === relacion.length
+                    ? "Excel completo: Resumen, Comprobantes (con detracción), Ítems"
+                    : "Excel con lo descargado + hoja \"Faltantes\" con los comprobantes que aún no se bajaron"}
+                >
+                  {genBusy ? "Generando…" : nOk === relacion.length ? "📗 Extraer en Excel (todo listo)" : `📗 Extraer en Excel (+${relacion.length - nOk} faltantes)`}
+                </button>
                 <button className="btn-ghost text-sm" onClick={() => descargarExcel(true)} disabled={genBusy}>⬇ Excel consolidado</button>
-                <button className="btn-ghost text-sm" onClick={() => descargarExcel(false)} disabled={genBusy}>⬇ Excel detalle</button>
                 <button className="btn-ghost text-sm" onClick={descargarZip}>⬇ Todo (ZIP)</button>
               </>
             )}

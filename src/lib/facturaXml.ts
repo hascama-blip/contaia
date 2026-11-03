@@ -60,7 +60,54 @@ export interface FacturaXml {
   pdfBase64?: string;
   /** XML crudo del comprobante en base64 (para descargarlo tal cual). */
   xmlBase64?: string;
+
+  // ---- Datos complementarios (para el Excel completo) ----------------------
+  direccionEmisor?: string;
+  direccionReceptor?: string;
+  /** Contado / Crédito (con N° de cuotas si las hay). */
+  formaPago?: string;
+  anticipos?: number;
+  otrosCargos?: number;
+  redondeo?: number;
+  /** Impuesto a las bolsas plásticas (esquema 7152). */
+  icbper?: number;
+  observacion?: string;
+  /** Bloque "Información de la detracción" (null = no sujeta). */
+  detraccion?: DetraccionXml | null;
+  /** De dónde salieron los datos: XML (exacto) o texto del PDF (heurístico). */
+  fuente?: "xml" | "pdf";
 }
+
+export interface DetraccionXml {
+  codigo: string;      // Bien o servicio (Anexo: 022 Otros servicios empresariales…)
+  porcentaje: number;  // 12.00
+  monto: number;       // 101.95
+  cuenta: string;      // N° cuenta Banco de la Nación
+  medioPago: string;   // 001 Depósito en cuenta
+}
+
+/** Nombres del Anexo de detracciones (los más comunes) para mostrar junto al código. */
+export const BIENES_DETRACCION: Record<string, string> = {
+  "001": "Azúcar y melaza de caña", "003": "Alcohol etílico", "004": "Recursos hidrobiológicos",
+  "005": "Maíz amarillo duro", "007": "Caña de azúcar", "008": "Madera", "009": "Arena y piedra",
+  "010": "Residuos, subproductos, desechos", "012": "Intermediación laboral y tercerización",
+  "014": "Carnes y despojos comestibles", "017": "Harina, polvo y pellets de pescado",
+  "019": "Arrendamiento de bienes", "020": "Mantenimiento y reparación de bienes muebles",
+  "021": "Movimiento de carga", "022": "Otros servicios empresariales", "023": "Leche",
+  "024": "Comisión mercantil", "025": "Fabricación de bienes por encargo", "026": "Servicio de transporte de personas",
+  "027": "Servicio de transporte de carga", "030": "Contratos de construcción", "031": "Oro gravado con el IGV",
+  "034": "Minerales metálicos no auríferos", "035": "Bienes exonerados del IGV", "036": "Oro y demás minerales exonerados",
+  "037": "Demás servicios gravados con el IGV", "039": "Minerales no metálicos", "040": "Bien inmueble gravado con IGV",
+  "041": "Plomo",
+};
+export const MEDIOS_PAGO: Record<string, string> = {
+  "001": "Depósito en cuenta", "002": "Giro", "003": "Transferencia de fondos", "004": "Orden de pago",
+  "005": "Tarjeta de débito", "006": "Tarjeta de crédito", "007": "Cheques", "008": "Efectivo",
+  "009": "Efectivo, en los demás casos", "010": "Medios de pago usados en comercio exterior",
+  "011": "Documentos emitidos por las EDPYMES", "012": "Tarjeta de crédito emitida en el país",
+  "013": "Tarjetas de crédito emitidas en el exterior", "101": "Transferencias – Comercio exterior",
+  "102": "Cheques bancarios – Comercio exterior", "999": "Otros medios de pago",
+};
 
 function asArray<T>(x: T | T[] | undefined): T[] {
   if (x === undefined || x === null) return [];
@@ -132,8 +179,12 @@ export function parseFacturaXml(xml: string): FacturaXml | null {
     txt(asArray(receptor.PartyLegalEntity)[0]?.RegistrationName) ||
     txt(asArray(receptor.PartyName)[0]?.Name);
 
+  // Direcciones (RegistrationAddress del emisor y del receptor).
+  const direccionEmisor = direccionDe(emisor);
+  const direccionReceptor = direccionDe(receptor);
+
   // Montos por afectación (a nivel documento) desde TaxTotal/TaxSubtotal.
-  let gravado = 0, exonerado = 0, inafecto = 0, isc = 0, otrosTributos = 0;
+  let gravado = 0, exonerado = 0, inafecto = 0, isc = 0, otrosTributos = 0, icbper = 0, gratuitoTax = 0;
   let igv = 0;
   for (const tt of asArray(root.TaxTotal)) {
     igv += 0; // el IGV global se calcula abajo con más precisión por esquema
@@ -147,6 +198,10 @@ export function parseFacturaXml(xml: string): FacturaXml | null {
           gravado += base; igv += monto; break;
         case "2000": // ISC
           isc += monto; break;
+        case "7152": // ICBPER (bolsas plásticas)
+          icbper += monto; break;
+        case "9996": // Gratuitas
+          gratuitoTax += base; break;
         case "9997": // Exonerado
           exonerado += base; break;
         case "9998": // Inafecto
@@ -158,6 +213,40 @@ export function parseFacturaXml(xml: string): FacturaXml | null {
       }
     }
   }
+
+  // Forma de pago (Contado / Crédito + cuotas) y DETRACCIÓN (PaymentTerms +
+  // PaymentMeans con ID "Detraccion", según la guía UBL 2.1 de SUNAT).
+  let formaPago = "";
+  let cuotas = 0;
+  const det: DetraccionXml = { codigo: "", porcentaje: 0, monto: 0, cuenta: "", medioPago: "" };
+  let hayDetraccion = false;
+  for (const pt of asArray(root.PaymentTerms)) {
+    const id = txt(pt?.ID);
+    const mid = txt(pt?.PaymentMeansID);
+    if (/detracci/i.test(id)) {
+      hayDetraccion = true;
+      det.codigo = mid || det.codigo;
+      det.porcentaje = num(pt?.PaymentPercent) || det.porcentaje;
+      det.monto = num(pt?.Amount) || det.monto;
+    } else if (/formapago/i.test(id)) {
+      if (/contado/i.test(mid)) formaPago = "Contado";
+      else if (/cr[eé]dito/i.test(mid)) formaPago = "Crédito";
+      else if (/^cuota/i.test(mid)) cuotas++;
+    }
+  }
+  if (formaPago === "Crédito" && cuotas) formaPago += ` (${cuotas} cuota${cuotas > 1 ? "s" : ""})`;
+  for (const pm of asArray(root.PaymentMeans)) {
+    if (!/detracci/i.test(txt(pm?.ID))) continue;
+    hayDetraccion = true;
+    det.cuenta = txt(pm?.PayeeFinancialAccount?.ID) || det.cuenta;
+    det.medioPago = txt(pm?.PaymentMeansCode) || det.medioPago;
+  }
+
+  // Observaciones: cbc:Note sin languageLocaleID (el 1000 es el monto en letras
+  // y los 2xxx son leyendas fijas como la de detracción).
+  const observacion = asArray(root.Note)
+    .filter((n: any) => !attr(n, "languageLocaleID"))
+    .map(txt).filter(Boolean).join(" | ").slice(0, 300);
   // Respaldo: si no hubo subtotales, usa el IGV agregado de TaxAmount.
   if (igv === 0) igv = asArray(root.TaxTotal).reduce((a: number, t: any) => a + num(t?.TaxAmount), 0);
 
@@ -165,7 +254,10 @@ export function parseFacturaXml(xml: string): FacturaXml | null {
   const base = num(mon.LineExtensionAmount);
   const total = num(mon.PayableAmount) || num(mon.TaxInclusiveAmount);
   const descuento = num(mon.AllowanceTotalAmount);
-  const gratuito = num(mon.FreeOfChargeIndicatorAmount) || 0;
+  const gratuito = num(mon.FreeOfChargeIndicatorAmount) || gratuitoTax || 0;
+  const anticipos = num(mon.PrepaidAmount);
+  const otrosCargos = num(mon.ChargeTotalAmount);
+  const redondeo = num(mon.PayableRoundingAmount);
 
   const lineasRaw = asArray(root.InvoiceLine ?? root.CreditNoteLine ?? root.DebitNoteLine);
   const lineas: LineaXml[] = lineasRaw.map((l: any, i: number) => {
@@ -237,7 +329,32 @@ export function parseFacturaXml(xml: string): FacturaXml | null {
     total,
     lineas,
     glosa,
+    direccionEmisor,
+    direccionReceptor,
+    formaPago,
+    anticipos,
+    otrosCargos,
+    redondeo,
+    icbper,
+    observacion,
+    detraccion: hayDetraccion ? det : null,
+    fuente: "xml",
   };
+}
+
+// Dirección legible de una Party: AddressLine + distrito + provincia + departamento.
+function direccionDe(party: any): string {
+  const ra =
+    asArray(party?.PartyLegalEntity)[0]?.RegistrationAddress ??
+    party?.PostalAddress ??
+    asArray(party?.Person)[0]?.RegistrationAddress;
+  if (!ra) return "";
+  const linea = asArray(ra.AddressLine).map((a: any) => txt(a?.Line)).filter(Boolean).join(" ");
+  const partes = [linea, txt(ra.District), txt(ra.CityName), txt(ra.CountrySubentity)]
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Evita repetir "LIMA LIMA LIMA".
+  return partes.filter((p, i) => partes.findIndex((q) => q.toUpperCase() === p.toUpperCase()) === i).join(", ");
 }
 
 // Etiqueta de esquema exportada por si la UI la necesita.

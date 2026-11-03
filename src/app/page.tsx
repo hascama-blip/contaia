@@ -55,6 +55,13 @@ const PRINCIPALES: Opcion[] = [
     detalle:
       "Extensión del navegador: mientras navegas SUNAT (SIRE, DJ mensual y anual) captura los datos y los trae a Radar para el reporte — sin bots, captcha ni bloqueo de IP.",
   },
+  {
+    href: "/herramientas/comprobantes-xml",
+    icono: "📥",
+    titulo: "Descarga masiva de comprobantes",
+    detalle:
+      "Facturas y recibos por honorarios recibidos, directo de SUNAT por Clave SOL. Facturas: XML o PDF oficial en bloque (desde una relación o el SIRE) y el Excel completo con detracción, ítems y faltantes. Honorarios (RxH): por mes(es) completo(s), con la plantilla para Contasis/StarSoft.",
+  },
 ];
 
 // Utilitarios (abajo).
@@ -86,13 +93,6 @@ const UTILITARIOS: Opcion[] = [
     titulo: "Estado de cuenta (PDF) → Excel",
     detalle:
       "Convierte el PDF del estado de cuenta del banco (BCP) en un Excel con la tabla de conciliación (fecha, descripción, N° op, hora, cargo/abono, saldo) lista para llenar.",
-  },
-  {
-    href: "/herramientas/comprobantes-xml",
-    icono: "📥",
-    titulo: "Descarga masiva de comprobantes",
-    detalle:
-      "Facturas y recibos por honorarios recibidos, directo de SUNAT por Clave SOL. Facturas: XML o PDF oficial en bloque (desde una relación o el SIRE) con el Excel de detalle. Honorarios (RxH): por mes(es) completo(s), con la plantilla para Contasis/StarSoft.",
   },
 ];
 
