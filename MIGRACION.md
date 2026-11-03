@@ -92,7 +92,9 @@ viva (dejaría caída la web vieja), se trabaja sobre una **copia**:
    - `A`  `www` → IP estática de Lightsail
    - `A`  `@`   → IP estática de Lightsail (Caddy redirige el apex al www)
    - **`app` NO se toca todavía**: sigue apuntando a AWS (web vieja) hasta
-     terminar la Fase 3. Después, `A app` → IP de Lightsail: Caddy redirige
+     terminar la Fase 3. Después, `A app` → IP de Lightsail y en el servidor
+     `echo "DOMINIO_VIEJO=app.radartributaria.com" | sudo tee -a /opt/radar/.env`
+     seguido de `sudo /opt/radar/deploy/actualizar.sh`: Caddy redirige
      `app.radartributaria.com` a `www`, así los usuarios con el enlace viejo
      caen en la web nueva.
    - Deja `MX r` (RTT) y lo demás como está.
