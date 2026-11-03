@@ -46,6 +46,8 @@ services:
       - DOMINIO=${DOMINIO:-www.radartributaria.com}
       - DOMINIO_APEX=${DOMINIO_APEX:-radartributaria.com}
       - DOMINIO_VIEJO=${DOMINIO_VIEJO:-app.radartributaria.com}
+      # IP pública del servidor (opcional): permite abrir la web por http://IP para probar.
+      - IP_PUBLICA=${IP_PUBLICA:-sin-ip.invalid}
       - CORREO_TLS=${CORREO_TLS:-hascama@asencoauditores.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

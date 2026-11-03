@@ -22,6 +22,17 @@
 	redir https://{$DOMINIO}{uri} permanent
 }
 
+# Acceso por la IP pública (sin HTTPS), para probar antes de apuntar el DNS.
+# Se activa poniendo IP_PUBLICA=54.x.x.x en /opt/radar/.env.
+http://{$IP_PUBLICA} {
+	reverse_proxy web:3000 {
+		transport http {
+			read_timeout 900s
+			write_timeout 900s
+		}
+	}
+}
+
 # Dominio de la web VIEJA (app.radartributaria.com): cuando su DNS apunte a este
 # servidor, redirige a la web nueva para que los enlaces antiguos sigan sirviendo.
 {$DOMINIO_VIEJO} {
