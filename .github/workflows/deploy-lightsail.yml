@@ -1,0 +1,38 @@
+# Despliegue automático al servidor propio (Lightsail/EC2) en cada push a main.
+# Requiere estos secretos en GitHub → Settings → Secrets and variables → Actions:
+#   LIGHTSAIL_HOST   IP o dominio del servidor
+#   LIGHTSAIL_USER   usuario SSH (ubuntu)
+#   LIGHTSAIL_KEY    clave privada SSH (contenido del .pem)
+# Si los secretos no existen, el flujo no hace nada (Railway sigue desplegando solo).
+name: Desplegar en Lightsail
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lightsail
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ¿Hay servidor configurado?
+        id: cfg
+        env:
+          HOST: ${{ secrets.LIGHTSAIL_HOST }}
+        run: |
+          if [ -n "$HOST" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "Sin LIGHTSAIL_HOST: se omite."; fi
+
+      - name: Actualizar el servidor por SSH
+        if: steps.cfg.outputs.ok == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_KEY }}
+          command_timeout: 25m
+          script: |
+            sudo /opt/radar/deploy/actualizar.sh

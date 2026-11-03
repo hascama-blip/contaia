@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
     const r = await restaurarBackup(buf, file.name);
     return NextResponse.json({
       ok: true,
-      mensaje: `Restaurado: ${r.clientes} cliente(s), ${r.usuarios} usuario(s), ${r.archivosRestaurados} archivo(s). Se guardó una copia del estado anterior en backups/.`,
+      mensaje: r.clientes < 0
+        ? `Archivos restaurados: ${r.archivosRestaurados} (solo carpeta uploads; la base de datos no se tocó).`
+        : `Restaurado: ${r.clientes} cliente(s), ${r.usuarios} usuario(s), ${r.archivosRestaurados} archivo(s). Se guardó una copia del estado anterior en backups/.`,
     });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 400 });

@@ -261,6 +261,39 @@ export default function SupremoPanel() {
     } finally { setBusy(null); }
   }
 
+  // Migración desde la web vieja (Postgres en AWS/RDS) → store.json.
+  const [pgUrl, setPgUrl] = useState("");
+  const [pgModo, setPgModo] = useState<"fusionar" | "reemplazar">("fusionar");
+  const [pgBusy, setPgBusy] = useState<string | null>(null);
+  const [pgOut, setPgOut] = useState<string | null>(null);
+  async function pgAccion(accion: "probar" | "previsualizar" | "importar") {
+    if (!pgUrl.trim()) { setPgOut("Pega la URL de conexión de la base vieja."); return; }
+    if (accion === "importar") {
+      const ok = window.prompt(`Vas a ${pgModo === "reemplazar" ? "REEMPLAZAR la base actual por" : "FUSIONAR la base actual con"} los datos de la web vieja. Se guarda una copia del estado actual antes. Escribe IMPORTAR para continuar:`);
+      if (ok !== "IMPORTAR") return;
+    }
+    setPgBusy(accion); setPgOut(null);
+    try {
+      const res = await fetch("/api/supremo/importar-postgres", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: pgUrl.trim(), accion, modo: pgModo, confirmar: accion === "importar" ? "IMPORTAR" : undefined }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setPgOut(`❌ ${d.error ?? "No se pudo conectar."}`); return; }
+      if (accion === "probar") {
+        const lineas = (d.tablas ?? []).map((t: any) => `• ${t.tabla}: ${t.filas} fila(s) · ${t.columnas.join(", ")}`);
+        setPgOut(`✅ Conectado (${d.version}). ${lineas.length} tabla(s):\n${lineas.join("\n") || "(ninguna)"}`);
+      } else {
+        const r = d.resumen ?? {};
+        const base = `Usuarios ${r.usuarios} · Empresas ${r.clientes} · Mensajes buzón ${r.mensajesBuzon} · Seguimientos ${r.seguimientos} · Declaraciones ${r.declaraciones} (+${r.declaracionesAnuales} anuales) · Deudas ${r.deudas} · Auditoría ${r.acciones}\nTablas leídas: ${(r.tablasLeidas ?? []).join(", ") || "ninguna"}${r.tablasAusentes?.length ? `\nNo existen en la base vieja: ${r.tablasAusentes.join(", ")}` : ""}${r.avisos?.length ? `\nAvisos: ${r.avisos.join(" · ")}` : ""}`;
+        setPgOut(accion === "importar"
+          ? `✅ Importado (${d.modo}): ${d.usuariosNuevos} usuario(s) y ${d.clientesNuevos} empresa(s) nuevas. Copia previa: backups/${d.respaldo}.\n${base}\nAhora sube el ZIP con la carpeta uploads/ en “Restaurar desde archivo” para traer los PDF.`
+          : `Vista previa (no se escribió nada):\n${base}`);
+      }
+    } catch { setPgOut("❌ Error de red."); }
+    finally { setPgBusy(null); }
+  }
+
   // Avisos informativos (se muestran a todas las cuentas en el panel de notificaciones).
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [avTitulo, setAvTitulo] = useState("");
@@ -918,6 +951,33 @@ export default function SupremoPanel() {
           </label>
         </div>
         {bkMsg && <p className="mt-2 text-xs text-slate-600">{bkMsg}</p>}
+      </div>
+
+      {/* Migración desde la web vieja (Postgres en AWS/RDS) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-800">🚚 Migrar datos desde la web vieja (Postgres)</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Pega la URL de conexión de la base de la versión anterior (la de RDS en AWS). Primero <b>Probar</b> para
+          ver sus tablas, luego <b>Vista previa</b> para contar lo que se traería y al final <b>Importar</b>.
+          Los PDF no viven en la base: tráelos aparte con el ZIP de la carpeta <b>uploads/</b> en “Restaurar desde archivo”.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            className="input min-w-[280px] flex-1"
+            placeholder="postgresql://usuario:clave@host-rds.amazonaws.com:5432/radar"
+            value={pgUrl}
+            onChange={(e) => setPgUrl(e.target.value)}
+            autoComplete="off"
+          />
+          <select className="input w-auto" value={pgModo} onChange={(e) => setPgModo(e.target.value as any)} title="Fusionar agrega lo que no exista (por correo y RUC). Reemplazar deja la base vieja como la actual.">
+            <option value="fusionar">Fusionar con lo actual</option>
+            <option value="reemplazar">Reemplazar lo actual</option>
+          </select>
+          <button className="btn-ghost text-sm" onClick={() => pgAccion("probar")} disabled={pgBusy !== null}>{pgBusy === "probar" ? "…" : "🔌 Probar"}</button>
+          <button className="btn-ghost text-sm" onClick={() => pgAccion("previsualizar")} disabled={pgBusy !== null}>{pgBusy === "previsualizar" ? "…" : "👁 Vista previa"}</button>
+          <button className="btn-primary text-sm" onClick={() => pgAccion("importar")} disabled={pgBusy !== null}>{pgBusy === "importar" ? "Importando…" : "⬆ Importar"}</button>
+        </div>
+        {pgOut && <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-[11px] text-slate-700">{pgOut}</pre>}
       </div>
 
       <div className="rounded-xl border border-red-200 bg-red-50 p-4">

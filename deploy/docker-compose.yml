@@ -1,0 +1,56 @@
+# Radar Tributar IA en un servidor propio (Lightsail / EC2 / VPS).
+#   web   → la app (Dockerfile de la raíz), datos en /var/data del host.
+#   caddy → HTTPS automático (Let's Encrypt), compresión y proxy a la app.
+# Uso:  cd /opt/radar && docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: radar-web
+    restart: unless-stopped
+    env_file:
+      - /opt/radar/.env
+    environment:
+      - DATA_DIR=/var/data
+      - PORT=3000
+    volumes:
+      - /var/data:/var/data
+    expose:
+      - "3000"
+    # Los navegadores headless necesitan memoria compartida.
+    shm_size: "1gb"
+    deploy:
+      resources:
+        limits:
+          memory: ${RADAR_MEM_LIMIT:-6g}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 1m
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: radar-caddy
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # Dominio principal y apex (el apex redirige al www).
+      - DOMINIO=${DOMINIO:-www.radartributaria.com}
+      - DOMINIO_APEX=${DOMINIO_APEX:-radartributaria.com}
+      - CORREO_TLS=${CORREO_TLS:-hascama@asencoauditores.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

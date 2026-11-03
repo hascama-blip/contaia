@@ -72,7 +72,22 @@ export async function restaurarBackup(buf: Buffer, nombre: string): Promise<Resu
   if (esZip) {
     zipEntries = unzipSync(new Uint8Array(buf));
     const key = Object.keys(zipEntries).find((k) => k === "store.json" || k.endsWith("/store.json"));
-    if (!key) throw new Error("El ZIP no contiene store.json.");
+    if (!key) {
+      // ZIP SOLO de archivos (p. ej. la carpeta uploads de la web vieja, cuyos
+      // datos vinieron por Postgres): restaura los archivos sin tocar el store.
+      const soloArchivos = Object.keys(zipEntries).some((k) => /(^|\/)uploads\//.test(k) && !k.endsWith("/"));
+      if (!soloArchivos) throw new Error("El ZIP no contiene store.json ni una carpeta uploads/.");
+      for (const [k, data] of Object.entries(zipEntries)) {
+        const i = k.indexOf("uploads/");
+        if (i < 0 || k.endsWith("/")) continue;
+        const destino = path.join(UPLOADS_DIR, k.slice(i + "uploads/".length));
+        if (!path.resolve(destino).startsWith(path.resolve(UPLOADS_DIR))) continue;
+        await fs.mkdir(path.dirname(destino), { recursive: true });
+        await fs.writeFile(destino, Buffer.from(data));
+        archivosRestaurados++;
+      }
+      return { clientes: -1, usuarios: -1, archivosRestaurados };
+    }
     storeRaw = new TextDecoder().decode(zipEntries[key]);
   } else {
     storeRaw = buf.toString("utf-8");
