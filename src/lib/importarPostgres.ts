@@ -40,11 +40,26 @@ async function conectar(url: string): Promise<Client> {
   return c;
 }
 
-/** Solo prueba: lista tablas, filas y columnas (para ver si el esquema coincide). */
-export async function inspeccionarPostgres(url: string): Promise<{ version: string; tablas: ResumenTablas[] }> {
-  const c = await conectar(url);
+/** Solo prueba: lista las bases del servidor y, de la base conectada, sus tablas,
+ *  filas y columnas (para ver si el esquema coincide). Si la base de la URL no
+ *  existe, reintenta contra "postgres" solo para poder listar las bases. */
+export async function inspeccionarPostgres(url: string): Promise<{ version: string; baseConectada: string; bases: string[]; tablas: ResumenTablas[]; aviso?: string }> {
+  let c: Client;
+  let aviso: string | undefined;
+  try { c = await conectar(url); }
+  catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/does not exist/i.test(msg)) throw e;
+    // La base indicada no existe: conectar a "postgres" para listar las que hay.
+    const u = new URL(url);
+    u.pathname = "/postgres";
+    c = await conectar(u.toString());
+    aviso = `${msg}. Estas son las bases que sí existen; cambia el nombre al final de la URL.`;
+  }
   try {
     const v = await c.query("select version()");
+    const bd = await c.query("select current_database() as db");
+    const bases = (await c.query("select datname from pg_database where not datistemplate and datname <> 'rdsadmin' order by 1")).rows.map((r: any) => String(r.datname));
     const t = await c.query(`select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1`);
     const tablas: ResumenTablas[] = [];
     for (const r of t.rows) {
@@ -54,7 +69,7 @@ export async function inspeccionarPostgres(url: string): Promise<{ version: stri
       try { filas = Number((await c.query(`select count(*)::int as n from "${tabla}"`)).rows[0]?.n ?? 0); } catch { /* */ }
       tablas.push({ tabla, filas, columnas: cols.rows.map((x: any) => String(x.column_name)) });
     }
-    return { version: String(v.rows[0]?.version ?? "").split(" on ")[0], tablas };
+    return { version: String(v.rows[0]?.version ?? "").split(" on ")[0], baseConectada: String(bd.rows[0]?.db ?? ""), bases, tablas, aviso };
   } finally { await c.end().catch(() => {}); }
 }
 

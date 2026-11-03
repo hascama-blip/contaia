@@ -282,7 +282,7 @@ export default function SupremoPanel() {
       if (!res.ok) { setPgOut(`❌ ${d.error ?? "No se pudo conectar."}`); return; }
       if (accion === "probar") {
         const lineas = (d.tablas ?? []).map((t: any) => `• ${t.tabla}: ${t.filas} fila(s) · ${t.columnas.join(", ")}`);
-        setPgOut(`✅ Conectado (${d.version}). ${lineas.length} tabla(s):\n${lineas.join("\n") || "(ninguna)"}`);
+        setPgOut(`${d.aviso ? `⚠ ${d.aviso}\n` : "✅ Conectado"} (${d.version})\nBases en el servidor: ${(d.bases ?? []).join(", ") || "(ninguna)"}\nBase conectada: ${d.baseConectada} · ${lineas.length} tabla(s):\n${lineas.join("\n") || "(ninguna)"}`);
       } else {
         const r = d.resumen ?? {};
         const base = `Usuarios ${r.usuarios} · Empresas ${r.clientes} · Mensajes buzón ${r.mensajesBuzon} · Seguimientos ${r.seguimientos} · Declaraciones ${r.declaraciones} (+${r.declaracionesAnuales} anuales) · Deudas ${r.deudas} · Auditoría ${r.acciones}\nTablas leídas: ${(r.tablasLeidas ?? []).join(", ") || "ninguna"}${r.tablasAusentes?.length ? `\nNo existen en la base vieja: ${r.tablasAusentes.join(", ")}` : ""}${r.avisos?.length ? `\nAvisos: ${r.avisos.join(" · ")}` : ""}`;
