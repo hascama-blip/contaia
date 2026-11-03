@@ -45,6 +45,7 @@ services:
       # Dominio principal y apex (el apex redirige al www).
       - DOMINIO=${DOMINIO:-www.radartributaria.com}
       - DOMINIO_APEX=${DOMINIO_APEX:-radartributaria.com}
+      - DOMINIO_VIEJO=${DOMINIO_VIEJO:-app.radartributaria.com}
       - CORREO_TLS=${CORREO_TLS:-hascama@asencoauditores.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

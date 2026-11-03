@@ -9,42 +9,60 @@ Costo objetivo: Lightsail 8 GB en São Paulo (US$ 44/mes + IGV). Con 4 GB
 
 ---
 
-## Fase 1 · Respaldo de la web vieja (AWS: EC2 + RDS)
+## Fase 1 · Respaldo de la web vieja (`app.radartributaria.com`, AWS: EC2 + RDS)
 
-La versión anterior guarda los datos en **Postgres (RDS)** y los PDF en el disco
-del servidor **EC2**. Se necesitan ambos.
+La versión anterior la hizo y la despliega el programador; **no se necesita su
+código ni sus claves**: con la cuenta de AWS (dueña de los recursos) basta.
+Los datos están en **Postgres (RDS)** y los PDF en el disco del **EC2**.
 
 1. **Paga lo vencido** en AWS (Facturación → Pagos). Con deuda, AWS puede
    suspender la cuenta y borrar recursos.
-2. **Instantánea de RDS** (seguro): RDS → Bases de datos → selecciona la
-   instancia → Acciones → *Tomar instantánea*. Guárdala hasta terminar.
-3. **Instantánea del disco de EC2**: EC2 → Volúmenes → el volumen de la
-   instancia → Acciones → *Crear instantánea*.
-4. **Entra al servidor**: EC2 → Instancias → *Conectar* → pestaña *EC2 Instance
-   Connect* (terminal en el navegador, sin llave).
-5. **Datos de conexión a la base**: dentro del servidor, busca el `.env` de la app:
-   ```bash
-   sudo find / -name ".env" -path "*radar*" -o -name ".env" -path "*contaia*" 2>/dev/null
-   cat <ruta>/.env | grep -i -E "DATABASE|PG|POSTGRES"
-   ```
-   Apunta `DATABASE_URL` (o host, usuario, clave y nombre de la base).
-6. **Permitir la conexión desde la web nueva** (para importar directo): RDS →
-   la instancia → *Modificar* → **Acceso público: Sí**, y en su *grupo de
-   seguridad* agrega una regla de entrada TCP 5432 desde la IP del Lightsail
-   nuevo (la obtienes en la Fase 2). Al terminar la migración, vuelve a dejar
-   *Acceso público: No* o apaga RDS.
-   > Alternativa si no quieres abrir RDS: desde el EC2 haz
-   > `pg_dump "$DATABASE_URL" -Fc -f /tmp/radar.dump`, súbelo a S3 y pásamelo:
-   > lo convierto a `store.json`.
-7. **Archivos (PDF del buzón y subidos)**: en el EC2
+2. **Instantáneas (tu seguro)**: RDS → Bases de datos → la instancia → Acciones →
+   *Tomar instantánea*. EC2 → Volúmenes → el volumen → Acciones → *Crear
+   instantánea*. Guárdalas hasta terminar.
+
+### 1A · Base de datos, sin pedirle nada al programador
+
+La clave de la base la tiene el programador. En vez de cambiarla en la base
+viva (dejaría caída la web vieja), se trabaja sobre una **copia**:
+
+3. RDS → *Instantáneas* → la que tomaste → Acciones → **Restaurar instantánea**.
+   Nombre `radar-copia`, la clase más pequeña (db.t4g.micro), **Acceso
+   público: Sí**. Tarda 5 a 10 minutos. Cuesta centavos por las horas que viva.
+4. En `radar-copia` → *Modificar* → **Nueva contraseña maestra** (pon una tuya)
+   → Aplicar inmediatamente. El usuario maestro aparece en la pestaña
+   *Configuración* (suele ser `postgres`); el nombre de la base también.
+5. En el *grupo de seguridad* de `radar-copia` → Reglas de entrada → agrega
+   **PostgreSQL (5432)** desde la IP del Lightsail nuevo (Fase 2) o, mientras
+   pruebas, desde *Mi IP*.
+6. Arma la URL: `postgresql://postgres:TU-CLAVE@ENDPOINT-DE-radar-copia:5432/NOMBRE_BD`
+   (el *Endpoint* está en *Conectividad y seguridad*). Esa URL es la que pegas en
+   la web nueva (Fase 3). **No toca la base real.**
+7. Al terminar la migración, **elimina `radar-copia`** para no pagarla.
+
+### 1B · Archivos (PDF del buzón y subidos), que viven en el disco del EC2
+
+8. EC2 → Instancias → la instancia → **Conectar** → pestaña *EC2 Instance
+   Connect* (terminal en el navegador, sin llave; usuario `ubuntu` o
+   `ec2-user`). Si no deja entrar, usa la pestaña *Session Manager*.
    ```bash
    sudo find / -type d -name uploads -not -path "*/node_modules/*" 2>/dev/null
    sudo tar czf /tmp/uploads.tar.gz -C <carpeta-que-contiene-uploads> uploads
-   aws s3 cp /tmp/uploads.tar.gz s3://TU-BUCKET/   # o scp a tu PC
    ```
-   Descárgalo a tu PC y conviértelo a **ZIP** manteniendo la carpeta `uploads/`
-   en la raíz (en Windows: descomprime el .tar.gz y comprime la carpeta
-   `uploads` como ZIP).
+   Para bajarlo: `aws s3 cp /tmp/uploads.tar.gz s3://TU-BUCKET/` (si `aws` no
+   existe: `sudo apt install -y awscli` y `aws configure` con una clave IAM
+   tuya), y descárgalo desde la consola de S3.
+9. **Si ninguna pestaña de "Conectar" funciona** (el programador no habilitó el
+   acceso): EC2 → Instantáneas → la del disco → Acciones → *Crear volumen* en la
+   misma zona → adjúntalo a una instancia nueva tuya (o al Lightsail no se
+   puede; usa un EC2 t3.micro temporal) → `sudo mount /dev/xvdf1 /mnt` → copia
+   la carpeta `uploads` desde `/mnt`. Luego apaga y elimina esa instancia.
+10. En tu PC convierte el `.tar.gz` a **ZIP** manteniendo la carpeta `uploads/`
+    en la raíz (descomprime y vuelve a comprimir la carpeta `uploads`).
+
+> Atajo si la relación lo permite: pídele al programador un `pg_dump` de la
+> base y el `tar` de `uploads`. Con eso te saltas 1A y 1B. El `pg_dump` me lo
+> pasas y lo convierto, o lo restauras tú en `radar-copia`.
 
 ---
 
@@ -73,6 +91,10 @@ del servidor **EC2**. Se necesitan ambos.
 7. **DNS** (Namecheap → Advanced DNS):
    - `A`  `www` → IP estática de Lightsail
    - `A`  `@`   → IP estática de Lightsail (Caddy redirige el apex al www)
+   - **`app` NO se toca todavía**: sigue apuntando a AWS (web vieja) hasta
+     terminar la Fase 3. Después, `A app` → IP de Lightsail: Caddy redirige
+     `app.radartributaria.com` a `www`, así los usuarios con el enlace viejo
+     caen en la web nueva.
    - Deja `MX r` (RTT) y lo demás como está.
    En 5 a 30 minutos `https://www.radartributaria.com` sale con candado
    (Caddy pide el certificado solo).

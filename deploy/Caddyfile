@@ -21,3 +21,9 @@
 {$DOMINIO_APEX} {
 	redir https://{$DOMINIO}{uri} permanent
 }
+
+# Dominio de la web VIEJA (app.radartributaria.com): cuando su DNS apunte a este
+# servidor, redirige a la web nueva para que los enlaces antiguos sigan sirviendo.
+{$DOMINIO_VIEJO} {
+	redir https://{$DOMINIO}{uri} permanent
+}
