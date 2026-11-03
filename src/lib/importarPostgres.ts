@@ -112,6 +112,7 @@ export async function leerStoreDesdePostgres(url: string): Promise<{ store: any;
       id: String(r.id), ownerId: r.ownerId ?? undefined, razonSocial: r.razonSocial ?? "", ruc: String(r.ruc ?? "").trim(),
       negocio: r.negocio ?? undefined, email: r.email ?? "", telefono: r.telefono ?? "", createdAt: r.createdAt ?? new Date().toISOString(),
       sunat: r.sunat ?? null, documentos: [], diagnostico: r.diagnostico ?? null, sire: [], buzon: null,
+      itf: r.itf ?? null,
       declaraciones: [], declaracionesAnuales: [], deudas: [], credSire: null,
     }));
     const porId = new Map(clientes.map((c) => [c.id, c]));
