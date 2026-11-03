@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { esSupremo, getCurrentUser, resetUsuarios, SESSION_COOKIE } from "@/lib/auth";
+import { SESSION_COOKIE_CLEAR } from "@/lib/authToken";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,6 @@ export async function POST(req: NextRequest) {
     eliminadas,
     mensaje: `Se eliminaron ${eliminadas} cuenta(s). El usuario supremo fue recreado. Inicia sesión de nuevo.`,
   });
-  res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(SESSION_COOKIE, "", SESSION_COOKIE_CLEAR); // mismos atributos → sí se borra
   return res;
 }

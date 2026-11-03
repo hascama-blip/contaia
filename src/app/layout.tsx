@@ -43,12 +43,19 @@ export default async function RootLayout({
   const admin = esAdmin(user);
   const supremo = esSupremo(user);
   const soloRtp = esSoloRtp(user);
-  // El menú "Equipo" solo para el Plan de Equipo (o supremo).
-  const equipo = user && !soloRtp ? supremo || (await planDelEstudio(user)) === "equipo" : false;
+  // Páginas de autenticación: NUNCA muestran el header/menú ni el modal de
+  // planes, aunque quede una sesión previa (p. ej. al salir y volver al login).
+  const esAuthPage = pathname.startsWith("/login") || pathname.startsWith("/reset");
+  // Plan del estudio (los operadores heredan el de su admin). El supremo se
+  // trata como el plan máximo. Decide el menú "Equipo", el link de planes y
+  // si se muestra la ventana de planes (SOLO en el plan gratis = básico).
+  const plan = user && !soloRtp ? (supremo ? "equipo" : await planDelEstudio(user)) : undefined;
+  const equipo = plan === "equipo";
+  const mostrarHeader = !!user && !esAuthPage;
   return (
     <html lang="es">
       <body>
-        {user && (
+        {mostrarHeader && (
           <header className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
             <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-10">
               <Link href={soloRtp ? "/rtputilitarios" : "/"} className="mr-2 flex shrink-0 items-center lg:mr-6" translate="no">
@@ -64,16 +71,19 @@ export default async function RootLayout({
                 </div>
               ) : (
                 <HeaderNav
-                  nombre={user.nombre + (admin ? "" : " · operador")}
+                  nombre={user!.nombre + (admin ? "" : " · operador")}
                   admin={admin}
                   supremo={supremo}
                   equipo={equipo}
+                  plan={plan}
                 />
               )}
             </div>
           </header>
         )}
-        {user && !soloRtp && <PlanesModal />}
+        {/* Ventana de planes: solo en el plan GRATIS (básico); nunca si ya se
+            asignó un plan (regular/premium/equipo), ni al supremo, ni en login. */}
+        {mostrarHeader && !soloRtp && plan === "basico" && <PlanesModal />}
         <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">
           <SupremoProvider value={supremo}>{children}</SupremoProvider>
         </main>

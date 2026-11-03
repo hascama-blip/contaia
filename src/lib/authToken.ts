@@ -2,7 +2,21 @@
 // next/headers, para que también funcione en el middleware (edge runtime).
 
 export const SESSION_COOKIE = "rt_session";
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 días (segundos)
+// Vigencia MÁXIMA del token firmado (tope de seguridad). La cookie en sí es de
+// SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.
+export const SESSION_MAX_AGE = 60 * 60 * 24; // 24 horas (segundos)
+
+// Atributos de la cookie de sesión. Se usan IGUALES al crear y al borrar: para
+// que el navegador borre una cookie, los atributos (path/sameSite/secure) deben
+// coincidir; si no, el logout "no borra" y el usuario sigue viéndose logueado.
+export const SESSION_COOKIE_OPTS = {
+  httpOnly: true as const,
+  sameSite: "lax" as const,
+  path: "/",
+  secure: process.env.NODE_ENV === "production",
+};
+/** Opciones para BORRAR la cookie de sesión (mismos atributos + vencida). */
+export const SESSION_COOKIE_CLEAR = { ...SESSION_COOKIE_OPTS, maxAge: 0, expires: new Date(0) };
 
 const SECRET =
   process.env.AUTH_SECRET || "radar-tributario-dev-secret-cambiar-en-produccion";

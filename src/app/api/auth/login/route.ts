@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, getUserById } from "@/lib/db";
 import { verifyPassword, ensureSupremo, puedeIngresar } from "@/lib/auth";
-import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/authToken";
+import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
 
 export const runtime = "nodejs";
 
@@ -35,9 +35,7 @@ export async function POST(req: NextRequest) {
 
   const token = await createSessionToken(user.id);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true, sameSite: "lax", path: "/", maxAge: SESSION_MAX_AGE,
-    secure: process.env.NODE_ENV === "production",
-  });
+  // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.
+  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
   return res;
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface NavLink { href: string; label: string }
@@ -11,15 +10,19 @@ export function HeaderNav({
   admin,
   supremo,
   equipo,
+  plan,
 }: {
   nombre: string;
   admin: boolean;
   supremo: boolean;
   equipo?: boolean;
+  /** Plan del estudio: el link de planes solo se muestra en básico/regular
+   *  (no en Premium = mejor plan, ni en Plan de Equipo, ni para el supremo). */
+  plan?: "basico" | "regular" | "premium" | "equipo";
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const mostrarPlanes = !supremo && (plan === "basico" || plan === "regular" || !plan);
 
   const links: NavLink[] = [
     { href: "/", label: "Inicio" },
@@ -27,16 +30,18 @@ export function HeaderNav({
     { href: "/clientes", label: "Clientes" },
     ...(admin && equipo ? [{ href: "/equipo", label: "Equipo" }, { href: "/actividad", label: "Actividad" }] : []),
     ...(supremo ? [{ href: "/supremo", label: "Supremo" }] : []),
-    { href: "/planes", label: "Adquirir módulos" },
+    ...(mostrarPlanes ? [{ href: "/planes", label: "Adquirir módulos" }] : []),
   ];
 
   const iniciales = nombre.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "U";
 
   async function salir() {
     setBusy(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
+    try { localStorage.removeItem("mostrar_planes"); } catch { /* */ }
+    // Navegación COMPLETA (no suave): el layout del servidor relee las cookies
+    // y no queda el header de la sesión anterior sobre la pantalla de login.
+    window.location.replace("/login");
   }
 
   return (
