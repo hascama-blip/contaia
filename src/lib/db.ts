@@ -17,6 +17,8 @@ import type {
   ProveedorCuenta,
   Usuario,
   Aviso,
+  AlertasUsuario,
+  VigilanciaBuzon,
   DeudaF36Tabla,
   SeguimientoBuzon,
   AccionAuditoria,
@@ -82,6 +84,17 @@ interface Store {
   visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[]; matriz?: Record<string, VisorMatriz[]> };
   /** Avisos informativos publicados por el supremo (panel Notificaciones). */
   avisos?: Aviso[];
+  /** Alertas (Telegram/correo): registro de lo ya enviado y estado de la tarea nocturna. */
+  alertas?: {
+    /** clave de alerta → fecha ISO en que se envió (para no repetir). */
+    enviadas?: Record<string, string>;
+    /** Último update_id procesado de Telegram (getUpdates). */
+    telegramOffset?: number;
+    /** Última ejecución de la tarea nocturna (YYYY-MM-DD) y su resumen. */
+    ultimaNocturna?: string;
+    ultimaNocturnaAt?: string;
+    ultimaNocturnaResumen?: string;
+  };
 }
 
 async function ensureDirs() {
@@ -385,6 +398,75 @@ export async function setPlanVenceUsuario(userId: string, planVence: string): Pr
   u.planVence = planVence || undefined;
   await writeStore(store);
   return u;
+}
+
+// --- Alertas por usuario (Telegram / correo) ---------------------------------
+export async function setAlertasUsuario(userId: string, patch: Partial<AlertasUsuario>): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId);
+  if (!u) return null;
+  u.alertas = { ...(u.alertas ?? {}), ...patch };
+  // Limpia claves vacías para no dejar basura.
+  for (const k of Object.keys(u.alertas) as (keyof AlertasUsuario)[]) if (u.alertas[k] === undefined) delete u.alertas[k];
+  await writeStore(store);
+  return u;
+}
+/** Usuario que tiene pendiente el código de vinculación de Telegram. */
+export async function getUserPorCodigoTelegram(codigo: string): Promise<Usuario | null> {
+  const store = await readStore();
+  const lim = Date.now() - 15 * 60 * 1000;
+  return (store.users ?? []).find((u) => u.alertas?.telegramCodigo && u.alertas.telegramCodigo === codigo && new Date(u.alertas.telegramCodigoAt ?? 0).getTime() >= lim) ?? null;
+}
+/** Admins (dueños de estudio), para recorrer en la tarea nocturna. */
+export async function listAdmins(): Promise<Usuario[]> {
+  const store = await readStore();
+  return (store.users ?? []).filter((u) => !u.parentId && u.rol !== "supremo" && !u.soloRtp);
+}
+
+// --- Vigilancia nocturna del buzón (por empresa) -----------------------------
+export async function setVigilancia(clienteId: string, v: VigilanciaBuzon | null): Promise<Cliente | null> {
+  const store = await readStore();
+  const c = store.clientes.find((x) => x.id === clienteId);
+  if (!c) return null;
+  c.vigilancia = v;
+  await writeStore(store);
+  return c;
+}
+export async function patchVigilancia(clienteId: string, patch: Partial<VigilanciaBuzon>): Promise<void> {
+  const store = await readStore();
+  const c = store.clientes.find((x) => x.id === clienteId);
+  if (!c?.vigilancia) return;
+  Object.assign(c.vigilancia, patch);
+  await writeStore(store);
+}
+export async function listClientesVigilados(): Promise<Cliente[]> {
+  const store = await readStore();
+  return store.clientes.filter((c) => c.vigilancia?.activo);
+}
+
+// --- Registro de alertas enviadas / estado de la tarea nocturna ---------------
+export async function alertaYaEnviada(clave: string): Promise<boolean> {
+  const store = await readStore();
+  return Boolean(store.alertas?.enviadas?.[clave]);
+}
+export async function marcarAlertaEnviada(clave: string): Promise<void> {
+  const store = await readStore();
+  if (!store.alertas) store.alertas = {};
+  if (!store.alertas.enviadas) store.alertas.enviadas = {};
+  store.alertas.enviadas[clave] = new Date().toISOString();
+  // Poda: conserva 90 días.
+  const lim = Date.now() - 90 * 86400000;
+  for (const [k, v] of Object.entries(store.alertas.enviadas)) if (new Date(v).getTime() < lim) delete store.alertas.enviadas[k];
+  await writeStore(store);
+}
+export async function getEstadoAlertas(): Promise<NonNullable<Store["alertas"]>> {
+  const store = await readStore();
+  return store.alertas ?? {};
+}
+export async function setEstadoAlertas(patch: Partial<NonNullable<Store["alertas"]>>): Promise<void> {
+  const store = await readStore();
+  store.alertas = { ...(store.alertas ?? {}), ...patch };
+  await writeStore(store);
 }
 
 // --- Avisos informativos (los publica el supremo; los ven todas las cuentas) ---

@@ -5,6 +5,8 @@ const nextConfig = {
   // pesados): unpdf (pdf.js) para leer PDFs, y el navegador headless del buzón.
   experimental: {
     serverComponentsExternalPackages: ["unpdf", "tesseract.js", "exceljs", "fast-xml-parser", "playwright-core", "@sparticuz/chromium"],
+    // src/instrumentation.ts: planificador de la tarea nocturna de alertas.
+    instrumentationHook: true,
   },
 };
 

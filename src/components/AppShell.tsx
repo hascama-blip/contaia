@@ -82,6 +82,7 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
   const menu: { href: string; label: string; clase: string }[] = soloRtp ? [] : [
     ...(supremo ? [{ href: "/supremo", label: "Supremo", clase: "font-semibold text-accent-300" }] : []),
     ...(mostrarPlanes ? [{ href: "/planes", label: "Adquirir módulos", clase: "font-semibold text-accent-300" }] : []),
+    { href: "/alertas", label: "Alertas al celular", clase: "text-slate-100" },
     { href: "/cuenta", label: "Cambiar contraseña", clase: "text-slate-100" },
   ];
   const activo = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
@@ -303,7 +304,7 @@ function Campana() {
       .catch(() => {});
   }, []);
   return (
-    <Link href="/" className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" title={n ? `${n} recordatorio(s) de buzón` : "Recordatorios de buzón"}>
+    <Link href="/alertas" className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" title={n ? `${n} recordatorio(s) de buzón · configurar alertas` : "Alertas al celular"}>
       <Icono name="bell" className="h-5 w-5" />
       {n > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />}
     </Link>

@@ -141,6 +141,8 @@ export interface Usuario {
   codigoEnviadoAt?: string;
   /** Cupo del módulo gratis: 3 consultas por ventana de 7 días. */
   usosGratis?: { usados: number; desde: string };
+  /** Alertas al celular/correo (Telegram vinculado, correo, cronograma). */
+  alertas?: AlertasUsuario;
 }
 
 /** Aviso informativo que publica el supremo (lo ven todas las cuentas en el Inicio). */
@@ -206,6 +208,43 @@ export interface Cliente {
   credSire?: CredencialesSire | null;
   /** Seguimientos de mensajes del buzón (plazo de atención + comentario). */
   seguimientosBuzon?: SeguimientoBuzon[];
+  /** Vigilancia automática del buzón (opt-in, Premium/Equipo): la Clave SOL se
+   *  guarda CIFRADA, con vencimiento a 30 días y se borra al desactivar. */
+  vigilancia?: VigilanciaBuzon | null;
+}
+
+/** Vigilancia nocturna del buzón de una empresa (consentimiento explícito). */
+export interface VigilanciaBuzon {
+  activo: boolean;
+  solUser: string;
+  /** Clave SOL cifrada (AES-256-GCM, llave del servidor). Nunca en claro. */
+  claveEnc: string;
+  guardadaAt: string;
+  /** Vence a los 30 días: hay que volver a escribir la clave. */
+  venceAt: string;
+  /** Quién aceptó la vigilancia (id de usuario). */
+  aceptadoPor: string;
+  /** Ids de mensajes ya avisados (no se repiten). */
+  vistos: string[];
+  ultimoChequeo?: string;
+  ultimoError?: string;
+  erroresSeguidos?: number;
+  /** Última vez que se avisó algo de esta empresa. */
+  ultimaAlerta?: string;
+}
+
+/** Preferencias de alertas de un usuario (canal Telegram y correo). */
+export interface AlertasUsuario {
+  /** chat_id de Telegram vinculado (vacío = no vinculado). */
+  telegramChatId?: string;
+  telegramNombre?: string;
+  /** Código temporal para vincular Telegram (/start CODIGO). */
+  telegramCodigo?: string;
+  telegramCodigoAt?: string;
+  /** Recibir también por correo (por defecto sí). */
+  email?: boolean;
+  /** Avisos del cronograma de DDJJ mensual (por defecto sí). */
+  cronograma?: boolean;
 }
 
 /** Credenciales SIRE persistidas (sin la Clave SOL, que es efímera). */

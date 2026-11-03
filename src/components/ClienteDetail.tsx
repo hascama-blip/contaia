@@ -7,6 +7,7 @@ import type { Cliente } from "@/lib/types";
 import { llevaSire, esPersonaNatural } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
+import VigilanciaBuzonPanel from "./VigilanciaBuzonPanel";
 import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
 import RentasPanel from "./RentasPanel";
@@ -196,6 +197,9 @@ export default function ClienteDetail({
         llevaSire={llevaSire(cliente)}
         inicialCred={cliente.credSire ? { clientId: cliente.credSire.clientId ?? "", clientSecret: cliente.credSire.clientSecret ?? "" } : null}
       />
+
+      {/* Vigilancia nocturna del buzón (opt-in, Clave SOL cifrada 30 días) */}
+      <VigilanciaBuzonPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Columna izquierda: SUNAT + documentos */}

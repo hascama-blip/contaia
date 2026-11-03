@@ -5,6 +5,7 @@ import { getCurrentUser, studioId, modulosDelEstudio, esSupremo, esSoloRtp } fro
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
 import NotificacionesPanel from "@/components/NotificacionesPanel";
+import DescubreMas from "@/components/DescubreMas";
 import Landing from "@/components/Landing";
 
 export const dynamic = "force-dynamic";
@@ -130,26 +131,6 @@ function TarjetaModulo({ o }: { o: Opcion }) {
   );
 }
 
-function ItemPremium({ o, badge, boton, href }: { o: Opcion; badge: string; boton: string; href: string }) {
-  return (
-    <div className="sheen rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:border-accent-300 hover:shadow-md">
-      <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-100 text-accent-700 ring-1 ring-accent-200">🔒</span>
-        <div className="min-w-0">
-          <h3 className="text-sm font-bold leading-snug text-slate-800">
-            {o.titulo}{" "}
-            <span className="ml-1 inline-block rounded-md bg-accent-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-accent-800">{badge}</span>
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">{o.detalle}</p>
-        </div>
-      </div>
-      <Link href={href} className="relative z-10 mt-3 block rounded-xl border border-slate-300 bg-white py-2 text-center text-sm font-semibold text-slate-700 transition-colors duration-500 hover:border-accent-400 hover:bg-accent-50 hover:text-accent-800">
-        {boton}
-      </Link>
-    </div>
-  );
-}
-
 function ItemUtilitario({ o }: { o: Opcion }) {
   return (
     <Link href={o.href} className="sheen group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 hover:border-brand-200 hover:shadow-md">
@@ -214,7 +195,7 @@ export default async function MenuPage() {
   // Las cuentas que no son supremo ven el panel de Notificaciones (plan, buzones,
   // próximos a declarar, avisos) en la columna derecha, en lugar de Utilitarios.
   const verNotificaciones = !supremo;
-  const hayPanelDerecho = verNotificaciones || premium.length > 0 || utilActivos.length > 0 || utilBloqueados.length > 0;
+  const hayPanelDerecho = true; // Notificaciones (o Utilitarios) + "Descubre qué más puedes hacer"
 
   const etiqueta = (o: Opcion) => {
     const m = moduloPorHref(o.href);
@@ -222,6 +203,11 @@ export default async function MenuPage() {
     if (m?.planMin === "premium") return { badge: "Bloqueado (de pago)", boton: "Ver planes" };
     return { badge: "Bloqueado", boton: "Desbloquear acceso" };
   };
+  // Módulos que el plan NO incluye → botón "Descubre qué más puedes hacer".
+  const bloqueadosDescubre = [...premium, ...utilBloqueados].map((o) => {
+    const e = etiqueta(o);
+    return { titulo: o.titulo, detalle: o.detalle, icono: o.icono, badge: e.badge, boton: e.boton, href: "/planes" };
+  });
 
   return (
     <div className="space-y-5">
@@ -282,24 +268,17 @@ export default async function MenuPage() {
 
         {/* Servicios Premium / Utilitarios */}
         {hayPanelDerecho && (
-          // Fija al hacer scroll (igual que el héroe) para que no se descuadre;
-          // si es más alta que la pantalla, se desplaza dentro de sí misma.
-          <aside className="space-y-5 lg:sticky lg:top-20 lg:col-span-3 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+          // Fija al hacer scroll (igual que el héroe), sin barra de desplazamiento
+          // propia: el contenido es compacto y los módulos bloqueados viven en el
+          // botón "Descubre qué más puedes hacer".
+          <aside className="space-y-5 lg:sticky lg:top-20 lg:col-span-3">
             {verNotificaciones && <NotificacionesPanel />}
-            {premium.length > 0 && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-bold text-slate-800">Servicios Premium</h2>
-                <div className="mt-4 space-y-3">
-                  {premium.map((o) => { const e = etiqueta(o); return <ItemPremium key={o.href} o={o} badge={e.badge} boton={e.boton} href="/planes" />; })}
-                </div>
-              </section>
-            )}
-            {(utilActivos.length > 0 || utilBloqueados.length > 0) && (
+            <DescubreMas bloqueados={bloqueadosDescubre} />
+            {utilActivos.length > 0 && (
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="flex items-center gap-2 text-xl font-bold text-slate-800">🧰 Utilitarios</h2>
                 <div className="mt-4 space-y-3">
                   {utilActivos.map((o) => <ItemUtilitario key={o.href} o={o} />)}
-                  {utilBloqueados.map((o) => <ItemPremium key={o.href} o={o} badge="Bloqueado (de pago)" boton="Saber más" href="/planes" />)}
                 </div>
               </section>
             )}
