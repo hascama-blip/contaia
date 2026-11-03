@@ -10,7 +10,17 @@ DIR="/opt/radar"
 
 echo "==> Paquetes base"
 apt-get update -y
-apt-get install -y ca-certificates curl git unzip awscli
+apt-get install -y ca-certificates curl git unzip
+
+echo "==> AWS CLI (solo para el respaldo opcional a S3; si falla, se sigue)"
+if ! command -v aws >/dev/null 2>&1; then
+  (
+    cd /tmp \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o awscliv2.zip \
+    && rm -rf aws && unzip -q awscliv2.zip && ./aws/install >/dev/null \
+    && rm -rf aws awscliv2.zip
+  ) || echo "   (no se pudo instalar AWS CLI; el respaldo a S3 queda opcional)"
+fi
 
 echo "==> Docker"
 if ! command -v docker >/dev/null 2>&1; then
