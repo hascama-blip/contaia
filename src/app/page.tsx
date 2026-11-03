@@ -95,7 +95,7 @@ const PRINCIPALES: Opcion[] = [
     contenido: [
       "Facturas recibidas en bloque: XML o PDF oficial, desde una relación o el SIRE.",
       "Excel completo: cabecera, importes, detracción, ítems y relación de faltantes.",
-      "Recibos por honorarios (RxH) por mes completo, con plantilla para Contasis/StarSoft.",
+      "Recibos por honorarios (RxH) por mes completo: detalle en Excel y plantilla para Contasis/StarSoft.",
     ],
   },
 ];

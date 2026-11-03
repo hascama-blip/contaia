@@ -30,7 +30,7 @@ export default async function Page() {
         <p className="text-sm text-slate-500">
           Elige la empresa y carga su Clave SOL una sola vez. Luego descarga en bloque las{" "}
           <strong>facturas</strong> recibidas (XML o PDF oficial, con el Excel de detalle) o los{" "}
-          <strong>recibos por honorarios</strong> (RxH) por mes completo.
+          <strong>recibos por honorarios</strong> (RxH) por mes completo, con su detalle en Excel o la plantilla para StarSoft.
         </p>
       </div>
       <ComprobantesXmlTool clientes={min} />

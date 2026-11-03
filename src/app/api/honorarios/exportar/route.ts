@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { xlsDeAsientos, txtDeAsientos, AsientoHonorario } from "@/lib/honorarios";
+import { xlsDeAsientos, txtDeAsientos, excelDetalleRecibos, AsientoHonorario, Recibo } from "@/lib/honorarios";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,12 +12,28 @@ export async function POST(req: NextRequest) {
   await requireUser();
   const body = await req.json().catch(() => ({}));
   const asientos = Array.isArray(body.asientos) ? (body.asientos as AsientoHonorario[]) : [];
-  const formato = body.formato === "txt" ? "txt" : "xlsx";
+  const formato = body.formato === "txt" ? "txt" : body.formato === "detalle" ? "detalle" : "xlsx";
   // Nombre base SIN extensión previa (para no arrastrar .xls/.xlsx/.txt).
   const baseNombre = String(body.nombre || "Honorarios").replace(/\.(xlsx|xls|txt)$/i, "").replace(/[^\w.-]+/g, "_") || "Honorarios";
-  if (!asientos.length) return NextResponse.json({ error: "No hay asientos para exportar." }, { status: 400 });
 
   try {
+    // Detalle en Excel de los recibos tal cual se leyeron de SUNAT (sin cuentas
+    // contables ni formato de importación): hojas "Detalle" y "Resumen".
+    if (formato === "detalle") {
+      const recibos = Array.isArray(body.recibos) ? (body.recibos as Recibo[]) : [];
+      if (!recibos.length) return NextResponse.json({ error: "No hay recibos para exportar." }, { status: 400 });
+      const meta = body.meta && typeof body.meta === "object" ? body.meta : {};
+      const buf = await excelDetalleRecibos(recibos, {
+        ruc: String(meta.ruc || ""), razonSocial: String(meta.razonSocial || ""),
+        desde: String(meta.desde || ""), hasta: String(meta.hasta || ""),
+      });
+      return NextResponse.json({
+        archivo: Buffer.from(buf).toString("base64"),
+        nombre: `Detalle-RxH-${baseNombre.replace(/^Honorarios-?/i, "") || "recibos"}.xlsx`,
+        mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    }
+    if (!asientos.length) return NextResponse.json({ error: "No hay asientos para exportar." }, { status: 400 });
     if (formato === "txt") {
       const txt = txtDeAsientos(asientos);
       // ANSI (Windows-1252 ~ latin1): la mayoría del contenido es ASCII; los

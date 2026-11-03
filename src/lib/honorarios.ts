@@ -482,6 +482,142 @@ export function txtDeAsientos(asientos: AsientoHonorario[]): string {
   return lineas.join("\r\n") + "\r\n"; // CRLF (Windows/StarSoft) + enter al final
 }
 
+// ---- Detalle de recibos en Excel (SIN cuentas contables) ---------------------
+/** Convierte "1,234.56" / "1234,56" a número. */
+function montoRecibo(s: string): number {
+  const t = String(s || "").trim();
+  if (!t) return 0;
+  // Si la coma es el separador decimal (última coma después del último punto).
+  const limpio = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  return Number(limpio.replace(/[^\d.-]/g, "")) || 0;
+}
+const esDolares = (moneda: string) => /d[oó]lar|usd|\$/i.test(moneda || "");
+const esAnulado = (estado: string) => /anulad/i.test(estado) && !/no\s*anulad/i.test(estado);
+
+export interface DetalleRecibosMeta { ruc?: string; razonSocial?: string; desde?: string; hasta?: string }
+
+/** Excel DETALLADO de los recibos leídos de SUNAT, tal cual (sin cuentas
+ *  contables ni formato de importación): hoja "Detalle" con una fila por recibo
+ *  (fecha, periodo, serie-número, estado, emisor, tipo de renta, moneda, renta
+ *  bruta, retención, renta neta, pendiente, T.C. SUNAT, importes en soles y el
+ *  concepto completo) y hoja "Resumen" con totales, por emisor y por mes. */
+export async function excelDetalleRecibos(recibos: Recibo[], meta: DetalleRecibosMeta = {}): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Radar Tributario";
+  const tcPorFecha = await tiposCambioSunat(recibos.filter((r) => esDolares(r.moneda)).map((r) => aISO(r.fecha))).catch(() => ({} as Record<string, number | null>));
+  const cab = { bold: true, color: { argb: "FFFFFFFF" } };
+  const fillCab: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1D4ED8" } };
+  const borde: Partial<ExcelJS.Borders> = { bottom: { style: "thin", color: { argb: "FFE2E8F0" } } };
+  const NUM = "#,##0.00";
+
+  // ---------- Hoja Detalle ----------
+  const ws = wb.addWorksheet("Detalle", { views: [{ state: "frozen", ySplit: 1 }] });
+  const cols: { h: string; w: number; fmt?: string }[] = [
+    { h: "N°", w: 5 }, { h: "Fecha emisión", w: 13 }, { h: "Periodo", w: 9 }, { h: "Tipo doc.", w: 9 },
+    { h: "Serie-Número", w: 14 }, { h: "Estado", w: 13 }, { h: "Tipo doc. emisor", w: 10 }, { h: "N° doc. emisor", w: 14 },
+    { h: "Emisor (apellidos y nombres)", w: 38 }, { h: "Tipo de renta", w: 9 }, { h: "Gratuito", w: 9 }, { h: "Moneda", w: 10 },
+    { h: "Renta bruta", w: 13, fmt: NUM }, { h: "Retención (Imp. Renta)", w: 14, fmt: NUM }, { h: "Renta neta", w: 13, fmt: NUM },
+    { h: "Pendiente de pago", w: 14, fmt: NUM }, { h: "T.C. SUNAT", w: 10, fmt: "0.000" },
+    { h: "Renta bruta S/", w: 14, fmt: NUM }, { h: "Retención S/", w: 13, fmt: NUM }, { h: "Renta neta S/", w: 14, fmt: NUM },
+    { h: "Concepto (por concepto de)", w: 60 },
+  ];
+  ws.columns = cols.map((c) => ({ width: c.w }));
+  const head = ws.addRow(cols.map((c) => c.h));
+  head.font = cab; head.fill = fillCab; head.alignment = { vertical: "middle", wrapText: true }; head.height = 30;
+
+  const totales = { n: 0, anulados: 0, gratuitos: 0, bruto: 0, ret: 0, neto: 0, pendiente: 0 };
+  const porEmisor = new Map<string, { doc: string; nombre: string; n: number; bruto: number; ret: number; neto: number }>();
+  const porMes = new Map<string, { n: number; bruto: number; ret: number; neto: number }>();
+  let i = 0;
+  for (const r of recibos) {
+    i++;
+    const bruto = montoRecibo(r.rentaBruta), ret = montoRecibo(r.impRenta), neto = montoRecibo(r.rentaNeta) || bruto - ret;
+    const pend = montoRecibo(r.pendiente);
+    const usd = esDolares(r.moneda);
+    const tc = usd ? tcPorFecha[aISO(r.fecha)] ?? null : null;
+    const factor = usd ? (tc ?? 0) : 1;
+    const brutoS = bruto * factor, retS = ret * factor, netoS = neto * factor;
+    const anulado = esAnulado(r.estado);
+    const row = ws.addRow([
+      i, r.fecha, yyyymm(r.fecha), r.td, r.nro, r.estado, r.tipoDocEmisor, r.nroDocEmisor, r.nombre, r.tipoRenta, r.gratuito, r.moneda,
+      bruto, ret, neto, pend, usd ? (tc ?? "") : "", usd && tc == null ? "" : brutoS, usd && tc == null ? "" : retS, usd && tc == null ? "" : netoS,
+      r.concepto || "",
+    ]);
+    cols.forEach((c, k) => { if (c.fmt) row.getCell(k + 1).numFmt = c.fmt; });
+    row.getCell(21).alignment = { wrapText: false };
+    row.border = borde;
+    if (anulado) { row.font = { color: { argb: "FF94A3B8" }, strike: true }; totales.anulados++; continue; }
+    if (/^s[ií]$/i.test(r.gratuito || "")) totales.gratuitos++;
+    totales.n++; totales.bruto += brutoS; totales.ret += retS; totales.neto += netoS; totales.pendiente += pend * factor;
+    const kE = (r.nroDocEmisor || "").trim() || r.nombre;
+    const e = porEmisor.get(kE) || { doc: r.nroDocEmisor, nombre: r.nombre, n: 0, bruto: 0, ret: 0, neto: 0 };
+    e.n++; e.bruto += brutoS; e.ret += retS; e.neto += netoS; porEmisor.set(kE, e);
+    const kM = yyyymm(r.fecha) || "—";
+    const m = porMes.get(kM) || { n: 0, bruto: 0, ret: 0, neto: 0 };
+    m.n++; m.bruto += brutoS; m.ret += retS; m.neto += netoS; porMes.set(kM, m);
+  }
+  // Fila de totales en soles (los anulados van tachados y NO se suman).
+  const ult = ws.rowCount;
+  if (ult >= 2) {
+    const tot = ws.addRow(["", "TOTAL (sin anulados)"]);
+    tot.getCell(18).value = Math.round(totales.bruto * 100) / 100;
+    tot.getCell(19).value = Math.round(totales.ret * 100) / 100;
+    tot.getCell(20).value = Math.round(totales.neto * 100) / 100;
+    [18, 19, 20].forEach((c) => (tot.getCell(c).numFmt = NUM));
+    tot.font = { bold: true };
+    tot.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } };
+  }
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(1, ult), column: cols.length } };
+
+  // ---------- Hoja Resumen ----------
+  const rs = wb.addWorksheet("Resumen");
+  rs.columns = [{ width: 30 }, { width: 40 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 16 }];
+  const titulo = rs.addRow(["Recibos por honorarios recibidos — detalle"]);
+  titulo.font = { bold: true, size: 14, color: { argb: "FF1D4ED8" } };
+  const per = (s?: string) => (s ? String(s).replace(/\D/g, "").replace(/^(\d{4})(\d{2})$/, "$2/$1") : "");
+  rs.addRow(["Empresa (receptor)", meta.razonSocial || ""]);
+  rs.addRow(["RUC", meta.ruc || ""]);
+  rs.addRow(["Rango consultado", meta.desde ? `${per(meta.desde)}${meta.hasta && meta.hasta !== meta.desde ? " a " + per(meta.hasta) : ""}` : ""]);
+  rs.addRow(["Generado", new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })]);
+  rs.addRow(["Fuente", "SUNAT · Recibo por Honorarios Electrónicos · Consulta Receptor"]);
+  rs.addRow([]);
+  const sec = (t: string) => { const r = rs.addRow([t]); r.font = { bold: true, size: 12 }; return r; };
+  sec("Totales (en soles, sin anulados)");
+  const filaT = (k: string, v: number | string, fmt?: string) => { const r = rs.addRow([k, v]); if (fmt) r.getCell(2).numFmt = fmt; r.getCell(2).alignment = { horizontal: "left" }; return r; };
+  filaT("Recibos válidos", totales.n);
+  filaT("Recibos anulados (excluidos)", totales.anulados);
+  filaT("Recibos gratuitos", totales.gratuitos);
+  filaT("Renta bruta S/", totales.bruto, NUM);
+  filaT("Retención (Imp. Renta) S/", totales.ret, NUM);
+  filaT("Renta neta S/", totales.neto, NUM);
+  filaT("Pendiente de pago S/", totales.pendiente, NUM);
+  if (recibos.some((r) => esDolares(r.moneda))) filaT("Nota", "Los recibos en dólares se convirtieron con el T.C. SUNAT (venta) de su fecha de emisión; si no hubo T.C., quedan vacíos en soles.");
+  rs.addRow([]);
+
+  sec("Por emisor");
+  const hE = rs.addRow(["N° doc. emisor", "Emisor", "Recibos", "Renta bruta S/", "Retención S/", "Renta neta S/"]);
+  hE.font = cab; hE.fill = fillCab;
+  const emisores = Array.from(porEmisor.values()).sort((a, b) => b.bruto - a.bruto);
+  for (const e of emisores) {
+    const r = rs.addRow([e.doc, e.nombre, e.n, e.bruto, e.ret, e.neto]);
+    [4, 5, 6].forEach((c) => (r.getCell(c).numFmt = NUM)); r.border = borde;
+  }
+  if (emisores.length) {
+    const r = rs.addRow(["", "TOTAL", totales.n, totales.bruto, totales.ret, totales.neto]);
+    [4, 5, 6].forEach((c) => (r.getCell(c).numFmt = NUM)); r.font = { bold: true };
+  }
+  rs.addRow([]);
+
+  sec("Por mes (periodo de emisión)");
+  const hM = rs.addRow(["Periodo", "", "Recibos", "Renta bruta S/", "Retención S/", "Renta neta S/"]);
+  hM.font = cab; hM.fill = fillCab;
+  for (const [k, m] of Array.from(porMes.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
+    const r = rs.addRow([k, "", m.n, m.bruto, m.ret, m.neto]);
+    [4, 5, 6].forEach((c) => (r.getCell(c).numFmt = NUM)); r.border = borde;
+  }
+  return (await wb.xlsx.writeBuffer()) as Buffer;
+}
+
 /** Compat: Excel directo desde recibos (arma asientos internamente). */
 export async function construirExcelHonorarios(recibos: Recibo[], meta: { ruc: string; razonSocial?: string; mapaCuentas?: Record<string, MapCuenta> }): Promise<Buffer> {
   return excelDeAsientos(await armarAsientos(recibos, meta));

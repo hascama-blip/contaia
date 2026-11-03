@@ -13,6 +13,21 @@ interface Asiento {
   ctaPagar: string; ctaGasto: string; centro: string; nro: string; nombre: string;
 }
 
+// Recibo tal cual lo lee el bot en SUNAT (Consulta Receptor), sin tocar.
+interface Recibo {
+  fecha: string; td: string; nro: string; estado: string; tipoDocEmisor: string; nroDocEmisor: string; nombre: string;
+  tipoRenta: string; gratuito: string; moneda: string; rentaBruta: string; impRenta: string; rentaNeta: string; pendiente: string;
+  concepto?: string;
+}
+
+const esAnulado = (estado: string) => /anulad/i.test(estado || "") && !/no\s*anulad/i.test(estado || "");
+const fmtMonto = (s: string) => {
+  const t = String(s || "").trim();
+  const limpio = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  const n = Number(limpio.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) && t ? n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (t || "—");
+};
+
 // Mes actual en formato YYYY-MM (valor de <input type="month">).
 function mesActual(): string {
   const d = new Date();
@@ -38,7 +53,8 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
   const [desde, setDesde] = useState(mesActual());
   const [hasta, setHasta] = useState(mesActual());
   const [busy, setBusy] = useState(false);
-  const [expBusy, setExpBusy] = useState<"" | "xlsx" | "txt">("");
+  const [expBusy, setExpBusy] = useState<"" | "xlsx" | "txt" | "detalle">("");
+  const [recibos, setRecibos] = useState<Recibo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
@@ -71,7 +87,7 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
   }
 
   async function extraer() {
-    setError(null); setInfo(null); setDiag(null); setAsientos([]);
+    setError(null); setInfo(null); setDiag(null); setAsientos([]); setRecibos([]);
     if (!sel) { setError("Elige la empresa con la que inicias sesión en SOL."); return; }
     const solPass = getSolPass(sel.id);
     const solUser = getSolUser(sel.id, sel.solUser);
@@ -92,11 +108,12 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
       if (!res.ok) { setError(data.error ?? "No se pudo extraer los honorarios."); return; }
       const arr: Asiento[] = Array.isArray(data.asientos) ? data.asientos : [];
       setAsientos(arr);
+      setRecibos(Array.isArray(data.recibos) ? data.recibos : []);
       if (data.nombre) setNombreBase(String(data.nombre).replace(/\.xlsx$/i, ""));
       const n = data.total ?? (data.recibos ?? []).length;
       setInfo(diagModo
         ? `Diagnóstico: ${n} recibo(s) leído(s) (revisa la traza abajo).`
-        : `✅ ${n} recibo(s). Completa las cuentas que falten en la tabla y descarga el Excel o el TXT para StarSoft.`);
+        : `✅ ${n} recibo(s) leído(s). Descarga el detalle en Excel (sin cuentas) o completa las cuentas que falten y baja el Excel/TXT para StarSoft.`);
     } catch { setError("Error de red al extraer."); }
     finally { setBusy(false); }
   }
@@ -120,7 +137,29 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
     finally { setExpBusy(""); }
   }
 
+  // Detalle en Excel de los recibos tal cual (sin cuentas contables ni formato
+  // de importación): para cuando solo se quiere la relación de recibos.
+  async function exportarDetalle() {
+    if (!recibos.length) return;
+    setExpBusy("detalle"); setError(null);
+    try {
+      const res = await fetch("/api/honorarios/exportar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formato: "detalle", recibos, nombre: nombreBase,
+          meta: { ruc: sel?.ruc ?? "", razonSocial: sel?.razonSocial ?? "", desde, hasta: hasta || desde },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo generar el detalle."); return; }
+      descargar(data.archivo, data.nombre, data.mime || "application/octet-stream");
+    } catch { setError("Error de red al exportar."); }
+    finally { setExpBusy(""); }
+  }
+
   const faltan = asientos.filter((a) => !a.ctaPagar || !a.ctaGasto).length;
+  const validos = recibos.filter((r) => !esAnulado(r.estado));
+  const anulados = recibos.length - validos.length;
 
   return (
     <div className="space-y-4">
@@ -128,8 +167,9 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
         <h2 className="mb-1 font-semibold text-slate-800">Subida masiva de honorarios (RxH)</h2>
         <p className="mb-4 text-xs text-slate-400">
           El bot inicia sesión en SOL, entra a <strong>Recibo por Honorarios Electrónicos → Consulta Receptor</strong>,
-          consulta los recibos <strong>recibidos</strong> por <strong>mes(es) completo(s)</strong> y arma el asiento
-          contable. Completa las <strong>cuentas que falten</strong> en la tabla y descarga el <strong>Excel</strong> o el
+          lee los recibos <strong>recibidos</strong> por <strong>mes(es) completo(s)</strong> (con el concepto de cada uno)
+          y te da dos salidas: el <strong>detalle en Excel</strong> tal cual (sin cuentas contables) y el asiento contable,
+          donde completas las <strong>cuentas que falten</strong> y descargas el <strong>Excel</strong> o el
           <strong> TXT</strong> para importar directo a StarSoft. La <strong>Clave SOL</strong> no se guarda.
         </p>
 
@@ -177,11 +217,67 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
         {diag && diagModo && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
       </div>
 
+      {/* Lectura de los recibos: lo que se leyó de SUNAT + detalle en Excel (sin cuentas) */}
+      {recibos.length > 0 && !diagModo && (
+        <div className="card p-5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold text-slate-800">📄 Recibos leídos ({recibos.length})</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">{validos.length} válidos</span>
+              {anulados > 0 && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">{anulados} anulados</span>}
+              <button className="btn-accent" onClick={exportarDetalle} disabled={!!expBusy} title="Excel con una fila por recibo (fecha, serie-número, emisor, renta bruta, retención, neta, T.C., concepto) y hoja Resumen por emisor y por mes. Sin cuentas contables.">
+                {expBusy === "detalle" ? "Generando…" : "⬇ Detalle en Excel (sin cuentas)"}
+              </button>
+            </div>
+          </div>
+          <p className="mb-2 text-[11px] text-slate-500">
+            Es la relación tal cual la lee SUNAT: una fila por recibo con fecha, serie-número, estado, emisor, moneda, renta bruta,
+            retención, renta neta, pendiente de pago, T.C. SUNAT (si es en dólares) y el concepto completo. Trae además la hoja{" "}
+            <b>Resumen</b> con totales, por emisor y por mes. Si solo necesitas el detalle, no hace falta llenar cuentas.
+          </p>
+          <div className="sin-barra max-h-72 overflow-auto rounded-lg border border-slate-200">
+            <table className="min-w-full text-[12px]">
+              <thead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">Fecha</th>
+                  <th className="px-2 py-1.5 text-left">Recibo</th>
+                  <th className="px-2 py-1.5 text-left">Estado</th>
+                  <th className="px-2 py-1.5 text-left">Emisor</th>
+                  <th className="px-2 py-1.5 text-left">Moneda</th>
+                  <th className="px-2 py-1.5 text-right">Renta bruta</th>
+                  <th className="px-2 py-1.5 text-right">Retención</th>
+                  <th className="px-2 py-1.5 text-right">Renta neta</th>
+                  <th className="px-2 py-1.5 text-left">Concepto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recibos.map((r, i) => {
+                  const anul = esAnulado(r.estado);
+                  return (
+                    <tr key={i} className={anul ? "text-slate-400 line-through" : "hover:bg-slate-50"}>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.fecha}</td>
+                      <td className="px-2 py-1 whitespace-nowrap font-medium text-slate-700">{r.td} {r.nro}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.estado}</td>
+                      <td className="px-2 py-1" title={r.nombre}>{r.nroDocEmisor}<div className="max-w-[180px] truncate text-[10px] text-slate-400">{r.nombre}</div></td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.moneda}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{fmtMonto(r.rentaBruta)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{fmtMonto(r.impRenta)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{fmtMonto(r.rentaNeta)}</td>
+                      <td className="px-2 py-1 text-slate-500" title={r.concepto || ""}><div className="max-w-[260px] truncate">{r.concepto || "—"}</div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Tabla editable: completar las cuentas que faltan y exportar */}
       {asientos.length > 0 && !diagModo && (
         <div className="card p-5">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-slate-800">Asientos ({asientos.length} recibos)</h3>
+            <h3 className="font-semibold text-slate-800">Asiento contable para StarSoft ({asientos.length} recibos)</h3>
             <div className="flex items-center gap-2">
               {faltan > 0
                 ? <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⚠ {faltan} sin cuenta</span>

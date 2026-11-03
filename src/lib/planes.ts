@@ -136,7 +136,7 @@ export const PLANES: Plan[] = [
         puntos: [
           "Facturas recibidas en bloque: XML o PDF oficial de SUNAT, desde una relación o el SIRE.",
           "Excel completo con detracción, ítems por factura y la relación de faltantes.",
-          "Recibos por honorarios (RxH) por mes completo, con la plantilla para Contasis/StarSoft.",
+          "Recibos por honorarios (RxH) por mes completo: detalle en Excel y plantilla para Contasis/StarSoft.",
         ],
       },
       {
