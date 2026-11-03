@@ -31,8 +31,10 @@ function descargar(b64: string, nombre: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }) {
-  const [id, setId] = useState("");
+// `clienteFijo`: cuando el panel va EMBEBIDO (Descarga masiva de comprobantes),
+// la empresa y la Clave SOL ya se eligieron arriba: no se repiten aquí.
+export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: ClienteMin[]; clienteFijo?: ClienteMin }) {
+  const [id, setId] = useState(clienteFijo?.id ?? "");
   const [desde, setDesde] = useState(mesActual());
   const [hasta, setHasta] = useState(mesActual());
   const [busy, setBusy] = useState(false);
@@ -46,7 +48,7 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
   const [aprendidas, setAprendidas] = useState<number | null>(null);
   const [aprendMsg, setAprendMsg] = useState<string | null>(null);
   const [aprendBusy, setAprendBusy] = useState(false);
-  const sel = clientes.find((c) => c.id === id) ?? null;
+  const sel = clienteFijo ?? clientes.find((c) => c.id === id) ?? null;
 
   useEffect(() => {
     fetch("/api/honorarios/aprender", { cache: "no-store" })
@@ -131,19 +133,23 @@ export default function HonorariosPanel({ clientes }: { clientes: ClienteMin[] }
           <strong> TXT</strong> para importar directo a StarSoft. La <strong>Clave SOL</strong> no se guarda.
         </p>
 
-        <label className="label">Empresa (acceso SOL)</label>
-        {clientes.length === 0 ? (
-          <p className="text-sm text-slate-500">No tienes empresas. <a href="/clientes/nuevo" className="text-brand-600 hover:underline">Crea una →</a></p>
-        ) : (
-          <select className="input max-w-sm" value={id} onChange={(e) => setId(e.target.value)}>
-            <option value="">— Elige una empresa —</option>
-            {clientes.map((c) => <option key={c.id} value={c.id}>{c.razonSocial} · RUC {c.ruc}</option>)}
-          </select>
+        {!clienteFijo && (
+          <>
+            <label className="label">Empresa (acceso SOL)</label>
+            {clientes.length === 0 ? (
+              <p className="text-sm text-slate-500">No tienes empresas. <a href="/clientes/nuevo" className="text-brand-600 hover:underline">Crea una →</a></p>
+            ) : (
+              <select className="input max-w-sm" value={id} onChange={(e) => setId(e.target.value)}>
+                <option value="">— Elige una empresa —</option>
+                {clientes.map((c) => <option key={c.id} value={c.id}>{c.razonSocial} · RUC {c.ruc}</option>)}
+              </select>
+            )}
+          </>
         )}
 
         {sel && (
-          <div className="mt-4 space-y-3">
-            <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
+          <div className={`${clienteFijo ? "" : "mt-4 "}space-y-3`}>
+            {!clienteFijo && <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />}
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="label">Mes inicial</label>

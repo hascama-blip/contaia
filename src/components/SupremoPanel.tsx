@@ -29,8 +29,8 @@ const UTILITARIOS_OPC: { key: string; label: string }[] = [
   { key: "banco-word", label: "Estado de cuenta → Word" },
   { key: "visor", label: "Visor Tributario" },
   { key: "analisis-rtp", label: "Análisis para RTP" },
-  { key: "comprobantes-xml", label: "Comprobante XML SUNAT" },
-  { key: "honorarios", label: "Subida masiva de honorarios (RxH)" },
+  { key: "comprobantes-xml", label: "Descarga masiva de comprobantes (facturas + RxH)" },
+  { key: "honorarios", label: "Solo honorarios (RxH) — pantalla aparte" },
 ];
 
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";

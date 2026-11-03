@@ -68,7 +68,7 @@ export default function PlanesModal() {
                 {p.proximamente && (
                   <li className="flex gap-1.5 text-[11px] text-slate-400">
                     <span className="mt-0.5">🔜</span>
-                    <span>{p.proximamente.titulo}: Comprobantes XML</span>
+                    <span>{p.proximamente.titulo}: Descarga masiva de comprobantes</span>
                   </li>
                 )}
               </ul>

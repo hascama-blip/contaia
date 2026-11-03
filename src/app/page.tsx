@@ -48,6 +48,13 @@ const PRINCIPALES: Opcion[] = [
     detalle:
       "Extrae el detalle de la propuesta SUNAT (compras RCE y ventas RVIE, cada uno por separado) comprobante por comprobante desde la API oficial, y descárgalo en Excel.",
   },
+  {
+    href: "/herramientas/visor",
+    icono: "🧩",
+    titulo: "Visor Tributario",
+    detalle:
+      "Extensión del navegador: mientras navegas SUNAT (SIRE, DJ mensual y anual) captura los datos y los trae a Radar para el reporte — sin bots, captcha ni bloqueo de IP.",
+  },
 ];
 
 // Utilitarios (abajo).
@@ -74,13 +81,6 @@ const UTILITARIOS: Opcion[] = [
       "Sube el Libro Diario y obtén el análisis de la cuenta clase 9 (gastos por función: administración, ventas, financieros), un dashboard de compras/gastos para gerencia y el informe en Excel.",
   },
   {
-    href: "/herramientas/visor",
-    icono: "🧩",
-    titulo: "Visor Tributario",
-    detalle:
-      "Extensión del navegador: mientras navegas SUNAT (SIRE, DJ mensual y anual) captura los datos y los trae a Radar para el reporte — sin bots, captcha ni bloqueo de IP.",
-  },
-  {
     href: "/herramientas/banco-word",
     icono: "📊",
     titulo: "Estado de cuenta (PDF) → Excel",
@@ -90,16 +90,9 @@ const UTILITARIOS: Opcion[] = [
   {
     href: "/herramientas/comprobantes-xml",
     icono: "📥",
-    titulo: "Comprobante XML SUNAT",
+    titulo: "Descarga masiva de comprobantes",
     detalle:
-      "Descarga los XML de las compras (comprobantes recibidos) directo de SUNAT por Clave SOL. Sube una relación de comprobantes (con su plantilla) o un periodo, y arma el Excel con el detalle.",
-  },
-  {
-    href: "/herramientas/honorarios",
-    icono: "🧾",
-    titulo: "Subida masiva de honorarios (RxH)",
-    detalle:
-      "El bot entra a SUNAT (Recibo por Honorarios → Consulta Receptor) y extrae los recibos recibidos por mes(es) completo(s), para armar la plantilla de importación a Contasis.",
+      "Facturas y recibos por honorarios recibidos, directo de SUNAT por Clave SOL. Facturas: XML o PDF oficial en bloque (desde una relación o el SIRE) con el Excel de detalle. Honorarios (RxH): por mes(es) completo(s), con la plantilla para Contasis/StarSoft.",
   },
 ];
 

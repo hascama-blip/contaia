@@ -41,9 +41,12 @@ export const MODULOS: ModuloDef[] = [
   { key: "banco-word", nombre: "Estado de cuenta (PDF) → Excel", href: "/herramientas/banco-word", soloSupremo: true },
   { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
-  { key: "comprobantes-xml", nombre: "Comprobante XML SUNAT", href: "/herramientas/comprobantes-xml", soloSupremo: true },
-  { key: "honorarios", nombre: "Subida masiva de honorarios (RxH)", href: "/herramientas/honorarios", soloSupremo: true },
+  // Descarga masiva: facturas (XML/PDF) + honorarios (RxH) en una sola pantalla.
+  { key: "comprobantes-xml", nombre: "Descarga masiva de comprobantes (facturas + RxH)", href: "/herramientas/comprobantes-xml", soloSupremo: true },
   // Legacy (no están en el menú; se conservan como solo-supremo)
+  // "honorarios" sigue existiendo como permiso (cuentas solo-RTP) y como pestaña
+  // dentro de Descarga masiva; su pantalla propia queda para /rtputilitarios.
+  { key: "honorarios", nombre: "Subida masiva de honorarios (RxH)", href: "/herramientas/honorarios", soloSupremo: true },
   { key: "cruce-sire", nombre: "Comparativo SIRE vs sistema contable", href: "/herramientas/cruce-sire", soloSupremo: true },
   { key: "procesar-compras", nombre: "Masivo SIRE → Contabilidad (Contasis)", href: "/herramientas/procesar-compras", soloSupremo: true },
 ];

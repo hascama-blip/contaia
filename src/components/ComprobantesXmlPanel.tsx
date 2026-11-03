@@ -29,8 +29,6 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   const [filaBusy, setFilaBusy] = useState<number | null>(null);
   const [auto, setAuto] = useState(false); // "extraer todas" en curso
   const [genBusy, setGenBusy] = useState(false);
-  // Modo API: baja el XML por el endpoint interno de SUNAT (sin PDF, más rápido).
-  const [apiMode, setApiMode] = useState(false);
   // Modo PDF masivo: baja el PDF OFICIAL (API /01 + scraping de respaldo).
   const [pdfMode, setPdfMode] = useState(false);
   const [diagModo, setDiagModo] = useState(false);
@@ -113,8 +111,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     try {
       // parte 0 = consume 1 cupo (solo la 1ª vez); el resto no consume.
       const parte = consumido ? 1 : 0;
-      const endpoint = apiMode ? "comprobantes-xml-api" : "comprobantes-xml";
-      const res = await fetch(`/api/clientes/${clienteId}/${endpoint}`, {
+      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ solUser, solPass, relacion: [item], parte, periodo: periodoSire, diagnostico: diagModo }),
       });
@@ -132,51 +129,6 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: "Error de red" } }));
       return false;
     } finally { setFilaBusy(null); }
-  }
-
-  // MODO API — extrae TODA la relación en UNA sola llamada (el servidor baja los
-  // XML en paralelo, en lote). Es lo rápido para volúmenes grandes (1000+): no va
-  // fila por fila ni abre un navegador por comprobante.
-  async function extraerLoteApi() {
-    const solPass = getSolPass(clienteId);
-    const solUser = getSolUser(clienteId);
-    if (!solPass) { setError("Carga tu Clave SOL (arriba) para extraer."); return; }
-    setError(null); setInfo(null); setDiag(null);
-    setAuto(true);
-    // Marca todas las pendientes como "extrayendo".
-    setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado !== "ok") n[i] = { estado: "extrayendo" }; }); return n; });
-    try {
-      const res = await fetch(`/api/clientes/${clienteId}/comprobantes-xml-api`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solUser, solPass, relacion, periodo: periodoSire, diagnostico: diagModo }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
-      if (res.status === 401) { setError(data.error ?? "Login SOL falló"); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "error", motivo: data.error }; }); return n; }); return; }
-      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas({}); return; }
-      if (!res.ok && !Array.isArray(data.facturas)) { setError(data.error ?? "No se pudo extraer."); setFilas((p) => { const n = { ...p }; relacion.forEach((_, i) => { if (n[i]?.estado === "extrayendo") n[i] = { estado: "pendiente" }; }); return n; }); return; }
-      // Mapear las facturas devueltas a sus filas por serie-número.
-      const norm = (s: any, num: any) => `${String(s || "").toUpperCase()}-${String(num || "").replace(/^0+/, "")}`;
-      const mapa = new Map<string, any>();
-      for (const f of (data.facturas ?? [])) {
-        const sn = String(f.serieNumero || `${f.serie}-${f.numero}`);
-        const [s, ...rest] = sn.split("-");
-        mapa.set(norm(s, rest.join("-")), f);
-      }
-      setFilas(() => {
-        const n: Record<number, EstadoFila> = {};
-        relacion.forEach((it, i) => {
-          const f = mapa.get(norm(it.serie, it.numero));
-          if (f) n[i] = { estado: "ok", factura: f };
-          else n[i] = { estado: "error", motivo: "SUNAT no devolvió este comprobante" };
-        });
-        return n;
-      });
-      setConsumido(true);
-      const ok = (data.facturas ?? []).length;
-      setInfo(`Extracción por API: ${ok}/${relacion.length} XML descargados${data.error ? ` · ${data.error}` : ""}.`);
-    } catch { setError("Error de red al extraer por API."); }
-    finally { setAuto(false); }
   }
 
   // MODO PDF MASIVO — baja el PDF OFICIAL de toda la relación en UNA llamada
@@ -323,7 +275,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   return (
     <section className="card p-5">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-800">Comprobantes recibidos (XML) desde SUNAT</h2>
+        <h2 className="font-semibold text-slate-800">Facturas recibidas (XML / PDF) desde SUNAT</h2>
         <span className="badge bg-slate-100 text-slate-500">Solo Usuario + Clave SOL</span>
       </div>
       <p className="mb-4 text-xs text-slate-400">
@@ -365,21 +317,18 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
 
       {/* Modo de extracción */}
       <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        <label className="flex items-center gap-2" title="Baja el XML por el endpoint interno de SUNAT (sin PDF) — más rápido">
-          <input type="checkbox" checked={apiMode} onChange={(e) => { setApiMode(e.target.checked); if (e.target.checked) setPdfMode(false); setDiag(null); }} />
-          <span>⚡ <strong>Modo API</strong> (XML, sin PDF)</span>
-        </label>
         <label className="flex items-center gap-2" title="Baja el PDF OFICIAL de SUNAT en masa (API /01 + scraping de respaldo)">
-          <input type="checkbox" checked={pdfMode} onChange={(e) => { setPdfMode(e.target.checked); if (e.target.checked) setApiMode(false); setDiag(null); }} />
+          <input type="checkbox" checked={pdfMode} onChange={(e) => { setPdfMode(e.target.checked); setDiag(null); }} />
           <span>📄 <strong>PDF masivo</strong> (PDF oficial)</span>
         </label>
-        {(apiMode || pdfMode) && (
+        {pdfMode && (
           <label className="flex items-center gap-2" title="Captura las llamadas de red internas de SUNAT para identificar el endpoint">
             <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
           </label>
         )}
-        {apiMode && <span className="text-slate-400">Solo XML — no descarga el PDF.</span>}
-        {pdfMode && <span className="text-slate-400">PDF oficial — rápido por API, con scraping de respaldo.</span>}
+        {pdfMode
+          ? <span className="text-slate-400">PDF oficial — rápido por API, con scraping de respaldo.</span>
+          : <span className="text-slate-400">XML + PDF, fila por fila (o “Extraer todas” con pausa).</span>}
       </div>
 
       {info && <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
@@ -393,10 +342,6 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
             {pdfMode ? (
               <button className="btn-primary text-sm" onClick={extraerLotePdf} disabled={auto || filaBusy !== null}>
                 {auto ? "Extrayendo PDF…" : "📄 Extraer TODO en PDF (masivo)"}
-              </button>
-            ) : apiMode ? (
-              <button className="btn-primary text-sm" onClick={extraerLoteApi} disabled={auto || filaBusy !== null}>
-                {auto ? "Extrayendo por API…" : "⚡ Extraer TODO por API (rápido, en paralelo)"}
               </button>
             ) : (
               <button className="btn-primary text-sm" onClick={extraerTodas} disabled={auto || filaBusy !== null}>
@@ -450,9 +395,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
                             {!pdfMode && (
                               <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarXml(e.factura)}>XML</button>
                             )}
-                            {!apiMode && (
-                              <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
-                            )}
+                            <button className="rounded border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 hover:bg-brand-100" onClick={() => descargarPdf(e.factura)}>PDF</button>
                           </span>
                         ) : (
                           <button

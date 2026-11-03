@@ -142,7 +142,7 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
           <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>⬇ Excel</button>
         )}
         {!esVentas && hayDatos && (
-          <button className="btn-ghost" onClick={descargarPlantilla} disabled={busy} title="Excel con el formato de la plantilla para subir al módulo de Comprobantes XML">
+          <button className="btn-ghost" onClick={descargarPlantilla} disabled={busy} title="Excel con el formato de la plantilla para subir al módulo de Descarga masiva de comprobantes">
             ⬇ Plantilla para XML
           </button>
         )}
@@ -158,7 +158,7 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
       {!esVentas && hayDatos && (
         <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-xs text-brand-800">
           ➡ Esta relación queda guardada. Para bajar los <strong>XML con glosa</strong> de estas compras, ve a{" "}
-          <a href="/herramientas/comprobantes-xml" className="font-semibold underline">Comprobantes XML (SUNAT)</a>,
+          <a href="/herramientas/comprobantes-xml" className="font-semibold underline">Descarga masiva de comprobantes</a>,
           elige esta empresa y pulsa <strong>“📋 Cargar del SIRE”</strong> con este mismo periodo.
         </div>
       )}

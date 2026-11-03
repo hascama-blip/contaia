@@ -141,7 +141,7 @@ export const PLANES: Plan[] = [
     proximamente: {
       titulo: "Próximamente",
       puntos: [
-        "Módulo Comprobantes XML: descarga tus facturas en bloque (todas juntas, no una por una).",
+        "Descarga masiva de comprobantes: facturas y honorarios en bloque (todos juntos, no uno por uno).",
         "Detalle de facturas en Excel con glosa, para facilitar tus registros contables.",
       ],
     },
