@@ -44,25 +44,19 @@ export const PLANES: Plan[] = [
     planId: "basico",
     gratis: true,
     precio: "Gratis",
-    resumen: "Para empezar: consulta básica y el reporte analítico de auditoría.",
+    resumen: "Para empezar: el Reporte analítico de auditoría, siempre incluido.",
     cta: "Empezar gratis",
     ctaHref: "/",
     ctaEstilo: "ghost",
     incluidos: [
       {
-        titulo: "Módulo de Consultas",
-        puntos: [
-          "Consulta el estado del RUC en SUNAT (razón social, estado y condición de domicilio).",
-          "Actividad económica y datos generales del contribuyente.",
-          "Genera la información 1 vez a la semana por empresa.",
-        ],
-      },
-      {
         titulo: "Reporte Analítico de Auditoría",
         puntos: [
+          "Consulta el estado del RUC en SUNAT (razón social, estado, condición de domicilio y actividad económica).",
           "Diagnóstico tributario del contribuyente con hallazgos y score de riesgo.",
           "Revisión del buzón electrónico (mensajes peligrosos y urgentes) y deudas.",
           "Dashboard e informe de gerencia imprimible (contingencias, buzón y gráficos en una hoja).",
+          "Genera la información 1 vez a la semana por empresa.",
         ],
       },
     ],
@@ -74,7 +68,7 @@ export const PLANES: Plan[] = [
     precioAntes: "S/ 19.98",
     periodo: "/mes",
     etiqueta: "Lanzamiento −50%",
-    resumen: "Más consultas y el módulo de consultas tributarias.",
+    resumen: "Consultas tributarias y el Detalle SIRE, comprobante por comprobante.",
     cta: "Solicitar plan",
     ctaHref: "",
     ctaEstilo: "primary",
@@ -82,17 +76,24 @@ export const PLANES: Plan[] = [
       {
         titulo: "Todo lo del Plan Básico",
         puntos: [
-          "Módulo de Consultas y Reporte Analítico de Auditoría incluidos.",
+          "Reporte Analítico de Auditoría incluido.",
           "Consultas ampliadas a 3 por semana.",
         ],
       },
       {
         titulo: "Módulo de Consultas Tributarias",
         puntos: [
-          "Ficha RUC completa: representantes legales, establecimientos anexos y condición de domicilio.",
-          "Validación de comprobantes y verificación de proveedores/clientes por RUC.",
-          "Consulta de deudas y situación tributaria del contribuyente.",
+          "Mensajes del buzón electrónico SUNAT con sus asuntos y el PDF adjunto de cada notificación.",
+          "Seguimiento con plazo de atención y recordatorios de vencimiento.",
           "Exporta los resultados para tu expediente.",
+        ],
+      },
+      {
+        titulo: "Módulo Detalle SIRE",
+        puntos: [
+          "Compras y ventas reales por periodo (RCE / RVIE) directo de la API de SUNAT.",
+          "Acumulado anual y estado presentado / no presentado por mes.",
+          "Descarga en Excel, comprobante por comprobante.",
         ],
       },
     ],
@@ -104,7 +105,7 @@ export const PLANES: Plan[] = [
     precioAntes: "S/ 39.98",
     periodo: "/mes",
     etiqueta: "Lanzamiento −50%",
-    resumen: "El detalle real del SIRE y el Reporte Tributario para Terceros, automáticos.",
+    resumen: "RTT automático, Visor Tributario y Descarga masiva de comprobantes.",
     destacado: true,
     cta: "Solicitar Premium",
     ctaHref: "",
@@ -113,15 +114,7 @@ export const PLANES: Plan[] = [
       {
         titulo: "Todo lo del Plan Regular",
         puntos: [
-          "Consultas, Reporte Analítico de Auditoría y Consultas Tributarias incluidos.",
-        ],
-      },
-      {
-        titulo: "Módulo Detalle SIRE",
-        puntos: [
-          "Compras y ventas reales por periodo (RCE / RVIE) directo de SUNAT.",
-          "Acumulado anual y estado presentado / no presentado por mes.",
-          "Cruce del SIRE contra tu sistema contable, comprobante por comprobante.",
+          "Reporte Analítico de Auditoría, Consultas Tributarias y Detalle SIRE incluidos.",
         ],
       },
       {
@@ -132,19 +125,27 @@ export const PLANES: Plan[] = [
         ],
       },
       {
+        titulo: "Visor Tributario",
+        puntos: [
+          "Extensión del navegador: captura SIRE, DJ mensual y anual mientras navegas SUNAT.",
+          "Sin bots, captcha ni bloqueo de IP; los datos llegan a Radar para el reporte.",
+        ],
+      },
+      {
+        titulo: "Descarga masiva de comprobantes",
+        puntos: [
+          "Facturas recibidas en bloque: XML o PDF oficial de SUNAT, desde una relación o el SIRE.",
+          "Excel completo con detracción, ítems por factura y la relación de faltantes.",
+          "Recibos por honorarios (RxH) por mes completo, con la plantilla para Contasis/StarSoft.",
+        ],
+      },
+      {
         titulo: "Soporte 24/7",
         puntos: [
           "Atención prioritaria por cualquier canal, en cualquier momento.",
         ],
       },
     ],
-    proximamente: {
-      titulo: "Próximamente",
-      puntos: [
-        "Descarga masiva de comprobantes: facturas y honorarios en bloque (todos juntos, no uno por uno).",
-        "Detalle de facturas en Excel con glosa, para facilitar tus registros contables.",
-      ],
-    },
   },
   {
     nombre: "Plan de Equipo",
@@ -158,7 +159,7 @@ export const PLANES: Plan[] = [
       {
         titulo: "Todo lo del Plan Premium",
         puntos: [
-          "Todos los módulos anteriores incluidos.",
+          "Reporte Analítico, Consultas Tributarias, Detalle SIRE, RTT, Visor Tributario y Descarga masiva incluidos.",
         ],
       },
       {

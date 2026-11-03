@@ -29,20 +29,25 @@ export interface ModuloDef {
   soloSupremo?: boolean;
 }
 
+// Regla de planes:
+//   Básico (gratis) → Reporte analítico de auditoría.
+//   Regular         → + Consultas tributarias + Detalle SIRE.
+//   Premium         → + RTT + Visor Tributario + Descarga masiva de comprobantes.
+//   Equipo          → todo Premium + operadores (equipo).
 export const MODULOS: ModuloDef[] = [
   // Principales (según planes)
   { key: "reporte", nombre: "Reporte analítico de auditoría", href: "/clientes", planMin: "basico" },
   { key: "consultas", nombre: "Consultas tributarias", href: "/herramientas/consultas", planMin: "regular" },
-  { key: "detalle-sire", nombre: "Detalle SIRE", href: "/herramientas/detalle-sire", planMin: "premium" },
+  { key: "detalle-sire", nombre: "Detalle SIRE", href: "/herramientas/detalle-sire", planMin: "regular" },
   { key: "rtt", nombre: "Reporte Tributario para Terceros (RTT)", href: "/herramientas/rtt", planMin: "premium" },
-  // Utilitarios — solo supremo
+  { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", planMin: "premium" },
+  // Descarga masiva: facturas (XML/PDF) + honorarios (RxH) en una sola pantalla.
+  { key: "comprobantes-xml", nombre: "Descarga masiva de comprobantes (facturas + RxH)", href: "/herramientas/comprobantes-xml", planMin: "premium" },
+  // Utilitarios — solo supremo (o habilitados por cuenta)
   { key: "conciliacion", nombre: "Conciliación bancaria", href: "/herramientas/conciliacion", soloSupremo: true },
   { key: "ventas-caja", nombre: "Ventas vs Caja Virtual", href: "/herramientas/ventas-caja", soloSupremo: true },
   { key: "banco-word", nombre: "Estado de cuenta (PDF) → Excel", href: "/herramientas/banco-word", soloSupremo: true },
-  { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
-  // Descarga masiva: facturas (XML/PDF) + honorarios (RxH) en una sola pantalla.
-  { key: "comprobantes-xml", nombre: "Descarga masiva de comprobantes (facturas + RxH)", href: "/herramientas/comprobantes-xml", soloSupremo: true },
   // Legacy (no están en el menú; se conservan como solo-supremo)
   // "honorarios" sigue existiendo como permiso (cuentas solo-RTP) y como pestaña
   // dentro de Descarga masiva; su pantalla propia queda para /rtputilitarios.

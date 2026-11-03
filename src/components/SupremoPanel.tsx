@@ -11,27 +11,35 @@ interface Solicitud {
   decididoAt?: string;
   modulos?: string[];
   plan?: "basico" | "regular" | "premium" | "equipo";
+  /** Vencimiento del plan de paga (YYYY-MM-DD); vacío = sin vencimiento. */
+  planVence?: string;
   operadores?: number;
 }
 
 // Planes que el supremo asigna (cada uno desbloquea sus módulos).
 const PLANES_OPC: { key: "basico" | "regular" | "premium" | "equipo"; label: string; desc: string }[] = [
   { key: "basico", label: "Básico (gratis)", desc: "Reporte analítico de auditoría" },
-  { key: "regular", label: "Regular", desc: "+ Consultas tributarias" },
-  { key: "premium", label: "Premium", desc: "+ Detalle SIRE y RTT" },
-  { key: "equipo", label: "Plan de Equipo", desc: "Premium + operarios (equipo)" },
+  { key: "regular", label: "Regular", desc: "+ Consultas tributarias y Detalle SIRE" },
+  { key: "premium", label: "Premium", desc: "+ RTT, Visor Tributario y Descarga masiva de comprobantes" },
+  { key: "equipo", label: "Plan de Equipo", desc: "Todo Premium + operadores (equipo)" },
 ];
 
 // Utilitarios que el supremo puede habilitar por cuenta.
 const UTILITARIOS_OPC: { key: string; label: string }[] = [
   { key: "conciliacion", label: "Conciliación bancaria" },
   { key: "ventas-caja", label: "Ventas vs Caja Virtual" },
-  { key: "banco-word", label: "Estado de cuenta → Word" },
-  { key: "visor", label: "Visor Tributario" },
+  { key: "banco-word", label: "Estado de cuenta → Excel" },
   { key: "analisis-rtp", label: "Análisis para RTP" },
-  { key: "comprobantes-xml", label: "Descarga masiva de comprobantes (facturas + RxH)" },
   { key: "honorarios", label: "Solo honorarios (RxH) — pantalla aparte" },
 ];
+
+interface Aviso { id: string; titulo: string; texto: string; at: string; hasta?: string }
+
+// Fecha (YYYY-MM-DD) a N días de hoy, para el vencimiento por defecto del plan.
+function enDias(n: number): string {
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 type Filtro = "pendiente" | "aprobado" | "rechazado" | "todas";
 
@@ -222,18 +230,69 @@ export default function SupremoPanel() {
     } finally { setBusy(null); }
   }
 
+  // Asigna el plan. Un plan de paga sin vencimiento previo vence a los 30 días
+  // (editable abajo); el básico no vence.
   async function cambiarPlan(s: Solicitud, plan: string) {
     setBusy(s.id); setError(null);
     try {
+      const planVence = plan === "basico" ? "" : (s.planVence || enDias(30));
       const res = await fetch("/api/supremo/solicitudes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: s.id, plan }),
+        body: JSON.stringify({ userId: s.id, plan, planVence }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo asignar el plan."); return; }
       await cargar();
     } finally { setBusy(null); }
+  }
+
+  async function cambiarVence(s: Solicitud, planVence: string) {
+    setBusy(s.id); setError(null);
+    try {
+      const res = await fetch("/api/supremo/solicitudes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: s.id, planVence }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? "No se pudo guardar el vencimiento."); return; }
+      await cargar();
+    } finally { setBusy(null); }
+  }
+
+  // Avisos informativos (se muestran a todas las cuentas en el panel de notificaciones).
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [avTitulo, setAvTitulo] = useState("");
+  const [avTexto, setAvTexto] = useState("");
+  const [avHasta, setAvHasta] = useState("");
+  const [avBusy, setAvBusy] = useState(false);
+  const cargarAvisos = useCallback(async () => {
+    try {
+      const res = await fetch("/api/supremo/avisos", { cache: "no-store" });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) setAvisos(d.avisos ?? []);
+    } catch { /* */ }
+  }, []);
+  useEffect(() => { cargarAvisos(); }, [cargarAvisos]);
+  async function publicarAviso() {
+    if (!avTitulo.trim()) { setError("Escribe el título del aviso."); return; }
+    setAvBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/supremo/avisos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo: avTitulo, texto: avTexto, hasta: avHasta || undefined }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(d.error ?? "No se pudo publicar el aviso."); return; }
+      setAvTitulo(""); setAvTexto(""); setAvHasta("");
+      await cargarAvisos();
+    } finally { setAvBusy(false); }
+  }
+  async function borrarAviso(id: string) {
+    setAvBusy(true);
+    try { await fetch(`/api/supremo/avisos?id=${encodeURIComponent(id)}`, { method: "DELETE" }); await cargarAvisos(); }
+    finally { setAvBusy(false); }
   }
 
   async function toggleUtilitario(s: Solicitud, key: string) {
@@ -401,6 +460,33 @@ export default function SupremoPanel() {
 
       {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
 
+      {/* Avisos informativos para todas las cuentas (panel Notificaciones del Inicio) */}
+      <details className="card p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+          📣 Avisos informativos ({avisos.length}) — se muestran en el Inicio de todas las cuentas
+        </summary>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto_auto]">
+          <input className="input" placeholder="Título del aviso" value={avTitulo} onChange={(e) => setAvTitulo(e.target.value)} />
+          <input className="input" placeholder="Texto (opcional)" value={avTexto} onChange={(e) => setAvTexto(e.target.value)} />
+          <input type="date" className="input" title="Mostrar hasta (opcional)" value={avHasta} onChange={(e) => setAvHasta(e.target.value)} />
+          <button className="btn-primary" onClick={publicarAviso} disabled={avBusy}>{avBusy ? "…" : "Publicar"}</button>
+        </div>
+        {avisos.length > 0 && (
+          <ul className="mt-3 divide-y divide-slate-100 text-sm">
+            {avisos.map((a) => (
+              <li key={a.id} className="flex items-start justify-between gap-3 py-2">
+                <div>
+                  <p className="font-medium text-slate-700">{a.titulo}</p>
+                  {a.texto && <p className="text-xs text-slate-500">{a.texto}</p>}
+                  <p className="text-[10px] text-slate-400">{fmt(a.at)}{a.hasta ? ` · hasta ${a.hasta}` : ""}</p>
+                </div>
+                <button onClick={() => borrarAviso(a.id)} disabled={avBusy} className="text-xs text-red-500 hover:underline">Quitar</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+
       {lista.length === 0 ? (
         <div className="card p-6 text-sm text-slate-500">
           {cargando ? "Cargando…" : "No hay solicitudes en esta vista."}
@@ -457,6 +543,18 @@ export default function SupremoPanel() {
                               </label>
                             );
                           })}
+                          {(s.plan ?? "basico") !== "basico" && (
+                            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500" title="Fecha en que vence el plan de paga. Al vencer, la cuenta vuelve al plan Básico.">
+                              Vence
+                              <input
+                                type="date"
+                                className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                                value={s.planVence ?? ""}
+                                disabled={busy !== null}
+                                onChange={(e) => cambiarVence(s, e.target.value)}
+                              />
+                            </label>
+                          )}
                           <div className="mt-1 border-t border-slate-100 pt-1">
                             <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Utilitarios</p>
                             {UTILITARIOS_OPC.map((u) => {

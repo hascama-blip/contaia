@@ -120,6 +120,9 @@ export interface Usuario {
   /** Plan asignado por el supremo. De aquí se derivan los módulos.
    *  undefined = "basico" (gratis). */
   plan?: "basico" | "regular" | "premium" | "equipo";
+  /** Vencimiento del plan de paga (YYYY-MM-DD). Al vencer, la cuenta vuelve al
+   *  plan Básico. undefined = sin vencimiento. */
+  planVence?: string;
   /** Usuario RESTRINGIDO a los Utilitarios RTP: solo ve /rtputilitarios y sus 4
    *  herramientas; sin menús (Inicio/Dashboard/Clientes/Planes/Equipo/Supremo). */
   soloRtp?: boolean;
@@ -138,6 +141,16 @@ export interface Usuario {
   codigoEnviadoAt?: string;
   /** Cupo del módulo gratis: 3 consultas por ventana de 7 días. */
   usosGratis?: { usados: number; desde: string };
+}
+
+/** Aviso informativo que publica el supremo (lo ven todas las cuentas en el Inicio). */
+export interface Aviso {
+  id: string;
+  titulo: string;
+  texto: string;
+  at: string;
+  /** Fecha hasta la que se muestra (YYYY-MM-DD); vacío = sin límite. */
+  hasta?: string;
 }
 
 export interface Cliente {

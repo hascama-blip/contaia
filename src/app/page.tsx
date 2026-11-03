@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, studioId, modulosDelEstudio, esSupremo, esSoloRtp } from "@/lib/auth";
 import { moduloPorHref } from "@/lib/modulos";
 import RecordatoriosBanner from "@/components/RecordatoriosBanner";
+import NotificacionesPanel from "@/components/NotificacionesPanel";
 import Landing from "@/components/Landing";
 
 export const dynamic = "force-dynamic";
@@ -210,7 +211,10 @@ export default async function MenuPage() {
   const verUtilitarios = supremo || UTILITARIOS.some((o) => !bloqueado(o));
   const utilActivos = verUtilitarios ? UTILITARIOS.filter((o) => !bloqueado(o)) : [];
   const utilBloqueados = verUtilitarios ? UTILITARIOS.filter((o) => bloqueado(o)) : [];
-  const hayPanelDerecho = premium.length > 0 || utilActivos.length > 0 || utilBloqueados.length > 0;
+  // Las cuentas que no son supremo ven el panel de Notificaciones (plan, buzones,
+  // próximos a declarar, avisos) en la columna derecha, en lugar de Utilitarios.
+  const verNotificaciones = !supremo;
+  const hayPanelDerecho = verNotificaciones || premium.length > 0 || utilActivos.length > 0 || utilBloqueados.length > 0;
 
   const etiqueta = (o: Opcion) => {
     const m = moduloPorHref(o.href);
@@ -278,7 +282,10 @@ export default async function MenuPage() {
 
         {/* Servicios Premium / Utilitarios */}
         {hayPanelDerecho && (
-          <aside className="space-y-5 lg:col-span-3">
+          // Fija al hacer scroll (igual que el héroe) para que no se descuadre;
+          // si es más alta que la pantalla, se desplaza dentro de sí misma.
+          <aside className="space-y-5 lg:sticky lg:top-20 lg:col-span-3 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+            {verNotificaciones && <NotificacionesPanel />}
             {premium.length > 0 && (
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="text-xl font-bold text-slate-800">Servicios Premium</h2>

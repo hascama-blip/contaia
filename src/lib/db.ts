@@ -16,6 +16,7 @@ import type {
   CredencialesSire,
   ProveedorCuenta,
   Usuario,
+  Aviso,
   DeudaF36Tabla,
   SeguimientoBuzon,
   AccionAuditoria,
@@ -79,6 +80,8 @@ interface Store {
   rentas?: SolicitudRentas[];
   /** Visor Tributario: token por usuario + capturas + matriz (cuadro año×mes). */
   visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[]; matriz?: Record<string, VisorMatriz[]> };
+  /** Avisos informativos publicados por el supremo (panel Notificaciones). */
+  avisos?: Aviso[];
 }
 
 async function ensureDirs() {
@@ -357,17 +360,53 @@ export async function setModulosUsuario(
   return u;
 }
 
-/** El supremo asigna el PLAN de un estudio (basico/regular/premium/equipo). */
+/** El supremo asigna el PLAN de un estudio (basico/regular/premium/equipo) y,
+ *  opcionalmente, su vencimiento (YYYY-MM-DD; "" = sin vencimiento). */
 export async function setPlanUsuario(
   userId: string,
-  plan: "basico" | "regular" | "premium" | "equipo"
+  plan: "basico" | "regular" | "premium" | "equipo",
+  planVence?: string
 ): Promise<Usuario | null> {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
   u.plan = plan;
+  if (planVence !== undefined) u.planVence = planVence || undefined;
+  if (plan === "basico") u.planVence = undefined;
   await writeStore(store);
   return u;
+}
+
+/** Cambia solo el vencimiento del plan ("" = sin vencimiento). */
+export async function setPlanVenceUsuario(userId: string, planVence: string): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
+  if (!u) return null;
+  u.planVence = planVence || undefined;
+  await writeStore(store);
+  return u;
+}
+
+// --- Avisos informativos (los publica el supremo; los ven todas las cuentas) ---
+export async function listAvisos(soloVigentes = true): Promise<Aviso[]> {
+  const store = await readStore();
+  const hoy = new Date().toISOString().slice(0, 10);
+  const todos = (store.avisos ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
+  return soloVigentes ? todos.filter((a) => !a.hasta || a.hasta >= hoy) : todos;
+}
+export async function addAviso(titulo: string, texto: string, hasta?: string): Promise<Aviso> {
+  const store = await readStore();
+  if (!store.avisos) store.avisos = [];
+  const aviso: Aviso = { id: crypto.randomUUID(), titulo, texto, at: new Date().toISOString(), hasta: hasta || undefined };
+  store.avisos.unshift(aviso);
+  store.avisos = store.avisos.slice(0, 50);
+  await writeStore(store);
+  return aviso;
+}
+export async function deleteAviso(id: string): Promise<void> {
+  const store = await readStore();
+  store.avisos = (store.avisos ?? []).filter((a) => a.id !== id);
+  await writeStore(store);
 }
 
 /** El supremo aprueba o rechaza el acceso de un estudio. */

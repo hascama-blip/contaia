@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { esSupremo, getCurrentUser, publicUser, hashPassword } from "@/lib/auth";
-import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPlanUsuario, setPasswordUsuario, conteoOperadores } from "@/lib/db";
+import { listSolicitudes, setEstadoUsuario, setModulosUsuario, setPlanUsuario, setPlanVenceUsuario, setPasswordUsuario, conteoOperadores } from "@/lib/db";
+
+const FECHA_OK = (s: unknown) => s === "" || (typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s));
 import { TODOS_MODULO_KEYS, PLAN_ORDEN, type PlanId } from "@/lib/modulos";
 
 export const runtime = "nodejs";
@@ -47,7 +49,20 @@ export async function PATCH(req: NextRequest) {
     if (!PLAN_ORDEN.includes(body.plan as PlanId)) {
       return NextResponse.json({ error: "Plan inválido." }, { status: 400 });
     }
-    const u = await setPlanUsuario(userId, body.plan as PlanId);
+    if (body.planVence !== undefined && !FECHA_OK(body.planVence)) {
+      return NextResponse.json({ error: "Fecha de vencimiento inválida (AAAA-MM-DD)." }, { status: 400 });
+    }
+    const u = await setPlanUsuario(userId, body.plan as PlanId, body.planVence);
+    if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
+    return NextResponse.json({ ok: true, usuario: publicUser(u) });
+  }
+
+  // Solo el vencimiento del plan ("" = sin vencimiento).
+  if (body?.planVence !== undefined) {
+    if (!FECHA_OK(body.planVence)) {
+      return NextResponse.json({ error: "Fecha de vencimiento inválida (AAAA-MM-DD)." }, { status: 400 });
+    }
+    const u = await setPlanVenceUsuario(userId, body.planVence);
     if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });
     return NextResponse.json({ ok: true, usuario: publicUser(u) });
   }

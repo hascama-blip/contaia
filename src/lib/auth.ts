@@ -152,10 +152,26 @@ export function bloquearSiSoloRtp(u: Usuario | null | undefined): void {
 
 /** Plan del estudio al que pertenece el usuario. El supremo = "equipo" (todo).
  *  Los operadores heredan el plan de su admin. */
+/** Plan EFECTIVO de un admin: el asignado, salvo que su vencimiento ya pasó
+ *  (entonces vuelve al Básico). */
+export function planEfectivo(admin: Usuario | null | undefined): import("./modulos").PlanId {
+  const plan = (admin?.plan ?? "basico") as import("./modulos").PlanId;
+  if (plan !== "basico" && admin?.planVence && admin.planVence < new Date().toISOString().slice(0, 10)) return "basico";
+  return plan;
+}
+
+/** Días que faltan para que venza el plan (null = sin vencimiento; negativo = vencido). */
+export function diasParaVencerPlan(admin: Usuario | null | undefined): number | null {
+  if (!admin?.planVence || (admin.plan ?? "basico") === "basico") return null;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const v = new Date(`${admin.planVence}T00:00:00`);
+  return Math.round((v.getTime() - hoy.getTime()) / 86400000);
+}
+
 export async function planDelEstudio(u: Usuario): Promise<import("./modulos").PlanId> {
   if (esSupremo(u)) return "equipo";
   const admin = u.parentId ? await getUserById(u.parentId) : u;
-  return (admin?.plan ?? "basico") as import("./modulos").PlanId;
+  return planEfectivo(admin);
 }
 
 /** Módulos habilitados para el estudio del usuario, según su PLAN. El supremo
@@ -165,7 +181,7 @@ export async function modulosDelEstudio(u: Usuario): Promise<Set<string>> {
   if (esSoloRtp(u)) return new Set(MODULOS_RTP); // usuario restringido: solo sus 4
   if (esSupremo(u)) return new Set(TODOS_MODULO_KEYS);
   const admin = u.parentId ? await getUserById(u.parentId) : u;
-  const base = modulosDePlan(admin?.plan as import("./modulos").PlanId | undefined);
+  const base = modulosDePlan(planEfectivo(admin));
   // Utilitarios habilitados por el supremo a esta cuenta (guardados en modulos).
   const utilGranted = (admin?.modulos ?? []).filter((k) => UTILITARIO_KEYS.includes(k));
   return new Set([...base, ...utilGranted]);
