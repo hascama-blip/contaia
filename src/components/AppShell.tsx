@@ -140,10 +140,11 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
         </div>
       </header>
 
-      {/* Contenido (fondo claro siempre; el Inicio usa un ancho mayor). */}
+      {/* Contenido (fondo claro siempre). El Inicio ocupa EXACTAMENTE una
+          pantalla en escritorio: sin desplazamiento y sin pie de página. */}
       <div className="md:pl-60">
-        <main className={`mx-auto px-3 py-5 sm:px-5 sm:py-6 ${inicio ? "max-w-7xl" : "max-w-6xl"}`}>{children}</main>
-        <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
+        <main className={`mx-auto px-3 py-5 sm:px-5 sm:py-6 ${inicio ? "max-w-[1600px] lg:h-[calc(100vh-4rem)] lg:overflow-hidden lg:py-4" : "max-w-6xl"}`}>{children}</main>
+        <footer className={`no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400 ${inicio ? "lg:hidden" : ""}`}>
           <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
           <br />
           <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>

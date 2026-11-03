@@ -82,6 +82,14 @@ body {
   .sheen:hover {
     transform: translateY(-3px);
   }
+  /* Área que puede desplazarse con la rueda pero SIN barra visible. */
+  .sin-barra {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sin-barra::-webkit-scrollbar {
+    display: none;
+  }
   /* Variante para fondos oscuros (héroe): brillo más tenue. */
   .sheen-dark::after {
     background: linear-gradient(105deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 45%, rgba(255, 255, 255, 0) 100%);

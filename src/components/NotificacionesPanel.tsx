@@ -46,9 +46,10 @@ export default function NotificacionesPanel() {
   const total = d ? d.buzon.vencidos + d.buzon.porVencer + d.declaraciones.filter((x) => x.dias >= 0).length + d.avisos.length + d.autos.length : 0;
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-xl font-bold text-slate-800">🔔 Notificaciones</h2>
+    // Ocupa la altura disponible; su contenido se desplaza dentro SIN barra visible.
+    <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-bold text-slate-800">🔔 Notificaciones</h2>
         {d && total > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">{total}</span>}
       </div>
 
@@ -56,7 +57,7 @@ export default function NotificacionesPanel() {
       {err && <p className="mt-3 text-xs text-red-500">No se pudieron cargar las notificaciones.</p>}
 
       {d && (
-        <div className="mt-4 space-y-3">
+        <div className="sin-barra mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
           {/* Plan */}
           <PlanCard plan={d.plan} />
 
