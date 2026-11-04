@@ -185,7 +185,12 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   ingreso y si está verificado en RENIEC); nunca dirección, teléfonos, correo, nacimiento, familia,
   cuenta, documentos ni observaciones. Tope de **30 consultas cada 10 minutos por IP** (429) para que
   no se puedan barrer DNIs; respuestas `no-store`; la página lleva `noindex`. Si hay dos fichas con el
-  mismo DNI se prefiere la vigente (con N° y no transferida).
+  mismo DNI se prefiere la vigente (con N° y no transferida). Debajo de los datos generales se muestra
+  **la ficha completa como imagen** (`GET /api/publico/ficha?dni=`, `servidor/lib/fichaSvg.js`): SVG con
+  el mismo diseño que el PDF del padrón (escudo, foto, tablas), servido como `<img>` no seleccionable ni
+  arrastrable, con marca de agua "SOLO CONSULTA" y **CONFIDENCIAL** en DNI, dirección, correo, celular y
+  fijo, cónyuge (DNI y nombre), N° de cuenta, DNI de los hijos y observaciones. Sin scripts, todo
+  escapado, `Content-Security-Policy: default-src 'none'`, mismo tope por IP (60 peticiones / 10 min).
 - **Visitas al perfil** (colección `visitas`, solo la escribe el servidor): cada `GET /tienda/:id`
   cuenta una visita por visitante (hash ip+navegador) y hora; los clics al perfil digital externo
   avisan con `POST /api/publico/visita/:id` (beacon). Se guarda total + conteo por día (90 días);

@@ -77,7 +77,8 @@
           ${fila("Verificación", a.verificado ? `<span class="etiqueta">Verificado en RENIEC</span>` : "Pendiente de verificación")}
         </dl>
         <p class="nota">Información general del Libro de Padrón. Si algún dato no coincide, comunícate con la administración de la asociación.</p>
-      </article>`;
+      </article>
+      <figure class="ficha-imagen"><img src="/api/publico/ficha?dni=${S.esc(dni)}" alt="Ficha del Libro de Padrón de Asociados (datos confidenciales ocultos)" draggable="false"><figcaption>Ficha del Libro de Padrón. DNI, dirección, correo, celular, cónyuge y cuenta se muestran como CONFIDENCIAL.</figcaption></figure>`;
     } catch (err) { r.innerHTML = `<div class="vacio consulta-aviso">${S.esc(err.message)}</div>`; }
     finally { b.disabled = false; b.textContent = "Consultar"; }
   };

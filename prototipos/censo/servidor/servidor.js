@@ -8,7 +8,8 @@
 //
 // Rutas:
 //   GET  /, /ofertas, /tiendas, /consulta, /tienda/:id, /sitio/*, /api/publico/*   web pública (sin sesión)
-//   GET  /api/publico/asociado?dni=12345678          datos generales de la ficha (tope 30 consultas / 10 min por IP)
+//   GET  /api/publico/asociado?dni=12345678          datos generales de la ficha (tope por IP)
+//   GET  /api/publico/ficha?dni=12345678             la ficha como imagen SVG con datos confidenciales ocultos
 //   GET  /portal, /src/*, /estilos/*, /img/*          el padrón (con sesión) · GET /editar-sitio (sesión con edición)
 //   GET  /login, POST/GET/DELETE /api/sesion       entrar / quién soy / salir
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
@@ -34,6 +35,7 @@ import { completarTodo } from "./lib/completar.js";
 import { SitioPublico, validarPublico } from "./lib/sitio.js";
 import { aplicarMigraciones } from "./lib/migraciones.js";
 import { importarExpedientes } from "./lib/expedientes.js";
+import { fichaSVG } from "./lib/fichaSvg.js";
 import { PLANO } from "../src/plano.js";
 import { json, cookies, leerCuerpo, leerJSON, servirArchivo, redirigir } from "./lib/http.js";
 
@@ -84,13 +86,25 @@ function intentoPermitido(ip) {
   return ++v.n <= 10;
 }
 
-// Consulta pública por DNI: hasta 30 consultas cada 10 minutos por IP.
+// Consulta pública por DNI: hasta 60 peticiones (30 consultas: datos + ficha) cada 10 minutos por IP.
 const consultas = new Map();
 function consultaPermitida(ip) {
   const ahora = Date.now();
   const v = consultas.get(ip);
   if (!v || v.hasta < ahora) { consultas.set(ip, { hasta: ahora + 10 * 60_000, n: 1 }); if (consultas.size > 5000) for (const [k, x] of consultas) if (x.hasta < ahora) consultas.delete(k); return true; }
-  return ++v.n <= 30;
+  return ++v.n <= 60;
+}
+/** Ficha vigente con ese DNI (si hay dos, la que tiene N° y no está transferida). */
+function asociadoPorDni(dni) {
+  const candidatos = almacen.listar("asociados").filter((a) => String(a.data?.dni || "").replace(/\D/g, "") === dni);
+  return candidatos.find((x) => x.data.estado !== "transferido" && String(x.data.numero || "").trim()) || candidatos[0] || null;
+}
+const standsDe = (id) => almacen.listar("stands").filter((s) => s.data?.propietarioId === id).map((s) => ({ codigo: s.data.codigo || s.id, galeria: s.data.galeria || "", cuenta: s.data.cuenta || "" })).sort((x, y) => String(x.codigo).localeCompare(String(y.codigo), "es", { numeric: true }));
+const LOGO_DATA = (() => { try { return "data:image/jpeg;base64," + fs.readFileSync(path.join(RAIZ_WEB, "img", "logo.jpg")).toString("base64"); } catch { return null; } })();
+/** Un archivo del almacén como data URL (para incrustar la foto en la ficha SVG), o null. */
+function archivoDataURL(id) {
+  const meta = id && metaArchivos.get(id); if (!meta || !/^image\//.test(meta.tipo)) return null;
+  try { return `data:${meta.tipo};base64,${fs.readFileSync(path.join(DATOS, "archivos", id)).toString("base64")}`; } catch { return null; }
 }
 
 const codigoInstalacionValido = (c) => {
@@ -157,12 +171,22 @@ async function manejar(req, res) {
     const dni = String(url.searchParams.get("dni") || "").replace(/\D/g, "");
     if (!/^\d{8}$/.test(dni)) return json(res, 400, { error: "El DNI debe tener 8 dígitos." });
     if (!consultaPermitida(ipDe(req))) return json(res, 429, { error: "Demasiadas consultas desde esta conexión. Espera unos minutos." });
-    const candidatos = almacen.listar("asociados").filter((a) => String(a.data?.dni || "").replace(/\D/g, "") === dni);
-    const a = candidatos.find((x) => x.data.estado !== "transferido" && String(x.data.numero || "").trim()) || candidatos[0];
+    const a = asociadoPorDni(dni);
     if (!a) return json(res, 404, { error: "No figura en el padrón." });
-    const d = a.data;
-    const stands = almacen.listar("stands").filter((s) => s.data?.propietarioId === a.id).map((s) => ({ codigo: s.data.codigo || s.id, galeria: s.data.galeria || "" })).sort((x, y) => String(x.codigo).localeCompare(String(y.codigo), "es", { numeric: true }));
+    const d = a.data, stands = standsDe(a.id).map(({ codigo, galeria }) => ({ codigo, galeria }));
     return json(res, 200, { asociado: { numero: String(d.numero || "").trim(), nombres: d.nombres || "", apellidoPaterno: d.apellidoPaterno || "", apellidoMaterno: d.apellidoMaterno || "", dni, estado: d.estado || "activo", fechaIngreso: d.fechaIngreso || "", verificado: Boolean(d.reniec?.verificadoAt) || d.censo?.estado === "verificado", stands } });
+  }
+  // La misma ficha como imagen (SVG) con el diseño del Libro de Padrón; DNI, dirección, correo, celular, cónyuge, cuenta y observaciones salen como "CONFIDENCIAL".
+  if (ruta === "/api/publico/ficha" && metodo === "GET") {
+    const dni = String(url.searchParams.get("dni") || "").replace(/\D/g, "");
+    if (!/^\d{8}$/.test(dni)) return json(res, 400, { error: "El DNI debe tener 8 dígitos." });
+    if (!consultaPermitida(ipDe(req))) return json(res, 429, { error: "Demasiadas consultas desde esta conexión. Espera unos minutos." });
+    const a = asociadoPorDni(dni);
+    if (!a) return json(res, 404, { error: "No figura en el padrón." });
+    const hoy = new Date(Date.now() - 5 * 3600e3), fechaConsulta = `${String(hoy.getUTCDate()).padStart(2, "0")}/${String(hoy.getUTCMonth() + 1).padStart(2, "0")}/${hoy.getUTCFullYear()}`;
+    const svg = Buffer.from(fichaSVG(a.data, { stands: standsDe(a.id), logo: LOGO_DATA, foto: archivoDataURL(a.data.archivos?.foto), fechaConsulta }));
+    res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8", "Content-Length": svg.length, "Cache-Control": "no-store", "Content-Disposition": "inline", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Content-Type-Options": "nosniff" });
+    return res.end(svg);
   }
   // Cada vista del perfil cuenta como visita (una por visitante y hora); también los clics al perfil digital externo (beacon).
   if ((m = ruta.match(/^\/api\/publico\/visita\/([A-Za-z0-9_.-]+)$/)) && metodo === "POST") { sitio.registrarVisita(m[1], ipDe(req), req.headers["user-agent"]); res.writeHead(204); return res.end(); }
