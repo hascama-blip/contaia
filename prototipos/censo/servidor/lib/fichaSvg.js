@@ -1,6 +1,7 @@
 // Ficha del Libro de Padrón como imagen SVG (misma disposición que el PDF de src/lib/exportar.js),
-// para la consulta pública por DNI. Los datos confidenciales (DNI, dirección, correo, celular y fijo,
-// cónyuge, cuenta bancaria, DNI de los hijos, observaciones) se reemplazan por "CONFIDENCIAL".
+// para la consulta pública por DNI: cabecera, identificación y datos personales con foto. No incluye
+// hijos, otros familiares ni observaciones. Los datos confidenciales (DNI, dirección, correo, celular
+// y fijo, cónyuge, cuenta bancaria) se reemplazan por "CONFIDENCIAL".
 // Se sirve como <img>: no se puede seleccionar ni editar en la página. Sin scripts, todo escapado.
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -86,33 +87,7 @@ export function fichaSVG(a, { stands = [], logo = null, foto = null, fechaConsul
   fila(y + F * 10, [[c1, "CÓNYUGE / CONVIV.", ET], [c2, CONFIDENCIAL], [c3, "NOMBRE", ET], [c4 + c5 + c6, CONFIDENCIAL]]);
   y += F * 11 + 3;
 
-  // ---- Hijos (DNI confidencial) ----
-  titulo("NOMBRES Y DATOS DE LOS HIJOS");
-  const h1 = 70.6, h2 = 28.2, h3 = 45.9, h4 = ANCHO - h1 - h2 - h3;
-  const CAB = { fill: VERDE, bold: true, size: 7, align: "center" };
-  fila(y, [[h1, "NOMBRES Y APELLIDOS", CAB], [h2, "EDAD", CAB], [h3, "ESTUDIOS", CAB], [h4, "DNI", CAB]]);
-  for (let i = 0; i < 5; i++) {
-    const h = (a.hijos || [])[i] || {};
-    fila(y + F * (i + 1), [[h1, h.nombre, VAL], [h2, h.edad, { ...VAL, align: "center" }], [h3, h.estudios, VAL], [h4, h.dni ? CONFIDENCIAL : "", VAL]]);
-  }
-  if ((a.hijos || []).length > 5) texto(M + ANCHO, y + F * 6 + 2.6, `y ${a.hijos.length - 5} más`, { size: 6, color: GRIS, align: "right" });
-  y += F * 6 + 3;
-
-  // ---- Otros familiares ----
-  titulo("OTROS FAMILIARES");
-  const f1 = 70.6, f2 = 45.9, f3 = 21.2, f4 = ANCHO - f1 - f2 - f3;
-  fila(y, [[f1, "NOMBRES Y APELLIDOS", CAB], [f2, "PARENTESCO", CAB], [f3, "EDAD", CAB], [f4, "ESTUDIOS", CAB]]);
-  for (let i = 0; i < 4; i++) {
-    const x = (a.familiares || [])[i] || {};
-    fila(y + F * (i + 1), [[f1, x.nombre, VAL], [f2, x.parentesco, VAL], [f3, x.edad, { ...VAL, align: "center" }], [f4, x.estudios, VAL]]);
-  }
-  y += F * 5 + 3;
-
-  // ---- Observaciones (confidenciales) ----
-  const HO = 17.6; rect(M, y, ANCHO, HO);
-  texto(M + 1.5, y + 3.6, "OBSERVACIONES:", { size: 7.5, bold: true });
-  texto(M + ANCHO / 2, y + HO / 2 + 1.5, CONFIDENCIAL, { size: 7, color: GRIS, italic: true, align: "center" });
-  y += HO + 4;
+  // (La consulta pública termina aquí: no se muestran hijos, otros familiares ni observaciones.)
 
   // ---- Pie: consulta pública ----
   texto(105, y + 3, `Consulta pública del Libro de Padrón${fechaConsulta ? ` · ${fechaConsulta}` : ""} · los datos confidenciales se muestran ocultos · ccinmaculadaconcepcion.com`, { size: 6.5, color: GRIS, align: "center" });
