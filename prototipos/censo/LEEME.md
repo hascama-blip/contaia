@@ -188,8 +188,8 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   mismo DNI se prefiere la vigente (con N° y no transferida). El resultado es **solo la ficha como
   imagen** (`GET /api/publico/ficha?dni=`, `servidor/lib/fichaSvg.js`): SVG con el mismo diseño que el
   PDF del padrón (escudo, identificación, datos personales con foto; **sin** hijos, otros familiares ni
-  observaciones), servido como `<img>` no seleccionable ni arrastrable, con marca de agua "SOLO
-  CONSULTA" y **CONFIDENCIAL** en DNI, dirección, correo, celular y fijo, cónyuge (DNI y nombre) y N° de
+  observaciones), servido como `<img>` no seleccionable ni arrastrable, con marca de agua "VISTA
+  PREVIA" y **CONFIDENCIAL** en DNI, dirección, correo, celular y fijo, cónyuge (DNI y nombre) y N° de
   cuenta. Sin scripts, todo escapado, `Content-Security-Policy: default-src 'none'`, mismo tope por IP
   (60 peticiones / 10 min). El JSON de datos generales sigue existiendo (lo usa la página para saber si
   el DNI figura antes de pedir la imagen).

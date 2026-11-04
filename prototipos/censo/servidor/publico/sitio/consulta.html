@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consulta de asociados · Centro Comercial Inmaculada Concepción</title>
-<meta name="description" content="Consulta por DNI si una persona figura en el Libro de Padrón de Asociados del Centro Comercial Inmaculada Concepción.">
+<meta name="description" content="Vista previa de la ficha del Libro de Padrón de Asociados del Centro Comercial Inmaculada Concepción: consulta por DNI con los datos confidenciales ocultos.">
 <meta name="robots" content="noindex">
 <link rel="icon" href="/img/favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="/img/icono-180.png">
@@ -30,7 +30,7 @@
 <main>
   <section class="contenedor seccion seccion-pagina" id="consulta">
     <h1 class="titulo-grande">Consulta de <b>asociados</b><span class="punto">.</span></h1>
-    <p class="titulo-sub">Ingresa el número de DNI para ver los datos generales que figuran en el Libro de Padrón de Asociados.</p>
+    <p class="titulo-sub"><b>Vista previa</b> de la ficha del Libro de Padrón de Asociados. Ingresa el número de DNI para verla; los datos confidenciales se muestran ocultos.</p>
     <form class="consulta-form" id="f-consulta" autocomplete="off">
       <label class="sr" for="dni">Número de DNI</label>
       <input id="dni" name="dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="Número de DNI (8 dígitos)" required>
@@ -61,7 +61,7 @@
       const j = await res.json().catch(() => ({}));
       if (res.status === 404) { r.innerHTML = `<div class="vacio consulta-aviso">No figura ningún asociado con el DNI <b>${S.esc(dni)}</b> en el Libro de Padrón.<br><small>Si crees que es un error, acércate a la administración de la asociación.</small></div>`; return; }
       if (!res.ok) throw new Error(j.error || "No se pudo consultar. Intenta de nuevo en un momento.");
-      r.innerHTML = `<figure class="ficha-imagen"><img src="/api/publico/ficha?dni=${S.esc(dni)}" alt="Ficha del Libro de Padrón de Asociados (datos confidenciales ocultos)" draggable="false"><figcaption>Ficha del Libro de Padrón. DNI, dirección, correo, celular, cónyuge y cuenta se muestran como CONFIDENCIAL.</figcaption></figure>`;
+      r.innerHTML = `<figure class="ficha-imagen"><img src="/api/publico/ficha?dni=${S.esc(dni)}" alt="Ficha del Libro de Padrón de Asociados (datos confidenciales ocultos)" draggable="false"><figcaption>Vista previa de la ficha del Libro de Padrón. DNI, dirección, correo, celular, cónyuge y cuenta se muestran como CONFIDENCIAL.</figcaption></figure>`;
     } catch (err) { r.innerHTML = `<div class="vacio consulta-aviso">${S.esc(err.message)}</div>`; }
     finally { b.disabled = false; b.textContent = "Consultar"; }
   };

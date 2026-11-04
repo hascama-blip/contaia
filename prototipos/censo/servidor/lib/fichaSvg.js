@@ -90,11 +90,11 @@ export function fichaSVG(a, { stands = [], logo = null, foto = null, fechaConsul
   // (La consulta pública termina aquí: no se muestran hijos, otros familiares ni observaciones.)
 
   // ---- Pie: consulta pública ----
-  texto(105, y + 3, `Consulta pública del Libro de Padrón${fechaConsulta ? ` · ${fechaConsulta}` : ""} · los datos confidenciales se muestran ocultos · ccinmaculadaconcepcion.com`, { size: 6.5, color: GRIS, align: "center" });
+  texto(105, y + 3, `Vista previa de la ficha del Libro de Padrón${fechaConsulta ? ` · ${fechaConsulta}` : ""} · los datos confidenciales se muestran ocultos · ccinmaculadaconcepcion.com`, { size: 6.5, color: GRIS, align: "center" });
   const ALTO = Math.min(297, Math.ceil(y + 8));
 
   // Marca de agua diagonal (no estorba la lectura, deja claro que es una consulta y no el documento oficial).
-  const marca = `<text x="105" y="${ALTO / 2}" font-family="${FUENTE}" font-size="22" font-weight="700" fill="${GRIS}" fill-opacity="0.08" text-anchor="middle" transform="rotate(-30 105 ${ALTO / 2})">SOLO CONSULTA</text>`;
+  const marca = `<text x="105" y="${ALTO / 2}" font-family="${FUENTE}" font-size="22" font-weight="700" fill="${GRIS}" fill-opacity="0.08" text-anchor="middle" transform="rotate(-30 105 ${ALTO / 2})">VISTA PREVIA</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 ${ALTO}" width="840" height="${ALTO * 4}" role="img" aria-label="Ficha del Libro de Padrón de Asociados">
 <rect width="210" height="${ALTO}" fill="#fff"/>
 ${marca}
