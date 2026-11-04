@@ -179,6 +179,13 @@ privado vive en **`/portal`** y se entra por **`/login`** (`/entrar` redirige).
   El carrusel se detiene mientras haya un afiche volteado. Lo compartido (afiche, tarjeta de
   tienda, burbuja, modal, cabecera) vive en `comun.js` (`S.afiche`, `S.afichesInteractivos`,
   `S.tarjetaTienda`, `S.burbujaMas`, `S.modalTienda`, `S.cabecera`).
+- **Consulta de asociados por DNI** (`/consulta`, `consulta.html`, enlace "Consulta asociados" en
+  cabecera y pie): `GET /api/publico/asociado?dni=12345678` devuelve **solo datos generales** de la
+  ficha (N° de asociado, nombres y apellidos, DNI consultado, estado, puestos con galería, fecha de
+  ingreso y si está verificado en RENIEC); nunca dirección, teléfonos, correo, nacimiento, familia,
+  cuenta, documentos ni observaciones. Tope de **30 consultas cada 10 minutos por IP** (429) para que
+  no se puedan barrer DNIs; respuestas `no-store`; la página lleva `noindex`. Si hay dos fichas con el
+  mismo DNI se prefiere la vigente (con N° y no transferida).
 - **Visitas al perfil** (colección `visitas`, solo la escribe el servidor): cada `GET /tienda/:id`
   cuenta una visita por visitante (hash ip+navegador) y hora; los clics al perfil digital externo
   avisan con `POST /api/publico/visita/:id` (beacon). Se guarda total + conteo por día (90 días);

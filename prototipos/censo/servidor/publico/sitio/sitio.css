@@ -362,3 +362,17 @@ main { overflow-x: clip; }
 .tienda-velo { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.82) 55%, rgba(255,255,255,.9) 100%); z-index: -1; pointer-events: none; }
 .tienda.con-fondo .tienda-ofertas.con { background: rgba(253,246,214,.95); }
 .tienda.con-fondo .btn-borde { background: rgba(255,255,255,.92); }
+
+/* Consulta de asociados por DNI */
+.consulta-form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 0 auto 22px; max-width: 560px; }
+.consulta-form input { flex: 1 1 220px; font: inherit; font-size: 1.1rem; padding: 11px 18px; border: 1.5px solid var(--borde-fuerte); border-radius: 999px; letter-spacing: .08em; }
+.consulta-form input:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-100); }
+.consulta-aviso { max-width: 720px; margin: 0 auto; }
+.ficha-consulta { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid var(--borde); border-radius: 18px; overflow: hidden; box-shadow: var(--sombra); }
+.ficha-consulta .banda { background: var(--brand-600); color: #fff; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 10px 18px; font-size: .85rem; text-align: center; }
+.ficha-consulta dl { display: grid; grid-template-columns: max-content 1fr; margin: 0; }
+.ficha-consulta dt { background: var(--brand-50); color: var(--brand-800); font-weight: 700; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; padding: 11px 14px; border-bottom: 1px solid var(--borde); border-right: 1px solid var(--borde); }
+.ficha-consulta dd { margin: 0; padding: 11px 14px; border-bottom: 1px solid var(--borde); font-weight: 500; }
+.ficha-consulta dd b { font-weight: 800; }
+.ficha-consulta .nota { margin: 0; padding: 12px 18px; font-size: .82rem; color: var(--texto-3); }
+@media (max-width: 520px) { .ficha-consulta dl { grid-template-columns: 1fr; } .ficha-consulta dt { border-right: 0; border-bottom: 0; padding-bottom: 2px; } }

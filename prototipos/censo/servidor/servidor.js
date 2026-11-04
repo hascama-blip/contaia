@@ -7,7 +7,8 @@
 //   DATOS=/var/censo PUERTO=3000 node servidor/servidor.js
 //
 // Rutas:
-//   GET  /, /ofertas, /tiendas, /tienda/:id, /sitio/*, /api/publico/*   web pública (sin sesión)
+//   GET  /, /ofertas, /tiendas, /consulta, /tienda/:id, /sitio/*, /api/publico/*   web pública (sin sesión)
+//   GET  /api/publico/asociado?dni=12345678          datos generales de la ficha (tope 30 consultas / 10 min por IP)
 //   GET  /portal, /src/*, /estilos/*, /img/*          el padrón (con sesión) · GET /editar-sitio (sesión con edición)
 //   GET  /login, POST/GET/DELETE /api/sesion       entrar / quién soy / salir
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
@@ -83,6 +84,15 @@ function intentoPermitido(ip) {
   return ++v.n <= 10;
 }
 
+// Consulta pública por DNI: hasta 30 consultas cada 10 minutos por IP.
+const consultas = new Map();
+function consultaPermitida(ip) {
+  const ahora = Date.now();
+  const v = consultas.get(ip);
+  if (!v || v.hasta < ahora) { consultas.set(ip, { hasta: ahora + 10 * 60_000, n: 1 }); if (consultas.size > 5000) for (const [k, x] of consultas) if (x.hasta < ahora) consultas.delete(k); return true; }
+  return ++v.n <= 30;
+}
+
 const codigoInstalacionValido = (c) => {
   const esperado = String(process.env.CENSO_CODIGO_INSTALACION || "").trim();
   const dado = String(c || "").trim();
@@ -141,7 +151,19 @@ async function manejar(req, res) {
   if (ruta === "/login") { if (yo) return redirigir(res, "/portal"); return servirArchivo(res, PUBLICO, "/login.html"); }
   // ---- Público: web del centro comercial (sin sesión) ----
   if (ruta === "/") return servirArchivo(res, SITIO, "/index.html", { cache: "no-cache", req });
-  if (ruta === "/ofertas" || ruta === "/tiendas") return servirArchivo(res, SITIO, ruta + ".html", { cache: "no-cache", req });
+  if (ruta === "/ofertas" || ruta === "/tiendas" || ruta === "/consulta") return servirArchivo(res, SITIO, ruta + ".html", { cache: "no-cache", req });
+  // Consulta pública de asociados por DNI: solo datos generales de la ficha, con tope por IP (evita barrer DNIs).
+  if (ruta === "/api/publico/asociado" && metodo === "GET") {
+    const dni = String(url.searchParams.get("dni") || "").replace(/\D/g, "");
+    if (!/^\d{8}$/.test(dni)) return json(res, 400, { error: "El DNI debe tener 8 dígitos." });
+    if (!consultaPermitida(ipDe(req))) return json(res, 429, { error: "Demasiadas consultas desde esta conexión. Espera unos minutos." });
+    const candidatos = almacen.listar("asociados").filter((a) => String(a.data?.dni || "").replace(/\D/g, "") === dni);
+    const a = candidatos.find((x) => x.data.estado !== "transferido" && String(x.data.numero || "").trim()) || candidatos[0];
+    if (!a) return json(res, 404, { error: "No figura en el padrón." });
+    const d = a.data;
+    const stands = almacen.listar("stands").filter((s) => s.data?.propietarioId === a.id).map((s) => ({ codigo: s.data.codigo || s.id, galeria: s.data.galeria || "" })).sort((x, y) => String(x.codigo).localeCompare(String(y.codigo), "es", { numeric: true }));
+    return json(res, 200, { asociado: { numero: String(d.numero || "").trim(), nombres: d.nombres || "", apellidoPaterno: d.apellidoPaterno || "", apellidoMaterno: d.apellidoMaterno || "", dni, estado: d.estado || "activo", fechaIngreso: d.fechaIngreso || "", verificado: Boolean(d.reniec?.verificadoAt) || d.censo?.estado === "verificado", stands } });
+  }
   // Cada vista del perfil cuenta como visita (una por visitante y hora); también los clics al perfil digital externo (beacon).
   if ((m = ruta.match(/^\/api\/publico\/visita\/([A-Za-z0-9_.-]+)$/)) && metodo === "POST") { sitio.registrarVisita(m[1], ipDe(req), req.headers["user-agent"]); res.writeHead(204); return res.end(); }
   if ((m = ruta.match(/^\/tienda\/([A-Za-z0-9_.-]+)$/))) { if (sitio.tienda(m[1])) { if (metodo === "GET") sitio.registrarVisita(m[1], ipDe(req), req.headers["user-agent"]); return servirArchivo(res, SITIO, "/tienda.html", { cache: "no-cache", req }); } res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }); return res.end(fs.readFileSync(path.join(SITIO, "no-existe.html"))); }
