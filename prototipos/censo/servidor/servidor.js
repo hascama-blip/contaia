@@ -15,11 +15,11 @@
 //   GET  /api/db/:col · GET/PUT/PATCH/DELETE /api/db/:col/:id
 //   GET  /api/eventos                                  SSE: {col} cuando algo cambia
 //   POST /api/archivos · GET /_blob/:id · DELETE /api/archivos/:id
-//   GET  /api/usuarios · POST · PATCH/DELETE /api/usuarios/:id   (admin)
+//   GET  /api/usuarios · POST · PATCH/DELETE /api/usuarios/:id   (admin y admingen; solo admin toca cuentas admin)
 //   GET  /api/usuarios/perfiles?ids=a,b                nombres para "registrado por"
 //   GET  /api/reniec/:dni                              consulta DNI (token en el servidor)
 //   POST /api/instalacion                              primer admin (código CENSO_CODIGO_INSTALACION, solo sin usuarios)
-//   GET  /administracion · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
+//   GET  /administracion (admin y admingen) · GET /api/exportar · POST /api/importar · GET/POST /api/dominio   (admin)
 //   POST /api/importar-expedientes                     ZIP con una carpeta por socio nuevo y sus documentos (admin)
 //   GET/POST /api/verificacion · POST /api/verificacion/ejecutar · POST /api/verificacion/detener   (admin: DNI automático)
 import http from "node:http";
@@ -28,7 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Almacen, nuevoId, COLECCIONES, fusionar } from "./lib/almacen.js";
-import { Usuarios, COOKIE, puedeEscribir, puedeIncidencias, esAdmin } from "./lib/sesiones.js";
+import { Usuarios, COOKIE, puedeEscribir, puedeIncidencias, esAdmin, esAdminGeneral, puedeWeb, puedeManejarRol } from "./lib/sesiones.js";
 import { Reniec } from "./lib/reniec.js";
 import { Verificacion } from "./lib/verificacion.js";
 import { completarTodo } from "./lib/completar.js";
@@ -216,7 +216,7 @@ async function manejar(req, res) {
       return json(res, 200, { usuario: usuarios.publico(u) }, { "Set-Cookie": usuarios.emitirCookie(u, seguro(req)) });
     }
     if (metodo === "DELETE") return json(res, 200, { ok: true }, { "Set-Cookie": usuarios.cookieSalida() });
-    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), puedeIncidencias: puedeIncidencias(yo), esAdmin: esAdmin(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
+    if (metodo === "GET") return json(res, yo ? 200 : 401, yo ? { usuario: usuarios.publico(yo), puedeEscribir: puedeEscribir(yo), puedeIncidencias: puedeIncidencias(yo), esAdmin: esAdmin(yo), esAdminGeneral: esAdminGeneral(yo), puedeWeb: puedeWeb(yo) } : { error: "No autenticado", instalar: usuarios.lista.length === 0 });
   }
   // Estáticos públicos que la página de entrada necesita (logo, estilos).
   if (ruta.startsWith("/estilos/") || ruta.startsWith("/img/") || ruta === "/manifest.webmanifest") {
@@ -241,6 +241,8 @@ async function manejar(req, res) {
     // Seguridad solo puede crear y actualizar incidencias (no borrarlas ni tocar otra colección).
     if (!escribe && !(col === "incidencias" && metodo !== "DELETE" && puedeIncidencias(yo))) return soloLectura();
     const PUBLICAS = ["tiendas", "articulos", "sitio"];
+    // La web pública (tiendas, artículos, portada) la editan edición y admin; la administración general no.
+    if (PUBLICAS.includes(col) && !puedeWeb(yo)) return json(res, 403, { error: "Tu usuario no edita la web pública.", code: "invalid_argument" });
     const ctxPublico = { id, tamanoArchivo: (a) => metaArchivos.get(a)?.tamano, ofertasDeTienda: (tiendaId, excluir) => almacen.listar("articulos").filter((x) => x.id !== excluir && x.data?.tiendaId === tiendaId && x.data.visible !== false).length };
     if (metodo === "PUT") {
       const datos = await leerJSON(req);
@@ -285,11 +287,21 @@ async function manejar(req, res) {
     return json(res, 200, Object.fromEntries(ids.map((id) => [id, usuarios.porId(id) ? { id, name: usuarios.porId(id).nombre } : null])));
   }
   if (ruta === "/api/usuarios" || (m = ruta.match(/^\/api\/usuarios\/(u_[a-f0-9]+)$/))) {
-    if (!esAdmin(yo)) return json(res, 403, { error: "Solo un administrador maneja usuarios." });
+    if (!esAdminGeneral(yo)) return json(res, 403, { error: "Solo un administrador maneja usuarios." });
+    // La administración general crea y maneja edición, lectura, seguridad y otras cuentas de administración
+    // general; las cuentas admin (programador) solo las toca un admin: evita que alguien se dé más permisos.
+    const vetado = () => json(res, 403, { error: "Solo el administrador principal maneja cuentas de administrador." });
+    const objetivo = m ? usuarios.porId(m[1]) : null;
+    if (objetivo && !puedeManejarRol(yo, objetivo.rol)) return vetado();
     if (ruta === "/api/usuarios" && metodo === "GET") return json(res, 200, { usuarios: usuarios.lista.map((u) => usuarios.publico(u)) });
-    if (ruta === "/api/usuarios" && metodo === "POST") return json(res, 200, { usuario: usuarios.crear(await leerJSON(req, 4096)) });
+    if (ruta === "/api/usuarios" && metodo === "POST") {
+      const c = await leerJSON(req, 4096);
+      if (!puedeManejarRol(yo, c.rol || "edicion")) return vetado();
+      return json(res, 200, { usuario: usuarios.crear(c) });
+    }
     if (m && metodo === "PATCH") {
       const c = await leerJSON(req, 4096);
+      if (c.rol && !puedeManejarRol(yo, c.rol)) return vetado();
       if (c.clave) usuarios.cambiarClave(m[1], c.clave);
       if (c.rol) usuarios.cambiarRol(m[1], c.rol);
       return json(res, 200, { ok: true });
@@ -297,11 +309,12 @@ async function manejar(req, res) {
     if (m && metodo === "DELETE") { usuarios.borrar(m[1]); return json(res, 200, { ok: true }); }
   }
 
-  // ---- Administración (solo admin): respaldo, importación, dominio ----
+  // ---- Administración: la página la ven admin y administración general (ésta solo maneja usuarios);
+  // respaldo, importación, expedientes, dominio, RENIEC y verificación automática son solo del admin ----
   if (ruta === "/admin.html") return redirigir(res, "/administracion");
-  if (ruta === "/administracion" || ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/importar-expedientes" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
-    if (!esAdmin(yo)) return ruta === "/administracion" ? redirigir(res, "/portal") : json(res, 403, { error: "Solo un administrador." });
-    if (ruta === "/administracion") return servirArchivo(res, PUBLICO, "/admin.html");
+  if (ruta === "/administracion") { if (!esAdminGeneral(yo)) return redirigir(res, "/portal"); return servirArchivo(res, PUBLICO, "/admin.html"); }
+  if (ruta === "/api/exportar" || ruta === "/api/importar" || ruta === "/api/importar-expedientes" || ruta === "/api/dominio" || ruta === "/api/consulta-dni" || ruta.startsWith("/api/verificacion")) {
+    if (!esAdmin(yo)) return json(res, 403, { error: "Solo el administrador principal." });
     if (ruta === "/api/exportar" && metodo === "GET") {
       const colecciones = Object.fromEntries(COLECCIONES.map((c) => [c, almacen.listar(c)]));
       return json(res, 200, { exportadoAt: new Date().toISOString(), colecciones }, { "Content-Disposition": `attachment; filename="censo-respaldo-${new Date().toISOString().slice(0, 10)}.json"` });
@@ -377,8 +390,8 @@ async function manejar(req, res) {
     return json(res, 200, { persona, simulado: !reniec.real });
   }
 
-  // ---- Editor de la web pública (cualquier usuario con permiso de edición) ----
-  if (ruta === "/editar-sitio") { if (!escribe) return redirigir(res, "/portal"); return servirArchivo(res, SITIO, "/editor.html", { cache: "no-cache", req }); }
+  // ---- Editor de la web pública (edición y admin; la administración general no) ----
+  if (ruta === "/editar-sitio") { if (!puedeWeb(yo)) return redirigir(res, "/portal"); return servirArchivo(res, SITIO, "/editor.html", { cache: "no-cache", req }); }
 
   // ---- El padrón (la web privada) ----
   if (ruta === "/index.html" || ruta === "/portal/") return redirigir(res, "/portal");

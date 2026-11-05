@@ -1,11 +1,13 @@
 // Usuarios (clave con scrypt) y sesiones (cookie firmada con HMAC).
-// Roles: admin (todo, incluye usuarios) · edicion (registra y edita) · lectura (solo mira).
+// Roles: admin (todo, incluye usuarios) · admingen (administración general: como admin salvo dominio,
+// RENIEC, verificación automática, expedientes ZIP, respaldo/importación y la web pública; no toca
+// cuentas admin) · edicion (registra y edita) · lectura (solo mira) · seguridad (solo incidencias).
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
 export const COOKIE = "censo_sesion";
-export const ROLES = ["admin", "edicion", "lectura", "seguridad"]; // seguridad: consulta y solo registra incidencias
+export const ROLES = ["admin", "admingen", "edicion", "lectura", "seguridad"]; // seguridad: consulta y solo registra incidencias
 const DURACION_MS = 1000 * 60 * 60 * 12; // 12 horas de sesión
 
 export class Usuarios {
@@ -132,7 +134,14 @@ export class Usuarios {
   }
 }
 
-export const puedeEscribir = (u) => Boolean(u && (u.rol === "admin" || u.rol === "edicion"));
+export const puedeEscribir = (u) => Boolean(u && (u.rol === "admin" || u.rol === "admingen" || u.rol === "edicion"));
 /** Registrar y actualizar incidencias: edición, administración y el personal de seguridad. */
 export const puedeIncidencias = (u) => puedeEscribir(u) || Boolean(u && u.rol === "seguridad");
+/** Administrador principal (programador): todo, incluidas dominio, RENIEC, verificación, expedientes, respaldo y cuentas admin. */
 export const esAdmin = (u) => Boolean(u && u.rol === "admin");
+/** Administración general: página de Administración (usuarios) y descarga masiva de fichas, además de todo lo de edición. */
+export const esAdminGeneral = (u) => Boolean(u && (u.rol === "admin" || u.rol === "admingen"));
+/** Edita la web pública (editor, tiendas, artículos, portada): edición y admin; la administración general no. */
+export const puedeWeb = (u) => Boolean(u && (u.rol === "admin" || u.rol === "edicion"));
+/** Qué cuentas puede crear o tocar quien maneja usuarios: solo el admin principal maneja cuentas admin. */
+export const puedeManejarRol = (yo, rol) => esAdmin(yo) || (esAdminGeneral(yo) && rol !== "admin");

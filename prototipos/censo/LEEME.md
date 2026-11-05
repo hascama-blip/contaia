@@ -129,8 +129,11 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   `/api/usuarios`, `/api/eventos` (SSE) y `/api/reniec/:dni` (token en el servidor).
   Sirve `index.html` inyectando `publico/adaptador.js` (mismo `window.claude`).
 - `lib/almacen.js` (JSON por colección, escritura atómica), `lib/sesiones.js` (scrypt +
-  cookie firmada, roles admin/edicion/lectura/seguridad; `seguridad` solo escribe en
-  `incidencias` y nunca borra), `lib/reniec.js` (apidni con caché).
+  cookie firmada, roles admin/admingen/edicion/lectura/seguridad; `seguridad` solo escribe en
+  `incidencias` y nunca borra; `admingen` = administración general: todo lo de edición, maneja
+  usuarios y descarga todas las fichas, pero no ve dominio, RENIEC, verificación automática,
+  expedientes ZIP ni respaldo, no edita la web pública y no toca cuentas `admin`), `lib/reniec.js`
+  (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
 - **Expedientes de socios nuevos (ZIP)**: Administración → "Expedientes de socios nuevos (ZIP)" →
   `POST /api/importar-expedientes` (admin; `servidor/lib/expedientes.js`, lector ZIP propio sin

@@ -84,15 +84,21 @@ el portal responde en `http://IP-ESTATICA/` y muestra la pantalla de **primera c
 6. Abrir `https://TU-DOMINIO.com` → pantalla de entrada → listo.
 
 ## 5. Usuarios de la directiva
-Roles: **admin** (todo y manejar usuarios), **edicion** (registrar y modificar),
+Roles: **admin** (el programador: todo y manejar usuarios), **admingen** (administración
+general: todo lo de edición, crea y maneja los usuarios de la directiva y descarga todas las
+fichas en PDF; **no** ve Dominio, Consulta de DNI (RENIEC), Verificación automática, Expedientes
+de socios nuevos (ZIP) ni Respaldo e importación, **no** edita la web pública y **no** puede crear,
+cambiar ni borrar cuentas admin), **edicion** (registrar y modificar, incluida la web pública),
 **lectura** (solo consultar) y **seguridad** (para el personal de vigilancia: consulta el
 padrón y **solo** puede registrar y actualizar incidencias; no borra, no edita fichas ni
 pagos, no sube archivos ni edita la web; al entrar va directo a Incidencias). Lo normal es
-manejarlos desde **Administración** en el portal (`/administracion`, solo admin). También desde el SSH:
+manejarlos desde **Administración** en el portal (`/administracion`; el admin ve todas las
+secciones, el admingen solo "Usuarios"). También desde el SSH:
 ```bash
 cd /opt/censo/prototipos/censo/servidor
 sudo -u censo DATOS=/var/censo node usuarios.js crear tesorera "Nombre Apellido" 'Clave' edicion
 sudo -u censo DATOS=/var/censo node usuarios.js crear vigilante "Nombre Apellido" 'Clave' seguridad
+sudo -u censo DATOS=/var/censo node usuarios.js crear admingen "Nombre Apellido" 'Clave' admingen
 sudo -u censo DATOS=/var/censo node usuarios.js listar
 sudo -u censo DATOS=/var/censo node usuarios.js clave tesorera 'ClaveNueva'
 sudo -u censo DATOS=/var/censo node usuarios.js borrar tesorera

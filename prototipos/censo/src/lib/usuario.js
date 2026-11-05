@@ -13,9 +13,11 @@ export function conectarUsuario() {
 export async function usuarioActual() {
   const u = await conectarUsuario();
   if (!u) return { id: null, nombre: "", puedeEscribir: null, puedeIncidencias: null };
-  const [yo, puede, incid, admin] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null), u.can("incidencias.write").catch(() => null), u.isOwner ? u.isOwner().catch(() => false) : false]);
+  const [yo, puede, incid, admin, web, general] = await Promise.all([u.me().catch(() => null), u.can("data.write").catch(() => null), u.can("incidencias.write").catch(() => null), u.isOwner ? u.isOwner().catch(() => false) : false, u.can("web.write").catch(() => null), u.can("admin.general").catch(() => null)]);
   // puedeIncidencias: edición y administración siempre; el rol "seguridad" solo esto (en claude.ai no existe, equivale a puedeEscribir).
-  return { id: yo?.id ?? null, nombre: yo?.name || "", rol: yo?.rol || null, puedeEscribir: puede, puedeIncidencias: incid === null ? puede : Boolean(incid || puede), esAdmin: Boolean(admin) };
+  // puedeWeb: edita la web pública (en el servidor, edición y admin; la administración general no).
+  // esAdminGeneral: ve Administración y descarga todas las fichas (admin y administración general).
+  return { id: yo?.id ?? null, nombre: yo?.name || "", rol: yo?.rol || null, puedeEscribir: puede, puedeIncidencias: incid === null ? puede : Boolean(incid || puede), esAdmin: Boolean(admin), puedeWeb: web === null ? puede : Boolean(web), esAdminGeneral: Boolean(general || admin) };
 }
 
 export async function nombresDe(ids) {

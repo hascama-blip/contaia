@@ -55,7 +55,7 @@ export function Padron() {
         sub=${`${datos.asociados.length} asociados registrados`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${exportar}>Exportar a Excel (CSV)</button>`}
-          ${caps.descargas && usuario?.esAdmin && html`<button className="btn btn-ghost" disabled=${!!zipAvance} onClick=${descargarFichasZip}>${zipAvance ? `Generando ${zipAvance[0]} de ${zipAvance[1]}…` : "Descargar fichas en PDF (ZIP)"}</button>`}
+          ${caps.descargas && usuario?.esAdminGeneral && html`<button className="btn btn-ghost" disabled=${!!zipAvance} onClick=${descargarFichasZip}>${zipAvance ? `Generando ${zipAvance[0]} de ${zipAvance[1]}…` : "Descargar fichas en PDF (ZIP)"}</button>`}
           ${puedeEscribir && reniecActivo() && html`<button className="btn btn-ghost" onClick=${() => setVerificando(true)}>Verificar DNI con RENIEC</button>`}
           ${puedeEscribir !== false && html`<a className="btn btn-primary" href="#nueva">+ Nueva ficha</a>`}`} />
       ${verificando && html`<${VerificacionMasiva} asociados=${lista} onCerrar=${() => setVerificando(false)} />`}
