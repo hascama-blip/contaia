@@ -44,7 +44,8 @@ chown -R censo:censo /opt/censo
 compilar_web() {
   local C=/opt/censo/prototipos/censo/servidor/compilar
   if command -v npm >/dev/null && [[ -f "$C/package.json" ]]; then
-    (cd "$C" && npm install --no-audit --no-fund --loglevel=error --omit=dev >/dev/null 2>&1 && node construir.mjs) && chown -R censo:censo /opt/censo/prototipos/censo/dist 2>/dev/null || echo "AVISO: no se pudo compilar la web; se sirven los módulos sueltos."
+    if (cd "$C" && npm install --no-audit --no-fund --loglevel=error --omit=dev >/dev/null 2>&1 && node construir.mjs); then chown -R censo:censo /opt/censo/prototipos/censo/dist 2>/dev/null || true
+    else rm -rf /opt/censo/prototipos/censo/dist; echo "AVISO: no se pudo compilar la web; se sirven los módulos sueltos (código actual, sin paquete único)."; fi
   fi
 }
 compilar_web
