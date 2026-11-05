@@ -5,16 +5,17 @@ import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
 import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero, faltantes, observacionFaltantes } from "../lib/padron.js";
-import { aCSV, descargar, COLUMNAS_PADRON } from "../lib/exportar.js";
+import { aCSV, descargar, COLUMNAS_PADRON, pdfTodasLasFichas } from "../lib/exportar.js";
 import { Paginador, usePaginacion } from "../components/Paginador.js";
 import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
 import { reniecActivo } from "../lib/reniec.js";
 import { hoy } from "../lib/formato.js";
 
 export function Padron() {
-  const { datos, derivados, caps, ir, avisar, puedeEscribir } = useApp();
+  const { datos, derivados, caps, ir, avisar, puedeEscribir, usuario } = useApp();
   const [filtro, setFiltro] = useState({ texto: "", galeria: "", censo: "" });
   const [verificando, setVerificando] = useState(false);
+  const [zipAvance, setZipAvance] = useState(null); // [hechos, total] mientras se generan las fichas
   const lista = useMemo(
     () => ordenarPorNumero(filtrarPadron(datos.asociados, derivados.mapaStands, filtro)),
     [datos.asociados, derivados.mapaStands, filtro],
@@ -32,12 +33,29 @@ export function Padron() {
     }
   }
 
+  /** Todas las fichas de la lista (según el filtro activo) en PDF, dentro de un ZIP. Solo administración. */
+  async function descargarFichasZip() {
+    if (zipAvance || !lista.length) return;
+    if (!confirm(`Se generará la ficha PDF de ${lista.length} asociado${lista.length === 1 ? "" : "s"} (los de la lista actual) y se descargarán en un ZIP. Puede tardar un par de minutos. ¿Continuar?`)) return;
+    setZipAvance([0, lista.length]);
+    try {
+      const r = await pdfTodasLasFichas(lista, { mapaStands: derivados.mapaStands, onAvance: (hechos, total) => setZipAvance([hechos, total]) });
+      await descargar(`fichas-padron-${hoy().iso}.zip`, r.zip);
+      avisar(r.errores.length ? `${r.generadas} fichas en el ZIP; ${r.errores.length} no se pudieron generar: ${r.errores.slice(0, 3).join(" · ")}` : `${r.generadas} fichas descargadas en el ZIP.`, r.errores.length ? "error" : undefined);
+    } catch (e) {
+      if (e?.code !== "declined") avisar(mensajeError(e), "error");
+    } finally {
+      setZipAvance(null);
+    }
+  }
+
   return html`
     <div className="pagina">
       <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Padrón de asociados"
         sub=${`${datos.asociados.length} asociados registrados`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${exportar}>Exportar a Excel (CSV)</button>`}
+          ${caps.descargas && usuario?.esAdmin && html`<button className="btn btn-ghost" disabled=${!!zipAvance} onClick=${descargarFichasZip}>${zipAvance ? `Generando ${zipAvance[0]} de ${zipAvance[1]}…` : "Descargar fichas en PDF (ZIP)"}</button>`}
           ${puedeEscribir && reniecActivo() && html`<button className="btn btn-ghost" onClick=${() => setVerificando(true)}>Verificar DNI con RENIEC</button>`}
           ${puedeEscribir !== false && html`<a className="btn btn-primary" href="#nueva">+ Nueva ficha</a>`}`} />
       ${verificando && html`<${VerificacionMasiva} asociados=${lista} onCerrar=${() => setVerificando(false)} />`}

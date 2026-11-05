@@ -5,6 +5,7 @@ import { ESTADOS_ASOCIADO, ESTADOS_CENSO, ESTADOS_STAND } from "./types.js";
 import { fecha, hoy } from "./formato.js";
 import { nombreCompleto, nombreGaleria, faltantes } from "./padron.js";
 import { archivoComoDataURL } from "./archivos.js";
+import { crearZip, nombreArchivoSeguro } from "./zip.js";
 
 let conexion = null;
 
@@ -262,3 +263,34 @@ export const COLUMNAS_PADRON = (mapaStands, atraso) => [
   { titulo: "Fecha de ingreso", valor: (a) => a.fechaIngreso },
   { titulo: "Estado", valor: (a) => ESTADOS_ASOCIADO[a.estado]?.label },
 ];
+
+/**
+ * Genera la ficha PDF de cada asociado y las entrega juntas en un ZIP (una carpeta plana, ordenadas por N°).
+ * @param {object[]} asociados
+ * @param {{ mapaStands: Map<string, object[]>, onAvance?: (hechos:number, total:number, nombre:string) => void }} op
+ * @returns {Promise<{ zip: Blob, generadas: number, errores: string[] }>}
+ */
+export async function pdfTodasLasFichas(asociados, { mapaStands, onAvance } = {}) {
+  const numeroDe = (a) => { const n = parseInt(String(a.numero || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
+  const lista = [...asociados].sort((x, y) => numeroDe(x) - numeroDe(y) || `${x.apellidoPaterno} ${x.apellidoMaterno} ${x.nombres}`.localeCompare(`${y.apellidoPaterno} ${y.apellidoMaterno} ${y.nombres}`, "es"));
+  const entradas = [], errores = [], usados = new Set(), indice = ["N°;Apellidos y nombres;DNI;Archivo"];
+  let i = 0;
+  for (const a of lista) {
+    i++;
+    const apellidos = `${a.apellidoPaterno || ""} ${a.apellidoMaterno || ""}`.trim();
+    onAvance?.(i, lista.length, `${apellidos}, ${a.nombres || ""}`);
+    try {
+      const blob = await pdfFicha(a, { stands: mapaStands?.get(a.id) || [] });
+      const etiqueta = String(a.numero || "").trim() ? `N° ${String(a.numero).trim().padStart(3, "0")}` : a.estado === "transferido" ? "Transferido" : "Sin N°";
+      let nombre = nombreArchivoSeguro(`${etiqueta} - ${apellidos}, ${a.nombres || ""}`);
+      let k = 2; while (usados.has(nombre.toLowerCase())) nombre = nombreArchivoSeguro(`${etiqueta} - ${apellidos}, ${a.nombres || ""} (${k++})`);
+      usados.add(nombre.toLowerCase());
+      entradas.push({ nombre: `${nombre}.pdf`, datos: blob });
+      indice.push(`${String(a.numero || "").trim() || "—"};${apellidos}, ${a.nombres || ""};${a.dni || ""};${nombre}.pdf`);
+    } catch (e) {
+      errores.push(`${apellidos}, ${a.nombres || ""}: ${e?.message || "no se pudo generar"}`);
+    }
+  }
+  entradas.push({ nombre: "INDICE.csv", datos: new TextEncoder().encode("\ufeff" + indice.join("\r\n")) });
+  return { zip: await crearZip(entradas), generadas: entradas.length - 1, errores };
+}

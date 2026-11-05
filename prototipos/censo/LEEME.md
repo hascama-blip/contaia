@@ -115,7 +115,10 @@ Colecciones: `asociados`, `stands` (id = número del plano, p. ej. `1091`; el du
 ## Tecnología
 
 React 18 + htm (plantillas `html\`…\`` sin compilación), cargados desde CDN.
-PDF de la ficha con jsPDF (se carga al pedir el PDF). El escudo va además como **marca de agua** centrada detrás del contenido (opacidad 35 %, `GState` de jsPDF).
+PDF de la ficha con jsPDF (se carga al pedir el PDF). **Todas las fichas en un ZIP**: en Padrón, botón "Descargar fichas en PDF (ZIP)" (solo
+administración, respeta el filtro activo): `pdfTodasLasFichas` genera el PDF de cada asociado en el navegador
+y `src/lib/zip.js` (escritor ZIP sin dependencias, método stored, CRC-32, nombres UTF-8) los empaqueta como
+`N° 123 - Apellidos, Nombres.pdf` (o `Sin N°` / `Transferido`) más un `INDICE.csv` (N°, nombre, DNI, archivo). El escudo va además como **marca de agua** centrada detrás del contenido (opacidad 35 %, `GState` de jsPDF).
 
 ## Servidor propio en AWS (dominio de GoDaddy)
 Carpeta `servidor/`: servidor Node 22 **sin dependencias** que reemplaza lo que da
