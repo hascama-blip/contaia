@@ -14,7 +14,7 @@
 # ejecutar el instalador. Registro: /var/log/instituto-web.log
 set -uo pipefail
 
-BUCKET_URL="${BUCKET_URL:-https://instituto-web-lfmn74.s3.us-east-1.amazonaws.com}"
+BUCKET_URL="${BUCKET_URL:-https://instituto-web-lfmn74.s3.us-east-2.amazonaws.com}"
 ESTADO=/var/lib/instituto-web          # copias descargadas, etags y marcas
 SBIN=/usr/local/sbin
 ZIP="$ESTADO/instituto-mutualista-web.zip"

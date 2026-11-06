@@ -80,6 +80,10 @@ python3 -m http.server -d sitios/instituto-mutualista   # luego abrir http://loc
 ```
 
 ## Publicar en AWS Lightsail
+Región: **us-east-2 (Ohio)** para el servidor y el bucket, porque la política de la organización de AWS
+(`AdvancedModeRegionRestrictionSecurityControlPolicy`) solo deja crear recursos ahí; en us-east-1 solo
+permite servicios globales, entre ellos el DNS de Lightsail, que se crea en esa región.
+
 Todo se hace por la API de Lightsail, sin SSH, con `deploy/publicar-lightsail.sh` (necesita la
 AWS CLI y un usuario IAM con `lightsail:*`; en una sesión de Claude toma `LS_AWS_ACCESS_KEY_ID`
 y `LS_AWS_SECRET_ACCESS_KEY`). Cada paso revisa lo que ya existe, así que se puede repetir.
@@ -94,7 +98,7 @@ bash deploy/publicar-lightsail.sh estado                        # resumen
 | --- | --- |
 | `bucket` | Bucket de Lightsail `instituto-web-lfmn74` (plan de 1 USD, privado con objetos públicos uno por uno) y una llave del bucket, guardada solo en la máquina que publica (`~/.config/instituto-lightsail/`) |
 | `subir [DOMINIO] [CORREO]` | Sube, solo si cambiaron: `actualizar-sitio.sh`, `instalar-lightsail.sh`, `config.env` (dominio y correo del certificado) y `instituto-mutualista-web.zip` (index.html, sitio.json, imagenes/, videos/), todos públicos de solo lectura. El ZIP es reproducible: si el sitio no cambió, no se vuelve a subir |
-| `instancia` | Ubuntu 24.04, plan `nano_3_0` (el más pequeño con IPv4), con `deploy/arranque-lightsail.sh` como script de arranque |
+| `instancia` | Ubuntu 24.04 en us-east-2 (Ohio), plan `nano_3_0` (el más pequeño con IPv4), con `deploy/arranque-lightsail.sh` como script de arranque |
 | `ip` | IP estática `instituto-mutualista-ip` asignada a la instancia, y puertos 80 y 443 abiertos |
 | `dns DOMINIO` | Zona DNS de Lightsail con registros A de `@` y `www` hacia la IP estática; muestra los servidores de nombres para GoDaddy |
 

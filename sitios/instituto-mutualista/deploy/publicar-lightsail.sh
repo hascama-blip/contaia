@@ -20,8 +20,12 @@
 # $LLAVE_BUCKET (por defecto ~/.config/instituto-lightsail/llave-bucket.env).
 set -euo pipefail
 
-REGION=us-east-1
-ZONA=us-east-1a
+# La política de la organización (AdvancedModeRegionRestrictionSecurityControlPolicy) solo deja
+# crear servidores y buckets en us-east-2; en us-east-1 permite el DNS de Lightsail, que solo
+# existe ahí.
+REGION=us-east-2
+ZONA=us-east-2a
+DNS_REGION=us-east-1
 BUCKET=instituto-web-lfmn74
 BUCKET_PLAN=small_1_0          # 5 GB, 25 GB de transferencia
 INSTANCIA=instituto-mutualista
@@ -47,7 +51,7 @@ paso() { printf '\n== %s ==\n' "$*"; }
 # ls_api ARGS... → lightsail con un mensaje claro si lo bloquea la política de la organización.
 ls_api() {
   local err="$TMP/err" out
-  if out=$(aws lightsail --region "$REGION" --output text "$@" 2>"$err"); then printf '%s' "$out"; return 0; fi
+  if out=$(aws lightsail --region "${LS_REGION:-$REGION}" --output text "$@" 2>"$err"); then printf '%s' "$out"; return 0; fi
   if grep -q "service control policy" "$err"; then
     echo "BLOQUEADO: la política de la organización de AWS (SCP) no permite 'lightsail $1'." >&2
     grep -oE 'arn:aws:organizations::[^ ]+' "$err" | head -n1 | sed 's/^/  Política: /' >&2
@@ -57,6 +61,7 @@ ls_api() {
   cat "$err" >&2; return 1
 }
 existe() { ls_api "$@" >/dev/null 2>&1; }   # para get-* que dan NotFound si no existe
+dns_api() { LS_REGION="$DNS_REGION" ls_api "$@"; }   # el DNS de Lightsail vive en us-east-1
 
 # ---------- 1. Bucket ----------
 cmd_bucket() {
@@ -70,7 +75,13 @@ cmd_bucket() {
     [ "$(ls_api get-buckets --bucket-name "$BUCKET" --query 'buckets[0].state.code')" = "OK" ] && break; sleep 5
   done
   # Privado por defecto, pero cada objeto que subimos se marca público (el sitio es público).
-  ls_api update-bucket --bucket-name "$BUCKET" --access-rules getObject=private,allowPublicOverrides=true >/dev/null
+  # Recién creado, el bucket puede tener todavía una operación en curso: se reintenta.
+  local intento
+  for intento in $(seq 1 30); do
+    ls_api update-bucket --bucket-name "$BUCKET" --access-rules getObject=private,allowPublicOverrides=true >/dev/null 2>"$TMP/err.upd" && break
+    grep -q "conflicting conditional operation" "$TMP/err.upd" || { cat "$TMP/err.upd" >&2; exit 1; }
+    sleep 10
+  done
   echo "Acceso: privado, con objetos públicos permitidos uno por uno."
   if [ -s "$LLAVE_BUCKET" ]; then echo "Llave para subir: $LLAVE_BUCKET"; return; fi
   local llaves; llaves=$(ls_api get-bucket-access-keys --bucket-name "$BUCKET" --query 'sort_by(accessKeys,&createdAt)[].accessKeyId')
@@ -169,19 +180,19 @@ cmd_dns() {
   [[ "$dominio" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Uso: $0 dns tudominio.pe"; exit 1; }
   paso "5. Zona DNS de $dominio"
   local ip; ip=$(ip_estatica)
-  existe get-domain --domain-name "$dominio" || { ls_api create-domain --domain-name "$dominio" --tags "$ETIQUETA" >/dev/null; echo "Zona creada."; }
+  dns_api get-domain --domain-name "$dominio" >/dev/null 2>&1 || { dns_api create-domain --domain-name "$dominio" --tags "$ETIQUETA" >/dev/null; echo "Zona creada."; }
   local nombre id destino
   for nombre in "$dominio" "www.$dominio"; do
-    read -r id destino < <(ls_api get-domain --domain-name "$dominio" \
+    read -r id destino < <(dns_api get-domain --domain-name "$dominio" \
       --query "domain.domainEntries[?type=='A' && name=='$nombre'] | [0].[id,target]" | sed 's/^None.*$//') || true
     if [ -z "${id:-}" ]; then
-      ls_api create-domain-entry --domain-name "$dominio" --domain-entry "name=$nombre,type=A,target=$ip" >/dev/null; echo "  A $nombre → $ip (creado)"
+      dns_api create-domain-entry --domain-name "$dominio" --domain-entry "name=$nombre,type=A,target=$ip" >/dev/null; echo "  A $nombre → $ip (creado)"
     elif [ "$destino" != "$ip" ]; then
-      ls_api update-domain-entry --domain-name "$dominio" --domain-entry "id=$id,name=$nombre,type=A,target=$ip" >/dev/null; echo "  A $nombre → $ip (antes $destino)"
+      dns_api update-domain-entry --domain-name "$dominio" --domain-entry "id=$id,name=$nombre,type=A,target=$ip" >/dev/null; echo "  A $nombre → $ip (antes $destino)"
     else echo "  A $nombre → $ip (ya estaba)"; fi
   done
   echo; echo "Servidores de nombres para poner en GoDaddy (Dominio → DNS → Servidores de nombres → Cambiar → 'Usaré mis propios servidores'):"
-  ls_api get-domain --domain-name "$dominio" --query "domain.domainEntries[?type=='NS'].target" | tr '\t' '\n' | sed 's/\.$//; s/^/  /'
+  dns_api get-domain --domain-name "$dominio" --query "domain.domainEntries[?type=='NS'].target" | tr '\t' '\n' | sed 's/\.$//; s/^/  /'
   echo "Si el dominio tiene correo, copia antes sus registros MX/TXT/CNAME a esta zona o el correo dejará de llegar."
 }
 
@@ -194,7 +205,7 @@ cmd_estado() {
   done
   echo "Instancia: $(ls_api get-instance-state --instance-name "$INSTANCIA" --query 'state.name' 2>/dev/null || echo 'no existe')"
   echo "IP fija:   $(ip_estatica 2>/dev/null || echo 'no reservada')"
-  local dominios; dominios=$(ls_api get-domains --query 'domains[].name' 2>/dev/null || true)
+  local dominios; dominios=$(dns_api get-domains --query 'domains[].name' 2>/dev/null || true)
   echo "Zonas DNS: ${dominios:-ninguna}"
 }
 

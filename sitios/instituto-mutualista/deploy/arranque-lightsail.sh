@@ -7,7 +7,7 @@
 # (instala Nginx y el sitio) y deja un cron que lo repite cada 5 minutos: así el servidor
 # se actualiza solo cuando cambia el ZIP del sitio en el bucket, y saca el certificado
 # HTTPS cuando el dominio ya apunta a él.
-BUCKET_URL="${BUCKET_URL:-https://instituto-web-lfmn74.s3.us-east-1.amazonaws.com}"
+BUCKET_URL="${BUCKET_URL:-https://instituto-web-lfmn74.s3.us-east-2.amazonaws.com}"
 export BUCKET_URL
 exec >>/var/log/instituto-web-arranque.log 2>&1
 echo "$(date '+%F %T') arranque: descargando el actualizador de $BUCKET_URL"
