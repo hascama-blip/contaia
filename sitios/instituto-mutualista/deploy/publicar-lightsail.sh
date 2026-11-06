@@ -146,7 +146,10 @@ cmd_codigo() {
   curl -fsS --max-time 60 -o "$TMP/comprobar.zip" "$url" || { echo "El enlace firmado no descarga." >&2; exit 1; }
   [ "$(sha256sum "$TMP/comprobar.zip" | awk '{print $1}')" = "$sha" ] || { echo "La descarga no coincide con lo subido." >&2; exit 1; }
   echo "Versión: $(cat "$rel/VERSION") · $clave · vence $(date -u -d "+$VIGENCIA seconds" '+%F %H:%M UTC')" >&2
-  printf "D=\$(mktemp -d); curl -fsSL -o \"\$D/v.zip\" '%s' && echo \"%s  \$D/v.zip\" | sha256sum -c --quiet - && python3 -m zipfile -e \"\$D/v.zip\" \"\$D/v\" && sudo bash \"\$D/v/aplicar.sh\" || echo 'ERROR: no se aplicó (el código pudo vencer o copiarse incompleto).'\n" "$url" "$sha"
+  # El enlace va en base64: así el código no contiene texto con forma de llave de AWS, que
+  # algunas apps ocultan con puntos al mostrarlo (y entonces se copia alterado).
+  local u64; u64=$(printf '%s' "$url" | base64 -w0)
+  printf "U=\$(echo '%s' | base64 -d); D=\$(mktemp -d); if ! curl -fsSL -o \"\$D/v.zip\" \"\$U\"; then echo 'ERROR: no se pudo descargar la versión (código vencido o copiado incompleto). No se instaló nada.'; elif ! echo \"%s  \$D/v.zip\" | sha256sum -c --quiet -; then echo 'ERROR: la versión descargada no coincide con su huella. No se instaló nada.'; else python3 -m zipfile -e \"\$D/v.zip\" \"\$D/v\" && sudo bash \"\$D/v/aplicar.sh\"; fi\n" "$u64" "$sha"
 }
 
 # ---------- Instancia ----------

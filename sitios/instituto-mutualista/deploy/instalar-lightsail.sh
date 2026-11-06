@@ -143,8 +143,21 @@ resuelve() { getent ahostsv4 "$1" 2>/dev/null | awk '{print $1; exit}' || true; 
 if [ -z "$DOMINIO" ]; then
   echo "Sin dominio: el sitio queda en http://${IP:-IP-DEL-SERVIDOR}"; exit 0
 fi
+# Un certificado sacado antes con "certbot --nginx" se renovaría editando Nginx: se pasa al modo
+# webroot (sin emitir otro). Si no se puede, queda el modo anterior, que también renueva.
+pasar_a_webroot() {
+  local renov="/etc/letsencrypt/renewal/$DOMINIO.conf"
+  [ -f "$renov" ] && grep -qE '^authenticator *= *nginx' "$renov" || return 0
+  echo "Renovación del certificado: se pasa al modo webroot (certbot ya no edita Nginx)."
+  if certbot reconfigure --cert-name "$DOMINIO" --webroot -w "$WEB" --deploy-hook "systemctl reload nginx" -n; then
+    echo "Renovación configurada en modo webroot."
+  else
+    echo "Aviso: no se pudo cambiar el modo de renovación; se mantiene el anterior, que también renueva."
+  fi
+}
 D1=$(resuelve "$DOMINIO"); D2=$(resuelve "www.$DOMINIO")
 if hay_cert && cubre "$DOMINIO" && { cubre "www.$DOMINIO" || [ "$D2" != "$IP" ]; }; then
+  pasar_a_webroot
   echo "Certificado vigente para $DOMINIO (se renueva solo): https://$DOMINIO"; exit 0
 fi
 if [ -z "$CORREO" ]; then
