@@ -79,6 +79,18 @@ El logo de la Asociación Mutualista Sanitaria del Perú (AMSP) está en `imagen
 python3 -m http.server -d sitios/instituto-mutualista   # luego abrir http://localhost:8000
 ```
 
+## Publicar en AWS Lightsail
+`deploy/instalar-lightsail.sh` instala Nginx en una instancia Lightsail (Linux/Unix → OS Only →
+Ubuntu 24.04), copia el sitio desde el ZIP (`index.html`, `sitio.json`, `imagenes/`, `videos/`) a
+`/var/www/instituto` y, con dominio y correo, saca el certificado HTTPS de Let's Encrypt (solo si
+el DNS ya apunta a la IP estática del servidor). Se vuelve a ejecutar igual para actualizar el sitio.
+```bash
+sudo bash instalar-lightsail.sh instituto-mutualista-web.zip                        # por IP
+sudo bash instalar-lightsail.sh instituto-mutualista-web.zip tudominio.pe            # con dominio
+sudo bash instalar-lightsail.sh instituto-mutualista-web.zip tudominio.pe tu@correo  # + HTTPS
+```
+`sitio.json` e `index.html` se sirven sin caché para que los cambios se vean al instante.
+
 ## Qué más personalizar en el código
 - `COURSES` (en el `<script>`): lista de cursos (área, fechas, horario, modalidad, docente,
   temario, constancia o certificado).
