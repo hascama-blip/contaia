@@ -72,7 +72,9 @@ El logo de la Asociación Mutualista Sanitaria del Perú (AMSP) está en `imagen
   archivos de la página; lo ven todos los visitantes. Solo quien tiene permiso de edición
   puede guardar.
 - **Abierto como archivo o servidor simple**: se guarda en el navegador (`localStorage`).
-- **Producción**: hace falta un backend o gestor de contenidos que reciba `sitio.json` y las fotos.
+- **Producción (institutoamsp.com)**: el panel oculto guarda solo en el navegador de quien lo usa;
+  los visitantes no ven esos cambios. Los cambios se hacen en los archivos y se publican con un
+  código de despliegue (ver *Publicar en AWS Lightsail*).
 
 ## Cómo verlo
 ```bash
@@ -80,47 +82,48 @@ python3 -m http.server -d sitios/instituto-mutualista   # luego abrir http://loc
 ```
 
 ## Publicar en AWS Lightsail
-Región: **us-east-2 (Ohio)** para el servidor y el bucket, porque la política de la organización de AWS
-(`AdvancedModeRegionRestrictionSecurityControlPolicy`) solo deja crear recursos ahí; en us-east-1 solo
-permite servicios globales, entre ellos el DNS de Lightsail, que se crea en esa región.
+Publicado en **https://institutoamsp.com**: servidor Lightsail `instituto-mutualista` (Ubuntu 24.04,
+plan nano) en **us-east-2 (Ohio)**, IP estática `18.119.230.5`, zona DNS de Lightsail para el dominio
+(registrado en GoDaddy, con los servidores de nombres de Lightsail). La región es us-east-2 porque la
+política de la organización de AWS (`AdvancedModeRegionRestrictionSecurityControlPolicy`) solo deja
+crear recursos ahí; en us-east-1 permite el DNS de Lightsail, que se crea en esa región.
 
-Todo se hace por la API de Lightsail, sin SSH, con `deploy/publicar-lightsail.sh` (necesita la
-AWS CLI y un usuario IAM con `lightsail:*`; en una sesión de Claude toma `LS_AWS_ACCESS_KEY_ID`
-y `LS_AWS_SECRET_ACCESS_KEY`). Cada paso revisa lo que ya existe, así que se puede repetir.
+### Actualizar el sitio: código de despliegue
+Nada se publica solo. Cada cambio llega como un **código de una línea** que se pega en el servidor:
 
+1. Se editan los archivos del sitio (`index.html`, `sitio.json`, `imagenes/`, `videos/`).
+2. `bash deploy/publicar-lightsail.sh codigo` arma la versión (sitio + instalador + `aplicar.sh`), la
+   sube al bucket **privado** `instituto-web-lfmn74` y muestra el código.
+3. En Lightsail → instancia `instituto-mutualista` → **Conectar mediante SSH**, se pega el código y se
+   pulsa Enter. Descarga la versión con un enlace firmado que **vence en 7 días**, comprueba su huella
+   SHA-256 y la instala. Termina con `LISTO`.
+
+`aplicar.sh` respalda la versión anterior (las 5 últimas, en `/var/backups/instituto`) y deja registro
+en `/var/log/instituto-despliegues.log`. Si el dominio ya apunta al servidor y falta el certificado,
+lo obtiene en ese momento. El dominio y el correo del certificado se guardan en `config.env` del
+bucket privado; para cambiarlos: `codigo DOMINIO CORREO`.
+
+### Seguridad del servidor
+- `instalar-lightsail.sh` genera **toda** la configuración de Nginx en cada despliegue, también la de
+  HTTPS. Certbot solo obtiene y renueva el certificado (modo webroot) y no edita la configuración.
+- Cabeceras en todas las respuestas: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`,
+  `Permissions-Policy` y, con certificado, `Strict-Transport-Security`. No se muestra la versión de
+  Nginx. Solo TLS 1.2 y 1.3. Con certificado, http y la IP redirigen a `https://DOMINIO`.
+- No se sirven `README.md`, `deploy/` ni archivos ocultos. Los métodos que escriben dan 405.
+- El bucket es privado: nada se lee sin un enlace firmado, y solo quien tiene la llave del bucket
+  (guardada fuera del repositorio) o el usuario IAM con `lightsail:*` puede subir versiones.
+
+### Servidor desde cero
 ```bash
-bash deploy/publicar-lightsail.sh todo tudominio.pe tu@correo   # todo, en orden
-bash deploy/publicar-lightsail.sh subir                         # actualizar el sitio después
-bash deploy/publicar-lightsail.sh estado                        # resumen
+bash deploy/publicar-lightsail.sh todo tudominio.pe tu@correo
 ```
+Crea el bucket, la instancia (su script de arranque es el código de despliegue de la versión
+actual, así que se instala sola), la IP estática, los puertos 80 y 443 y la zona DNS, y muestra los
+servidores de nombres para el registrador. Cada paso revisa lo que ya existe y se puede repetir.
 
-| Paso | Qué crea |
-| --- | --- |
-| `bucket` | Bucket de Lightsail `instituto-web-lfmn74` (plan de 1 USD, privado con objetos públicos uno por uno) y una llave del bucket, guardada solo en la máquina que publica (`~/.config/instituto-lightsail/`) |
-| `subir [DOMINIO] [CORREO]` | Sube, solo si cambiaron: `actualizar-sitio.sh`, `instalar-lightsail.sh`, `config.env` (dominio y correo del certificado) y `instituto-mutualista-web.zip` (index.html, sitio.json, imagenes/, videos/), todos públicos de solo lectura. El ZIP es reproducible: si el sitio no cambió, no se vuelve a subir |
-| `instancia` | Ubuntu 24.04 en us-east-2 (Ohio), plan `nano_3_0` (el más pequeño con IPv4), con `deploy/arranque-lightsail.sh` como script de arranque |
-| `ip` | IP estática `instituto-mutualista-ip` asignada a la instancia, y puertos 80 y 443 abiertos |
-| `dns DOMINIO` | Zona DNS de Lightsail con registros A de `@` y `www` hacia la IP estática; muestra los servidores de nombres para GoDaddy |
-
-**En el servidor** (sin entrar por SSH):
-- `arranque-lightsail.sh` corre en el primer arranque: baja el actualizador del bucket, lo ejecuta
-  (instala Nginx y el sitio) y deja `/etc/cron.d/instituto-web`, que lo repite cada 5 minutos.
-- `actualizar-sitio.sh` compara el ETag de cada objeto del bucket y descarga solo lo que cambió.
-  Si cambió algo, vuelve a ejecutar `instalar-lightsail.sh`. Con dominio y correo en
-  `config.env`, en cuanto el dominio (y luego `www`) apunta a la IP del servidor saca el
-  certificado HTTPS de Let's Encrypt; si falla, espera 1 hora antes de reintentar. También se
-  renueva solo desde el bucket. Registro: `/var/log/instituto-web.log`.
-- `instalar-lightsail.sh` sigue sirviendo a mano: copia el sitio a `/var/www/instituto`, configura
-  Nginx (`sitio.json` e `index.html` sin caché) y, con correo, ejecuta certbot.
-
-```bash
-sudo bash instalar-lightsail.sh instituto-mutualista-web.zip                        # por IP
-sudo bash instalar-lightsail.sh instituto-mutualista-web.zip tudominio.pe            # con dominio
-sudo bash instalar-lightsail.sh instituto-mutualista-web.zip tudominio.pe tu@correo  # + HTTPS
-```
-
-**Dominio en GoDaddy:** si el dominio tiene correo, hay que copiar sus registros MX, TXT y CNAME a
-la zona de Lightsail **antes** de cambiar los servidores de nombres; si no, el correo deja de llegar.
+**Dominio:** si tiene correo, hay que copiar sus registros MX, TXT y CNAME a la zona de Lightsail
+**antes** de cambiar los servidores de nombres. Con institutoamsp.com solo se copió el TXT `_dmarc`
+(el dominio no tiene correo).
 
 ## Qué más personalizar en el código
 - `COURSES` (en el `<script>`): lista de cursos (área, fechas, horario, modalidad, docente,
