@@ -192,7 +192,7 @@ cmd_dns() {
     else echo "  A $nombre → $ip (ya estaba)"; fi
   done
   echo; echo "Servidores de nombres para poner en GoDaddy (Dominio → DNS → Servidores de nombres → Cambiar → 'Usaré mis propios servidores'):"
-  dns_api get-domain --domain-name "$dominio" --query "domain.domainEntries[?type=='NS'].target" | tr '\t' '\n' | sed 's/\.$//; s/^/  /'
+  dns_api get-domain --domain-name "$dominio" --query "domain.domainEntries[?type=='NS'].target" | tr '\t' '\n' | sed 's/\.$//; s/^/  /'; echo
   echo "Si el dominio tiene correo, copia antes sus registros MX/TXT/CNAME a esta zona o el correo dejará de llegar."
 }
 
