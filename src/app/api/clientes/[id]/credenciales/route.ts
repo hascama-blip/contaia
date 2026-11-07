@@ -48,5 +48,5 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     clienteId: cliente.id,
     clienteNombre: cliente.razonSocial,
   });
-  return NextResponse.json({ cliente: actualizado, credSire: ocultarCred(actualizado?.credSire ?? null) });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado), credSire: ocultarCred(actualizado?.credSire ?? null) });
 }

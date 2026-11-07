@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const user = await requireUser();
   const clientes = await listClientes(studioId(user));
-  return NextResponse.json({ clientes });
+  return NextResponse.json({ clientes: clientes.map((c) => ocultarCliente(c)) });
 }
 
 export async function POST(req: NextRequest) {
