@@ -164,7 +164,11 @@ export default function PagarPlan({ plan, whatsapp }: { plan: PlanPago; whatsapp
         </div>
       </div>
 
-      {!cfg.puedePagar ? (
+      {cfg.plan === "equipo" ? (
+        <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          Tu cuenta tiene el <b>Plan Empresas</b>, que ya incluye todo lo de este plan. Para renovarlo o cambiarlo, escríbenos.
+        </p>
+      ) : !cfg.puedePagar ? (
         <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Solo el líder del estudio puede pagar el plan. Los operadores heredan el plan de su líder.
         </p>

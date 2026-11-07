@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const plan = String(body.plan ?? "") as PlanPago;
   if (!PRECIOS[plan]) return NextResponse.json({ error: "Plan inválido." }, { status: 400 });
+  // El Plan Empresas es cotizado: pagar Regular/Premium lo rebajaría.
+  if (planEfectivo(u) === "equipo") {
+    return NextResponse.json({ error: "Tu cuenta tiene el Plan Empresas, que ya incluye todo. Para renovarlo o cambiarlo, escríbenos." }, { status: 409 });
+  }
   try {
     return NextResponse.json(await iniciarPago(u, plan));
   } catch (e: any) {
