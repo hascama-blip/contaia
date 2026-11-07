@@ -4,6 +4,7 @@ import { requireUser, bloquearSiSoloRtp, planDelEstudio, esSupremo } from "@/lib
 import { getUserById } from "@/lib/db";
 import { PLANES, CONTACTO, waPlan } from "@/lib/planes";
 import { estadoLanzamiento, pasarelaActiva } from "@/lib/pagos";
+import BotonPagar from "@/components/BotonPagar";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Adquirir módulos — Radar Tributario" };
@@ -103,13 +104,13 @@ export default async function Page() {
                 <Link href={p.ctaHref || "/"} className="btn-ghost mt-5 w-full text-center">
                   {esActual ? "Seguir con el plan gratis" : p.cta}
                 </Link>
-              ) : p.ctaHref && pagoEnLinea ? (
-                <Link
-                  href={p.ctaHref}
+              ) : p.ctaHref && pagoEnLinea && (p.planId === "regular" || p.planId === "premium") ? (
+                <BotonPagar
+                  plan={p.planId}
+                  texto={esActual ? `Renovar ${p.nombre}` : p.cta}
                   className={`mt-5 w-full text-center ${p.ctaEstilo === "accent" ? "btn-accent" : "btn-primary"}`}
-                >
-                  {esActual ? `Renovar ${p.nombre}` : p.cta}
-                </Link>
+                  whatsapp={waPlan(user.nombre, p.nombre, perfil)}
+                />
               ) : (
                 <a
                   href={waPlan(user.nombre, p.nombre, perfil)}

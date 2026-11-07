@@ -156,37 +156,88 @@ body {
   }
 }
 
-/* ── Formulario incrustado de Izipay (KR, tema neon) con la marca Radar ──
-   Las cajas de tarjeta/fecha/CVV son iframes de Izipay: aquí solo se ajusta
-   el contenedor, el botón y se ocultan cuotas/diferido (pago único). */
+/* ── Ventana flotante de pago ── */
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-in { animation: modal-in 0.22s ease-out both; }
+
+/* ── Formulario incrustado de Izipay (KR, tema neon) con el diseño de Radar ──
+   Las cajas de tarjeta / fecha / CVV son iframes de Izipay: su interior no se
+   puede tocar; aquí se rediseñan los contenedores (bordes, radios, grilla,
+   foco) y se oculta el botón de Izipay cuando Radar usa el suyo. */
 .radar-kr .kr-embedded,
 .radar-kr.kr-embedded {
   width: 100% !important;
   max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
-.radar-kr .kr-field,
-.radar-kr .kr-field-wrapper,
-.radar-kr .kr-select-wrapper {
-  border-radius: 0.75rem !important;
+.radar-kr .kr-field-element,
+.radar-kr .kr-form-error,
+.radar-kr .kr-payment-button,
+.radar-kr .kr-pan,
+.radar-kr .kr-card-holder-name,
+.radar-kr .kr-card-holder-mail {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+}
+.radar-kr .kr-expiry,
+.radar-kr .kr-security-code {
+  grid-column: auto;
+}
+.radar-kr .kr-field-element * { box-sizing: border-box !important; }
+.radar-kr .kr-field-element { overflow: hidden !important; padding: 0 4px !important; }
+.radar-kr .kr-field-element,
+.radar-kr .kr-field-wrapper {
+  border: 1px solid #e2e8f0 !important;     /* slate-200 */
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  min-height: 52px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+.radar-kr .kr-field-element .kr-field-wrapper {
+  border: 0 !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+}
+.radar-kr .kr-field-element:hover { border-color: #a7c0e0 !important; }   /* brand-200 */
+.radar-kr .kr-field-element.kr-focus,
+.radar-kr .kr-field-element:focus-within {
+  border-color: #234d82 !important;         /* brand-500 */
+  box-shadow: 0 0 0 3px rgb(35 77 130 / 0.15) !important;
+}
+.radar-kr .kr-field-element.kr-error { border-color: #ef4444 !important; }
+.radar-kr input.kr-input-field,
+.radar-kr .kr-card-holder-name input {
+  font-family: inherit !important;
+  font-size: 15px !important;
+  color: #0f172a !important;
 }
 .radar-kr .kr-installment-number,
-.radar-kr .kr-first-installment-delay {
+.radar-kr .kr-first-installment-delay,
+.radar-kr .kr-field-element.kr-select {
   display: none !important;
 }
+.radar-kr .kr-form-error {
+  border-radius: 12px !important;
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+.radar-kr.sin-boton .kr-payment-button { display: none !important; }
 .radar-kr .kr-payment-button {
-  background-color: #edb91e !important; /* accent-400 */
-  border-radius: 0.75rem !important;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08) !important;
-  transition: background-color 0.15s ease !important;
+  background-color: #0b2140 !important;     /* brand-800 */
+  border-radius: 16px !important;
+  min-height: 50px !important;
+  box-shadow: none !important;
 }
 .radar-kr .kr-payment-button,
 .radar-kr .kr-payment-button * {
-  color: #0b2140 !important; /* brand-800 */
+  color: #fff !important;
   font-weight: 700 !important;
+  font-family: inherit !important;
 }
-.radar-kr .kr-payment-button:hover {
-  background-color: #f1c945 !important; /* accent-300 */
-}
-.radar-kr .kr-form-error {
-  border-radius: 0.75rem !important;
-}
+.radar-kr .kr-payment-button:hover { background-color: #102b4d !important; }

@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams: { plan?: st
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host") ?? "radartributaria.com"}`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-3xl space-y-5">
       <div>
         <Link href="/planes" className="text-sm text-brand-600 hover:underline">← Planes</Link>
         <h1 className="mt-1 text-2xl font-bold text-slate-800">Pagar {info.nombre}</h1>
