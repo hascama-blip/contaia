@@ -14,7 +14,7 @@ export const TERMINOS_VERSION = "2026-11-07";
 export function titularLegal(): { nombre: string; ruc: string; correo: string } {
   return {
     nombre: (process.env.LEGAL_TITULAR || "KALLPA GREEN").trim(),
-    ruc: (process.env.LEGAL_RUC || "").trim(),
+    ruc: (process.env.LEGAL_RUC || "20603593597").trim(),
     correo: (process.env.LEGAL_CORREO || "").trim(),
   };
 }
