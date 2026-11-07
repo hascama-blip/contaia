@@ -4,6 +4,7 @@ import { getUserByEmail, getUserById } from "@/lib/db";
 import { verifyPassword, ensureSupremo, puedeIngresar, esSupremo } from "@/lib/auth";
 import { enviarCodigo, comprobarCodigo } from "@/lib/codigos";
 import { correoConfigurado } from "@/lib/email";
+import { telegramConfigurado } from "@/lib/alertas";
 import { limpiarCodigoUsuario } from "@/lib/db";
 import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
 
@@ -58,13 +59,19 @@ export async function POST(req: NextRequest) {
 
   // Segundo paso para la cuenta supremo (SUPREMO_2FA=1): además de la
   // contraseña, un código de 6 dígitos que llega a su correo.
-  if (esSupremo(user) && /^(1|true|si|sí)$/i.test(process.env.SUPREMO_2FA || "") && correoConfigurado()) {
+  //   El código va a SUPREMO_2FA_CORREO (un correo real; el del supremo suele
+  //   ser genérico) y, si la cuenta supremo tiene Telegram vinculado, también ahí.
+  const destino2fa = (process.env.SUPREMO_2FA_CORREO || "").trim();
+  const tieneTelegram = Boolean(user.alertas?.telegramChatId && telegramConfigurado());
+  if (esSupremo(user) && /^(1|true|si|sí)$/i.test(process.env.SUPREMO_2FA || "") && ((correoConfigurado() && destino2fa) || tieneTelegram)) {
     const codigo = String(body?.codigo ?? "").replace(/\D/g, "");
     if (!codigo) {
-      const r = await enviarCodigo(user, "acceso");
+      const r = await enviarCodigo(user, "acceso", { destino: destino2fa || undefined, telegram: true });
       if (!r.ok && !r.esperar) return NextResponse.json({ error: r.error ?? "No se pudo enviar el código." }, { status: 502 });
+      const oculto = (c: string) => c.replace(/^(.{2}).*(@.*)$/, "$1•••$2");
+      const donde = [r.canales?.includes("correo") && destino2fa ? oculto(destino2fa) : null, r.canales?.includes("Telegram") ? "tu Telegram" : null].filter(Boolean).join(" y ");
       return NextResponse.json(
-        { requiereCodigo: true, mensaje: r.esperar ? r.error : `Te enviamos un código de acceso a ${user.email}.` },
+        { requiereCodigo: true, mensaje: r.esperar ? r.error : `Te enviamos un código de acceso a ${donde || "tu canal de seguridad"}.` },
         { status: 401 },
       );
     }

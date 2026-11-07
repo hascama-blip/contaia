@@ -10,6 +10,7 @@ import { createHash, randomInt, timingSafeEqual } from "crypto";
 import type { Usuario } from "./types";
 import { setCodigoUsuario, incIntentosCodigo, limpiarCodigoUsuario } from "./db";
 import { enviarCorreo, htmlCodigo, correoConfigurado } from "./email";
+import { telegramConfigurado, telegramEnviar } from "./alertas";
 
 export const CODIGO_VIGENCIA_MIN = 10;
 export const CODIGO_MAX_INTENTOS = 5;
@@ -25,9 +26,14 @@ function generarCodigo(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
-/** Genera, guarda y envía un código al correo del usuario (respeta el throttle). */
-export async function enviarCodigo(u: Usuario, tipo: TipoCodigo): Promise<{ ok: boolean; error?: string; esperar?: number }> {
-  if (!correoConfigurado()) {
+/** Genera, guarda y envía un código (respeta el throttle). Por defecto va al
+ *  correo del usuario; `destino` lo manda a otro correo y `telegram` también al
+ *  Telegram vinculado (para la cuenta supremo, cuyo correo de usuario es genérico). */
+export async function enviarCodigo(
+  u: Usuario, tipo: TipoCodigo, opts: { destino?: string; telegram?: boolean } = {},
+): Promise<{ ok: boolean; error?: string; esperar?: number; canales?: string[] }> {
+  const porTelegram = Boolean(opts.telegram && u.alertas?.telegramChatId && telegramConfigurado());
+  if (!correoConfigurado() && !porTelegram) {
     return { ok: false, error: "El envío de correo no está configurado en el servidor (falta RESEND_API_KEY)." };
   }
   if (u.codigoEnviadoAt && u.codigoTipo === tipo) {
@@ -45,12 +51,20 @@ export async function enviarCodigo(u: Usuario, tipo: TipoCodigo): Promise<{ ok: 
     : tipo === "acceso"
       ? `${codigo} es tu código de acceso — Radar Tributar IA`
       : `${codigo} es tu código para cambiar la contraseña — Radar Tributar IA`;
-  const r = await enviarCorreo(u.email, asunto, htmlCodigo(u.nombre, codigo, tipo));
-  if (!r.ok) {
-    await limpiarCodigoUsuario(u.id);
-    return { ok: false, error: "No se pudo enviar el correo. Intenta de nuevo en unos minutos." };
+  const canales: string[] = [];
+  if (correoConfigurado()) {
+    const r = await enviarCorreo(opts.destino || u.email, asunto, htmlCodigo(u.nombre, codigo, tipo));
+    if (r.ok) canales.push("correo");
   }
-  return { ok: true };
+  if (porTelegram) {
+    const t = await telegramEnviar(u.alertas!.telegramChatId!, `<b>${codigo}</b> es tu código de acceso a Radar. Vence en ${CODIGO_VIGENCIA_MIN} minutos. Si no fuiste tú, cambia la contraseña.`);
+    if (t.ok) canales.push("Telegram");
+  }
+  if (!canales.length) {
+    await limpiarCodigoUsuario(u.id);
+    return { ok: false, error: "No se pudo enviar el código. Intenta de nuevo en unos minutos." };
+  }
+  return { ok: true, canales };
 }
 
 /** Comprueba un código: vencimiento, intentos y coincidencia (tiempo constante). */
