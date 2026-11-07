@@ -1,10 +1,10 @@
-# Imagen para correr Radar Tributar·IA (Next.js + Playwright/Chromium) en
-# cualquier host de contenedores: Railway, Fly.io o un VPS (Hetzner/Contabo/Oracle).
-# Incluye las librerías del sistema que necesita el Chromium de @sparticuz/chromium
-# (buzón, RTT, honorarios). Los datos van a DATA_DIR (monta un volumen ahí).
-FROM node:22-bookworm-slim
+# Imagen de Radar Tributar·IA (Next.js + Chromium headless para SUNAT).
+# Dos etapas: se compila con todas las dependencias y la imagen final lleva solo
+# las de producción. La app corre con el usuario sin privilegios "node"; el
+# script de arranque solo usa root para entregarle la carpeta de datos.
 
-# Dependencias del sistema para Chromium headless.
+# ---- Base: librerías del sistema que necesita Chromium ----
+FROM node:22-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates fonts-liberation \
       libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
@@ -14,28 +14,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libgtk-3-0 libpangoft2-1.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
+# ---- Compilación (con dependencias de desarrollo) ----
+FROM base AS build
 WORKDIR /app
-
-# Instala TODAS las dependencias (incluye dev, necesarias para 'next build').
 COPY package*.json ./
 RUN npm ci
-
-# Copia el código y compila.
 COPY . .
-RUN npm run build
+RUN npm run build \
+ && npm prune --omit=dev
 
-# Runtime.
+# ---- Imagen final (solo producción) ----
+FROM base AS runtime
 ENV NODE_ENV=production
 # Los navegadores headless usan varios listeners; sube el límite para evitar warnings.
 ENV NODE_OPTIONS=--max-old-space-size=1536
 # Persistencia: monta un volumen del host en /var/data (clientes, uploads, backups).
 ENV DATA_DIR=/var/data
-# Máx. navegadores simultáneos (protege la RAM). Ajusta según el plan del host.
+# Máx. navegadores simultáneos (protege la RAM). docker-compose lo sobreescribe.
 ENV MAX_NAVEGADORES=2
-# Puerto (los hosts inyectan PORT; Next 'start' lo respeta).
 ENV PORT=3000
+WORKDIR /app
+RUN chown node:node /app
+COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=node:node /app/next.config.js ./
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY deploy/entrypoint.sh /usr/local/bin/radar-entrypoint
+RUN chmod 0755 /usr/local/bin/radar-entrypoint
 EXPOSE 3000
-
-# La persistencia de /var/data la da el host (Railway Volumes / -v en el VPS).
-# (Railway NO admite la instrucción VOLUME en el Dockerfile.)
+ENTRYPOINT ["radar-entrypoint"]
 CMD ["npm", "start"]

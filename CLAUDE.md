@@ -3,7 +3,7 @@
 Contexto de proyecto para Claude Code. **Leer esto primero** al retomar el trabajo.
 
 ## Qué es
-App web (Next.js 14 App Router + TypeScript + Tailwind) para un estudio contable.
+App web (Next.js 15 App Router + React 19 + TypeScript + Tailwind) para un estudio contable.
 Por cada cliente: consulta estado SUNAT (RUC), SIRE (compras/ventas), buzón
 electrónico, lectura de declaraciones (PDF) y comparativo vs SIRE, diagnóstico, dashboard
 e **informe de gerencia** (PDF).
@@ -148,6 +148,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
 - **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
+- **Next 15**: `params`, `searchParams`, `cookies()` y `headers()` son asíncronos (usar `await`).
+- **Contenedor** (Lightsail, `deploy/`): Dockerfile en dos etapas; la app corre como usuario
+  `node` (uid 1000). `deploy/entrypoint.sh` entrega `/var/data` a ese usuario al arrancar y suelta
+  root con `setpriv`. `xlsx` (sin parche en npm) solo se usa en utilitarios del supremo.
 
 ## Hecho
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·
