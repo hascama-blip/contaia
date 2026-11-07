@@ -12,7 +12,7 @@ export function revisarConfiguracion(): AvisoSeguridad[] {
   const auth = e("AUTH_SECRET");
   if (!auth) out.push({ nivel: "critico", texto: "Falta AUTH_SECRET: las sesiones se firman con una clave pública del código y cualquiera podría fabricar una. Agrégala al .env (64 caracteres al azar)." });
   else if (auth.length < 32) out.push({ nivel: "critico", texto: "AUTH_SECRET es muy corta (menos de 32 caracteres). Usa una de 64 caracteres al azar." });
-  if (!e("VIGILANCIA_KEY")) out.push({ nivel: "advertencia", texto: "Falta VIGILANCIA_KEY: las Claves SOL de la vigilancia se cifran con AUTH_SECRET. Si algún día cambias AUTH_SECRET, se pierden. Agrega una clave propia." });
+  if (!e("VIGILANCIA_KEY")) out.push({ nivel: "advertencia", texto: "Falta VIGILANCIA_KEY: las Claves SOL de la vigilancia, los client_secret SIRE y las claves de integraciones se cifran con AUTH_SECRET. Si algún día cambias AUTH_SECRET, no se podrán leer." });
   if (!e("SUPREMO_PASSWORD")) out.push({ nivel: "advertencia", texto: "Falta SUPREMO_PASSWORD en el .env." });
   const dosPasos = /^(1|true|si|sí)$/i.test(e("SUPREMO_2FA"));
   if (!dosPasos) out.push({ nivel: "advertencia", texto: "La cuenta supremo entra solo con contraseña. Activa el código de acceso con SUPREMO_2FA=1 y SUPREMO_2FA_CORREO=tu correo real (o vincula Telegram en Alertas)." });

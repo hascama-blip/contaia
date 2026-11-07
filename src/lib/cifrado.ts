@@ -1,12 +1,21 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
-// Cifrado simétrico (AES-256-GCM) para la Clave SOL de la vigilancia del buzón.
-// La llave vive SOLO en el entorno del servidor (VIGILANCIA_KEY); si no está,
-// se deriva de AUTH_SECRET. Sin la llave, el archivo de datos no revela nada.
+// Cifrado simétrico (AES-256-GCM) de los secretos guardados en el servidor: la
+// Clave SOL de la vigilancia del buzón, el client_secret del API SIRE y las
+// claves de integraciones. La llave vive SOLO en el entorno del servidor
+// (VIGILANCIA_KEY; si no está, se deriva de AUTH_SECRET). Sin la llave, el
+// archivo de datos y sus copias no revelan esos secretos.
 
+let llaveMemo: { base: string; key: Buffer } | null = null;
 function llave(): Buffer {
   const base = process.env.VIGILANCIA_KEY || process.env.AUTH_SECRET || "radar-tributario-dev-secret-cambiar-en-produccion";
-  return createHash("sha256").update(`vigilancia:${base}`).digest();
+  if (llaveMemo?.base !== base) llaveMemo = { base, key: createHash("sha256").update(`vigilancia:${base}`).digest() };
+  return llaveMemo.key;
+}
+
+/** ¿El texto ya viene cifrado con `cifrar`? */
+export function esCifrado(v: unknown): v is string {
+  return typeof v === "string" && /^v1:[\w-]+:[\w-]+:[\w-]*$/.test(v);
 }
 
 /** Devuelve "v1:<iv>:<tag>:<cifrado>" en base64url. */

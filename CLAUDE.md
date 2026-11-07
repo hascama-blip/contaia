@@ -146,7 +146,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   es SOLO desde el login ("Olvidé mi contraseña", código al correo); `/cuenta` redirige y
   `/api/auth/cambiar` responde 410.
 - **Secretos**: el client_secret SIRE nunca va al navegador (`ocultarCliente`/`resolverSecreto`
-  en `src/lib/secretos.ts`). Sin contraseña supremo por defecto en el código. El panel Supremo y
+  en `src/lib/secretos.ts`). **Cifrado en disco** (AES-256-GCM, `src/lib/cifrado.ts`): `writeStore`
+  cifra `credSire.clientSecret` y `config.{browserWsUrl,rttSecret,capsolverKey,proxyPass}`
+  (`serializarStore`) y `readStore` los descifra (`descifrarSecretos`): store.json y backups
+  quedan con `v1:…`; en memoria se ven en claro. Llave = VIGILANCIA_KEY (o AUTH_SECRET):
+  **no cambiarla** o habrá que volver a ingresar esas credenciales. Sin contraseña supremo por defecto en el código. El panel Supremo y
   el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
 - **Supremo**: con `SUPREMO_2FA=1` el login del supremo pide además un código de 6 dígitos

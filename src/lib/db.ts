@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { AsyncLocalStorage } from "async_hooks";
 import { hoyLima } from "./fechas";
+import { cifrar, descifrar, esCifrado } from "./cifrado";
 import type { AsociacionContenido, RatingAgg, Sugerencia } from "./asociacion";
 import { CONTENIDO_DEFAULT, normalizarContenido } from "./asociacion";
 import type {
@@ -132,6 +133,7 @@ async function readStore(): Promise<Store> {
       if (!Array.isArray(c.deudas)) c.deudas = [];
       if (c.credSire === undefined) c.credSire = null;
     }
+    descifrarSecretos(store);
     return store;
   } catch {
     return { clientes: [], users: [], cuentasProveedor: {}, rubrosProveedor: {}, acciones: [] };
@@ -1322,6 +1324,42 @@ async function snapshotDiario(raw: string): Promise<void> {
   }
 }
 
+// ---- Secretos cifrados en el archivo de datos ----------------------------------
+// En DISCO (store.json y sus copias) van cifrados con AES-256-GCM: el
+// client_secret del API SIRE de cada cliente y las claves de integraciones de
+// la configuración. En MEMORIA el resto del código los ve en claro: se
+// descifran al leer el store y se cifran al escribirlo.
+const SECRETOS_CONFIG = new Set(["browserWsUrl", "rttSecret", "capsolverKey", "proxyPass"]);
+let avisoLlave = false;
+
+function descifrarCampo(v: string): string {
+  try { return descifrar(v); }
+  catch {
+    // Llave distinta a la que cifró (cambió VIGILANCIA_KEY/AUTH_SECRET): se deja
+    // el dato cifrado tal cual (no se pierde si se restaura la llave).
+    if (!avisoLlave) { avisoLlave = true; console.error("[seguridad] No se pudo descifrar un secreto guardado: ¿cambió VIGILANCIA_KEY o AUTH_SECRET?"); }
+    return v;
+  }
+}
+
+function descifrarSecretos(store: Store): void {
+  for (const c of store.clientes ?? []) {
+    if (c.credSire && esCifrado(c.credSire.clientSecret)) c.credSire.clientSecret = descifrarCampo(c.credSire.clientSecret);
+  }
+  const cfg = store.config as Record<string, unknown> | undefined;
+  if (cfg) for (const k of Array.from(SECRETOS_CONFIG)) if (esCifrado(cfg[k])) cfg[k] = descifrarCampo(cfg[k] as string);
+}
+
+/** Serializa el store cifrando los secretos (sin tocar el objeto en memoria). */
+function serializarStore(store: Store): string {
+  return JSON.stringify(store, function (this: any, k: string, v: unknown) {
+    if (typeof v !== "string" || !v || esCifrado(v)) return v;
+    if (k === "clientSecret" && this && typeof this === "object" && "clientId" in this) return cifrar(v);
+    if (this === store.config && SECRETOS_CONFIG.has(k)) return cifrar(v);
+    return v;
+  }, 2);
+}
+
 // ---- Transacciones sobre el store ---------------------------------------------
 // Cada función que LEE → MODIFICA → ESCRIBE el store corre dentro de
 // conBloqueoStore: una a la vez, en orden de llegada. Antes dos operaciones
@@ -1352,7 +1390,7 @@ let writeCola: Promise<void> = Promise.resolve();
 async function writeStore(store: Store): Promise<void> {
   const tarea = writeCola.then(async () => {
     await ensureDirs();
-    const raw = JSON.stringify(store, null, 2);
+    const raw = serializarStore(store);
     // Escritura ATÓMICA: temporal + rename (evita dejar el JSON a medio escribir
     // si dos escrituras coinciden, lo que corrompía el store).
     const tmp = `${STORE_PATH}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
