@@ -78,7 +78,7 @@ export default async function RootLayout({
               <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
               {" · "}<a href="/legal" className="hover:text-slate-600 hover:underline">Políticas y privacidad</a>
               <br />
-              <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>
+              <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">KALLPA TEC</span></span>
             </footer>
           </>
         )}

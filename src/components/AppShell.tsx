@@ -146,7 +146,7 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
         <footer className={`no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400 ${inicio ? "lg:hidden" : ""}`}>
           <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
           <br />
-          <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>
+          <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">KALLPA TEC</span></span>
         </footer>
       </div>
     </div>
