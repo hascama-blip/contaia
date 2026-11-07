@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { unzipSync, strFromU8 } from "fflate";
+import { strFromU8 } from "fflate";
+import { descomprimirSeguro } from "./zip";
 import type { SireBloque, SireResumen } from "./types";
 
 // ============================================================
@@ -423,7 +424,7 @@ function descomprimirSiHaceFalta(buf: Buffer): string {
   // ZIP empieza con "PK" (0x50 0x4B).
   if (buf[0] === 0x50 && buf[1] === 0x4b) {
     try {
-      const files = unzipSync(new Uint8Array(buf));
+      const files = descomprimirSeguro(buf);
       const primero = Object.values(files)[0];
       return primero ? strFromU8(primero) : "";
     } catch {

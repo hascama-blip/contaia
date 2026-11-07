@@ -252,6 +252,9 @@ export async function confirmarPago(
   return { ok: true, pago: r.pago };
 }
 
+/** Escapa texto que va dentro de HTML de correo (nombres, correos, referencias). */
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
 async function avisarPago(p: Pago) {
   const nombre = PRECIOS[p.plan].nombre;
   const vence = p.vigenteHasta ? new Date(`${p.vigenteHasta}T12:00:00Z`).toLocaleDateString("es-PE", { timeZone: "UTC" }) : "";
@@ -268,7 +271,7 @@ async function avisarPago(p: Pago) {
       await enviarCorreo(
         u.email,
         `${nombre} activado — Radar Tributario`,
-        `<p>Hola ${u.nombre},</p><p>Recibimos tu pago de <b>${soles(p.montoCentimos)}</b>. Tu <b>${nombre}</b> está activo hasta el <b>${vence}</b>.</p><p><a href="${appUrl()}">Entrar a Radar Tributario</a></p>`,
+        `<p>Hola ${esc(u.nombre)},</p><p>Recibimos tu pago de <b>${soles(p.montoCentimos)}</b>. Tu <b>${nombre}</b> está activo hasta el <b>${vence}</b>.</p><p><a href="${appUrl()}">Entrar a Radar Tributario</a></p>`,
       ).catch(() => null);
     }
   }
@@ -277,8 +280,8 @@ async function avisarPago(p: Pago) {
     await enviarCorreo(
       supremo,
       `${p.prueba ? "[PRUEBA] " : ""}Nuevo pago: ${nombre} · ${soles(p.montoCentimos)}`,
-      `<p><b>${p.userNombre}</b> (${p.userEmail}) pagó <b>${soles(p.montoCentimos)}</b> por el ${nombre}${p.lanzamiento ? " con precio de lanzamiento" : ""}.</p>` +
-        `<p>Pasarela: ${p.proveedor} · Ref: ${p.referencia ?? "-"} · Vigente hasta ${vence}.</p>`,
+      `<p><b>${esc(p.userNombre)}</b> (${esc(p.userEmail)}) pagó <b>${soles(p.montoCentimos)}</b> por el ${nombre}${p.lanzamiento ? " con precio de lanzamiento" : ""}.</p>` +
+        `<p>Pasarela: ${esc(p.proveedor)} · Ref: ${esc(p.referencia ?? "-")} · Vigente hasta ${esc(vence)}.</p>`,
     ).catch(() => null);
   }
 }

@@ -1,5 +1,36 @@
 import { unzipSync } from "fflate";
 
+// Topes para archivos ZIP subidos: se revisa el tamaño DECLARADO de cada archivo
+// antes de descomprimirlo (fflate reserva exactamente ese tamaño y falla si el
+// contenido real es mayor). Evita que un ZIP pequeño "explote" a varios GB y
+// deje sin memoria al servidor.
+const ZIP_MAX_ENTRADAS = 5000;
+const ZIP_MAX_ARCHIVO = 50 * 1024 * 1024;   // 50 MB por archivo
+const ZIP_MAX_TOTAL = 200 * 1024 * 1024;    // 200 MB en total
+
+/** Descomprime un ZIP respetando los topes. Lanza error si los supera. */
+export function descomprimirSeguro(buf: Uint8Array | Buffer): Record<string, Uint8Array> {
+  let total = 0;
+  let n = 0;
+  return unzipSync(new Uint8Array(buf), {
+    filter: (f) => {
+      n++;
+      if (n > ZIP_MAX_ENTRADAS) throw new Error("El ZIP tiene demasiados archivos.");
+      if (f.originalSize > ZIP_MAX_ARCHIVO) throw new Error(`El archivo ${f.name} del ZIP es demasiado grande.`);
+      total += f.originalSize;
+      if (total > ZIP_MAX_TOTAL) throw new Error("El contenido del ZIP es demasiado grande.");
+      return true;
+    },
+  });
+}
+
+/** Lista los nombres del ZIP SIN descomprimir nada. */
+function nombresZip(buf: Uint8Array | Buffer): string[] {
+  const nombres: string[] = [];
+  unzipSync(new Uint8Array(buf), { filter: (f) => { if (nombres.length < ZIP_MAX_ENTRADAS) nombres.push(f.name); return false; } });
+  return nombres;
+}
+
 // Utilidades para aceptar archivos ZIP de SUNAT (que adentro traen los Excel
 // del SIRE o los XML de los comprobantes, a veces en subcarpetas).
 
@@ -22,7 +53,7 @@ export function esZipContenedor(buf: Buffer, nombre?: string): boolean {
   // Sin pista por el nombre: mira adentro. Si parece Office (Content_Types,
   // carpeta xl/ o word/), no es un contenedor.
   try {
-    const files = Object.keys(unzipSync(new Uint8Array(buf))).map((k) => k.toLowerCase());
+    const files = nombresZip(buf).map((k) => k.toLowerCase());
     if (files.some((f) => f === "[content_types].xml" || f.startsWith("xl/") || f.startsWith("word/"))) {
       return false;
     }
@@ -40,7 +71,7 @@ export function esZipContenedor(buf: Buffer, nombre?: string): boolean {
 export function extraerTodo(buf: Buffer): { name: string; data: Buffer }[] {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(buf));
+    files = descomprimirSeguro(buf);
   } catch {
     return [];
   }
@@ -63,7 +94,7 @@ export function extraerDeZip(
 ): { name: string; data: Buffer }[] {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(buf));
+    files = descomprimirSeguro(buf);
   } catch {
     return [];
   }

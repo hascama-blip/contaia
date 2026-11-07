@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPago } from "@/lib/db";
 import { mpConsultarPago, confirmarPago } from "@/lib/pagos";
+import { leerCuerpoLimitado, limitar, ipDe, MIN } from "@/lib/limite";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,17 @@ export const runtime = "nodejs";
 // consulta el pago a su API con nuestro token y solo si está "approved" y su
 // external_reference es uno de nuestros pagos, se activa el plan.
 async function procesar(req: NextRequest) {
+  // Ruta pública: límite por IP (cada aviso dispara una consulta a Mercado Pago)
+  // y cuerpo de 64 KB como máximo.
+  const _lim = limitar([{ clave: `ipn-mp:${ipDe(req)}`, max: 120, ventanaMs: MIN }]);
+  if (_lim) return _lim;
   const q = req.nextUrl.searchParams;
-  const body: any = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  let body: any = {};
+  if (req.method === "POST") {
+    const crudo = await leerCuerpoLimitado(req, 64 * 1024);
+    if (crudo === null) return NextResponse.json({ error: "demasiado grande" }, { status: 413 });
+    try { body = crudo ? JSON.parse(crudo) : {}; } catch { body = {}; }
+  }
   const tipo = String(body?.type ?? body?.topic ?? q.get("type") ?? q.get("topic") ?? "");
   const id = String(body?.data?.id ?? q.get("data.id") ?? q.get("id") ?? "");
   if (tipo && tipo !== "payment") return NextResponse.json({ ok: true, ignorado: tipo });

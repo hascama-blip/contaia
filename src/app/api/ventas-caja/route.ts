@@ -1,7 +1,7 @@
 import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { unzipSync } from "fflate";
+import { descomprimirSeguro } from "@/lib/zip";
 import { parseLibroVentas, parseCajaVirtual, conciliarVentasCaja, excelVentasCaja, type VentaRow, type CajaRow } from "@/lib/ventasCaja";
 import { parseBancoStarsoft } from "@/lib/conciliacionStarsoft";
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     for (const f of ventasFiles) {
       const buf = Buffer.from(await f.arrayBuffer());
       if (/\.zip$/i.test(f.name)) {
-        const zip = unzipSync(new Uint8Array(buf));
+        const zip = descomprimirSeguro(buf);
         for (const [nombre, data] of Object.entries(zip)) {
           if (esExcel(nombre) && !nombre.startsWith("__MACOSX")) excelVentas.push({ nombre, buf: Buffer.from(data) });
         }

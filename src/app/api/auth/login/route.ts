@@ -1,7 +1,10 @@
 import { limitar, reiniciar, ipDe, MIN } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, getUserById } from "@/lib/db";
-import { verifyPassword, ensureSupremo, puedeIngresar } from "@/lib/auth";
+import { verifyPassword, ensureSupremo, puedeIngresar, esSupremo } from "@/lib/auth";
+import { enviarCodigo, comprobarCodigo } from "@/lib/codigos";
+import { correoConfigurado } from "@/lib/email";
+import { limpiarCodigoUsuario } from "@/lib/db";
 import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
 
 export const runtime = "nodejs";
@@ -13,9 +16,13 @@ export async function POST(req: NextRequest) {
   const password = String(body?.password ?? "");
 
   // Anti fuerza bruta: 30 intentos/15 min por IP y 8 por correo.
+  // Anti fuerza bruta: por IP, por correo+IP (otra persona no puede bloquearte
+  // desde su conexión) y un tope alto por correo contra ataques distribuidos.
+  const ip = ipDe(req);
   const _lim = limitar([
-    { clave: `login-ip:${ipDe(req)}`, max: 30, ventanaMs: 15 * MIN },
-    { clave: `login-mail:${email}`, max: 8, ventanaMs: 15 * MIN },
+    { clave: `login-ip:${ip}`, max: 30, ventanaMs: 15 * MIN },
+    { clave: `login-mail-ip:${email}:${ip}`, max: 8, ventanaMs: 15 * MIN },
+    { clave: `login-mail:${email}`, max: 60, ventanaMs: 15 * MIN },
   ], "Demasiados intentos de inicio de sesión.");
   if (_lim) return _lim;
   if (!email || !password) {
@@ -49,7 +56,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  reiniciar(`login-mail:${email}`);
+  // Segundo paso para la cuenta supremo (SUPREMO_2FA=1): además de la
+  // contraseña, un código de 6 dígitos que llega a su correo.
+  if (esSupremo(user) && /^(1|true|si|sí)$/i.test(process.env.SUPREMO_2FA || "") && correoConfigurado()) {
+    const codigo = String(body?.codigo ?? "").replace(/\D/g, "");
+    if (!codigo) {
+      const r = await enviarCodigo(user, "acceso");
+      if (!r.ok && !r.esperar) return NextResponse.json({ error: r.error ?? "No se pudo enviar el código." }, { status: 502 });
+      return NextResponse.json(
+        { requiereCodigo: true, mensaje: r.esperar ? r.error : `Te enviamos un código de acceso a ${user.email}.` },
+        { status: 401 },
+      );
+    }
+    const ok = await comprobarCodigo(user, codigo, "acceso");
+    if (!ok.ok) return NextResponse.json({ error: ok.error, requiereCodigo: true }, { status: 401 });
+    await limpiarCodigoUsuario(user.id);
+  }
+
+  reiniciar(`login-mail-ip:${email}:${ip}`);
   const token = await createSessionToken(user.id, user.sesionVersion ?? 0);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
   // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.

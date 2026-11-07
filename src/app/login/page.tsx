@@ -4,14 +4,17 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogoAsenco } from "@/components/Logo";
 
-type Modo = "login" | "registro" | "verificar" | "olvido" | "olvido-codigo";
+type Modo = "login" | "registro" | "verificar" | "olvido" | "olvido-codigo" | "acceso";
 
 // Login / registro con verificación de correo por código de 6 dígitos /
 // recuperación de contraseña autoservicio (código + nueva clave).
 export default function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/";
+  // Solo se vuelve a rutas INTERNAS ("/algo"). Un enlace con ?next=https://otro-sitio
+  // o //otro-sitio llevaría a la persona fuera de Radar tras iniciar sesión (phishing).
+  const nextCrudo = params.get("next") || "/";
+  const next = /^\/(?![\/\\])/.test(nextCrudo) ? nextCrudo : "/";
   const [modo, setModo] = useState<Modo>("login");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -33,9 +36,13 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setError(null); setAviso(null);
     try {
-      if (modo === "login") {
-        const { res, data } = await post("/api/auth/login", { email, password });
+      if (modo === "login" || modo === "acceso") {
+        const { res, data } = await post("/api/auth/login", modo === "acceso" ? { email, password, codigo } : { email, password });
         if (res.status === 403 && data.noVerificado) { setModo("verificar"); setAviso(data.error); return; }
+        if (data.requiereCodigo && !res.ok) {
+          if (modo === "login") { setModo("acceso"); setCodigo(""); setAviso(data.mensaje ?? "Te enviamos un código de acceso."); return; }
+          setError(data.error ?? data.mensaje ?? "Código incorrecto."); return;
+        }
         if (!res.ok) { setError(data.error ?? "No se pudo ingresar."); return; }
         try { localStorage.setItem("mostrar_planes", "1"); } catch { /* */ }
         entrar();
@@ -78,6 +85,12 @@ export default function LoginPage() {
   async function reenviar() {
     setBusy(true); setError(null); setAviso(null);
     try {
+      if (modo === "acceso") {
+        const { data } = await post("/api/auth/login", { email, password });
+        if (data.requiereCodigo) setAviso(data.mensaje ?? "Te enviamos un nuevo código.");
+        else if (data.error) setError(data.error);
+        return;
+      }
       const url = modo === "verificar" ? "/api/auth/reenviar" : "/api/auth/forgot";
       const { res, data } = await post(url, { email });
       if (!res.ok) { setError(data.error ?? "No se pudo reenviar."); return; }
@@ -87,7 +100,7 @@ export default function LoginPage() {
 
   const titulo: Record<Modo, string> = {
     login: "Iniciar sesión", registro: "Crear cuenta", verificar: "Verifica tu correo",
-    olvido: "Recuperar contraseña", "olvido-codigo": "Nueva contraseña",
+    olvido: "Recuperar contraseña", "olvido-codigo": "Nueva contraseña", acceso: "Código de acceso",
   };
   const subtitulo: Record<Modo, string> = {
     login: "Entra a tu espacio de trabajo.",
@@ -95,6 +108,7 @@ export default function LoginPage() {
     verificar: `Ingresa el código de 6 dígitos que enviamos a ${email || "tu correo"}.`,
     olvido: "Pon tu correo y te enviaremos un código de 6 dígitos.",
     "olvido-codigo": `Ingresa el código que enviamos a ${email || "tu correo"} y tu nueva contraseña.`,
+    acceso: `Por seguridad, ingresa el código de 6 dígitos que enviamos a ${email || "tu correo"}.`,
   };
   const input = "mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500";
 
@@ -117,7 +131,7 @@ export default function LoginPage() {
             <div><label className="text-xs font-semibold text-slate-600">Correo</label>
               <input type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required /></div>
           )}
-          {(modo === "verificar" || modo === "olvido-codigo") && (
+          {(modo === "verificar" || modo === "olvido-codigo" || modo === "acceso") && (
             <div><label className="text-xs font-semibold text-slate-600">Código de 6 dígitos</label>
               <input inputMode="numeric" pattern="[0-9]*" maxLength={6} className={`${input} text-center text-2xl tracking-[0.5em]`} value={codigo}
                 onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))} autoComplete="one-time-code" autoFocus required /></div>
@@ -131,11 +145,11 @@ export default function LoginPage() {
               <input type="password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
           )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Crear cuenta" : modo === "verificar" ? "Verificar y entrar" : modo === "olvido" ? "Enviar código" : "Cambiar contraseña"}
+            {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Crear cuenta" : modo === "verificar" || modo === "acceso" ? "Verificar y entrar" : modo === "olvido" ? "Enviar código" : "Cambiar contraseña"}
           </button>
         </form>
 
-        {(modo === "verificar" || modo === "olvido-codigo") && (
+        {(modo === "verificar" || modo === "olvido-codigo" || modo === "acceso") && (
           <div className="mt-3 text-center text-sm text-slate-500">
             ¿No llegó? Revisa spam o{" "}
             <button className="font-semibold text-brand-600 hover:underline" onClick={reenviar} disabled={busy}>reenviar código</button>

@@ -64,3 +64,22 @@ export function limitar(reglas: { clave: string; max: number; ventanaMs: number 
 
 export const MIN = 60_000;
 export const HORA = 3_600_000;
+
+/** Lee el cuerpo como texto, cortando si pasa de `max` bytes (para rutas
+ *  públicas: evita que un envío gigante agote la memoria). null = demasiado grande. */
+export async function leerCuerpoLimitado(req: Request, max: number): Promise<string | null> {
+  const declarado = Number(req.headers.get("content-length") || "0");
+  if (declarado > max) return null;
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const partes: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { await reader.cancel().catch(() => {}); return null; }
+    partes.push(value);
+  }
+  return Buffer.concat(partes.map((p) => Buffer.from(p))).toString("utf8");
+}

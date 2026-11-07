@@ -136,7 +136,7 @@ export interface Usuario {
    *  solo se guarda su hash, con vencimiento, intentos y último envío. */
   codigoHash?: string;
   codigoExp?: string;
-  codigoTipo?: "verificacion" | "reset";
+  codigoTipo?: "verificacion" | "reset" | "acceso";
   codigoIntentos?: number;
   codigoEnviadoAt?: string;
   /** Cupo del módulo gratis (legacy): 3 consultas por ventana de 7 días. */

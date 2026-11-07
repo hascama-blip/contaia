@@ -16,7 +16,7 @@ export const CODIGO_MAX_INTENTOS = 5;
 export const CODIGO_REENVIO_SEG = 60;
 const PEPPER = process.env.AUTH_SECRET || "radar-tributario-dev-secret-cambiar-en-produccion";
 
-export type TipoCodigo = "verificacion" | "reset";
+export type TipoCodigo = "verificacion" | "reset" | "acceso";
 
 function hashCodigo(uid: string, codigo: string): string {
   return createHash("sha256").update(`${uid}:${codigo}:${PEPPER}`).digest("hex");
@@ -42,7 +42,9 @@ export async function enviarCodigo(u: Usuario, tipo: TipoCodigo): Promise<{ ok: 
   await setCodigoUsuario(u.id, { hash: hashCodigo(u.id, codigo), exp, tipo });
   const asunto = tipo === "verificacion"
     ? `${codigo} es tu código de verificación — Radar Tributar IA`
-    : `${codigo} es tu código para cambiar la contraseña — Radar Tributar IA`;
+    : tipo === "acceso"
+      ? `${codigo} es tu código de acceso — Radar Tributar IA`
+      : `${codigo} es tu código para cambiar la contraseña — Radar Tributar IA`;
   const r = await enviarCorreo(u.email, asunto, htmlCodigo(u.nombre, codigo, tipo));
   if (!r.ok) {
     await limpiarCodigoUsuario(u.id);

@@ -149,6 +149,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   en `src/lib/secretos.ts`). Sin contraseña supremo por defecto en el código. El panel Supremo y
   el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
+- **Supremo**: con `SUPREMO_2FA=1` el login del supremo pide además un código de 6 dígitos por
+  correo (`codigos.ts`, tipo "acceso"). El login solo redirige a rutas internas (`?next=/…`).
+- **Entradas públicas**: avisos de pago con cuerpo ≤ 64 KB y límite por IP; ZIP subidos se
+  descomprimen con `descomprimirSeguro` (topes por archivo, total y cantidad); los correos
+  escapan nombres y datos del usuario.
 - **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
 - **Next 15**: `params`, `searchParams`, `cookies()` y `headers()` son asíncronos (usar `await`).
 - **Contenedor** (Lightsail, `deploy/`): Dockerfile en dos etapas; la app corre como usuario

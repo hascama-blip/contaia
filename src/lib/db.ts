@@ -516,7 +516,7 @@ export async function setPasswordUsuario(userId: string, passHash: string): Prom
 // ---- Códigos de 6 dígitos (verificación de correo / cambio de contraseña) ---
 
 /** Guarda un código (hash + vencimiento + tipo) y reinicia intentos. */
-export async function setCodigoUsuario(userId: string, d: { hash: string; exp: string; tipo: "verificacion" | "reset" }): Promise<void> {
+export async function setCodigoUsuario(userId: string, d: { hash: string; exp: string; tipo: "verificacion" | "reset" | "acceso" }): Promise<void> {
   return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);

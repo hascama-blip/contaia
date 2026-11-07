@@ -26,7 +26,7 @@ export async function enviarCorreo(
       filename: a.filename,
       content: Buffer.isBuffer(a.content) ? a.content.toString("base64") : a.content,
     }));
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch(`${(process.env.RESEND_API_URL || "https://api.resend.com").replace(/\/$/, "")}/emails`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -44,21 +44,28 @@ export async function enviarCorreo(
   }
 }
 
+/** Escapa texto que va dentro del HTML del correo. El nombre lo escribe quien
+ *  se registra (puede registrar el correo de OTRA persona): sin escapar, podría
+ *  meter enlaces o texto engañoso en un correo que sale desde Radar. */
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
 /** Plantilla del correo con CÓDIGO de 6 dígitos (verificar correo / cambiar clave). */
-export function htmlCodigo(nombre: string, codigo: string, proposito: "verificacion" | "reset"): string {
-  const titulo = proposito === "verificacion" ? "Verifica tu correo" : "Cambia tu contraseña";
+export function htmlCodigo(nombre: string, codigo: string, proposito: "verificacion" | "reset" | "acceso"): string {
+  const titulo = proposito === "verificacion" ? "Verifica tu correo" : proposito === "acceso" ? "Código de acceso" : "Cambia tu contraseña";
   const texto = proposito === "verificacion"
     ? "Gracias por registrarte. Ingresa este código en la pantalla de registro para activar tu cuenta:"
-    : "Recibimos una solicitud para cambiar tu contraseña. Ingresa este código en la pantalla de recuperación:";
+    : proposito === "acceso"
+      ? "Alguien ingresó la contraseña correcta de la cuenta de administración. Para terminar de entrar, ingresa este código:"
+      : "Recibimos una solicitud para cambiar tu contraseña. Ingresa este código en la pantalla de recuperación:";
   return `
   <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:auto;color:#1e293b">
     <h2 style="color:#102b4d">Radar Tributar IA</h2>
-    <p>Hola ${nombre || ""},</p>
+    <p>Hola ${esc(nombre)},</p>
     <p><b>${titulo}.</b> ${texto}</p>
     <p style="text-align:center;margin:24px 0">
       <span style="display:inline-block;font-size:32px;letter-spacing:10px;font-weight:800;background:#f1f5f9;color:#102b4d;padding:14px 22px;border-radius:10px">${codigo}</span>
     </p>
-    <p style="font-size:13px;color:#64748b">El código vence en 10 minutos y solo sirve una vez. Si no fuiste tú, ignora este correo: nadie puede ${proposito === "verificacion" ? "activar la cuenta" : "cambiar tu contraseña"} sin este código.</p>
+    <p style="font-size:13px;color:#64748b">El código vence en 10 minutos y solo sirve una vez. Si no fuiste tú, ignora este correo: nadie puede ${proposito === "verificacion" ? "activar la cuenta" : proposito === "acceso" ? "entrar" : "cambiar tu contraseña"} sin este código${proposito === "acceso" ? ". Si no fuiste tú, cambia tu contraseña de inmediato" : ""}.</p>
   </div>`;
 }
 
@@ -67,7 +74,7 @@ export function htmlReset(nombre: string, enlace: string): string {
   return `
   <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:auto;color:#1e293b">
     <h2 style="color:#102b4d">Radar Tributar IA</h2>
-    <p>Hola ${nombre || ""},</p>
+    <p>Hola ${esc(nombre)},</p>
     <p>Recibimos una solicitud para restablecer tu contraseña. Pulsa el botón para crear una nueva:</p>
     <p style="text-align:center;margin:24px 0">
       <a href="${enlace}" style="background:#102b4d;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">Cambiar contraseña</a>
