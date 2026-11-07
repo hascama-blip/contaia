@@ -30,6 +30,7 @@ import type {
   SolicitudRTT,
   EstadoRTT,
   SolicitudRentas,
+  AceptacionLegal,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -227,6 +228,8 @@ export async function createUser(data: {
   soloRtp?: boolean;
   /** false = registro con verificación de correo pendiente (no puede entrar aún). */
   emailVerificado?: boolean;
+  /** Constancia de aceptación de las políticas (registro). */
+  aceptacion?: AceptacionLegal;
 }): Promise<Usuario> {
   return conBloqueoStore(async () => {
   const store = await readStore();
@@ -242,6 +245,7 @@ export async function createUser(data: {
     estado: data.estado,
     ...(data.soloRtp ? { soloRtp: true } : {}),
     ...(data.emailVerificado === false ? { emailVerificado: false } : {}),
+    ...(data.aceptacion ? { aceptaciones: [data.aceptacion] } : {}),
   };
   store.users.push(user);
   await writeStore(store);
@@ -769,6 +773,28 @@ export async function deleteSubUsuario(adminId: string, userId: string): Promise
   await writeStore(store);
   return true;
 });
+}
+
+// ---- Aceptación de políticas ------------------------------------------------
+
+/** Guarda la constancia de aceptación de las políticas (no borra las anteriores). */
+export async function registrarAceptacion(userId: string, a: AceptacionLegal): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const u = store.users?.find((x) => x.id === userId);
+  if (!u) return null;
+  u.aceptaciones = [...(u.aceptaciones ?? []), a].slice(-20);
+  await writeStore(store);
+  return u;
+});
+}
+
+/** Constancias de aceptación de todos los usuarios (para la evidencia del supremo). */
+export async function listarAceptaciones(): Promise<{ usuario: Pick<Usuario, "id" | "nombre" | "email" | "rol" | "parentId">; a: AceptacionLegal }[]> {
+  const store = await readStore();
+  return (store.users ?? []).flatMap((u) =>
+    (u.aceptaciones ?? []).map((a) => ({ usuario: { id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, parentId: u.parentId }, a })),
+  );
 }
 
 // ---- Bitácora de auditoría -------------------------------------------------

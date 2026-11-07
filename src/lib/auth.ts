@@ -3,7 +3,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById, eliminarTodosLosUsuarios } from "./db";
-import { leerSessionToken, SESSION_COOKIE } from "./authToken";
+import { leerSessionToken, createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "./authToken";
+import { createHash } from "crypto";
+import { TERMINOS_VERSION, textoLegalPlano } from "./legal";
+import type { AceptacionLegal } from "./types";
 import type { Usuario, Cliente } from "./types";
 import { hoyLima } from "./fechas";
 
@@ -243,4 +246,32 @@ export async function getClienteAutorizado(id: string): Promise<Cliente | null> 
   const u = await getCurrentUser();
   if (!u) return null;
   return getClienteDeUsuario(id, studioId(u));
+}
+
+// ---- Políticas aceptadas -----------------------------------------------------
+
+/** Versión de políticas que va en el token de sesión: la vigente si el usuario
+ *  ya la aceptó (o está exento: supremo y el usuario interno "solo RTP"). */
+export function versionTerminos(u: Usuario): string {
+  if (esSupremo(u) || esSoloRtp(u)) return TERMINOS_VERSION;
+  return (u.aceptaciones ?? []).some((a) => a.version === TERMINOS_VERSION) ? TERMINOS_VERSION : "";
+}
+
+/** Arma la constancia de aceptación con los datos de la petición. */
+export function constanciaAceptacion(req: Request, ip: string, origen: AceptacionLegal["origen"]): AceptacionLegal {
+  return {
+    version: TERMINOS_VERSION,
+    fecha: new Date().toISOString(),
+    ip,
+    userAgent: (req.headers.get("user-agent") || "").slice(0, 300),
+    documentos: ["seguridad", "responsabilidad"],
+    huella: createHash("sha256").update(textoLegalPlano()).digest("hex"),
+    origen,
+  };
+}
+
+/** Pone la cookie de sesión del usuario en la respuesta (con su versión de políticas). */
+export async function ponerSesion(res: { cookies: { set: (n: string, v: string, o: typeof SESSION_COOKIE_OPTS) => unknown } }, u: Usuario): Promise<void> {
+  const token = await createSessionToken(u.id, u.sesionVersion ?? 0, versionTerminos(u));
+  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
 }

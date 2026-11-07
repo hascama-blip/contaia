@@ -42,7 +42,8 @@ export default async function RootLayout({
   const soloRtp = esSoloRtp(user);
   // Páginas de autenticación: NUNCA muestran el header/menú ni el modal de
   // planes, aunque quede una sesión previa (p. ej. al salir y volver al login).
-  const esAuthPage = pathname.startsWith("/login") || pathname.startsWith("/reset") || pathname.startsWith("/conoce");
+  const esAuthPage = pathname.startsWith("/login") || pathname.startsWith("/reset") || pathname.startsWith("/conoce")
+    || pathname.startsWith("/aceptar") || pathname.startsWith("/legal");
   // Plan del estudio (los operadores heredan el de su admin). El supremo se
   // trata como el plan máximo. Decide el menú "Equipo", el link de planes y
   // si se muestra la ventana de planes (SOLO en el plan gratis = básico).
@@ -75,6 +76,7 @@ export default async function RootLayout({
             <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-6">{contenido}</main>
             <footer className="no-print mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-400">
               <span translate="no">RADAR TRIBUTAR IA</span> · Diagnóstico tributario asistido · {new Date().getFullYear()}
+              {" · "}<a href="/legal" className="hover:text-slate-600 hover:underline">Políticas y privacidad</a>
               <br />
               <span translate="no">© {new Date().getFullYear()} · Desarrollado por <span className="font-semibold text-slate-500">TAKTO</span></span>
             </footer>

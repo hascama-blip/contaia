@@ -1,12 +1,12 @@
 import { limitar, reiniciar, ipDe, MIN } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, getUserById } from "@/lib/db";
-import { verifyPassword, ensureSupremo, puedeIngresar, esSupremo } from "@/lib/auth";
+import { verifyPassword, ensureSupremo, puedeIngresar, esSupremo, ponerSesion } from "@/lib/auth";
+import { registrarAcceso } from "@/lib/registroAccesos";
 import { enviarCodigo, comprobarCodigo } from "@/lib/codigos";
 import { correoConfigurado } from "@/lib/email";
 import { telegramConfigurado } from "@/lib/alertas";
 import { limpiarCodigoUsuario } from "@/lib/db";
-import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   }
   const user = await getUserByEmail(email);
   if (!user || !verifyPassword(password, user.passHash)) {
+    void registrarAcceso({ ev: "login-fallido", email, uid: user?.id, ip, ua: req.headers.get("user-agent") ?? undefined, detalle: user ? "contraseña incorrecta" : "correo no registrado" });
     return NextResponse.json({ error: "Correo o contraseña incorrectos." }, { status: 401 });
   }
 
@@ -81,9 +82,9 @@ export async function POST(req: NextRequest) {
   }
 
   reiniciar(`login-mail-ip:${email}:${ip}`);
-  const token = await createSessionToken(user.id, user.sesionVersion ?? 0);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
   // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.
-  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
+  await ponerSesion(res, user);
+  void registrarAcceso({ ev: "login", uid: user.id, email: user.email, ip, ua: req.headers.get("user-agent") ?? undefined });
   return res;
 }

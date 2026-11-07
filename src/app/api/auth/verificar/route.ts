@@ -2,7 +2,8 @@ import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, marcarEmailVerificado } from "@/lib/db";
 import { comprobarCodigo } from "@/lib/codigos";
-import { createSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTS } from "@/lib/authToken";
+import { ponerSesion } from "@/lib/auth";
+import { registrarAcceso } from "@/lib/registroAccesos";
 
 export const runtime = "nodejs";
 
@@ -27,8 +28,8 @@ export async function POST(req: NextRequest) {
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
 
   await marcarEmailVerificado(user.id);
-  const token = await createSessionToken(user.id, user.sesionVersion ?? 0);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
-  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
+  await ponerSesion(res, user);
+  void registrarAcceso({ ev: "verificacion", uid: user.id, email: user.email, ip: ipDe(req), ua: req.headers.get("user-agent") ?? undefined });
   return res;
 }

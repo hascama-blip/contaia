@@ -20,6 +20,8 @@ export async function crearBackupZip(): Promise<Buffer> {
   }
   await agregarCarpeta(archivos, UPLOADS_DIR, "uploads");
   await agregarCarpeta(archivos, BACKUPS_DIR, "backups");
+  // Registro de accesos (evidencia): se respalda, pero restaurar NO lo pisa.
+  await agregarCarpeta(archivos, path.join(DATA_DIR, "accesos"), "accesos");
   return Buffer.from(zipSync(archivos, { level: 6 }));
 }
 

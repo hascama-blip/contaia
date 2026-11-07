@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogoAsenco } from "@/components/Logo";
+import CasillasPoliticas from "@/components/CasillasPoliticas";
 
 type Modo = "login" | "registro" | "verificar" | "olvido" | "olvido-codigo" | "acceso";
 
@@ -20,6 +21,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [codigo, setCodigo] = useState("");
+  const [aceptaSeguridad, setAceptaSeguridad] = useState(false);
+  const [aceptaResponsabilidad, setAceptaResponsabilidad] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -49,7 +52,8 @@ export default function LoginPage() {
         return;
       }
       if (modo === "registro") {
-        const { res, data } = await post("/api/auth/register", { nombre, email, password });
+        if (!aceptaSeguridad || !aceptaResponsabilidad) { setError("Para crear la cuenta debes aceptar ambas políticas."); return; }
+        const { res, data } = await post("/api/auth/register", { nombre, email, password, aceptaSeguridad, aceptaResponsabilidad });
         if (!res.ok) { setError(data.error ?? "No se pudo crear la cuenta."); return; }
         if (data.verificar) { setModo("verificar"); setAviso(data.mensaje ?? "Te enviamos un código a tu correo."); return; }
         entrar();
@@ -140,11 +144,15 @@ export default function LoginPage() {
             <div><label className="text-xs font-semibold text-slate-600">Contraseña</label>
               <input type="password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={modo === "login" ? "current-password" : "new-password"} required /></div>
           )}
+          {modo === "registro" && (
+            <CasillasPoliticas seguridad={aceptaSeguridad} responsabilidad={aceptaResponsabilidad}
+              onSeguridad={setAceptaSeguridad} onResponsabilidad={setAceptaResponsabilidad} />
+          )}
           {modo === "olvido-codigo" && (
             <div><label className="text-xs font-semibold text-slate-600">Nueva contraseña</label>
               <input type="password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
           )}
-          <button type="submit" className="btn-primary w-full" disabled={busy}>
+          <button type="submit" className="btn-primary w-full" disabled={busy || (modo === "registro" && (!aceptaSeguridad || !aceptaResponsabilidad))}>
             {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Crear cuenta" : modo === "verificar" || modo === "acceso" ? "Verificar y entrar" : modo === "olvido" ? "Enviar código" : "Cambiar contraseña"}
           </button>
         </form>

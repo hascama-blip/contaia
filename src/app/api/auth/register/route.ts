@@ -1,7 +1,9 @@
 import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, getUserByEmail } from "@/lib/db";
-import { hashPassword, ensureSupremo } from "@/lib/auth";
+import { hashPassword, ensureSupremo, constanciaAceptacion } from "@/lib/auth";
+import { registrarAceptacion } from "@/lib/db";
+import { registrarAcceso } from "@/lib/registroAccesos";
 import { enviarCodigo } from "@/lib/codigos";
 
 export const runtime = "nodejs";
@@ -17,6 +19,9 @@ export async function POST(req: NextRequest) {
   const nombre = String(body?.nombre ?? "").trim();
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
+  // Ambas casillas son obligatorias: Política de seguridad + Declaración de
+  // responsabilidad y registro de accesos (queda constancia con IP y fecha).
+  const acepta = body?.aceptaSeguridad === true && body?.aceptaResponsabilidad === true;
 
   if (!nombre || !email || !password) {
     return NextResponse.json({ error: "Completa nombre, correo y contraseña." }, { status: 400 });
@@ -27,17 +32,24 @@ export async function POST(req: NextRequest) {
   if (password.length < 8) {
     return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres." }, { status: 400 });
   }
+  if (!acepta) {
+    return NextResponse.json({ error: "Para crear la cuenta debes aceptar la Política de seguridad y la Declaración de responsabilidad." }, { status: 400 });
+  }
+  const ip = ipDe(req);
+  const ua = req.headers.get("user-agent") ?? undefined;
   const existente = await getUserByEmail(email);
   if (existente) {
     // Si ya existe pero nunca verificó, le reenviamos el código en vez de bloquearlo.
     if (existente.emailVerificado === false) {
+      await registrarAceptacion(existente.id, constanciaAceptacion(req, ip, "registro"));
       const r = await enviarCodigo(existente, "verificacion");
       return NextResponse.json({ ok: true, verificar: true, email, mensaje: r.ok ? "Esa cuenta ya existe pero no estaba verificada: te reenviamos el código." : r.error });
     }
     return NextResponse.json({ error: "Ya existe una cuenta con ese correo." }, { status: 409 });
   }
 
-  const user = await createUser({ nombre, email, passHash: hashPassword(password), estado: "aprobado", emailVerificado: false });
+  const user = await createUser({ nombre, email, passHash: hashPassword(password), estado: "aprobado", emailVerificado: false, aceptacion: constanciaAceptacion(req, ip, "registro") });
+  void registrarAcceso({ ev: "registro", uid: user.id, email, ip, ua, detalle: "aceptó Política de seguridad y Declaración de responsabilidad" });
   const r = await enviarCodigo(user, "verificacion");
   if (!r.ok) {
     return NextResponse.json({ error: r.error ?? "No se pudo enviar el código de verificación." }, { status: 502 });

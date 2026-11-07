@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, Fragment } from "react";
+import EvidenciasSupremo from "@/components/EvidenciasSupremo";
 
 interface Solicitud {
   id: string;
@@ -912,6 +913,8 @@ export default function SupremoPanel() {
         </div>
         {integMsg && <p className="mt-2 text-xs text-slate-600">{integMsg}</p>}
       </div>
+
+      <EvidenciasSupremo />
 
       {/* Copia de seguridad (backup / restauración) */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">

@@ -152,6 +152,16 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   quedan con `v1:…`; en memoria se ven en claro. Llave = VIGILANCIA_KEY (o AUTH_SECRET):
   **no cambiarla** o habrá que volver a ingresar esas credenciales. Sin contraseña supremo por defecto en el código. El panel Supremo y
   el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
+- **Políticas y registro de accesos** (evidencia ante reclamos): el registro exige marcar la
+  Política de seguridad y la Declaración de responsabilidad (texto en `src/lib/legal.ts`,
+  página pública `/legal`). Constancia por usuario en `Usuario.aceptaciones` (versión, fecha, IP,
+  navegador, huella SHA-256 del texto). El token de sesión lleva `t` = versión aceptada; el
+  **middleware (runtime Node)** manda a `/aceptar` (API → 403) si no es `TERMINOS_VERSION`
+  (supremo y "solo RTP" exentos). Cambiar el texto de forma sustancial → subir `TERMINOS_VERSION`
+  (todos vuelven a aceptar). El middleware anota cada página, cada POST/PUT/DELETE y las lecturas
+  sensibles en `DATA_DIR/accesos/AAAA-MM.jsonl` (`src/lib/registroAccesos.ts`; líneas firmadas
+  con HMAC, 5 años, van en el backup ZIP y la restauración no las pisa); login/registro también.
+  El supremo descarga CSV (accesos por mes/RUC/correo y constancias) en `/api/supremo/accesos`.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
 - **Supremo**: con `SUPREMO_2FA=1` el login del supremo pide además un código de 6 dígitos
   (`codigos.ts`, tipo "acceso") que va a `SUPREMO_2FA_CORREO` (correo real; el del supremo es

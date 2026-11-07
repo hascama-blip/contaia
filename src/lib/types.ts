@@ -148,6 +148,9 @@ export interface Usuario {
   /** Versión de sesión: al cambiar/restablecer la contraseña sube y las
    *  sesiones abiertas en otros equipos dejan de valer. */
   sesionVersion?: number;
+  /** Constancias de aceptación de la Política de seguridad y de la
+   *  Declaración de responsabilidad (una por versión aceptada). */
+  aceptaciones?: AceptacionLegal[];
   /** Compró con el precio de lanzamiento (−50 %): lo conserva al renovar. */
   precioLanzamiento?: boolean;
   /** Plan Empresas (a cotizar): límites pactados con el cliente. 0 = sin límite;
@@ -479,6 +482,20 @@ export interface AdjuntoCache {
 
 /** Entrada de la bitácora de auditoría: quién hizo qué, cuándo y dónde.
  *  La ve el usuario líder (admin) del estudio. */
+/** Constancia de que un usuario aceptó las políticas (evidencia). */
+export interface AceptacionLegal {
+  version: string;
+  fecha: string;
+  ip: string;
+  userAgent: string;
+  /** Documentos aceptados ("seguridad", "responsabilidad"). */
+  documentos: string[];
+  /** SHA-256 del texto exacto que se mostró y aceptó. */
+  huella: string;
+  /** Dónde aceptó: al registrarse o en un ingreso posterior. */
+  origen: "registro" | "ingreso";
+}
+
 export interface AccionAuditoria {
   id: string;
   /** Fecha/hora de la acción (ISO). */
