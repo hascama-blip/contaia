@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 import BuzonSeguimientoCell, { type Seguimiento } from "./BuzonSeguimientoCell";
 import { usePuedeDiag } from "./SupremoContext";
+import CuposEmpresa from "./CuposEmpresa";
 
 interface ClienteOpt {
   id: string;
@@ -297,6 +298,7 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
             Los mensajes y los PDF que descargues quedan <b>guardados</b>: la próxima vez se abren al
             instante, sin volver a ingresar la Clave SOL. La Clave SOL nunca se guarda.
           </p>
+          {clienteId && <div className="mt-3"><CuposEmpresa clienteId={clienteId} pasos={["buzon"]} /></div>}
         </section>
       )}
 

@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!esAdmin(user)) return NextResponse.json({ error: "Solo el administrador." }, { status: 403 });
 
-  // Agregar operarios/equipo solo está disponible en el Plan de Equipo.
+  // Agregar operarios/equipo solo está disponible en el Plan Empresas.
   if (!esSupremo(user) && (await planDelEstudio(user)) !== "equipo") {
     return NextResponse.json(
-      { error: "Agregar operarios está disponible solo en el Plan de Equipo. Solicítalo desde “Adquirir módulos”." },
+      { error: "Agregar operarios está disponible solo en el Plan Empresas. Solicítalo desde “Adquirir módulos”." },
       { status: 403 }
     );
   }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const actuales = await listSubUsuarios(user.id);
     if (actuales.length >= LIMITE_OPERADORES) {
       return NextResponse.json(
-        { error: `El Plan de Equipo permite hasta ${LIMITE_OPERADORES} trabajadores. Elimina uno para poder agregar otro.` },
+        { error: `El Plan Empresas permite hasta ${LIMITE_OPERADORES} trabajadores. Elimina uno para poder agregar otro.` },
         { status: 403 }
       );
     }

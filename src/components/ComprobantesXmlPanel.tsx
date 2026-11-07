@@ -99,7 +99,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   }
 
   // Extrae UN comprobante (login + consulta + descarga XML/PDF de esa fila).
-  async function extraerFila(i: number): Promise<boolean> {
+  async function extraerFila(i: number): Promise<boolean | "tope"> {
     const item = relacion[i];
     if (!item) return false;
     const solPass = getSolPass(clienteId);
@@ -118,8 +118,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       const data = await res.json().catch(() => ({}));
       if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
       if (res.status === 401) { setFilas((p) => ({ ...p, [i]: { estado: "error", motivo: data.error ?? "Login SOL falló" } })); return false; }
-      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas((p) => ({ ...p, [i]: { estado: "pendiente" } })); return false; }
+      if (res.status === 429) { setError(data.error ?? "Sin consultas disponibles."); setFilas((p) => ({ ...p, [i]: { estado: "pendiente" } })); return "tope"; }
       if (!consumido && res.ok) setConsumido(true);
+      if (data.tope?.tope) setInfo(`Comprobantes del mes: ${data.tope.usados} de ${data.tope.tope}.`);
       const factura = Array.isArray(data.facturas) ? data.facturas[0] : null;
       if (factura) { setFilas((p) => ({ ...p, [i]: { estado: "ok", factura } })); return true; }
       const motivo = (Array.isArray(data.fallidos) && data.fallidos[0]?.motivo) || data.error || "SUNAT no devolvió el comprobante.";
@@ -177,7 +178,9 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
         }
         if (Object.keys(files).length) bajarBlob(new Blob([zipSync(files, { level: 0 })], { type: "application/zip" }), periodoSire ? `pdf-comprobantes-${periodoSire}.zip` : "pdf-comprobantes.zip");
       }
-      setInfo(`PDF masivo: ${comps.length}/${relacion.length} descargados${data.error ? ` · ${data.error}` : ""}.`);
+      setInfo(`PDF masivo: ${comps.length}/${relacion.length} descargados${data.error ? ` · ${data.error}` : ""}.` +
+        (data.avisoTope ? ` ${data.avisoTope}` : "") +
+        (data.tope?.tope ? ` Comprobantes del mes: ${data.tope.usados} de ${data.tope.tope}.` : ""));
     } catch { setError("Error de red al extraer los PDF."); }
     finally { setAuto(false); }
   }
@@ -189,7 +192,8 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
       for (let i = 0; i < relacion.length; i++) {
         const est = filas[i]?.estado;
         if (est === "ok") continue;
-        await extraerFila(i);
+        const r = await extraerFila(i);
+        if (r === "tope") break; // llegó al máximo de comprobantes del mes
         // Pausa entre comprobantes para no gatillar el límite de SUNAT.
         await new Promise((r) => setTimeout(r, 6000));
       }

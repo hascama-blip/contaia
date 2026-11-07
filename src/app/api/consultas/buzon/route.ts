@@ -3,14 +3,16 @@ import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { mergeBuzon } from "@/lib/db";
 import { consultarBuzon } from "@/lib/buzon";
 import { logAccion } from "@/lib/auditoria";
-import { chequearUso, registrarUso } from "@/lib/usos";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// Cooldown del buzón: 1 vez por SEMANA (ahorra memoria/CPU y evita saturar
-// SUNAT). El admin puede forzar. Los datos guardados se muestran mientras tanto.
-const UNA_SEMANA = 7 * 24 * 60 * 60 * 1000;
+// Pausa mínima entre consultas del buzón de una misma empresa (evita saturar
+// SUNAT y el bloqueo por muchos ingresos). El cupo del plan (generaciones por
+// empresa al mes) es el límite real; esta pausa solo frena los reintentos
+// seguidos de una consulta que YA salió bien. El admin puede forzar.
+const PAUSA = Math.max(0, Number(process.env.BUZON_PAUSA_MIN ?? "60") || 0) * 60 * 1000;
 
 function mensajesGuardados(cliente: { buzon?: { mensajes?: any[]; peligrosos?: any[]; urgentes?: any[] } | null }) {
   const b = cliente.buzon;
@@ -48,21 +50,21 @@ export async function POST(req: NextRequest) {
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 
-  // Límite de 1 consulta por semana. Solo el admin puede forzar.
+  // Pausa mínima entre consultas exitosas. Solo el admin puede forzar.
   const ultima = cliente.buzon?.consultadoAt ? new Date(cliente.buzon.consultadoAt).getTime() : 0;
-  const dentroDelPlazo = ultima && Date.now() - ultima < UNA_SEMANA;
+  const dentroDelPlazo = ultima && Date.now() - ultima < PAUSA;
   if (dentroDelPlazo && !body.diagnostico) {
     const usuario = await getCurrentUser();
     const puedeForzar = body.forzar === true && esAdmin(usuario);
     if (!puedeForzar) {
-      const dias = Math.ceil((UNA_SEMANA - (Date.now() - ultima)) / (24 * 60 * 60 * 1000));
+      const min = Math.ceil((PAUSA - (Date.now() - ultima)) / 60000);
       return NextResponse.json({
         razonSocial: cliente.razonSocial,
         ruc: cliente.ruc,
         mensajes: mensajesGuardados(cliente),
         consultadoAt: cliente.buzon?.consultadoAt ?? null,
         limitado: true,
-        mensaje: `El buzón se actualiza 1 vez por semana (última: ${new Date(cliente.buzon!.consultadoAt).toLocaleString("es-PE")}). Mostrando lo guardado. Podrás actualizar en ~${dias} día(s).`,
+        mensaje: `El buzón se acaba de consultar (${new Date(cliente.buzon!.consultadoAt).toLocaleString("es-PE")}). Mostrando lo guardado. Podrás actualizar en ~${min} min.`,
       });
     }
   }
@@ -74,11 +76,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
   }
 
-  // Cupo del módulo gratis: 3 consultas cada 7 días (salvo diagnóstico).
-  const uso = await chequearUso();
-  if (!uso.ok && !body.diagnostico) {
-    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
-  }
+  // Cupo del plan: generaciones de este paso por empresa al mes (salvo diagnóstico).
+  const cupo = await verificarCupo(cliente.ruc, "buzon");
+  if (!cupo.ok && !body.diagnostico) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   try {
     const r = await consultarBuzon({
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     // actualización AGREGA los mensajes nuevos a los ya guardados.
     let mensajes = r.mensajes;
     let nuevos: string[] = [];
+    let estadoCupo: Awaited<ReturnType<typeof consumirCupo>> | null = null;
     if (!r.diag) {
       const fus = await mergeBuzon(cliente.id, r.mensajes).catch(() => null);
       if (fus) { mensajes = fus.mensajes; nuevos = fus.nuevos.map((m) => m.id); }
@@ -106,8 +107,8 @@ export async function POST(req: NextRequest) {
         clienteNombre: cliente.razonSocial,
         detalle: `${r.mensajes.length} mensaje(s) leído(s) · ${nuevos.length} nuevo(s) · ${mensajes.length} en historial`,
       });
-      // Consumir 1 uso del cupo gratis SOLO tras una extracción exitosa.
-      if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
+      // Consumir 1 generación SOLO tras una extracción exitosa.
+      if (cupo.ok) estadoCupo = await consumirCupo(cupo.ticket);
     }
     return NextResponse.json({
       razonSocial: cliente.razonSocial,
@@ -118,6 +119,7 @@ export async function POST(req: NextRequest) {
       peligrosos: r.peligrosos,
       urgentes: r.urgentes,
       cacheados: Object.keys(cliente.buzonAdjuntos ?? {}),
+      cupo: estadoCupo,
       diag: r.diag,
     });
   } catch (err: any) {

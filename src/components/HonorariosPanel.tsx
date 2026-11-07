@@ -113,7 +113,8 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
       const n = data.total ?? (data.recibos ?? []).length;
       setInfo(diagModo
         ? `Diagnóstico: ${n} recibo(s) leído(s) (revisa la traza abajo).`
-        : `✅ ${n} recibo(s) leído(s). Descarga el detalle en Excel (sin cuentas) o completa las cuentas que falten y baja el Excel/TXT para StarSoft.`);
+        : `✅ ${n} recibo(s) leído(s). Descarga el detalle en Excel (sin cuentas) o completa las cuentas que falten y baja el Excel/TXT para StarSoft.` +
+          (data.avisoTope ? ` ⚠ ${data.avisoTope}` : ""));
     } catch { setError("Error de red al extraer."); }
     finally { setBusy(false); }
   }

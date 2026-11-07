@@ -18,10 +18,10 @@ interface Solicitud {
 
 // Planes que el supremo asigna (cada uno desbloquea sus módulos).
 const PLANES_OPC: { key: "basico" | "regular" | "premium" | "equipo"; label: string; desc: string }[] = [
-  { key: "basico", label: "Básico (gratis)", desc: "Reporte analítico de auditoría" },
-  { key: "regular", label: "Regular", desc: "+ Consultas tributarias y Detalle SIRE" },
-  { key: "premium", label: "Premium", desc: "+ RTT, Visor Tributario y Descarga masiva de comprobantes" },
-  { key: "equipo", label: "Plan de Equipo", desc: "Todo Premium + operadores (equipo)" },
+  { key: "basico", label: "Básico (gratis)", desc: "Reporte analítico + Consultas tributarias · 3 generaciones por paso" },
+  { key: "regular", label: "Regular", desc: "5 generaciones + Detalle SIRE y Visor Tributario" },
+  { key: "premium", label: "Premium", desc: "+ RTT, Descarga masiva (500/mes) y seguimiento 24 h del buzón" },
+  { key: "equipo", label: "Plan Empresas", desc: "A cotizar: todo Premium + operadores y límites a medida" },
 ];
 
 // Utilitarios que el supremo puede habilitar por cuenta.

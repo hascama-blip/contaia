@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clearSire, setSireResumen, setCredSire } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
 import { consultarResumenSire } from "@/lib/sire";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -26,6 +27,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!body || typeof body.periodo !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
+
+  // Cupo del plan. Una corrida de VARIOS periodos ("Extraer todo" o un rango)
+  // manda el mismo `lote` en cada llamada → cuenta como UNA sola generación.
+  // El modo simulado (datos de ejemplo) y el diagnóstico no consumen cupo.
+  const esDiag = body.diagnostico === true || body.real !== true;
+  const lote = typeof body.lote === "string" && body.lote ? body.lote : undefined;
+  const cupo = await verificarCupo(cliente.ruc, "sire", lote);
+  if (!cupo.ok && !esDiag) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   try {
     const resultado = await consultarResumenSire({
@@ -57,6 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ diag: resultado.diag });
     }
     const actualizado = await setSireResumen(cliente.id, resultado.resumen);
+    if (cupo.ok && !esDiag) await consumirCupo(cupo.ticket);
     return NextResponse.json({
       resumen: resultado.resumen,
       cliente: actualizado,

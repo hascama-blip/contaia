@@ -174,7 +174,7 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
             texto: dias === 0
               ? "A partir de mañana la cuenta pasa al plan Básico y se pausan los módulos de paga. Renueva para no perder el acceso."
               : `Vence el ${fmtDia(admin.planVence!)}. Renueva a tiempo para mantener tus módulos y la vigilancia del buzón.`,
-            href: "/planes",
+            href: admin.plan === "regular" || admin.plan === "premium" ? `/pagar?plan=${admin.plan}` : "/planes",
           });
           if (env.telegram || env.email) { r.alertasPlan++; await marcarAlertaEnviada(clave); }
         }

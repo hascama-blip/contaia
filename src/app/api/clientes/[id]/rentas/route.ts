@@ -3,6 +3,7 @@ import { getClienteAutorizado, requireUser } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
 import { getRttConfig, upsertSolicitudRentas, setEstadoRentas, getSolicitudRentas, getWebhookLogRTT, leerPdfRentas } from "@/lib/db";
 import { generarReporteRentas } from "@/lib/reporteRentasBot";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 200;
@@ -63,12 +64,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ diag: r.diag });
   }
 
+  const cupo = await verificarCupo(cliente.ruc, "rentas");
+  if (!cupo.ok) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
+
   const sol = await upsertSolicitudRentas({ clienteId: params.id, ruc: cliente.ruc, emailDestino, solicitadoPor: user.id });
   const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
   if (!r.ok) {
     await setEstadoRentas(params.id, "error", { error: r.error });
     return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
   }
+  if (cupo.ok) await consumirCupo(cupo.ticket);
   // Devolvemos también la traza de la generación (modal/confirmado/éxito) para
   // poder verificar que SUNAT aceptó el envío, sin activar el modo diagnóstico.
   return NextResponse.json({ solicitud: sol, diag: r.diag });

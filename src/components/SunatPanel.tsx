@@ -74,7 +74,9 @@ export default function SunatPanel({
     return out;
   }
 
-  async function consultarSire(simulado: boolean, periodoOverride?: string): Promise<boolean> {
+  // `lote`: una corrida de varios periodos manda el mismo id → el servidor la
+  // cuenta como UNA sola generación del cupo del plan.
+  async function consultarSire(simulado: boolean, periodoOverride?: string, lote?: string): Promise<boolean | "cupo"> {
     setError(null); setDiag(null);
     const solPass = simulado ? "" : getSolPass(clienteId);
     if (!simulado && (!solUser || !solPass)) { setError("Carga tus accesos SOL (arriba) para extraer."); return false; }
@@ -92,10 +94,11 @@ export default function SunatPanel({
           clientId: simulado ? "" : clientId,
           clientSecret: simulado ? "" : clientSecret,
           diagnostico: !simulado && diagModo,
+          lote: lote ?? `uno-${Date.now()}`,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo consultar el SIRE."); return false; }
+      if (!res.ok) { setError(data.error ?? "No se pudo consultar el SIRE."); return data.sinCupo ? "cupo" : false; }
       if (data.diag) { setDiag(JSON.stringify(data.diag, null, 2)); return false; }
       const r: SireResumen = data.resumen;
       setSire((prev) => [r, ...prev.filter((p) => p.periodo !== r.periodo)]);
@@ -115,9 +118,11 @@ export default function SunatPanel({
     if (periodoDesde > periodoHasta) { setError("El periodo 'Desde' no puede ser mayor que 'Hasta'."); return; }
     setBusy("todo"); setError(null); setDiag(null);
     const periodos = rangoPeriodos(periodoDesde, periodoHasta);
+    const lote = `rango-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     for (let i = 0; i < periodos.length; i++) {
       setProgreso(`SIRE ${etiqueta(periodos[i])} (${i + 1}/${periodos.length})`);
-      await consultarSire(false, periodos[i]);
+      const r = await consultarSire(false, periodos[i], lote);
+      if (r === "cupo") break; // sin cupo: no seguir con los demás periodos
     }
     setProgreso(null); setBusy(null);
     router.refresh();

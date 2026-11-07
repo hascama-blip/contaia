@@ -15,7 +15,8 @@ export interface Plan {
   cta: string;
   ctaHref: string;
   ctaEstilo: "primary" | "accent" | "ghost";
-  incluidos: { titulo: string; puntos: string[] }[];
+  /** `nuevo` = novedad del plan: se muestra resaltada con la etiqueta NUEVO. */
+  incluidos: { titulo: string; puntos: string[]; nuevo?: boolean }[];
   proximamente?: { titulo: string; puntos: string[] };
 }
 
@@ -44,7 +45,7 @@ export const PLANES: Plan[] = [
     planId: "basico",
     gratis: true,
     precio: "Gratis",
-    resumen: "Para empezar: el Reporte analítico de auditoría, siempre incluido.",
+    resumen: "Para empezar: Reporte analítico de auditoría y Consultas tributarias.",
     cta: "Empezar gratis",
     ctaHref: "/",
     ctaEstilo: "ghost",
@@ -52,11 +53,16 @@ export const PLANES: Plan[] = [
       {
         titulo: "Reporte Analítico de Auditoría",
         puntos: [
-          "Consulta el estado del RUC en SUNAT (razón social, estado, condición de domicilio y actividad económica).",
-          "Diagnóstico tributario del contribuyente con hallazgos y score de riesgo.",
-          "Revisión del buzón electrónico (mensajes peligrosos y urgentes) y deudas.",
-          "Dashboard e informe de gerencia imprimible (contingencias, buzón y gráficos en una hoja).",
-          "Genera la información 1 vez a la semana por empresa.",
+          "Estado del RUC en SUNAT, diagnóstico tributario con hallazgos y score de riesgo.",
+          "Buzón, deudas, estado y montos SIRE, rentas e ITF, con su informe de gerencia.",
+          "3 generaciones por paso y por empresa al mes. Si un paso falla, no se descuenta.",
+        ],
+      },
+      {
+        titulo: "Consultas Tributarias",
+        puntos: [
+          "Mensajes del buzón electrónico SUNAT con el PDF adjunto de cada notificación.",
+          "Seguimiento con plazo de atención y recordatorios de vencimiento.",
         ],
       },
     ],
@@ -68,32 +74,30 @@ export const PLANES: Plan[] = [
     precioAntes: "S/ 19.98",
     periodo: "/mes",
     etiqueta: "Lanzamiento −50%",
-    resumen: "Consultas tributarias y el Detalle SIRE, comprobante por comprobante.",
-    cta: "Solicitar plan",
-    ctaHref: "",
+    resumen: "Más generaciones, el Detalle SIRE y el Visor Tributario.",
+    cta: "Pagar Plan Regular",
+    ctaHref: "/pagar?plan=regular",
     ctaEstilo: "primary",
     incluidos: [
       {
         titulo: "Todo lo del Plan Básico",
         puntos: [
-          "Reporte Analítico de Auditoría incluido.",
-          "Consultas ampliadas a 3 por semana.",
+          "Reporte Analítico de Auditoría y Consultas Tributarias.",
+          "5 generaciones por paso y por empresa al mes. Si un paso falla, no se descuenta.",
         ],
       },
       {
-        titulo: "Módulo de Consultas Tributarias",
+        titulo: "Reporte Detalle SIRE",
         puntos: [
-          "Mensajes del buzón electrónico SUNAT con sus asuntos y el PDF adjunto de cada notificación.",
-          "Seguimiento con plazo de atención y recordatorios de vencimiento.",
-          "Exporta los resultados para tu expediente.",
+          "Compras (RCE) y ventas (RVIE) por periodo, directo de la API de SUNAT.",
+          "Comprobante por comprobante, con acumulado anual y descarga en Excel.",
         ],
       },
       {
-        titulo: "Módulo Detalle SIRE",
+        titulo: "Visor Tributario",
         puntos: [
-          "Compras y ventas reales por periodo (RCE / RVIE) directo de la API de SUNAT.",
-          "Acumulado anual y estado presentado / no presentado por mes.",
-          "Descarga en Excel, comprobante por comprobante.",
+          "Extensión del navegador: captura SIRE, DJ mensual y anual mientras navegas SUNAT.",
+          "Sin bots, captcha ni bloqueo de IP; arma el cuadro año × mes.",
         ],
       },
     ],
@@ -105,53 +109,47 @@ export const PLANES: Plan[] = [
     precioAntes: "S/ 39.98",
     periodo: "/mes",
     etiqueta: "Lanzamiento −50%",
-    resumen: "RTT automático, Visor Tributario y Descarga masiva de comprobantes.",
+    resumen: "RTT, Descarga masiva y el seguimiento 24 h del buzón con aviso a tu celular.",
     destacado: true,
-    cta: "Solicitar Premium",
-    ctaHref: "",
+    cta: "Pagar Plan Premium",
+    ctaHref: "/pagar?plan=premium",
     ctaEstilo: "accent",
     incluidos: [
       {
+        titulo: "Seguimiento 24 h del buzón SUNAT",
+        nuevo: true,
+        puntos: [
+          "Revisamos el buzón de tus empresas cada 24 horas, sin que entres a SUNAT.",
+          "Si llega una notificación o un mensaje nuevo, te avisamos al instante por Telegram y por correo, con el PDF adjunto.",
+        ],
+      },
+      {
         titulo: "Todo lo del Plan Regular",
         puntos: [
-          "Reporte Analítico de Auditoría, Consultas Tributarias y Detalle SIRE incluidos.",
+          "Reporte Analítico, Consultas Tributarias, Detalle SIRE y Visor Tributario.",
+          "Generaciones sin límite por empresa.",
         ],
       },
       {
         titulo: "Reporte Tributario para Terceros (RTT)",
         puntos: [
-          "Genera el RTT en SUNAT de forma automática (llega a la nube, sin revisar correos).",
-          "Descarga el PDF y el XML del reporte cuando esté listo.",
-        ],
-      },
-      {
-        titulo: "Visor Tributario",
-        puntos: [
-          "Extensión del navegador: captura SIRE, DJ mensual y anual mientras navegas SUNAT.",
-          "Sin bots, captcha ni bloqueo de IP; los datos llegan a Radar para el reporte.",
+          "Genera el RTT en SUNAT de forma automática y descarga el PDF y el XML.",
         ],
       },
       {
         titulo: "Descarga masiva de comprobantes",
         puntos: [
-          "Facturas recibidas en bloque: XML o PDF oficial de SUNAT, desde una relación o el SIRE.",
-          "Excel completo con detracción, ítems por factura y la relación de faltantes.",
-          "Recibos por honorarios (RxH) por mes completo: detalle en Excel y plantilla para Contasis/StarSoft.",
-        ],
-      },
-      {
-        titulo: "Soporte 24/7",
-        puntos: [
-          "Atención prioritaria por cualquier canal, en cualquier momento.",
+          "Hasta 500 comprobantes al mes: facturas XML o PDF oficial y recibos por honorarios.",
+          "Excel completo con detracción, ítems y faltantes; RxH en Excel o plantilla StarSoft.",
         ],
       },
     ],
   },
   {
-    nombre: "Plan de Equipo",
+    nombre: "Plan Empresas",
     planId: "equipo",
     precio: "A cotizar",
-    resumen: "Para empresas: gestionen en equipo todas las empresas a su cargo.",
+    resumen: "A tu medida: módulos, usuarios y límites según lo que necesite tu empresa.",
     cta: "Solicitar cotización",
     ctaHref: "",
     ctaEstilo: "primary",
@@ -159,20 +157,15 @@ export const PLANES: Plan[] = [
       {
         titulo: "Todo lo del Plan Premium",
         puntos: [
-          "Reporte Analítico, Consultas Tributarias, Detalle SIRE, RTT, Visor Tributario y Descarga masiva incluidos.",
+          "Incluye el seguimiento 24 h del buzón con aviso por Telegram y correo.",
         ],
       },
       {
-        titulo: "Equipo y gestión",
+        titulo: "A la medida de tu empresa",
         puntos: [
-          "3 usuarios adicionales para tu empresa.",
-          "Gestionen en equipo todas las empresas a su cargo.",
-        ],
-      },
-      {
-        titulo: "Soporte 24/7",
-        puntos: [
-          "Atención prioritaria por cualquier canal, en cualquier momento.",
+          "Usuarios para tu equipo y gestión de todas las empresas a su cargo.",
+          "Generaciones y comprobantes según lo que acordemos.",
+          "Atención prioritaria.",
         ],
       },
     ],

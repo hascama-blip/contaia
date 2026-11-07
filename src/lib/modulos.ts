@@ -10,7 +10,7 @@ export const PLAN_LABEL: Record<PlanId, string> = {
   basico: "Básico (gratis)",
   regular: "Regular",
   premium: "Premium",
-  equipo: "Plan de Equipo",
+  equipo: "Plan Empresas",
 };
 
 /** ¿El `plan` del usuario incluye (>=) el plan mínimo requerido? */
@@ -30,17 +30,20 @@ export interface ModuloDef {
 }
 
 // Regla de planes:
-//   Básico (gratis) → Reporte analítico de auditoría.
-//   Regular         → + Consultas tributarias + Detalle SIRE.
-//   Premium         → + RTT + Visor Tributario + Descarga masiva de comprobantes.
-//   Equipo          → todo Premium + operadores (equipo).
+//   Básico (gratis) → Reporte analítico de auditoría + Consultas tributarias
+//                     (3 generaciones por paso y empresa al mes).
+//   Regular         → lo mismo con 5 generaciones + Detalle SIRE + Visor Tributario.
+//   Premium         → + RTT + Descarga masiva (500 comprobantes/mes) + seguimiento
+//                     24 h del buzón con aviso por Telegram y correo.
+//   Empresas (equipo) → a cotizar: todo Premium + operadores.
+// Los cupos y topes están en `cupos.ts`.
 export const MODULOS: ModuloDef[] = [
   // Principales (según planes)
   { key: "reporte", nombre: "Reporte analítico de auditoría", href: "/clientes", planMin: "basico" },
-  { key: "consultas", nombre: "Consultas tributarias", href: "/herramientas/consultas", planMin: "regular" },
+  { key: "consultas", nombre: "Consultas tributarias", href: "/herramientas/consultas", planMin: "basico" },
   { key: "detalle-sire", nombre: "Detalle SIRE", href: "/herramientas/detalle-sire", planMin: "regular" },
   { key: "rtt", nombre: "Reporte Tributario para Terceros (RTT)", href: "/herramientas/rtt", planMin: "premium" },
-  { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", planMin: "premium" },
+  { key: "visor", nombre: "Visor Tributario", href: "/herramientas/visor", planMin: "regular" },
   // Descarga masiva: facturas (XML/PDF) + honorarios (RxH) en una sola pantalla.
   { key: "comprobantes-xml", nombre: "Descarga masiva de comprobantes (facturas + RxH)", href: "/herramientas/comprobantes-xml", planMin: "premium" },
   // Utilitarios — solo supremo (o habilitados por cuenta)

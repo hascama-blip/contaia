@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSupremo, ensureSupremo } from "@/lib/auth";
 import SupremoPanel from "@/components/SupremoPanel";
+import PagosSupremo from "@/components/PagosSupremo";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function SupremoPage() {
         </p>
       </div>
       <SupremoPanel />
+      <PagosSupremo />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <p className="font-semibold text-slate-800">🧪 Laboratorio (experimental)</p>

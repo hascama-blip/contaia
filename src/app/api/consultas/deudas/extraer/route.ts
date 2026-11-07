@@ -3,7 +3,7 @@ import { getClienteAutorizado } from "@/lib/auth";
 import { extraerDeudasF36 } from "@/lib/fraccionamiento";
 import { setDeudasF36 } from "@/lib/db";
 import { logAccion } from "@/lib/auditoria";
-import { chequearUso, registrarUso } from "@/lib/usos";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -38,16 +38,14 @@ export async function POST(req: NextRequest) {
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
 
-  // Cupo del módulo gratis.
-  const uso = await chequearUso();
-  if (!uso.ok && !body.diagnostico) {
-    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
-  }
+  // Cupo del plan: generaciones de este paso por empresa al mes.
+  const cupo = await verificarCupo(cliente.ruc, "deudas-extraer");
+  if (!cupo.ok && !body.diagnostico) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true, forzarLogin: body.forzarLogin === true });
   if (r.ok && r.tablas && !body.diagnostico) {
     await setDeudasF36(cliente.id, r.tablas, r.nota).catch(() => {}); // reemplaza lo anterior
-    if (uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
+    if (cupo.ok) await consumirCupo(cupo.ticket);
     const total = r.tablas.reduce((a, t) => a + (t.filas?.length ?? 0), 0);
     await logAccion({
       area: "Fraccionamiento F36",

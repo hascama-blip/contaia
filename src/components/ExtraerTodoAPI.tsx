@@ -62,13 +62,16 @@ export default function ExtraerTodoAPI({
 
       // 2) Montos (compras/ventas) mes por mes.
       total = periodos.length;
+      // Mismo `lote` en todos los periodos → cuenta como UNA generación del cupo.
+      const lote = `todo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       for (let i = 0; i < periodos.length; i++) {
         setProgreso(`Montos SIRE ${periodos[i].slice(4)}/${periodos[i].slice(0, 4)} (${i + 1}/${periodos.length})…`);
         const r = await fetch(`/api/clientes/${clienteId}/sire`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ periodo: periodos[i], real: true, solUser, solPass, clientId, clientSecret }),
+          body: JSON.stringify({ periodo: periodos[i], real: true, solUser, solPass, clientId, clientSecret, lote }),
         });
         if (r.ok) montosOk++;
+        else if (r.status === 429) { const d = await r.json().catch(() => ({})); setError(d.error ?? "Sin cupo."); break; }
       }
       setRes({ estado: estadoOk, montos: montosOk, total });
       router.refresh();

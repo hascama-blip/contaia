@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { mergeBuzon } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { consultarBuzon } from "@/lib/buzon";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
+  const cupo = await verificarCupo(cliente.ruc, "buzon");
+  if (!cupo.ok && body.diagnostico !== true) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
+
   try {
     const resultado = await consultarBuzon({
       ruc: cliente.ruc,
@@ -44,7 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     // Persistir (no en modo diagnóstico): el buzón es un HISTORIAL acumulado;
     // cada consulta agrega los mensajes nuevos a los ya guardados.
-    if (!resultado.diag) {
+    if (!resultado.diag && !resultado.loginError) {
+      if (cupo.ok) await consumirCupo(cupo.ticket);
       const fus = await mergeBuzon(cliente.id, resultado.mensajes).catch(() => null);
       if (fus) {
         return NextResponse.json({

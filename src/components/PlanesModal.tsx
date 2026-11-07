@@ -60,17 +60,14 @@ export default function PlanesModal() {
 
               <ul className="mt-3 flex-1 space-y-1">
                 {p.incluidos.map((g, gi) => (
-                  <li key={gi} className="flex gap-1.5 text-[11px] text-slate-600">
+                  <li key={gi} className={`flex gap-1.5 text-[11px] ${g.nuevo ? "rounded-md bg-accent-50 px-1 py-0.5 font-semibold text-slate-800" : "text-slate-600"}`}>
                     <span className="mt-0.5 text-emerald-500">✓</span>
-                    <span>{g.titulo}</span>
+                    <span>
+                      {g.nuevo && <span className="mr-1 rounded-full bg-accent-400 px-1.5 py-px text-[9px] font-bold text-brand-900">NUEVO</span>}
+                      {g.titulo}
+                    </span>
                   </li>
                 ))}
-                {p.proximamente && (
-                  <li className="flex gap-1.5 text-[11px] text-slate-400">
-                    <span className="mt-0.5">🔜</span>
-                    <span>{p.proximamente.titulo}: Descarga masiva de comprobantes</span>
-                  </li>
-                )}
               </ul>
 
               {p.gratis ? (
@@ -82,7 +79,7 @@ export default function PlanesModal() {
                 </button>
               ) : (
                 <Link
-                  href="/planes"
+                  href={p.ctaHref || "/planes"}
                   onClick={cerrar}
                   className={`mt-3 w-full text-center text-xs ${p.ctaEstilo === "accent" ? "btn-accent" : "btn-primary"}`}
                 >

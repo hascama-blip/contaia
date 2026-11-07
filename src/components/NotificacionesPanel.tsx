@@ -131,11 +131,11 @@ function PlanCard({ plan }: { plan: Datos["plan"] }) {
       {!gratis && dias != null && (
         <p className="mt-1">
           {dias < 0 ? `Venció hace ${-dias} día(s). ` : dias === 0 ? "Vence hoy. " : `Vence en ${dias} día(s) (${fmtDia(plan.vence!)}). `}
-          {dias <= 7 && <Link href="/planes" className="font-semibold underline">Renovar</Link>}
+          {dias <= 7 && <Link href={plan.id === "regular" || plan.id === "premium" ? `/pagar?plan=${plan.id}` : "/planes"} className="font-semibold underline">Renovar</Link>}
         </p>
       )}
       {!gratis && dias == null && <p className="mt-1 opacity-80">Sin fecha de vencimiento.</p>}
-      {gratis && <p className="mt-1 opacity-80">Incluye el Reporte analítico de auditoría.</p>}
+      {gratis && <p className="mt-1 opacity-80">Incluye el Reporte analítico de auditoría y las Consultas tributarias (3 generaciones por paso y empresa al mes).</p>}
     </div>
   );
 }

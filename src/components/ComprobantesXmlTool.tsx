@@ -4,6 +4,7 @@ import { useState } from "react";
 import AccesosSol from "./AccesosSol";
 import ComprobantesXmlPanel from "./ComprobantesXmlPanel";
 import HonorariosPanel from "./HonorariosPanel";
+import { TopeComprobantes } from "./CuposEmpresa";
 
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
@@ -43,6 +44,8 @@ export default function ComprobantesXmlTool({ clientes }: { clientes: ClienteMin
           </select>
         )}
       </div>
+
+      <TopeComprobantes />
 
       {sel && (
         <>

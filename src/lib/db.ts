@@ -18,6 +18,7 @@ import type {
   ProveedorCuenta,
   Usuario,
   Aviso,
+  Pago,
   AlertasUsuario,
   VigilanciaBuzon,
   DeudaF36Tabla,
@@ -85,6 +86,8 @@ interface Store {
   visor?: { tokens?: Record<string, string>; capturas?: VisorCaptura[]; matriz?: Record<string, VisorMatriz[]> };
   /** Avisos informativos publicados por el supremo (panel Notificaciones). */
   avisos?: Aviso[];
+  /** Pagos de planes por la pasarela (pendientes, pagados, rechazados). */
+  pagos?: Pago[];
   /** Alertas (Telegram/correo): registro de lo ya enviado y estado de la tarea nocturna. */
   alertas?: {
     /** clave de alerta → fecha ISO en que se envió (para no repetir). */
@@ -268,6 +271,168 @@ export async function consumirUso(adminId: string): Promise<void> {
   const usados = c.expirado ? 1 : (u.usosGratis?.usados ?? 0) + 1;
   u.usosGratis = { usados, desde };
   await writeStore(store);
+}
+
+// ---- Cupos del mes por estudio (generaciones por empresa+paso y comprobantes)
+
+/** Mes en curso en Lima ("YYYY-MM"): los cupos se reinician el día 1. */
+export function mesLima(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).format(d).slice(0, 7);
+}
+
+/** Cupos del mes en curso del estudio (vacío si cambió de mes). */
+export async function getCuposMes(adminId: string): Promise<{ usos: Record<string, number>; lotes: Record<string, string>; comprobantes: number }> {
+  const u = await getUserById(adminId);
+  const mes = mesLima();
+  if (!u?.cupos || u.cupos.mes !== mes) return { usos: {}, lotes: {}, comprobantes: 0 };
+  return { usos: { ...u.cupos.usos }, lotes: { ...(u.cupos.lotes ?? {}) }, comprobantes: u.cupos.comprobantes ?? 0 };
+}
+
+function cuposDelMes(u: Usuario) {
+  const mes = mesLima();
+  if (!u.cupos || u.cupos.mes !== mes) u.cupos = { mes, usos: {}, lotes: {}, comprobantes: 0 };
+  if (!u.cupos.lotes) u.cupos.lotes = {};
+  return u.cupos;
+}
+
+/** Suma 1 generación a "RUC:paso". Si viene `lote` y esa tanda ya se contó,
+ *  no suma (p. ej. el SIRE de 12 periodos = 1 sola generación). Devuelve los usados. */
+export async function sumarCupo(adminId: string, clave: string, lote?: string): Promise<number> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === adminId);
+  if (!u) return 0;
+  const c = cuposDelMes(u);
+  if (lote) {
+    const kl = `${clave}:${lote}`;
+    if (c.lotes![kl]) return c.usos[clave] ?? 0;
+    c.lotes![kl] = new Date().toISOString();
+    // Poda: solo se guardan las tandas del mes, con tope de 300.
+    const ks = Object.keys(c.lotes!);
+    if (ks.length > 300) for (const k of ks.slice(0, ks.length - 300)) delete c.lotes![k];
+  }
+  c.usos[clave] = (c.usos[clave] ?? 0) + 1;
+  await writeStore(store);
+  return c.usos[clave];
+}
+
+/** Suma `n` comprobantes descargados en el mes. Devuelve el acumulado. */
+export async function sumarComprobantesMes(adminId: string, n: number): Promise<number> {
+  if (!(n > 0)) return (await getCuposMes(adminId)).comprobantes;
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === adminId);
+  if (!u) return 0;
+  const c = cuposDelMes(u);
+  c.comprobantes = (c.comprobantes ?? 0) + n;
+  await writeStore(store);
+  return c.comprobantes;
+}
+
+/** Límites pactados del Plan Empresas (los fija el supremo). */
+export async function setLimitesCotizados(userId: string, lim: { generaciones?: number; comprobantes?: number } | null): Promise<Usuario | null> {
+  const store = await readStore();
+  const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
+  if (!u) return null;
+  u.limitesCotizados = lim ?? undefined;
+  await writeStore(store);
+  return u;
+}
+
+// ---- Pagos de planes (pasarela) ---------------------------------------------
+
+export async function crearPago(p: Omit<Pago, "id" | "creadoAt" | "estado">): Promise<Pago> {
+  const store = await readStore();
+  if (!Array.isArray(store.pagos)) store.pagos = [];
+  const pago: Pago = { ...p, id: newId(), estado: "pendiente", creadoAt: new Date().toISOString() };
+  store.pagos.unshift(pago);
+  // Poda de pendientes viejos (más de 30 días sin pagar).
+  const lim = Date.now() - 30 * 86400000;
+  store.pagos = store.pagos.filter((x) => x.estado !== "pendiente" || new Date(x.creadoAt).getTime() > lim);
+  await writeStore(store);
+  return pago;
+}
+
+export async function getPago(id: string): Promise<Pago | null> {
+  const store = await readStore();
+  return (store.pagos ?? []).find((p) => p.id === id) ?? null;
+}
+
+export async function listPagos(userId?: string): Promise<Pago[]> {
+  const store = await readStore();
+  const l = store.pagos ?? [];
+  return userId ? l.filter((p) => p.userId === userId) : l;
+}
+
+/** Personas (estudios) distintas que ya pagaron con precio de lanzamiento. */
+export async function contarLanzamiento(): Promise<number> {
+  const store = await readStore();
+  const ids = new Set<string>();
+  for (const p of store.pagos ?? []) if (p.estado === "pagado" && p.lanzamiento) ids.add(p.userId);
+  for (const u of store.users ?? []) if (u.precioLanzamiento) ids.add(u.id);
+  return ids.size;
+}
+
+export async function marcarPago(id: string, cambios: Partial<Pick<Pago, "estado" | "referencia" | "detalle">>): Promise<Pago | null> {
+  const store = await readStore();
+  const p = (store.pagos ?? []).find((x) => x.id === id);
+  if (!p || p.estado === "pagado") return p ?? null;
+  Object.assign(p, cambios);
+  await writeStore(store);
+  return p;
+}
+
+const sumarDias = (iso: string, dias: number) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Acredita un pago (IDEMPOTENTE: si ya estaba pagado no hace nada) y activa
+ *  el plan del estudio por `dias`. Si renueva el MISMO plan aún vigente, los
+ *  días se suman a su vencimiento; si cambia de plan, la vigencia corre desde hoy.
+ *  Devuelve { pago, nuevo } (nuevo=false si ya estaba acreditado). */
+export async function acreditarPago(
+  id: string,
+  datos: { referencia?: string; montoCentimos?: number; detalle?: string },
+  dias = 30,
+): Promise<{ pago: Pago | null; nuevo: boolean; error?: string }> {
+  const store = await readStore();
+  const p = (store.pagos ?? []).find((x) => x.id === id);
+  if (!p) return { pago: null, nuevo: false, error: "Pago no encontrado." };
+  if (p.estado === "pagado") return { pago: p, nuevo: false };
+  if (datos.montoCentimos !== undefined && datos.montoCentimos < p.montoCentimos) {
+    p.estado = "rechazado";
+    p.detalle = `Monto recibido ${datos.montoCentimos} < esperado ${p.montoCentimos}.`;
+    await writeStore(store);
+    return { pago: p, nuevo: false, error: p.detalle };
+  }
+  const u = (store.users ?? []).find((x) => x.id === p.userId);
+  if (!u) return { pago: p, nuevo: false, error: "Usuario no encontrado." };
+  const hoy = new Date().toISOString().slice(0, 10);
+  const vigente = !!u.planVence && u.planVence >= hoy && (u.plan ?? "basico") !== "basico";
+  if (u.plan === p.plan && vigente) {
+    // Renovación del mismo plan: los días se suman al vencimiento actual.
+    u.planVence = sumarDias(u.planVence!, dias);
+  } else {
+    // Cambio de plan: corre desde hoy y los días que quedaban del plan anterior
+    // se convierten según el valor de cada plan (Premium vale el doble que
+    // Regular): subir de Regular con 20 días restantes suma 10 días de Premium.
+    const PESO: Record<string, number> = { regular: 1, premium: 2, equipo: 2 };
+    let credito = 0;
+    if (vigente && PESO[u.plan as string]) {
+      const restantes = Math.max(0, Math.round((Date.parse(`${u.planVence}T00:00:00Z`) - Date.parse(`${hoy}T00:00:00Z`)) / 86400000));
+      credito = Math.floor((restantes * PESO[u.plan as string]) / PESO[p.plan]);
+    }
+    u.plan = p.plan;
+    u.planVence = sumarDias(hoy, dias + credito);
+  }
+  if (p.lanzamiento) u.precioLanzamiento = true;
+  p.estado = "pagado";
+  p.pagadoAt = new Date().toISOString();
+  p.vigenteHasta = u.planVence;
+  if (datos.referencia) p.referencia = datos.referencia;
+  if (datos.detalle) p.detalle = datos.detalle;
+  await writeStore(store);
+  return { pago: p, nuevo: true };
 }
 
 // ---- Solicitudes de acceso (las gestiona el usuario supremo) ---------------

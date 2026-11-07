@@ -8,6 +8,7 @@ import { llevaSire, esPersonaNatural } from "@/lib/types";
 import SunatPanel from "./SunatPanel";
 import AccesosSol from "./AccesosSol";
 import VigilanciaBuzonPanel from "./VigilanciaBuzonPanel";
+import CuposEmpresa from "./CuposEmpresa";
 import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
 import RentasPanel from "./RentasPanel";
@@ -196,6 +197,16 @@ export default function ClienteDetail({
         solUserGuardado={cliente.credSire?.solUser ?? ""}
         llevaSire={llevaSire(cliente)}
         inicialCred={cliente.credSire ? { clientId: cliente.credSire.clientId ?? "", clientSecret: cliente.credSire.clientSecret ?? "" } : null}
+      />
+
+      {/* Cupos del mes de esta empresa (solo si el plan tiene límite) */}
+      <CuposEmpresa
+        clienteId={cliente.id}
+        pasos={[
+          "buzon", "deudas-generar", "deudas-extraer",
+          ...(esPersonaNatural(cliente.ruc) ? ["rentas", "itf"] : []),
+          ...(llevaSire(cliente) ? ["sire-estado", "sire"] : []),
+        ]}
       />
 
       {/* Vigilancia nocturna del buzón (opt-in, Clave SOL cifrada 30 días) */}

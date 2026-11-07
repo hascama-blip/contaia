@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerComprobantesXmlApi } from "@/lib/comprobantesXml";
-import { chequearUso, registrarUso } from "@/lib/usos";
+import { comprobantesDisponibles, sumarComprobantes, mensajeTopeComprobantes } from "@/lib/cupos";
 import { guardarComprobanteExtraido } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -30,12 +30,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Sube una relación de comprobantes o indica un periodo (AAAAMM)." }, { status: 400 });
   }
 
-  // Igual que el modo scraping: toda la operación cuenta como UN uso; solo la
-  // primera tanda (parte 0 o sin parte) chequea/consume el cupo.
-  const esPrimeraParte = !body.parte;
-  const uso = esPrimeraParte ? await chequearUso() : { ok: true, adminId: "", ilimitado: true } as any;
-  if (esPrimeraParte && !uso.ok && !body.diagnostico) {
-    return NextResponse.json({ error: uso.mensaje, sinUsos: true, renuevaAt: uso.renuevaAt }, { status: 429 });
+  // Tope del plan: comprobantes de la Descarga masiva por MES (solo cuentan los
+  // descargados con éxito). Si la relación pasa lo disponible, se recorta.
+  const esDiag = body.diagnostico === true;
+  const tope = esDiag ? null : await comprobantesDisponibles();
+  let relacionTope = relacion;
+  let recortados = 0;
+  if (tope && tope.disponibles !== null) {
+    if (tope.disponibles <= 0) {
+      return NextResponse.json({ error: mensajeTopeComprobantes(tope.tope!), sinCupo: true, tope: { usados: tope.usados, tope: tope.tope } }, { status: 429 });
+    }
+    if (relacion.length > tope.disponibles) {
+      recortados = relacion.length - tope.disponibles;
+      relacionTope = relacion.slice(0, tope.disponibles);
+    }
   }
 
   const r = await extraerComprobantesXmlApi({
@@ -43,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     solUser,
     solPass,
     periodo,
-    relacion,
+    relacion: relacionTope,
     diagnostico: body.diagnostico === true,
   });
 
@@ -53,7 +61,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (r.sunatCaido && !r.descargados) {
     return NextResponse.json({ error: r.error, sunatCaido: true, fallidos: r.fallidos ?? [], diag: r.diag }, { status: 503 });
   }
-  if (esPrimeraParte && !body.diagnostico && uso.ok) await registrarUso(uso.adminId, uso.ilimitado);
+  let usadosMes = tope?.usados ?? 0;
+  if (tope) usadosMes = await sumarComprobantes(tope.adminId, Number(r.descargados) || 0);
+  const avisoTope = tope?.tope != null && recortados > 0
+    ? `Se procesaron solo ${relacionTope.length} comprobante(s): llegaste al máximo de ${tope.tope} del mes (${recortados} quedaron fuera).`
+    : undefined;
 
   // Persistir lo extraído (por cliente+periodo) para poder recuperarlo luego.
   if (!body.diagnostico && /^\d{6}$/.test(periodo) && Array.isArray(r.facturas)) {
@@ -66,6 +78,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     fallidos: r.fallidos ?? [],
     sunatCaido: !!r.sunatCaido,
     error: r.error,
+    tope: tope ? { usados: usadosMes, tope: tope.tope, recortados } : null,
+    avisoTope,
     diag: r.diag,
   });
 }

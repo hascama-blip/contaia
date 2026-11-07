@@ -72,7 +72,7 @@ export default function VigilanciaBuzonPanel({ clienteId, solUserGuardado }: { c
 
       {!e.permitido ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          🔒 Disponible en los planes <strong>Premium</strong> y <strong>de Equipo</strong>.{" "}
+          🔒 <strong>Nuevo:</strong> seguimiento 24 h del buzón con aviso por Telegram y correo. Disponible en los planes <strong>Premium</strong> y <strong>Empresas</strong>.{" "}
           <Link href="/planes" className="font-semibold underline">Ver planes</Link>
         </div>
       ) : e.activo ? (

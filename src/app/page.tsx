@@ -48,6 +48,7 @@ const PRINCIPALES: Opcion[] = [
       "Mensajes y notificaciones del buzón SUNAT por empresa.",
       "Descarga del PDF adjunto de cada notificación.",
       "Seguimiento con plazo de atención y recordatorios.",
+      "Plan Premium: seguimiento 24 h del buzón con aviso por Telegram y correo.",
     ],
   },
   {
@@ -93,7 +94,7 @@ const PRINCIPALES: Opcion[] = [
     detalle: "Facturas (XML o PDF oficial en bloque) y recibos por honorarios, directo de SUNAT, con el Excel completo con detracción, ítems y faltantes.",
     cta: "Abrir descarga",
     contenido: [
-      "Facturas recibidas en bloque: XML o PDF oficial, desde una relación o el SIRE.",
+      "Hasta 500 comprobantes al mes (Plan Premium): facturas XML o PDF oficial y recibos por honorarios.",
       "Excel completo: cabecera, importes, detracción, ítems y relación de faltantes.",
       "Recibos por honorarios (RxH) por mes completo: detalle en Excel y plantilla para Contasis/StarSoft.",
     ],

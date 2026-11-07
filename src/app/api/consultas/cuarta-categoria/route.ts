@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
 import { consultarCuartaCategoria } from "@/lib/cuartaCategoria";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 200;
@@ -26,8 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Elige un Mes (01-12) y un Año válidos." }, { status: 400 });
   }
 
+  const cupo = await verificarCupo(cliente.ruc, "cuarta");
+  if (!cupo.ok && body.diagnostico !== true) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
+
   const r = await consultarCuartaCategoria({ ruc: cliente.ruc, solUser, solPass, mes, anio, diagnostico: body.diagnostico === true });
   if (body.diagnostico === true) return NextResponse.json({ diag: r.diag });
   if (!r.ok) return NextResponse.json({ error: r.error ?? "No se pudo consultar la 4ta categoría.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
-  return NextResponse.json({ cuarta: r.cuarta, diag: r.diag });
+  const estadoCupo = cupo.ok ? await consumirCupo(cupo.ticket) : null;
+  return NextResponse.json({ cuarta: r.cuarta, cupo: estadoCupo, diag: r.diag });
 }

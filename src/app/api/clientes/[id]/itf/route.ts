@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
 import { setItfReporte } from "@/lib/db";
 import { consultarItf } from "@/lib/itf";
+import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
 export const runtime = "nodejs";
 export const maxDuration = 200;
@@ -19,9 +20,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const ejercicio = typeof body.ejercicio === "string" ? body.ejercicio : undefined;
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario SOL y la Clave SOL." }, { status: 400 });
 
+  const cupo = await verificarCupo(cliente.ruc, "itf");
+  if (!cupo.ok && body.diagnostico !== true) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
+
   const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio, diagnostico: body.diagnostico === true });
   if (body.diagnostico === true) return NextResponse.json({ diag: r.diag });
   if (!r.ok) return NextResponse.json({ error: r.error ?? "No se pudo consultar el ITF.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
+  if (cupo.ok) await consumirCupo(cupo.ticket);
   // Persistimos el reporte (aunque venga vacío) para el informe.
   if (r.itf) await setItfReporte(params.id, r.itf).catch(() => {});
   return NextResponse.json({ itf: r.itf, diag: r.diag });

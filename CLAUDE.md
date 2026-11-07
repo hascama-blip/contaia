@@ -114,6 +114,22 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Clasifica por asunto: **PELIGROSO** (Fiscalización, No Contenciosa) y **URGENTE** (Cobranza, Valores).
   Pendiente: mapear `codEtiqueta` → etiqueta para clasificación exacta (hoy es por palabras del asunto).
 
+## Planes, cupos y pagos
+- Planes (`modulos.ts`, textos en `planes.ts`): **Básico** gratis = Reporte analítico + Consultas
+  tributarias · **Regular** S/ 9.99 = + Detalle SIRE + Visor · **Premium** S/ 19.99 = + RTT +
+  Descarga masiva (500 comprobantes/mes) + seguimiento 24 h del buzón (Telegram/correo, NUEVO) ·
+  **Empresas** (`equipo`) a cotizar. Precios de lanzamiento −50 % para las primeras
+  `LANZAMIENTO_CUPOS` (100) personas; quien lo obtuvo lo conserva al renovar.
+- Cupos (`cupos.ts`): generaciones por **RUC + paso** al mes (Lima): Básico 3, Regular 5, Premium y
+  Empresas sin límite (env `CUPO_*`). Solo consume tras éxito (`verificarCupo` → `consumirCupo`).
+  SIRE de varios periodos manda un `lote` = 1 generación. Tope de comprobantes (`TOPE_COMPROBANTES_*`).
+  Empresas: límites pactados por cuenta (`Usuario.limitesCotizados`, panel del supremo).
+- Pagos (`pagos.ts`): `PASARELA` = culqi | mercadopago | izipay. Confirmación SIEMPRE del lado
+  servidor (cargo Culqi con sk, consulta a la API de MP, firma HMAC de Izipay) → `acreditarPago`
+  (idempotente, +30 días; renovar suma; cambiar de plan convierte los días restantes). Webhooks en
+  `/api/webhooks/pagos/*` (públicos por el middleware). Sin pasarela configurada, los botones
+  vuelven a WhatsApp.
+
 ## Hecho
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·
 buzón (más peligroso aparte) · declaraciones PDF vs SIRE · diagnóstico · dashboard · informe de gerencia

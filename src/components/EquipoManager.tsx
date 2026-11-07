@@ -77,7 +77,7 @@ export default function EquipoManager({
         {info && <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{info}</div>}
         {lleno && (
           <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Alcanzaste el máximo de {limite} trabajadores del Plan de Equipo. Elimina uno para poder agregar otro.
+            Alcanzaste el máximo de {limite} trabajadores del Plan Empresas. Elimina uno para poder agregar otro.
           </div>
         )}
         <form onSubmit={crear} className="grid gap-3 sm:grid-cols-3">

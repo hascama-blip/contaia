@@ -12,7 +12,7 @@ export default async function EquipoPage() {
   bloquearSiSoloRtp(user);
   if (!esAdmin(user)) redirect("/");
 
-  // El equipo (operarios) es exclusivo del Plan de Equipo.
+  // El equipo (operarios) es exclusivo del Plan Empresas.
   const plan = await planDelEstudio(user);
   const subs = (await listSubUsuarios(user.id)).map(publicUser);
   if (!esSupremo(user) && plan !== "equipo") {
@@ -20,9 +20,9 @@ export default async function EquipoPage() {
       <div className="mx-auto max-w-2xl space-y-4">
         <h1 className="text-2xl font-bold text-slate-800">Equipo del estudio</h1>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-          <p className="font-semibold">🔒 Disponible en el Plan de Equipo</p>
+          <p className="font-semibold">🔒 Disponible en el Plan Empresas</p>
           <p className="mt-1">
-            Con el <b>Plan de Equipo</b> agregas usuarios para tus trabajadores (jefe + operarios) y
+            Con el <b>Plan Empresas</b> agregas usuarios para tus trabajadores (jefe + operarios) y
             gestionan juntos todas las empresas a su cargo.
           </p>
           {subs.length > 0 && (
@@ -30,7 +30,7 @@ export default async function EquipoPage() {
               Tienes {subs.length} operario(s) ya creado(s); se conservan y podrás gestionarlos al activar el plan.
             </p>
           )}
-          <Link href="/planes" className="btn-primary mt-4 inline-flex">Ver Plan de Equipo →</Link>
+          <Link href="/planes" className="btn-primary mt-4 inline-flex">Ver Plan Empresas →</Link>
         </div>
       </div>
     );

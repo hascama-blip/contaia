@@ -139,10 +139,44 @@ export interface Usuario {
   codigoTipo?: "verificacion" | "reset";
   codigoIntentos?: number;
   codigoEnviadoAt?: string;
-  /** Cupo del módulo gratis: 3 consultas por ventana de 7 días. */
+  /** Cupo del módulo gratis (legacy): 3 consultas por ventana de 7 días. */
   usosGratis?: { usados: number; desde: string };
+  /** Cupos del MES (zona Lima, "YYYY-MM") del estudio: generaciones por
+   *  "RUC:paso" y comprobantes descargados en la Descarga masiva. Al cambiar de
+   *  mes se reinicia. `lotes` = tandas ya contadas (SIRE de varios periodos). */
+  cupos?: { mes: string; usos: Record<string, number>; lotes?: Record<string, string>; comprobantes?: number };
+  /** Compró con el precio de lanzamiento (−50 %): lo conserva al renovar. */
+  precioLanzamiento?: boolean;
+  /** Plan Empresas (a cotizar): límites pactados con el cliente. 0 = sin límite;
+   *  undefined = el valor por defecto del plan. */
+  limitesCotizados?: { generaciones?: number; comprobantes?: number };
   /** Alertas al celular/correo (Telegram vinculado, correo, cronograma). */
   alertas?: AlertasUsuario;
+}
+
+/** Pago de un plan por la pasarela. Al confirmarse (webhook o cargo directo)
+ *  se activa el plan del estudio por 30 días. */
+export interface Pago {
+  id: string;
+  /** Admin del estudio que paga (los operadores heredan su plan). */
+  userId: string;
+  userEmail: string;
+  userNombre: string;
+  plan: "regular" | "premium";
+  /** Monto en céntimos (S/ 9.99 → 999) y moneda. */
+  montoCentimos: number;
+  moneda: "PEN";
+  /** true = precio de lanzamiento (−50 %, primeras 100 personas). */
+  lanzamiento: boolean;
+  proveedor: "culqi" | "mercadopago" | "izipay";
+  estado: "pendiente" | "pagado" | "rechazado";
+  /** Id del cargo/pago en la pasarela (para conciliar). */
+  referencia?: string;
+  detalle?: string;
+  creadoAt: string;
+  pagadoAt?: string;
+  /** Vigencia que otorgó este pago (YYYY-MM-DD). */
+  vigenteHasta?: string;
 }
 
 /** Aviso informativo que publica el supremo (lo ven todas las cuentas en el Inicio). */
