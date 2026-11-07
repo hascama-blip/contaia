@@ -155,3 +155,38 @@ body {
     page-break-inside: avoid;
   }
 }
+
+/* ── Formulario incrustado de Izipay (KR, tema neon) con la marca Radar ──
+   Las cajas de tarjeta/fecha/CVV son iframes de Izipay: aquí solo se ajusta
+   el contenedor, el botón y se ocultan cuotas/diferido (pago único). */
+.radar-kr .kr-embedded,
+.radar-kr.kr-embedded {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.radar-kr .kr-field,
+.radar-kr .kr-field-wrapper,
+.radar-kr .kr-select-wrapper {
+  border-radius: 0.75rem !important;
+}
+.radar-kr .kr-installment-number,
+.radar-kr .kr-first-installment-delay {
+  display: none !important;
+}
+.radar-kr .kr-payment-button {
+  background-color: #edb91e !important; /* accent-400 */
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08) !important;
+  transition: background-color 0.15s ease !important;
+}
+.radar-kr .kr-payment-button,
+.radar-kr .kr-payment-button * {
+  color: #0b2140 !important; /* brand-800 */
+  font-weight: 700 !important;
+}
+.radar-kr .kr-payment-button:hover {
+  background-color: #f1c945 !important; /* accent-300 */
+}
+.radar-kr .kr-form-error {
+  border-radius: 0.75rem !important;
+}
