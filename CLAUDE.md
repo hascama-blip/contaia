@@ -66,6 +66,15 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`/herramientas/analisis-compras`): con varias empresas abre en la 1.ª y descarga un ZIP con
   **un informe por empresa** (`/api/analisis-compras/por-empresa`, PDF o Excel); el consolidado
   queda como vista opcional.
+- `src/lib/conciliacionSire.ts` — **Conciliación SIRE vs contabilidad por empresa** (sección al
+  final del mismo módulo, `ConciliacionSireRtp.tsx`, `/api/analisis-compras/conciliacion` + `/excel`
+  ZIP por empresa). **Ventas**: SIRE RVIE vs **Registro de Ventas** contable (Excel con una pestaña
+  por empresa; empresa en A1, RUC en la fila 2; columnas Fecha · [T/D] · Documento "B002 0005839" ·
+  R.U.C. · Afecto · IGV e IPM · Total). Llave = **tipo + serie + número** (las NC usan las mismas
+  series que boletas/facturas); NC siempre en negativo en ambos lados. **Compras**: SIRE RCE vs
+  Libro Diario (`diarioAComprobantes`: 42/46 = total, 4011 = IGV, resto = base). Cada SIRE se ubica
+  en su empresa por RUC → razón social → asignación manual. 2.º paso: sueltos con mismo importe
+  (+ tipo/fecha/cliente en ventas, + RUC proveedor en compras) = "Nº distinto". Motor: `cruceSire.ts`.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

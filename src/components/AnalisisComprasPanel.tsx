@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ConciliacionSireRtp from "@/components/ConciliacionSireRtp";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -460,6 +461,9 @@ export default function AnalisisComprasPanel() {
           </div>
         </>
       )}
+
+      {/* Conciliación SIRE vs contabilidad (independiente del análisis de egresos) */}
+      <ConciliacionSireRtp />
     </section>
   );
 }
