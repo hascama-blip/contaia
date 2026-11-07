@@ -10,7 +10,7 @@ import { LogoAsenco } from "./Logo";
 // ============================================================
 // Lateral: logo, navegación (Inicio / Dashboard / Clientes / Equipo /
 // Actividad) con el ítem activo resaltado en dorado, y abajo el usuario con
-// su menú (Supremo / Adquirir módulos / Cambiar contraseña / Salir) más los
+// su menú (Supremo / Adquirir módulos / Alertas / Salir) más los
 // íconos de ajustes y salir. Superior: búsqueda de clientes, "+ Nuevo cliente"
 // y la campana de recordatorios. En móvil la lateral se vuelve un cajón.
 
@@ -83,7 +83,6 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
     ...(supremo ? [{ href: "/supremo", label: "Supremo", clase: "font-semibold text-accent-300" }] : []),
     ...(mostrarPlanes ? [{ href: "/planes", label: "Adquirir módulos", clase: "font-semibold text-accent-300" }] : []),
     { href: "/alertas", label: "Alertas al celular", clase: "text-slate-100" },
-    { href: "/cuenta", label: "Cambiar contraseña", clase: "text-slate-100" },
   ];
   const activo = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
   const inicio = !soloRtp && pathname === "/";
@@ -219,7 +218,7 @@ function SidebarContenido({ nav, menu, activo, base, nombreCorto, inicial, busy,
         </button>
       </div>
       <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
-        <Link href="/cuenta" className="rounded-lg p-1 text-slate-300 hover:bg-white/10 hover:text-white" title="Cambiar contraseña">
+        <Link href="/alertas" className="rounded-lg p-1 text-slate-300 hover:bg-white/10 hover:text-white" title="Configurar alertas">
           <Icono name="gear" className="h-5 w-5" />
         </Link>
         <button onClick={onSalir} disabled={busy} className="rounded-lg p-1 text-slate-300 hover:bg-white/10 hover:text-white" title="Salir">

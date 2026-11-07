@@ -141,8 +141,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **Modo diagnóstico**: solo el supremo (`limpiarDiagnostico(body)` tras leer el cuerpo).
 - **Límites**: `src/lib/limite.ts` (login por IP y correo, registro, códigos, pagos, Asociación,
   consulta RUC, webhook RTT).
-- **Sesiones**: el token lleva `sesionVersion`; cambiar/restablecer la contraseña cierra las demás
-  sesiones; una cuenta rechazada pierde la sesión. Contraseña mínima 8.
+- **Sesiones**: el token lleva `sesionVersion`; restablecer la contraseña cierra las demás
+  sesiones; una cuenta rechazada pierde la sesión. Contraseña mínima 8. El cambio de contraseña
+  es SOLO desde el login ("Olvidé mi contraseña", código al correo); `/cuenta` redirige y
+  `/api/auth/cambiar` responde 410.
 - **Secretos**: el client_secret SIRE nunca va al navegador (`ocultarCliente`/`resolverSecreto`
   en `src/lib/secretos.ts`). Sin contraseña supremo por defecto en el código. El panel Supremo y
   el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
