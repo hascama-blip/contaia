@@ -1,5 +1,6 @@
 // Autenticación (lado servidor Node): hash de contraseña + usuario actual.
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { anotarPeticion } from "./registroAccesos";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById, eliminarTodosLosUsuarios } from "./db";
@@ -139,6 +140,8 @@ export async function getCurrentUser(): Promise<Usuario | null> {
       if (!p || p.estado === "rechazado") return null;
     }
   }
+  // Registro de accesos (evidencia): una línea por petición con sesión.
+  try { anotarPeticion(u.id, await headers()); } catch { /* fuera de una petición */ }
   return u;
 }
 

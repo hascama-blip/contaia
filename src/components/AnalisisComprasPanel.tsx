@@ -14,18 +14,26 @@ export default function AnalisisComprasPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [archivos, setArchivos] = useState<any[]>([]);
-  const [a, setA] = useState<any>(null);
+  const [consolidado, setConsolidado] = useState<any>(null);
+  // Varias empresas (un Excel con una pestaña por empresa): análisis de cada una.
+  const [empresas, setEmpresas] = useState<any[]>([]);
+  const [sinGasto, setSinGasto] = useState<string[]>([]);
+  const [sel, setSel] = useState(-1); // -1 = consolidado (o la única empresa)
   const [verDetalle, setVerDetalle] = useState(false);
+  const a = sel >= 0 ? empresas[sel] : consolidado;
+  const esGrupo = empresas.length > 1;
 
   async function subir(files: FileList) {
-    setError(null); setA(null); setBusy(true);
+    setError(null); setConsolidado(null); setEmpresas([]); setSinGasto([]); setSel(-1); setBusy(true);
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("file", f));
       const res = await fetch("/api/analisis-compras/parsear", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No se pudo analizar el archivo."); return; }
-      setA(data.analisis);
+      setConsolidado(data.analisis);
+      setEmpresas(Array.isArray(data.empresas) ? data.empresas : []);
+      setSinGasto(Array.isArray(data.sinGasto) ? data.sinGasto : []);
       setArchivos(data.archivos ?? []);
     } catch {
       setError("Error de red al subir los archivos.");
@@ -46,7 +54,8 @@ export default function AnalisisComprasPanel() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const el = document.createElement("a");
-      el.href = url; el.download = `informe-compras-gerencia.${tipo === "excel" ? "xlsx" : "pdf"}`;
+      const slug = String(a?.consolidado ? "consolidado-grupo" : a?.empresa || "empresa").toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      el.href = url; el.download = `informe-compras-${slug}.${tipo === "excel" ? "xlsx" : "pdf"}`;
       document.body.appendChild(el); el.click(); el.remove();
       URL.revokeObjectURL(url);
     } catch {
@@ -56,7 +65,7 @@ export default function AnalisisComprasPanel() {
     }
   }
 
-  const funcData = (a?.porFuncion ?? []).map((f: any) => ({ name: `${f.cod} ${f.nombre.split(" ").slice(1, 2).join(" ") || f.nombre}`, nombre: f.nombre, value: f.debe, pct: f.pct }));
+  const funcData = (a?.porFuncion ?? []).map((f: any) => ({ name: `${f.cod} ${f.nombre.replace(/^Gastos\s+/i, "")}`, nombre: f.nombre, value: f.debe, pct: f.pct }));
   const natData = (a?.porNaturaleza ?? []).map((n: any) => ({ name: n.cod, nombre: n.nombre, value: n.debe }));
   const ccData = (a?.porCentroCosto ?? []).map((c: any) => ({ name: c.cod, value: c.debe }));
   const mesData = (a?.porMes ?? []).map((m: any) => ({ name: m.nombre.replace(/ \d{4}$/, ""), nombre: m.nombre, value: m.debe }));
@@ -71,7 +80,9 @@ export default function AnalisisComprasPanel() {
         </div>
         <p className="mb-4 text-xs text-slate-400">
           Sube el <strong>Libro Diario</strong> crudo (tal cual sale del sistema contable). Puedes subir
-          <strong> varios meses a la vez</strong> (enero…diciembre) y se combinan en un solo informe. El
+          <strong> varios meses a la vez</strong> (enero…diciembre) y se combinan en un solo informe, o un
+          Excel con <strong>una pestaña por empresa</strong> (mismo mes): sale un informe por empresa y el
+          <strong> consolidado del grupo</strong> con el comparativo. El
           sistema detecta los <strong>asientos</strong>, clasifica los gastos por <strong>función (clase 9)</strong>,
           arma el <strong>dashboard para gerencia</strong> y genera el informe (PDF/Excel).
         </p>
@@ -87,7 +98,7 @@ export default function AnalisisComprasPanel() {
             />
           </label>
           {archivos.length > 0 && (
-            <span className="text-xs text-emerald-700">✓ {archivos.length} archivo(s)</span>
+            <span className="text-xs text-emerald-700">✓ {esGrupo ? `${empresas.length} empresas` : `${archivos.length} archivo(s)`}</span>
           )}
           {a && (
             <div className="ml-auto flex gap-2">
@@ -105,12 +116,33 @@ export default function AnalisisComprasPanel() {
           <div className="mt-3 flex flex-wrap gap-2">
             {archivos.map((f: any, i: number) => (
               <span key={i} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-600">
-                📄 {f.nombre} <span className="text-slate-400">· {f.asientos} asiento(s), {f.movimientos} mov.</span>
+                📄 {f.hoja ? <><strong>{f.hoja}</strong> · {f.empresa}</> : f.nombre} <span className="text-slate-400">· {f.asientos} asiento(s), {f.movimientos} mov.</span>
               </span>
             ))}
           </div>
         )}
       </div>
+
+      {sinGasto.length > 0 && (
+        <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Sin gastos de clase 9 (no se analizan): {sinGasto.join(", ")}.
+        </div>
+      )}
+
+      {esGrupo && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setSel(-1)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${sel === -1 ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-brand-500"}`}>
+            Consolidado del grupo
+          </button>
+          {empresas.map((e: any, i: number) => (
+            <button key={i} onClick={() => setSel(i)}
+              className={`rounded-full border px-3 py-1.5 text-xs ${sel === i ? "border-brand-700 bg-brand-700 font-semibold text-white" : "border-slate-300 bg-white text-slate-600 hover:border-brand-500"}`}>
+              {e.empresa} <span className={sel === i ? "text-white/70" : "text-slate-400"}>· {solesK(e.totalGasto)}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {a && (
         <>
@@ -128,6 +160,8 @@ export default function AnalisisComprasPanel() {
             <Kpi label="Comprobantes" valor={String(a.nAsientos)} />
             <Kpi label="Movimientos" valor={String(a.nMovimientos)} />
           </div>
+
+          {a.porEmpresa?.length > 0 && <ComparativoEmpresas filas={a.porEmpresa} total={a.totalGasto} onVer={(empresa) => setSel(empresas.findIndex((e: any) => e.empresa === empresa))} />}
 
           {/* Charts */}
           <div className="grid gap-4 lg:grid-cols-2">
@@ -249,6 +283,7 @@ export default function AnalisisComprasPanel() {
                       <thead className="bg-amber-50">
                         <tr className="text-left text-[10px] uppercase text-slate-500">
                           <th className="px-2 py-1">Conf.</th>
+                          {a.consolidado && <th className="px-2 py-1">Empresa</th>}
                           <th className="px-2 py-1">Factura / Doc.</th>
                           <th className="px-2 py-1">Fecha</th>
                           <th className="px-2 py-1">Cuenta actual</th>
@@ -266,6 +301,7 @@ export default function AnalisisComprasPanel() {
                                 {h.confianza}
                               </span>
                             </td>
+                            {a.consolidado && <td className="px-2 py-1 text-slate-600">{h.empresa}</td>}
                             <td className="px-2 py-1 font-semibold text-brand-700">{h.documento || "—"}</td>
                             <td className="px-2 py-1 tabular-nums text-slate-500">{h.fecha || "—"}</td>
                             <td className="px-2 py-1 font-medium text-slate-700">{h.cuenta}<div className="text-[10px] font-normal text-slate-400">{h.funcionActual}</div></td>
@@ -301,6 +337,7 @@ export default function AnalisisComprasPanel() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-[10px] uppercase text-slate-400">
+                      {a.consolidado && <th className="px-2 py-1">Empresa</th>}
                       <th className="px-2 py-1">Documento</th>
                       <th className="px-2 py-1">Proveedor</th>
                       <th className="px-2 py-1">Glosa</th>
@@ -310,6 +347,7 @@ export default function AnalisisComprasPanel() {
                   <tbody>
                     {a.topComprobantes.map((d: any, i: number) => (
                       <tr key={i} className="border-t border-slate-100">
+                        {a.consolidado && <td className="px-2 py-1 text-slate-600">{d.empresa}</td>}
                         <td className="px-2 py-1 text-slate-600">{d.documento}</td>
                         <td className="px-2 py-1 text-slate-500">{d.proveedor || "—"}</td>
                         <td className="px-2 py-1 text-slate-500">{d.glosa}</td>
@@ -340,6 +378,7 @@ export default function AnalisisComprasPanel() {
                         <thead>
                           <tr className="text-left text-[10px] uppercase text-slate-400">
                             <th className="px-3 py-1">Fecha</th>
+                            {a.consolidado && <th className="px-3 py-1">Empresa</th>}
                             <th className="px-3 py-1">Cuenta</th>
                             <th className="px-3 py-1">Glosa</th>
                             <th className="px-3 py-1">Factura / Doc.</th>
@@ -351,6 +390,7 @@ export default function AnalisisComprasPanel() {
                           {g.movimientos.map((m: any, i: number) => (
                             <tr key={i} className="border-t border-slate-100">
                               <td className="px-3 py-1 tabular-nums text-slate-500">{m.fecha}</td>
+                              {a.consolidado && <td className="px-3 py-1 text-slate-500">{m.empresa}</td>}
                               <td className="px-3 py-1 tabular-nums text-slate-500">{m.cuenta}</td>
                               <td className="px-3 py-1 text-slate-600">{m.glosa}</td>
                               <td className="px-3 py-1 text-slate-500">{m.documento}</td>
@@ -369,6 +409,60 @@ export default function AnalisisComprasPanel() {
         </>
       )}
     </section>
+  );
+}
+
+// Comparativo entre las empresas del grupo (solo en el consolidado).
+function ComparativoEmpresas({ filas, total, onVer }: { filas: any[]; total: number; onVer: (empresa: string) => void }) {
+  const codigos = Array.from(new Set(filas.flatMap((f) => Object.keys(f.funciones ?? {})))).sort();
+  const suma = (k: string) => filas.reduce((s, f) => s + (f.funciones?.[k] ?? 0), 0);
+  return (
+    <div className="card p-4">
+      <h3 className="mb-1 text-sm font-semibold text-slate-700">Comparativo por empresa</h3>
+      <p className="mb-3 text-xs text-slate-400">Gasto de clase 9 de cada empresa del grupo, por función. Clic en una empresa para ver su informe.</p>
+      <div className="overflow-x-auto">
+        <table className="w-full whitespace-nowrap text-xs">
+          <thead>
+            <tr className="text-left text-[10px] uppercase text-slate-400">
+              <th className="px-2 py-1">Empresa</th>
+              <th className="px-2 py-1 text-right">Gasto total</th>
+              <th className="w-40 px-2 py-1">% del grupo</th>
+              {codigos.map((c) => <th key={c} className="px-2 py-1 text-right" title={c}>{c}</th>)}
+              <th className="px-2 py-1 text-right">IGV</th>
+              <th className="px-2 py-1 text-right">Comprob.</th>
+              <th className="px-2 py-1 text-right">Observ.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f) => (
+              <tr key={f.empresa} className="border-t border-slate-100">
+                <td className="min-w-[11rem] whitespace-normal px-2 py-1.5"><button className="text-left font-semibold text-brand-700 hover:underline" onClick={() => onVer(f.empresa)}>{f.empresa}</button></td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-700">{soles(f.totalGasto)}</td>
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 flex-1 overflow-hidden rounded bg-slate-100"><div className="h-2 rounded bg-brand-600" style={{ width: `${Math.min(100, f.pct)}%` }} /></div>
+                    <span className="w-10 text-right tabular-nums text-slate-500">{f.pct.toFixed(1)}%</span>
+                  </div>
+                </td>
+                {codigos.map((c) => <td key={c} className="px-2 py-1.5 text-right tabular-nums text-slate-600">{f.funciones?.[c] ? soles(f.funciones[c]) : "—"}</td>)}
+                <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{soles(f.totalIgv)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{f.nAsientos}</td>
+                <td className={`px-2 py-1.5 text-right tabular-nums ${f.observados ? "font-semibold text-amber-700" : "text-slate-400"}`}>{f.observados}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-brand-200 font-bold text-brand-800">
+              <td className="px-2 py-1.5">TOTAL GRUPO</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{soles(total)}</td>
+              <td className="px-2 py-1.5 text-right">100%</td>
+              {codigos.map((c) => <td key={c} className="px-2 py-1.5 text-right tabular-nums">{soles(suma(c))}</td>)}
+              <td className="px-2 py-1.5 text-right tabular-nums">{soles(filas.reduce((s, f) => s + f.totalIgv, 0))}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{filas.reduce((s, f) => s + f.nAsientos, 0)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{filas.reduce((s, f) => s + f.observados, 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

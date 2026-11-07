@@ -4,7 +4,8 @@
 // Archivo aparte del store: DATA_DIR/accesos/AAAA-MM.jsonl (una línea por
 // evento, solo se agrega al final). Cada línea lleva una FIRMA HMAC con la
 // llave del servidor: si alguien edita o inventa una línea, la firma no cuadra.
-// Lo usa el middleware (cada request con sesión) y las rutas de login/registro.
+// Lo alimentan getCurrentUser (cada página y cada API con sesión, vía
+// anotarPeticion) y las rutas de login/registro/aceptación.
 // Se conserva 5 años (ver Declaración de responsabilidad, punto 4).
 
 import { promises as fs } from "fs";
@@ -125,4 +126,41 @@ export async function leerAccesos(mes: string, filtro: { ruc?: string; email?: s
     } catch { /* línea dañada: se omite */ }
   }
   return out;
+}
+
+// ---- Anotación por petición (desde getCurrentUser) -------------------------
+// Qué se anota: toda página que se abre (no las precargas del navegador), toda
+// operación que modifica (POST/PUT/PATCH/DELETE) y las lecturas de la API sobre
+// una empresa o que descargan información. Una sola vez por petición (x-req-id).
+const LECTURA_SENSIBLE = /\/clientes\/|export|backup|descarg|excel|xml|pdf|zip|informe|accesos/i;
+const NO_SON_EMPRESA = new Set(["export", "importar", "verificar", "nuevo"]);
+const gv = globalThis as unknown as { __radarAnotadas?: Map<string, number> };
+const anotadas: Map<string, number> = gv.__radarAnotadas ?? (gv.__radarAnotadas = new Map());
+
+export function anotarPeticion(uid: string, h: Headers): void {
+  try {
+    const id = h.get("x-req-id");
+    const ruta = h.get("x-pathname") || "";
+    if (!id || !ruta || anotadas.has(id)) return;
+    const ahora = Date.now();
+    anotadas.set(id, ahora);
+    if (anotadas.size > 3000) for (const [k, t] of Array.from(anotadas.entries())) if (t < ahora - 120_000) anotadas.delete(k);
+    const metodo = (h.get("x-metodo") || "GET").toUpperCase();
+    const esApi = ruta.startsWith("/api/");
+    if (metodo === "HEAD" || metodo === "OPTIONS") return;
+    if (h.get("next-router-prefetch") || h.get("purpose") === "prefetch") return;
+    if (esApi && metodo === "GET" && !LECTURA_SENSIBLE.test(ruta)) return;
+    const seg = ruta.match(/\/clientes\/([A-Za-z0-9_-]+)/)?.[1];
+    const ruc = (new URLSearchParams(h.get("x-query") || "").get("ruc") || "").replace(/\D/g, "");
+    void registrarAcceso({
+      ev: esApi ? "api" : "pagina",
+      uid,
+      ip: (h.get("x-forwarded-for")?.split(",")[0] || h.get("x-real-ip") || "local").trim(),
+      ua: h.get("user-agent") ?? undefined,
+      metodo,
+      ruta,
+      clienteId: seg && !NO_SON_EMPRESA.has(seg) ? seg : undefined,
+      ruc: ruc.length === 11 ? ruc : undefined,
+    });
+  } catch { /* el registro nunca rompe la petición */ }
 }

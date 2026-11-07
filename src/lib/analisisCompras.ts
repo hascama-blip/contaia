@@ -21,6 +21,23 @@ export interface MovDiario {
   cenCos: string;
   debe: number;
   haber: number;
+  /** Empresa de origen (solo en el CONSOLIDADO de varias empresas). */
+  empresa?: string;
+}
+
+/** Fila del comparativo entre empresas (consolidado de un grupo). */
+export interface ResumenEmpresa {
+  empresa: string;
+  hoja: string;
+  totalGasto: number;
+  pct: number;              // % del gasto total del grupo
+  totalIgv: number;
+  nAsientos: number;
+  nMovimientos: number;
+  observados: number;
+  importeObservado: number;
+  /** Gasto por función (cód. 2 dígitos → importe). */
+  funciones: Record<string, number>;
 }
 
 export interface CuentaResumen {
@@ -55,7 +72,10 @@ export interface AnalisisCompras {
   porMes: { mes: string; nombre: string; debe: number; n: number }[]; // clase 9 por mes
   revision: RevisionClasificacion;      // evaluación de clasificación + sugerencias
   topConceptos: CuentaResumen[];        // por glosa
-  topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number }[];
+  topComprobantes: { documento: string; proveedor: string; glosa: string; debe: number; empresa?: string }[];
+  /** Solo en el consolidado de varias empresas (un Excel con una pestaña por empresa). */
+  consolidado?: boolean;
+  porEmpresa?: ResumenEmpresa[];
   // Detalle AGRUPADO POR FUNCIÓN (2 dígitos: 94/95/97…); dentro de cada
   // función, los movimientos van ordenados por fecha.
   detalleCuentas: {
@@ -70,6 +90,7 @@ export interface AnalisisCompras {
       documento: string;
       cenCos: string;
       debe: number;
+      empresa?: string;
     }[];
   }[];
 }
@@ -86,6 +107,7 @@ export interface HallazgoClasificacion {
   importe: number;
   motivo: string;
   confianza: "alta" | "media";
+  empresa?: string;
 }
 
 export interface RevisionClasificacion {
@@ -159,6 +181,29 @@ export async function parseLibroDiario(buf: Buffer): Promise<{ empresa: string; 
   await wb.xlsx.load(buf as any);
   const ws = wb.worksheets[0];
   if (!ws) return { empresa: "", movimientos: [], asientos: 0 };
+  return parseHoja(ws);
+}
+
+/** Lee TODAS las pestañas del libro: cada una puede ser un Libro Diario de una
+ *  empresa distinta (p. ej. "EGRESOS EMPRESAS OCT": una pestaña por empresa del
+ *  grupo, todas del mismo mes). Omite las pestañas sin movimientos. */
+export async function parseLibroDiarioHojas(buf: Buffer): Promise<{ hoja: string; empresa: string; movimientos: MovDiario[]; asientos: number }[]> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf as any);
+  const out: { hoja: string; empresa: string; movimientos: MovDiario[]; asientos: number }[] = [];
+  for (const ws of wb.worksheets) {
+    if (ws.state && ws.state !== "visible") continue; // pestañas ocultas: no
+    const r = parseHoja(ws);
+    if (!r.movimientos.length) continue;
+    out.push({ hoja: ws.name, empresa: r.empresa || ws.name, movimientos: r.movimientos, asientos: r.asientos });
+  }
+  return out;
+}
+
+/** Nombre de empresa normalizado (para juntar varios meses de una misma empresa). */
+export const claveEmpresa = (s: string) => norm(s).replace(/(sac|saa|srl|eirl|sa)$/, "");
+
+function parseHoja(ws: ExcelJS.Worksheet): { empresa: string; movimientos: MovDiario[]; asientos: number } {
 
   let empresa = aTexto(celValor(ws.getRow(1).getCell(1)));
   // Ubica la fila de encabezado (contiene "Cuenta" y "Debe"/"Haber").
@@ -296,16 +341,20 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
 
   // Proveedor por documento: el RUC (anexo) suele estar en la línea de la cuenta 42.
   const docProveedor = new Map<string, string>();
+  // En el consolidado, el mismo nº de documento puede existir en dos empresas:
+  // la clave incluye la empresa.
+  const claveDoc = (m: MovDiario) => (m.empresa ? `${m.empresa}\u0000${m.documento}` : m.documento);
   for (const m of movimientos) {
-    if (m.documento && m.anexo && !docProveedor.has(m.documento)) docProveedor.set(m.documento, m.anexo);
+    if (m.documento && m.anexo && !docProveedor.has(claveDoc(m))) docProveedor.set(claveDoc(m), m.anexo);
   }
   const docMap = new Map<string, MovDiario[]>();
-  for (const m of c9) { if (!m.documento) continue; (docMap.get(m.documento) ?? docMap.set(m.documento, []).get(m.documento)!).push(m); }
-  const topComprobantes = [...docMap.entries()].map(([documento, ms]) => ({
-    documento,
-    proveedor: docProveedor.get(documento) ?? "",
+  for (const m of c9) { if (!m.documento) continue; const k = claveDoc(m); (docMap.get(k) ?? docMap.set(k, []).get(k)!).push(m); }
+  const topComprobantes = [...docMap.entries()].map(([k, ms]) => ({
+    documento: ms[0].documento,
+    proveedor: docProveedor.get(k) ?? "",
     glosa: ms[0]?.glosa ?? "",
     debe: ms.reduce((s, m) => s + m.debe, 0),
+    ...(ms[0].empresa ? { empresa: ms[0].empresa } : {}),
   })).sort((a, b) => b.debe - a.debe).slice(0, 20);
 
   // Por mes (clase 9, según Fec.Reg). Útil al subir varios meses juntos.
@@ -332,7 +381,8 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
       documento: m.documento,
       cenCos: m.cenCos,
       debe: m.debe,
-    })).sort((a, b) => (a.fecha || "").localeCompare(b.fecha || "")),
+      ...(m.empresa ? { empresa: m.empresa } : {}),
+    })).sort((a, b) => (a.fecha || "").localeCompare(b.fecha || "") || (a.empresa || "").localeCompare(b.empresa || "")),
   })).sort((a, b) => a.cuenta.localeCompare(b.cuenta));
 
   return {
@@ -352,6 +402,33 @@ export function analizarCompras(movimientos: MovDiario[], empresa: string, asien
     topComprobantes,
     detalleCuentas,
   };
+}
+
+/**
+ * Varias empresas (p. ej. un Excel con una pestaña por empresa del grupo):
+ * un análisis por empresa + un CONSOLIDADO del grupo con el comparativo entre
+ * empresas. En el consolidado, cada movimiento conserva su empresa (aparece en
+ * el detalle, los comprobantes y la revisión de clasificación).
+ */
+export function analizarGrupo(grupos: { empresa: string; hoja: string; movimientos: MovDiario[]; asientos: number }[]): { consolidado: AnalisisCompras; empresas: AnalisisCompras[] } {
+  const empresas = grupos.map((g) => analizarCompras(g.movimientos, g.empresa, g.asientos));
+  const todos = grupos.flatMap((g) => g.movimientos.map((m) => ({ ...m, empresa: g.empresa })));
+  const consolidado = analizarCompras(todos, `Consolidado del grupo · ${grupos.length} empresas`, grupos.reduce((s, g) => s + g.asientos, 0));
+  const total = empresas.reduce((s, a) => s + a.totalGasto, 0);
+  consolidado.consolidado = true;
+  consolidado.porEmpresa = empresas.map((a, i) => ({
+    empresa: a.empresa,
+    hoja: grupos[i].hoja,
+    totalGasto: a.totalGasto,
+    pct: total > 0 ? (a.totalGasto / total) * 100 : 0,
+    totalIgv: a.totalIgv,
+    nAsientos: a.nAsientos,
+    nMovimientos: a.nMovimientos,
+    observados: a.revision.observados,
+    importeObservado: a.revision.importeObservado,
+    funciones: Object.fromEntries(a.porFuncion.map((f) => [f.cod, f.debe])),
+  })).sort((x, y) => y.totalGasto - x.totalGasto);
+  return { consolidado, empresas };
 }
 
 // Nombre de subcuenta de referencia (estructura de las imágenes 94/95/97).
@@ -411,6 +488,7 @@ function revisarClasificacion(c9: MovDiario[]): RevisionClasificacion {
         importe: m.debe,
         motivo,
         confianza: conf,
+        ...(m.empresa ? { empresa: m.empresa } : {}),
       });
     }
   }

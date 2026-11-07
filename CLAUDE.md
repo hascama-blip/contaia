@@ -55,6 +55,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (Contasis)**: sube los Excel (SIRE RCE/RVIE + libros Contasis), empareja por serie‑número+RUC
   y compara base/IGV/total comprobante por comprobante; descarga el comparativo en Excel.
   Panel `CruceSirePanel.tsx` (suelto en **Inicio** vía `/api/cruce-sire`; también por cliente).
+- `src/lib/analisisCompras.ts` — **Análisis de compras para RTP** (Libro Diario → clase 9 por
+  función). Lee **todas las pestañas** (`parseLibroDiarioHojas`); agrupa por empresa (celda A1):
+  varios meses de una empresa se combinan; un Excel con una pestaña por empresa (p. ej.
+  "EGRESOS EMPRESAS OCT") da un análisis por empresa + el **consolidado del grupo**
+  (`analizarGrupo`, `porEmpresa` = comparativo). Panel `AnalisisComprasPanel.tsx`
+  (`/herramientas/analisis-compras`), PDF/Excel por empresa o del consolidado.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
@@ -156,11 +162,15 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Política de seguridad y la Declaración de responsabilidad (texto en `src/lib/legal.ts`,
   página pública `/legal`). Constancia por usuario en `Usuario.aceptaciones` (versión, fecha, IP,
   navegador, huella SHA-256 del texto). El token de sesión lleva `t` = versión aceptada; el
-  **middleware (runtime Node)** manda a `/aceptar` (API → 403) si no es `TERMINOS_VERSION`
-  (supremo y "solo RTP" exentos). Cambiar el texto de forma sustancial → subir `TERMINOS_VERSION`
-  (todos vuelven a aceptar). El middleware anota cada página, cada POST/PUT/DELETE y las lecturas
-  sensibles en `DATA_DIR/accesos/AAAA-MM.jsonl` (`src/lib/registroAccesos.ts`; líneas firmadas
-  con HMAC, 5 años, van en el backup ZIP y la restauración no las pisa); login/registro también.
+  middleware manda a `/aceptar` (API → 403) si no es `TERMINOS_VERSION` (supremo y "solo RTP"
+  exentos). Cambiar el texto de forma sustancial → subir `TERMINOS_VERSION` (todos vuelven a
+  aceptar). **Registro de accesos**: `getCurrentUser` llama a `anotarPeticion` (una vez por
+  petición, con las cabeceras x-pathname/x-metodo/x-query/x-req-id que pone el middleware):
+  cada página, cada POST/PUT/DELETE y las lecturas sensibles van a `DATA_DIR/accesos/AAAA-MM.jsonl`
+  (`src/lib/registroAccesos.ts`; líneas firmadas con HMAC, 5 años, van en el backup ZIP y la
+  restauración no las pisa); login/registro también. ⚠️ El middleware debe quedar en runtime
+  **edge**: con `runtime: "nodejs"` (Next 15.5) las subidas de archivos fallan a veces con
+  "Response body object should not be disturbed or locked".
   El supremo descarga CSV (accesos por mes/RUC/correo y constancias) en `/api/supremo/accesos`.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
 - **Supremo**: con `SUPREMO_2FA=1` el login del supremo pide además un código de 6 dígitos

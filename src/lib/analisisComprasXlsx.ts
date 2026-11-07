@@ -50,6 +50,39 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   const tot = res.addRow(["TOTAL", a.totalGasto, "100%"]);
   tot.font = { bold: true }; tot.getCell(2).numFmt = MONEDA;
 
+  // --- Por empresa (solo el consolidado de un grupo) ---
+  if (a.porEmpresa?.length) {
+    const codigos = Array.from(new Set(a.porEmpresa.flatMap((f) => Object.keys(f.funciones)))).sort();
+    const pe = wb.addWorksheet("Por empresa");
+    pe.columns = [
+      { header: "Empresa", key: "empresa", width: 34 },
+      { header: "Pestaña", key: "hoja", width: 12 },
+      { header: "Gasto total (S/)", key: "totalGasto", width: 16 },
+      { header: "% del grupo", key: "pct", width: 12 },
+      ...codigos.map((c) => ({ header: `${c} · ${a.porFuncion.find((f) => f.cod === c)?.nombre ?? ""}`, key: `f${c}`, width: 18 })),
+      { header: "IGV (S/)", key: "totalIgv", width: 14 },
+      { header: "Comprobantes", key: "nAsientos", width: 13 },
+      { header: "Observados", key: "observados", width: 11 },
+    ];
+    encabezado(pe, 0);
+    const monedas = [3, ...codigos.map((_, i) => 5 + i), 5 + codigos.length];
+    for (const f of a.porEmpresa) {
+      const row = pe.addRow({ empresa: f.empresa, hoja: f.hoja, totalGasto: f.totalGasto, pct: f.pct / 100, ...Object.fromEntries(codigos.map((c) => [`f${c}`, f.funciones[c] ?? 0])), totalIgv: f.totalIgv, nAsientos: f.nAsientos, observados: f.observados });
+      for (const c of monedas) row.getCell(c).numFmt = MONEDA;
+      row.getCell(4).numFmt = "0.0%";
+    }
+    const t = pe.addRow({
+      empresa: "TOTAL GRUPO", totalGasto: a.totalGasto, pct: 1,
+      ...Object.fromEntries(codigos.map((c) => [`f${c}`, a.porEmpresa!.reduce((s, f) => s + (f.funciones[c] ?? 0), 0)])),
+      totalIgv: a.porEmpresa.reduce((s, f) => s + f.totalIgv, 0), nAsientos: a.porEmpresa.reduce((s, f) => s + f.nAsientos, 0), observados: a.porEmpresa.reduce((s, f) => s + f.observados, 0),
+    });
+    t.font = { bold: true };
+    for (const c of monedas) t.getCell(c).numFmt = MONEDA;
+    t.getCell(4).numFmt = "0.0%";
+    pe.views = [{ state: "frozen", ySplit: 1, xSplit: 1 }];
+  }
+  const conEmpresa = Boolean(a.consolidado);
+
   // --- Nivel 2 dígitos (rollup por función) ---
   const n2 = wb.addWorksheet("Nivel 2 dígitos");
   n2.columns = [
@@ -71,6 +104,7 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   const det = wb.addWorksheet("Detalle por función");
   det.columns = [
     { header: "Fecha", key: "fecha", width: 12 },
+    ...(conEmpresa ? [{ header: "Empresa", key: "empresa", width: 30 }] : []),
     { header: "Cuenta", key: "cuenta", width: 12 },
     { header: "Glosa", key: "glosa", width: 44 },
     { header: "Factura / Doc.", key: "documento", width: 18 },
@@ -81,10 +115,11 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   for (const g of a.detalleCuentas) {
     const h = det.addRow({ fecha: `${g.cuenta} · ${g.funcion}`, debe: g.total });
     h.getCell(1).font = { bold: true }; h.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3E7CC" } };
-    h.getCell(6).numFmt = MONEDA; h.getCell(6).font = { bold: true };
+    const cImp = conEmpresa ? 7 : 6;
+    h.getCell(cImp).numFmt = MONEDA; h.getCell(cImp).font = { bold: true };
     for (const m of g.movimientos) {
-      const row = det.addRow({ fecha: m.fecha, cuenta: m.cuenta, glosa: m.glosa, documento: m.documento, cenCos: m.cenCos, debe: m.debe });
-      row.getCell(6).numFmt = MONEDA;
+      const row = det.addRow({ fecha: m.fecha, empresa: m.empresa, cuenta: m.cuenta, glosa: m.glosa, documento: m.documento, cenCos: m.cenCos, debe: m.debe });
+      row.getCell(cImp).numFmt = MONEDA;
     }
   }
 
@@ -121,7 +156,8 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
   if (a.revision) {
     const rv = wb.addWorksheet("Revisión clasificación");
     rv.columns = [
-      { header: "Confianza", key: "conf", width: 10 },
+      { header: "Confianza", key: "confianza", width: 10 },
+      ...(conEmpresa ? [{ header: "Empresa", key: "empresa", width: 30 }] : []),
       { header: "Cuenta actual", key: "cuenta", width: 14 },
       { header: "Función actual", key: "funcionActual", width: 26 },
       { header: "Glosa", key: "glosa", width: 40 },
@@ -136,7 +172,7 @@ export async function informeComprasXlsx(a: AnalisisCompras): Promise<Buffer> {
     rv.addRow({ funcionActual: `Correctos: ${a.revision.correctos}`, glosa: `Observados: ${a.revision.observados}`, importe: a.revision.importeObservado }).font = { italic: true };
     for (const h of a.revision.hallazgos) {
       const row = rv.addRow(h);
-      row.getCell(7).numFmt = MONEDA;
+      row.getCell(conEmpresa ? 8 : 7).numFmt = MONEDA;
     }
     if (!a.revision.hallazgos.length) rv.addRow({ funcionActual: "Sin observaciones: todo clasificado de forma coherente." });
   }

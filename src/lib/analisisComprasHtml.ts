@@ -101,19 +101,33 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const conceptos = a.topConceptos.map((c) => `
     <tr><td>${esc(c.nombre)}</td><td class="num">${c.n}</td><td class="num">${soles(c.debe)}</td></tr>`).join("");
 
+  const conEmpresa = Boolean(a.consolidado);
+  const tdEmp = (e?: string) => (conEmpresa ? `<td>${esc(e ?? "")}</td>` : "");
+  const thEmp = conEmpresa ? "<th>Empresa</th>" : "";
+  const codigos = Array.from(new Set((a.porEmpresa ?? []).flatMap((f) => Object.keys(f.funciones)))).sort();
+  const comparativo = a.porEmpresa?.length ? `
+  <h2>Comparativo por empresa</h2>
+  <table class="tbl cmp">
+    <thead><tr><th>Empresa</th><th class="num">Gasto total</th><th class="pct">%</th><th></th>${codigos.map((c) => `<th class="num">${esc(c)}</th>`).join("")}<th class="num">IGV</th><th class="num">Comprob.</th></tr></thead>
+    <tbody>
+      ${a.porEmpresa.map((f) => `<tr><td><strong>${esc(f.empresa)}</strong></td><td class="num">${soles(f.totalGasto)}</td><td class="pct">${f.pct.toFixed(1)}%</td><td class="barcell">${barra(f.pct)}</td>${codigos.map((c) => `<td class="num">${f.funciones[c] ? soles(f.funciones[c]) : "—"}</td>`).join("")}<td class="num">${soles(f.totalIgv)}</td><td class="num">${f.nAsientos}</td></tr>`).join("")}
+      <tr class="totalrow"><td>TOTAL GRUPO</td><td class="num">${soles(a.totalGasto)}</td><td class="pct">100%</td><td></td>${codigos.map((c) => `<td class="num">${soles(a.porEmpresa!.reduce((s, f) => s + (f.funciones[c] ?? 0), 0))}</td>`).join("")}<td class="num">${soles(a.porEmpresa.reduce((s, f) => s + f.totalIgv, 0))}</td><td class="num">${a.porEmpresa.reduce((s, f) => s + f.nAsientos, 0)}</td></tr>
+    </tbody>
+  </table>` : "";
+
   const comprobantes = a.topComprobantes.map((d) => `
-    <tr><td class="mono">${esc(d.documento)}</td><td class="mono">${esc(d.proveedor || "—")}</td><td>${esc(d.glosa)}</td><td class="num">${soles(d.debe)}</td></tr>`).join("");
+    <tr>${tdEmp(d.empresa)}<td class="mono">${esc(d.documento)}</td><td class="mono">${esc(d.proveedor || "—")}</td><td>${esc(d.glosa)}</td><td class="num">${soles(d.debe)}</td></tr>`).join("");
 
   const detalle = a.detalleCuentas.map((g) => `
     <table class="tbl detalle">
       <thead>
-        <tr class="grp"><td colspan="5"><span class="dot" style="background:#1d4ed8"></span><strong>${esc(g.cuenta)} · ${esc(g.funcion)}</strong> — ${soles(g.total)} (${g.movimientos.length} mov.)</td></tr>
-        <tr class="th"><th>Fecha</th><th>Cuenta</th><th>Glosa</th><th>Factura / Doc.</th><th class="num">Importe</th></tr>
+        <tr class="grp"><td colspan="${conEmpresa ? 6 : 5}"><span class="dot" style="background:#1d4ed8"></span><strong>${esc(g.cuenta)} · ${esc(g.funcion)}</strong> — ${soles(g.total)} (${g.movimientos.length} mov.)</td></tr>
+        <tr class="th"><th>Fecha</th>${thEmp}<th>Cuenta</th><th>Glosa</th><th>Factura / Doc.</th><th class="num">Importe</th></tr>
       </thead>
       <tbody>
         ${g.movimientos.map((m) => `
           <tr>
-            <td>${esc(m.fecha)}${m.cenCos ? ` <span class="mut">(${esc(m.cenCos)})</span>` : ""}</td>
+            <td>${esc(m.fecha)}${m.cenCos ? ` <span class="mut">(${esc(m.cenCos)})</span>` : ""}</td>${tdEmp(m.empresa)}
             <td class="mono">${esc(m.cuenta)}</td>
             <td>${esc(m.glosa)}</td>
             <td class="mono">${esc(m.documento)}</td>
@@ -125,7 +139,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   const rev = a.revision;
   const revRows = (rev?.hallazgos ?? []).map((h) => `
     <tr>
-      <td><span class="conf ${h.confianza}">${esc(h.confianza)}</span></td>
+      <td><span class="conf ${h.confianza}">${esc(h.confianza)}</span></td>${tdEmp(h.empresa)}
       <td class="mono"><strong>${esc(h.documento || "—")}</strong><div class="mut">${esc(h.fecha || "")}</div></td>
       <td class="mono">${esc(h.cuenta)}<div class="mut">${esc(h.funcionActual)}</div></td>
       <td>${esc(h.glosa)}</td>
@@ -185,6 +199,9 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   .foot { margin-top: 24px; border-top: 2px solid #dca200; padding-top: 6px; color: #94a3b8; font-size: 9px; }
   .mut { color: #94a3b8; font-size: 8.5px; }
   .conf { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+  .cmp th, .cmp td { font-size: 9px; padding: 4px 4px; }
+  .cmp td:first-child { white-space: nowrap; }
+  .cmp .barcell { width: 46px; }
   .conf.alta { background: #fee2e2; color: #b91c1c; }
   .conf.media { background: #fef3c7; color: #b45309; }
 </style></head>
@@ -192,7 +209,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
 
   <div class="head">
     <h1>${esc(a.empresa)}</h1>
-    <p class="sub">Informe de análisis de compras y gastos</p>
+    <p class="sub">Informe de análisis de compras y gastos${conEmpresa ? ` — ${(a.porEmpresa ?? []).map((f) => esc(f.empresa)).join(" · ")}` : ""}</p>
     <p class="meta">Periodo analizado: ${esc(a.periodo || "—")} &nbsp;·&nbsp; Emitido: ${esc(hoy)}</p>
   </div>
 
@@ -226,6 +243,8 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     ${svgBars(ccBars, 940, 200)}
   </div>
 
+  ${comparativo}
+
   <h2>Gasto por función (destino)</h2>
   <table class="tbl">
     <thead><tr><th>Función</th><th class="num">Importe</th><th class="pct">%</th><th></th></tr></thead>
@@ -247,7 +266,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   ${rev && rev.observados > 0 ? `
   <p style="margin:0 0 6px;color:#475569;">Se detectaron <strong>${rev.observados}</strong> de ${rev.total} movimiento(s) con posible mala clasificación (${soles(rev.importeObservado)}). ${rev.correctos} correctos.</p>
   <table class="tbl">
-    <thead><tr><th>Conf.</th><th>Factura / Doc.</th><th>Cuenta actual</th><th>Glosa</th><th class="num">Importe</th><th>Reclasificar a</th><th>Motivo</th></tr></thead>
+    <thead><tr><th>Conf.</th>${thEmp}<th>Factura / Doc.</th><th>Cuenta actual</th><th>Glosa</th><th class="num">Importe</th><th>Reclasificar a</th><th>Motivo</th></tr></thead>
     <tbody>${revRows}</tbody>
   </table>
   <p class="mut" style="margin-top:4px;">Sugerencias para revisión del contador (no se modifica nada). La cuenta sugerida mantiene la naturaleza y corrige la función. Referencia: 94 Administración · 95 Ventas · 97 Financieros.</p>
@@ -282,7 +301,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
 
   <h2>Principales comprobantes</h2>
   <table class="tbl">
-    <thead><tr><th>Documento</th><th>Proveedor</th><th>Glosa</th><th class="num">Importe</th></tr></thead>
+    <thead><tr>${thEmp}<th>Documento</th><th>Proveedor</th><th>Glosa</th><th class="num">Importe</th></tr></thead>
     <tbody>${comprobantes}</tbody>
   </table>
 
