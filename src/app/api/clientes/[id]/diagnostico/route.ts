@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { setDiagnostico } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -12,5 +13,5 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const diagnostico = generarDiagnostico(cliente);
   const actualizado = await setDiagnostico(cliente.id, diagnostico);
-  return NextResponse.json({ cliente: actualizado, diagnostico });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado), diagnostico });
 }

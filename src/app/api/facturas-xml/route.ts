@@ -1,3 +1,4 @@
+import { bloqueoModulo, estudioMemoria } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { parseFacturaXml } from "@/lib/facturaXml";
 import { esZipContenedor, extraerDeZip } from "@/lib/zip";
@@ -15,6 +16,7 @@ const MAX_LOOKUPS = 120;
 // POST JSON { accion:"guardar", cuentas } -> aprende RUC→cuenta.
 // POST multipart (varios `file` = XML de comprobantes) -> lee detalle + clasifica.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "procesar-compras"); if (_bloqueo) return _bloqueo;
   const contentType = req.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (cuentas.length === 0) {
       return NextResponse.json({ error: "No hay cuentas para guardar." }, { status: 400 });
     }
-    await setCuentasProveedor(cuentas);
+    await setCuentasProveedor(cuentas, await estudioMemoria());
     return NextResponse.json({ ok: true, guardadas: cuentas.length });
   }
 
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Clasifica por proveedor (memoria > caché de rubro > decolecta una vez).
-  const memoria = await getCuentasProveedor();
+  const memoria = await getCuentasProveedor(await estudioMemoria());
   const rubrosCache = await getRubros();
   const nuevosRubros: Record<string, { razonSocial: string; actividad: string }> = {};
 

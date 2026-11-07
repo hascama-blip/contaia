@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail } from "@/lib/db";
 import { enviarCodigo } from "@/lib/codigos";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 // Paso 1 del "olvidé mi contraseña": envía un CÓDIGO de 6 dígitos al correo.
 // Respuesta genérica SIEMPRE (no revelamos si el correo existe).
 export async function POST(req: NextRequest) {
+  const _lim = limitar([{ clave: `forgot:${ipDe(req)}`, max: 10, ventanaMs: HORA }], "Demasiadas solicitudes de código.");
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const email = String(body?.email ?? "").trim().toLowerCase();
   const generica = NextResponse.json({

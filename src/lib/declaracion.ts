@@ -66,7 +66,7 @@ const UMBRAL_DIFERENCIA = 1;
 /** Extrae el texto de un PDF con capa de texto. Devuelve "" si no hay texto. */
 export async function extraerTextoPdf(buffer: Buffer): Promise<string> {
   try {
-    const { extractText, getDocumentProxy } = await import("unpdf");
+    const { extractText, getDocumentProxy } = await import("./pdfTexto");
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const { text } = await extractText(pdf, { mergePages: true });
     return Array.isArray(text) ? text.join("\n") : String(text ?? "");

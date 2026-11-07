@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { relacionDesdeSireCompras } from "@/lib/relacionComprobantes";
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 // GET ?periodo=AAAAMM&tipo=compras → relación de comprobantes (para descargar
 // XML) armada desde el DETALLE SIRE guardado (caché) de ese cliente/periodo.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

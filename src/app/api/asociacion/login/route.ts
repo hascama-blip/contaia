@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { ASOC_COOKIE, credencialesOk, edicionHabilitada, tokenEsperado } from "@/lib/asociacion";
 
@@ -8,6 +9,8 @@ export async function POST(req: NextRequest) {
   if (!edicionHabilitada()) {
     return NextResponse.json({ error: "La edición no está configurada (falta la clave en el servidor)." }, { status: 403 });
   }
+  const _lim = limitar([{ clave: `asoc-login:${ipDe(req)}`, max: 10, ventanaMs: 15 * MIN }], "Demasiados intentos.");
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const user = String(body?.usuario ?? body?.user ?? "");
   const pass = String(body?.clave ?? body?.password ?? "");

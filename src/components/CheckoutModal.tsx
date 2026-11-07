@@ -150,9 +150,10 @@ export default function CheckoutModal({
 
   if (!abierto) return null;
   const precio = cfg?.precios[plan];
-  const renueva = !!cfg && cfg.plan === plan && !!cfg.planVence && cfg.planVence >= new Date().toISOString().slice(0, 10);
+  const hoyLima = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const renueva = !!cfg && cfg.plan === plan && !!cfg.planVence && cfg.planVence >= hoyLima;
   const venceNuevo = (() => {
-    const base = renueva ? new Date(`${cfg!.planVence}T12:00:00Z`) : new Date();
+    const base = new Date(`${renueva ? cfg!.planVence : hoyLima}T12:00:00Z`);
     base.setUTCDate(base.getUTCDate() + 30);
     return base.toISOString().slice(0, 10);
   })();

@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { lanzarNavegador, bloquearRecursos } from "@/lib/navegador";
@@ -10,6 +11,7 @@ export const maxDuration = 120;
 // el navegador headless (misma cola/patrón que el buzón). Un comprobante por
 // llamada (el usuario pulsa el botón PDF de una fila).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => ({}));
   const f = body?.factura;

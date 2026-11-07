@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { xlsDeAsientos, txtDeAsientos, excelDetalleRecibos, AsientoHonorario, Recibo } from "@/lib/honorarios";
@@ -9,6 +10,7 @@ export const maxDuration = 60;
 // asientos YA EDITADOS por el contador (con las cuentas llenadas en la tabla).
 // No vuelve a consultar SUNAT.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "honorarios"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => ({}));
   const asientos = Array.isArray(body.asientos) ? (body.asientos as AsientoHonorario[]) : [];

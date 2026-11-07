@@ -1,5 +1,6 @@
+import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireUser, esSupremo } from "@/lib/auth";
 import { upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfig, limpiarRTT, getWebhookLogRTT } from "@/lib/db";
 import { generarRTT } from "@/lib/rtt";
 
@@ -8,18 +9,24 @@ export const maxDuration = 300;
 
 // GET → lista las solicitudes RTT del usuario + bitácora del webhook + config.
 export async function GET() {
+  const _bloqueo = await bloqueoModulo("rtt"); if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   await limpiarRTT(30); // quita casillas en error / atascadas (nunca deja rojas)
   const solicitudes = await listarSolicitudesRTT(user.id);
-  const webhookLog = await getWebhookLogRTT();
+  // La bitácora del correo trae RUC de todos los estudios: cada uno ve solo
+  // las entradas de los RUC que él solicitó (el supremo ve todo).
+  const rucsPropios = new Set(solicitudes.map((s) => s.ruc));
+  const webhookLog = ((await getWebhookLogRTT()) ?? []).filter((e: any) => esSupremo(user) || (e.ruc && rucsPropios.has(e.ruc)));
   const { dominio } = await getRttConfig();
   return NextResponse.json({ solicitudes, webhookLog, dominio, dominioOk: !!dominio });
 }
 
 // POST → crea una solicitud de RTT y dispara el bot en SOL (pasos 1→3).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("rtt"); if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   // ruc = el tercero que se reporta (asunto del RTT). rucLogin = la cuenta SOL
   // que inicia sesión (por defecto, el mismo).
   const ruc = String(body.ruc ?? "").replace(/\D/g, "");

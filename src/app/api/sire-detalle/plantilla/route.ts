@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { relacionDesdeSireCompras, plantillaRelacionLlenaXlsx } from "@/lib/relacionComprobantes";
@@ -8,6 +9,7 @@ export const runtime = "nodejs";
 // (formato de la plantilla de Comprobantes XML) a partir del Detalle SIRE de
 // compras, lista para subir al módulo de Comprobantes XML.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => ({}));
   const compras = body?.compras;

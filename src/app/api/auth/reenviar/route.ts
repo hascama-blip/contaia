@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail } from "@/lib/db";
 import { enviarCodigo } from "@/lib/codigos";
@@ -7,6 +8,8 @@ export const runtime = "nodejs";
 // Reenvía el código de verificación (solo a cuentas aún no verificadas).
 // Respuesta genérica: no revela si el correo existe.
 export async function POST(req: NextRequest) {
+  const _lim = limitar([{ clave: `reenviar:${ipDe(req)}`, max: 10, ventanaMs: HORA }], "Demasiadas solicitudes de código.");
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const email = String(body?.email ?? "").trim().toLowerCase();
   const generica = NextResponse.json({ ok: true, mensaje: "Si el correo está registrado y pendiente de verificación, te enviamos un nuevo código." });

@@ -1,3 +1,4 @@
+import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerComprobantesPdf } from "@/lib/comprobantesXml";
@@ -13,10 +14,13 @@ export const maxDuration = 240;
 // La Clave SOL viaja en el body y NO se persiste. Consume 1 uso solo si el login
 // fue correcto (primera parte).
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  await limpiarDiagnostico(body);
   const solUser =
     (typeof body.solUser === "string" && body.solUser) || cliente.credSire?.solUser || "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";

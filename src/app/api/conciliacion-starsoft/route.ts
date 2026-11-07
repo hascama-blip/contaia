@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import {
@@ -16,6 +17,7 @@ const MAX_SIZE = 30 * 1024 * 1024; // 30 MB (los .xls del SIRE pesan)
 // Auto-detecta cuál de los 3 es cada uno por sus encabezados. Devuelve el resumen
 // + el Excel conciliado (base64). No persiste nada.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("conciliacion"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });

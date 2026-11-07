@@ -56,10 +56,12 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Crea un token firmado con el id de usuario y vencimiento. */
-export async function createSessionToken(uid: string): Promise<string> {
+/** Crea un token firmado con el id de usuario, la versión de sesión del
+ *  usuario (`v`: al cambiar la contraseña sube y los tokens viejos dejan de
+ *  servir) y el vencimiento. */
+export async function createSessionToken(uid: string, v = 0): Promise<string> {
   const payload = strToB64Url(
-    JSON.stringify({ uid, exp: Date.now() + SESSION_MAX_AGE * 1000 })
+    JSON.stringify({ uid, v, exp: Date.now() + SESSION_MAX_AGE * 1000 })
   );
   const sig = await hmac(payload);
   return `${payload}.${sig}`;
@@ -67,14 +69,19 @@ export async function createSessionToken(uid: string): Promise<string> {
 
 /** Verifica el token y devuelve el id de usuario, o null si es inválido/venció. */
 export async function verifySessionToken(token: string): Promise<string | null> {
+  return (await leerSessionToken(token))?.uid ?? null;
+}
+
+/** Igual que verifySessionToken pero devuelve también la versión de sesión. */
+export async function leerSessionToken(token: string): Promise<{ uid: string; v: number } | null> {
   const [payload, sig] = (token || "").split(".");
   if (!payload || !sig) return null;
   const expected = await hmac(payload);
   if (!safeEqual(sig, expected)) return null;
   try {
-    const obj = JSON.parse(b64UrlToStr(payload)) as { uid?: string; exp?: number };
+    const obj = JSON.parse(b64UrlToStr(payload)) as { uid?: string; exp?: number; v?: number };
     if (!obj.uid || !obj.exp || obj.exp < Date.now()) return null;
-    return obj.uid;
+    return { uid: obj.uid, v: Number(obj.v) || 0 };
   } catch {
     return null;
   }

@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setCredSire } from "@/lib/db";
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // guardar solo el usuario (AccesosSol) no borre el API ya configurado.
   const traeApi = typeof body.clientId === "string" || typeof body.clientSecret === "string";
   const clientId = typeof body.clientId === "string" ? body.clientId.trim() : (cliente.credSire?.clientId ?? "");
-  const clientSecret = typeof body.clientSecret === "string" ? body.clientSecret.trim() : (cliente.credSire?.clientSecret ?? "");
+  const clientSecret = resolverSecreto(body.clientSecret, cliente.credSire?.clientSecret);
 
   if (!solUser) return NextResponse.json({ error: "Falta el Usuario SOL." }, { status: 400 });
 
@@ -46,5 +47,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     clienteId: cliente.id,
     clienteNombre: cliente.razonSocial,
   });
-  return NextResponse.json({ cliente: actualizado, credSire: actualizado?.credSire ?? null });
+  return NextResponse.json({ cliente: actualizado, credSire: ocultarCred(actualizado?.credSire ?? null) });
 }

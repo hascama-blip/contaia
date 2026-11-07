@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZipContenedor, extraerDeZip } from "@/lib/zip";
@@ -13,6 +14,7 @@ const CUENTA_VENTAS_DEFECTO = "70121";
 // POST multipart (sireVentas = Excel/ZIP del SIRE RVIE) -> comprobantes de venta
 // con su cuenta por defecto (reclasificable).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("procesar-compras"); if (_bloqueo) return _bloqueo;
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido" }, { status: 400 });
   const file = form.get("sireVentas");

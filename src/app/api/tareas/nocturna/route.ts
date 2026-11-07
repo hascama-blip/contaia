@@ -13,9 +13,15 @@ export const maxDuration = 800;
 // haya corrido hoy).
 async function autorizado(req: NextRequest): Promise<boolean> {
   const token = req.nextUrl.searchParams.get("token") || req.headers.get("x-cron-token") || "";
+  const igual = (a: string, b: string) => {
+    if (a.length !== b.length) return false;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return d === 0;
+  };
   if (token) {
-    if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return true;
-    if (token === (await tokenInterno())) return true;
+    if (process.env.CRON_SECRET && igual(token, process.env.CRON_SECRET)) return true;
+    if (igual(token, await tokenInterno())) return true;
   }
   return esSupremo(await getCurrentUser());
 }

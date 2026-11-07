@@ -44,9 +44,25 @@ const MIME_EXT: Record<string, string> = {
   "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
 };
 export const MEDIA_MAX = 60 * 1024 * 1024;
+/** Revisa la "firma" real del archivo (no basta el tipo que dice el navegador). */
+function firmaCoincide(buf: Buffer, ext: string): boolean {
+  const hex = buf.subarray(0, 16).toString("hex");
+  const ascii = buf.subarray(0, 16).toString("latin1");
+  switch (ext) {
+    case "jpg": return hex.startsWith("ffd8ff");
+    case "png": return hex.startsWith("89504e470d0a1a0a");
+    case "gif": return ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a");
+    case "webp": return ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP";
+    case "avif": case "mp4": case "mov": return ascii.slice(4, 8) === "ftyp";
+    case "webm": return hex.startsWith("1a45dfa3");
+    default: return false;
+  }
+}
+
 export async function guardarMedia(buf: Buffer, mime: string): Promise<string> {
   const ext = MIME_EXT[String(mime).toLowerCase()];
   if (!ext) throw new Error("Tipo de archivo no permitido (usa imagen o video).");
+  if (!firmaCoincide(buf, ext)) throw new Error("El archivo no es una imagen o video válido.");
   await fs.mkdir(MEDIA_DIR, { recursive: true });
   const id = crypto.randomBytes(10).toString("hex") + "." + ext;
   await fs.writeFile(path.join(MEDIA_DIR, id), buf);

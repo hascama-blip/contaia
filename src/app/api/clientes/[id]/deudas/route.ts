@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { addDeuda, deleteDeuda, newId } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -115,5 +116,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const deudaId = new URL(req.url).searchParams.get("deudaId");
   if (!deudaId) return NextResponse.json({ error: "Falta deudaId" }, { status: 400 });
   const actualizado = await deleteDeuda(cliente.id, deudaId);
-  return NextResponse.json({ cliente: actualizado });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado) });
 }

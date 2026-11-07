@@ -1,3 +1,5 @@
+import { resolverSecreto } from "@/lib/secretos";
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setSireEstado } from "@/lib/db";
@@ -30,6 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json().catch(() => ({}));
 
+  await limpiarDiagnostico(body);
+
   // Pausa mínima (salvo diagnóstico o admin que fuerza).
   const ultima = cliente.sireEstado?.at ? new Date(cliente.sireEstado.at).getTime() : 0;
   if (ultima && Date.now() - ultima < PAUSA && !body.diagnostico) {
@@ -56,8 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const clientId =
     (typeof body.clientId === "string" && body.clientId) || cliente.credSire?.clientId || "";
   const clientSecret =
-    (typeof body.clientSecret === "string" && body.clientSecret) ||
-    cliente.credSire?.clientSecret ||
+    resolverSecreto(body.clientSecret, cliente.credSire?.clientSecret) ||
     "";
 
   // Cupo del plan: generaciones de este paso por empresa al mes (salvo diagnóstico).

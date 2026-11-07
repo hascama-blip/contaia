@@ -1,3 +1,4 @@
+import { bloqueoModulo, estudioMemoria } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { parseReferenciaHonorarios } from "@/lib/honorarios";
@@ -11,6 +12,7 @@ const MAX = 15 * 1024 * 1024;
 // Aprende las cuentas de honorarios subiendo la plantilla YA LLENA del mes
 // anterior (Contasis). Arma el mapa emisor+concepto → cuentas y lo guarda.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "honorarios"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   const f = form?.get("archivo");
@@ -22,8 +24,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const mapa = await parseReferenciaHonorarios(Buffer.from(await f.arrayBuffer()));
-    const n = await mergeCuentasHonorarios(mapa);
-    const total = Object.keys(await getCuentasHonorarios()).length;
+    const n = await mergeCuentasHonorarios(mapa, await estudioMemoria());
+    const total = Object.keys(await getCuentasHonorarios(await estudioMemoria())).length;
     return NextResponse.json({ ok: true, aprendidas: n, total });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "No se pudo leer la plantilla." }, { status: 500 });
@@ -32,7 +34,8 @@ export async function POST(req: NextRequest) {
 
 // GET → cuántas combinaciones emisor+concepto hay aprendidas.
 export async function GET() {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "honorarios"); if (_bloqueo) return _bloqueo;
   await requireUser();
-  const total = Object.keys(await getCuentasHonorarios()).length;
+  const total = Object.keys(await getCuentasHonorarios(await estudioMemoria())).length;
   return NextResponse.json({ total });
 }

@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
@@ -7,6 +8,7 @@ export const maxDuration = 60;
 // POST JSON { comprobantes:[{fecha,serie,numero,ruc,razonSocial,base,igv,total,cuenta}] }
 // -> Excel listo para revisar/importar a Contasis.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("procesar-compras"); if (_bloqueo) return _bloqueo;
   const body = await req.json().catch(() => null);
   const rows: any[] = Array.isArray(body?.comprobantes) ? body.comprobantes : [];
   if (rows.length === 0) {

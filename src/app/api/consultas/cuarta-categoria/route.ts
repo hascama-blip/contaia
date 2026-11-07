@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
@@ -12,6 +13,7 @@ export const maxDuration = 200;
 // reporte. La Clave SOL NO se persiste.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
   if (!esPersonaNatural(cliente.ruc)) {

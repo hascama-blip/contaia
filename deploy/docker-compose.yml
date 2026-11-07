@@ -14,6 +14,8 @@ services:
     environment:
       - DATA_DIR=/var/data
       - PORT=3000
+      # Navegadores headless simultáneos (consultas a SUNAT). 4 entra holgado en 8 GB.
+      - MAX_NAVEGADORES=${MAX_NAVEGADORES:-4}
     volumes:
       - /var/data:/var/data
     expose:

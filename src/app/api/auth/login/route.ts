@@ -1,3 +1,4 @@
+import { limitar, reiniciar, ipDe, MIN } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, getUserById } from "@/lib/db";
 import { verifyPassword, ensureSupremo, puedeIngresar } from "@/lib/auth";
@@ -11,6 +12,12 @@ export async function POST(req: NextRequest) {
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
 
+  // Anti fuerza bruta: 30 intentos/15 min por IP y 8 por correo.
+  const _lim = limitar([
+    { clave: `login-ip:${ipDe(req)}`, max: 30, ventanaMs: 15 * MIN },
+    { clave: `login-mail:${email}`, max: 8, ventanaMs: 15 * MIN },
+  ], "Demasiados intentos de inicio de sesión.");
+  if (_lim) return _lim;
   if (!email || !password) {
     return NextResponse.json({ error: "Ingresa correo y contraseña." }, { status: 400 });
   }
@@ -42,7 +49,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const token = await createSessionToken(user.id);
+  reiniciar(`login-mail:${email}`);
+  const token = await createSessionToken(user.id, user.sesionVersion ?? 0);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
   // Cookie de SESIÓN (sin maxAge/expires): se borra al cerrar el navegador.
   res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);

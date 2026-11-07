@@ -1,3 +1,5 @@
+import { puedeVerIssosoma } from "@/lib/acceso";
+import { getCurrentUser as _usuarioIsso } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { analizarIssosoma, excelIssosoma } from "@/lib/issosoma";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 // por proyecto. Con ?empresa=<cliente> exporta SOLO los proyectos de esa empresa.
 // Usa el análisis cacheado (no recalcula Drive).
 export async function GET(req: NextRequest) {
+  if (!puedeVerIssosoma(await _usuarioIsso())) return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   if (!(await getCurrentUser())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const empresa = (new URL(req.url).searchParams.get("empresa") || "").trim() || undefined;
   const data = await analizarIssosoma();

@@ -91,7 +91,7 @@ export default function EquipoManager({
           </div>
           <div>
             <label className="label">Contraseña</label>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 6 caracteres" autoComplete="new-password" disabled={lleno} />
+            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 8 caracteres" autoComplete="new-password" disabled={lleno} />
           </div>
           <div className="sm:col-span-3">
             <button className="btn-primary" disabled={busy || lleno}>{busy ? "Creando…" : "Crear cuenta"}</button>

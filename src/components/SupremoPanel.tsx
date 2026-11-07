@@ -347,7 +347,7 @@ export default function SupremoPanel() {
   async function cambiarPassword(s: Solicitud) {
     const nueva = window.prompt(`Nueva contraseña para ${s.nombre} (${s.email}):`);
     if (nueva == null) return;
-    if (nueva.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+    if (nueva.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
     setBusy(s.id); setError(null);
     try {
       const res = await fetch("/api/supremo/solicitudes", {

@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ const HEAD = { font: { bold: true, color: { argb: "FFFFFFFF" } }, fill: { type: 
 
 // POST JSON { periodo, ventas:{columnas,filas}, compras:{columnas,filas} } → Excel.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });

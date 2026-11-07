@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { mergeBuzon } from "@/lib/db";
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
 // al día por empresa (evita el bloqueo de SUNAT por demasiados ingresos).
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 

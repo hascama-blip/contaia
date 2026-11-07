@@ -3,8 +3,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { getUserById, getClienteDeUsuario, getUserByEmail, createUser, updateUserById, eliminarTodosLosUsuarios } from "./db";
-import { verifySessionToken, SESSION_COOKIE } from "./authToken";
+import { leerSessionToken, SESSION_COOKIE } from "./authToken";
 import type { Usuario, Cliente } from "./types";
+import { hoyLima } from "./fechas";
 
 export { SESSION_COOKIE } from "./authToken";
 
@@ -33,7 +34,10 @@ export function publicUser(u: Usuario): UsuarioPublico {
 // Credenciales del usuario supremo (dueño de la plataforma). Se pueden
 // sobreescribir por entorno; si no, usa los valores iniciales acordados.
 const SUPREMO_EMAIL = (process.env.SUPREMO_EMAIL ?? "supremo@radartributaria.com").trim().toLowerCase();
-const SUPREMO_PASSWORD = process.env.SUPREMO_PASSWORD ?? "Supremo2026@";
+// Sin valor por defecto en el código: si falta SUPREMO_PASSWORD, la cuenta se
+// crea con una clave aleatoria (se recupera con "Olvidé mi contraseña") y
+// nunca se le cambia la clave existente.
+const SUPREMO_PASSWORD = (process.env.SUPREMO_PASSWORD ?? "").trim();
 // Nombre que se muestra en el perfil. Configurable por SUPREMO_NOMBRE; por
 // defecto uno neutral (sin la palabra "supremo").
 const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador";
@@ -43,15 +47,21 @@ const SUPREMO_NOMBRE = process.env.SUPREMO_NOMBRE ?? "Administrador";
  *  crea; si existe pero no es supremo, no está aprobada o su contraseña no
  *  coincide con la configurada, la reconcilia (rol + estado + contraseña). */
 export async function ensureSupremo(): Promise<void> {
+  // Se llama en cada página: la conciliación (que incluye un hash costoso de la
+  // contraseña) corre como mucho una vez cada 5 minutos por proceso.
+  const g = globalThis as unknown as { __radarSupremoOk?: number };
+  if (g.__radarSupremoOk && Date.now() - g.__radarSupremoOk < 5 * 60_000) return;
   const existente = await getUserByEmail(SUPREMO_EMAIL);
   if (!existente) {
+    if (!SUPREMO_PASSWORD) console.error("[seguridad] Falta SUPREMO_PASSWORD: la cuenta supremo se crea con una clave aleatoria. Configúrala en el .env.");
     await createUser({
       nombre: SUPREMO_NOMBRE,
       email: SUPREMO_EMAIL,
-      passHash: hashPassword(SUPREMO_PASSWORD),
+      passHash: hashPassword(SUPREMO_PASSWORD || randomBytes(24).toString("hex")),
       rol: "supremo",
       estado: "aprobado",
     });
+    g.__radarSupremoOk = Date.now();
     return;
   }
   const patch: Record<string, unknown> = {};
@@ -61,10 +71,11 @@ export async function ensureSupremo(): Promise<void> {
   // Nombre visible del perfil: se ajusta al configurado (SUPREMO_NOMBRE).
   if (existente.nombre !== SUPREMO_NOMBRE) patch.nombre = SUPREMO_NOMBRE;
   // Si la contraseña configurada no abre la cuenta, la reponemos.
-  if (!verifyPassword(SUPREMO_PASSWORD, existente.passHash)) {
+  if (SUPREMO_PASSWORD && !verifyPassword(SUPREMO_PASSWORD, existente.passHash)) {
     patch.passHash = hashPassword(SUPREMO_PASSWORD);
   }
   if (Object.keys(patch).length > 0) await updateUserById(existente.id, patch);
+  g.__radarSupremoOk = Date.now();
 }
 
 // Usuario RESTRINGIDO "solo RTP": se crea/reconcilia desde el entorno
@@ -102,6 +113,7 @@ export async function ensureRtpUser(): Promise<void> {
  *  cuántas cuentas se eliminaron. Acción destructiva (solo el supremo). */
 export async function resetUsuarios(): Promise<number> {
   const n = await eliminarTodosLosUsuarios();
+  (globalThis as unknown as { __radarSupremoOk?: number }).__radarSupremoOk = 0; // fuerza la recreación
   await ensureSupremo(); // recrea el supremo fresco
   return n;
 }
@@ -110,9 +122,21 @@ export async function resetUsuarios(): Promise<number> {
 export async function getCurrentUser(): Promise<Usuario | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const uid = await verifySessionToken(token);
-  if (!uid) return null;
-  return getUserById(uid);
+  const t = await leerSessionToken(token);
+  if (!t) return null;
+  const u = await getUserById(t.uid);
+  if (!u) return null;
+  // Sesión revocada (cambió la contraseña en otro lado).
+  if ((u.sesionVersion ?? 0) !== t.v) return null;
+  // Cuenta (o estudio) rechazada después de iniciar sesión: fuera.
+  if (u.rol !== "supremo") {
+    if (u.estado === "rechazado") return null;
+    if (u.parentId) {
+      const p = await getUserById(u.parentId);
+      if (!p || p.estado === "rechazado") return null;
+    }
+  }
+  return u;
 }
 
 /** Exige sesión: si no hay, redirige a /login. */
@@ -156,16 +180,16 @@ export function bloquearSiSoloRtp(u: Usuario | null | undefined): void {
  *  (entonces vuelve al Básico). */
 export function planEfectivo(admin: Usuario | null | undefined): import("./modulos").PlanId {
   const plan = (admin?.plan ?? "basico") as import("./modulos").PlanId;
-  if (plan !== "basico" && admin?.planVence && admin.planVence < new Date().toISOString().slice(0, 10)) return "basico";
+  if (plan !== "basico" && admin?.planVence && admin.planVence < hoyLima()) return "basico";
   return plan;
 }
 
 /** Días que faltan para que venza el plan (null = sin vencimiento; negativo = vencido). */
 export function diasParaVencerPlan(admin: Usuario | null | undefined): number | null {
   if (!admin?.planVence || (admin.plan ?? "basico") === "basico") return null;
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const v = new Date(`${admin.planVence}T00:00:00`);
-  return Math.round((v.getTime() - hoy.getTime()) / 86400000);
+  const hoy = Date.parse(`${hoyLima()}T00:00:00Z`);
+  const v = Date.parse(`${admin.planVence}T00:00:00Z`);
+  return Math.round((v - hoy) / 86400000);
 }
 
 export async function planDelEstudio(u: Usuario): Promise<import("./modulos").PlanId> {

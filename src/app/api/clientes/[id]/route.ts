@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { deleteCliente, updateCliente, liberarRucGlobal } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  return NextResponse.json({ cliente });
+  return NextResponse.json({ cliente: ocultarCliente(cliente) });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -18,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json().catch(() => ({}));
   const cliente = await updateCliente(params.id, body);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  return NextResponse.json({ cliente });
+  return NextResponse.json({ cliente: ocultarCliente(cliente) });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

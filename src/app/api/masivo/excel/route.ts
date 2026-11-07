@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
@@ -82,6 +83,7 @@ function filaVentas(row: ExcelJS.Row, d: any) {
 }
 
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("procesar-compras"); if (_bloqueo) return _bloqueo;
   const body = await req.json().catch(() => null);
   const rows: any[] = Array.isArray(body?.filas) ? body.filas : [];
   const libro = body?.libro === "ventas" ? "ventas" : "compras";

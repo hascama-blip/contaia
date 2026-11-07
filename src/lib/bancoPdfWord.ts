@@ -33,7 +33,7 @@ const num = (s: string): number => {
 
 /** Extrae el texto del PDF (unpdf, sin OCR). */
 export async function textoDePdf(buffer: Buffer): Promise<string> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
+  const { extractText, getDocumentProxy } = await import("./pdfTexto");
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
   const { text } = await extractText(pdf, { mergePages: true });
   return Array.isArray(text) ? text.join("\n") : text;

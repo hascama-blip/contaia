@@ -1,3 +1,4 @@
+import { bloqueoModulo, limpiarDiagnostico, estudioMemoria } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { extraerHonorarios } from "@/lib/honorarios";
@@ -9,8 +10,10 @@ export const maxDuration = 300;
 
 // POST → extrae los Recibos por Honorarios (Consulta Receptor) del rango de meses.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "honorarios"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const rucLogin = String(body.rucLogin ?? body.ruc ?? "").replace(/\D/g, "");
   const solUser = typeof body.solUser === "string" ? body.solUser : "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
@@ -28,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Memoria del mes anterior (emisor+concepto → cuentas) para heredar cuentas.
-  const mapaCuentas = await getCuentasHonorarios().catch(() => ({}));
+  const mapaCuentas = await getCuentasHonorarios(await estudioMemoria()).catch(() => ({}));
   const r = await extraerHonorarios({ ruc: rucLogin, solUser, solPass, desde, hasta, diagnostico, mapaCuentas });
   if (!r.ok) return NextResponse.json({ error: r.error, diag: r.diag }, { status: r.loginError ? 401 : 502 });
   // Si SUNAT trae más recibos que lo disponible del mes, se entregan solo esos.

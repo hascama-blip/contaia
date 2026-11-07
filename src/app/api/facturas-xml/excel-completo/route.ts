@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { excelComprobantesCompleto, type FaltanteExcel } from "@/lib/excelComprobantes";
@@ -10,6 +11,7 @@ export const maxDuration = 180;
 // Las facturas con xmlBase64 se re-parsean; las que solo traen pdfBase64 (modo
 // PDF masivo) se leen por la capa de texto del PDF (unpdf, sin OCR).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => null);
   const facturas: any[] = Array.isArray(body?.facturas) ? body.facturas : [];

@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Correo inválido." }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+  if (password.length < 8) {
+    return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres." }, { status: 400 });
   }
   if (await getUserByEmail(email)) {
     return NextResponse.json({ error: "Ya existe un usuario con ese correo." }, { status: 409 });

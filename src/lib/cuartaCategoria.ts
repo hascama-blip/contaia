@@ -114,10 +114,13 @@ async function leerTablaCuartaHTML(frame: any): Promise<string> {
     }
     if (!best) return "";
     const clone = best.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll("script,a,img,input,button,style").forEach((e) => e.remove());
-    clone.querySelectorAll("*").forEach((e) => {
+    // Solo se deja la tabla con texto: se quitan elementos activos y TODO
+    // atributo salvo los de estructura de tabla (se inserta en la web de Radar).
+    clone.querySelectorAll("script,a,img,input,button,style,iframe,frame,object,embed,svg,math,link,meta,form,video,audio,source,textarea,select,template").forEach((e) => e.remove());
+    const PERMITIDOS = new Set(["colspan", "rowspan", "align"]);
+    [clone, ...Array.from(clone.querySelectorAll("*"))].forEach((e) => {
       for (const at of Array.from(e.attributes)) {
-        if (/^on/i.test(at.name) || at.name === "href" || at.name === "class" || at.name === "id") e.removeAttribute(at.name);
+        if (!PERMITIDOS.has(at.name.toLowerCase())) e.removeAttribute(at.name);
       }
     });
     return clone.outerHTML;

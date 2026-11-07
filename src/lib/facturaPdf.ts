@@ -39,7 +39,7 @@ function textoEtiqueta(texto: string, etiqueta: RegExp, fin: RegExp): string {
 /** Extrae el texto del PDF (capa de texto). "" si no hay texto. */
 export async function textoDePdf(buffer: Buffer | Uint8Array): Promise<string> {
   try {
-    const { extractText, getDocumentProxy } = await import("unpdf");
+    const { extractText, getDocumentProxy } = await import("./pdfTexto");
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const { text } = await extractText(pdf, { mergePages: true });
     return Array.isArray(text) ? text.join("\n") : String(text ?? "");

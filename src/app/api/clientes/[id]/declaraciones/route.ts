@@ -1,3 +1,5 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { addDeclaracion, deleteDeclaracion, newId } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // ---- Guardar (JSON) ------------------------------------------------------
   if (contentType.includes("application/json")) {
     const body = await req.json().catch(() => null);
+    await limpiarDiagnostico(body);
     const d = body?.declaracion;
     if (!d || typeof d.periodo !== "string" || !/^\d{6}$/.test(d.periodo)) {
       return NextResponse.json(
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       clienteNombre: cliente.razonSocial,
       detalle: `Periodo ${decl.periodo}`,
     });
-    return NextResponse.json({ cliente: actualizado, declaracion: decl }, { status: 201 });
+    return NextResponse.json({ cliente: ocultarCliente(actualizado), declaracion: decl }, { status: 201 });
   }
 
   // ---- Leer PDF(s) (multipart) ---------------------------------------------
@@ -172,7 +175,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const declId = new URL(req.url).searchParams.get("declId");
   if (!declId) return NextResponse.json({ error: "Falta declId" }, { status: 400 });
   const actualizado = await deleteDeclaracion(cliente.id, declId);
-  return NextResponse.json({ cliente: actualizado });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado) });
 }
 
 function vacio(nombre: string) {

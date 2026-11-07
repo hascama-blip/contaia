@@ -1,9 +1,13 @@
 import Link from "next/link";
 import FacturasXmlPanel from "@/components/FacturasXmlPanel";
+import { exigirModuloPagina } from "@/lib/acceso";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Facturas XML — Radar Tributario" };
 
-export default function Page() {
+export default async function Page() {
+  await exigirModuloPagina("comprobantes-xml", "procesar-compras");
   return (
     <div className="space-y-4">
       <div>

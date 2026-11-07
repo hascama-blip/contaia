@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ export const runtime = "nodejs";
 // Genera un ZIP con la extensión (Manifest V3) y el TOKEN + URL de Radar ya
 // incrustados. El usuario lo descomprime y lo carga en Chrome/Edge (modo dev).
 export async function GET(_req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("visor"); if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   const token = await getVisorToken(user.id);
   const h = headers();

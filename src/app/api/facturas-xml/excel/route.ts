@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
@@ -11,6 +12,7 @@ const HEADER_FONT = { bold: true, color: { argb: "FFFFFFFF" } };
 // POST JSON { facturas:[...], detalle:true } -> Excel de detalle completo:
 //   hoja "Comprobantes" (toda la cabecera) + hoja "Ítems" (un renglón por línea).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml", "procesar-compras"); if (_bloqueo) return _bloqueo;
   const body = await req.json().catch(() => null);
   const rows: any[] = Array.isArray(body?.facturas) ? body.facturas : [];
   if (rows.length === 0) {

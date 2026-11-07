@@ -1,3 +1,4 @@
+import { bloqueoModulo, estudioMemoria } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZipContenedor, extraerDeZip } from "@/lib/zip";
@@ -16,6 +17,7 @@ const MAX_LOOKUPS = 120; // tope de consultas a decolecta por lote (rubro de nue
 // POST JSON { accion:"guardar", cuentas:[...] } -> aprende RUC→cuenta.
 // POST multipart (sireCompras = Excel del SIRE RCE) -> clasifica las compras.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("procesar-compras"); if (_bloqueo) return _bloqueo;
   const contentType = req.headers.get("content-type") ?? "";
 
   // ---- Guardar / aprender ----
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (cuentas.length === 0) {
       return NextResponse.json({ error: "No hay cuentas para guardar." }, { status: 400 });
     }
-    await setCuentasProveedor(cuentas);
+    await setCuentasProveedor(cuentas, await estudioMemoria());
     return NextResponse.json({ ok: true, guardadas: cuentas.length });
   }
 
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const memoria = await getCuentasProveedor();
+  const memoria = await getCuentasProveedor(await estudioMemoria());
   const rubrosCache = await getRubros();
   const nuevosRubros: Record<string, { razonSocial: string; actividad: string }> = {};
 

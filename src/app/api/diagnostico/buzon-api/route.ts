@@ -1,3 +1,4 @@
+import { bloqueoSupremo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esSupremo } from "@/lib/auth";
 
@@ -26,6 +27,7 @@ function decodeJwt(tok: string): any {
 }
 
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoSupremo(); if (_bloqueo) return _bloqueo;
   const user = await getCurrentUser();
   if (!esSupremo(user)) {
     return NextResponse.json({ error: "Solo el usuario supremo puede usar esta prueba." }, { status: 403 });

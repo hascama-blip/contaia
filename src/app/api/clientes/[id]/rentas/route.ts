@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
@@ -43,6 +44,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  await limpiarDiagnostico(body);
   const solUser = (typeof body.solUser === "string" && body.solUser) || cliente.credSire?.solUser || "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   const ejercicio = typeof body.ejercicio === "string" ? body.ejercicio : undefined;

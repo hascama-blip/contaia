@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getVisorMatriz } from "@/lib/db";
@@ -11,6 +12,7 @@ const EST: Record<string, string> = { P: "Presentó", NP: "No Presentó" };
 
 // Reporte del Visor: un cuadro AÑO × MES por empresa y fuente (SIRE / DJ).
 export async function GET() {
+  const _bloqueo = await bloqueoModulo("visor"); if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   const mats = await getVisorMatriz(user.id);
 

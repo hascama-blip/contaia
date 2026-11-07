@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { plantillaRelacionLlenaXlsx, type ItemRelacion } from "@/lib/relacionComprobantes";
@@ -8,6 +9,7 @@ export const runtime = "nodejs";
 // esos comprobantes (formato de Comprobantes XML), lista para revisar o volver a
 // subir y reintentar. Se usa, p. ej., para la relación de los que NO se bajaron.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => ({}));
   const items: ItemRelacion[] = Array.isArray(body?.items) ? body.items : [];

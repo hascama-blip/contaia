@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { setDeudaGenerado } from "@/lib/db";
@@ -14,6 +15,7 @@ const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
 // FASE 1: genera el pedido de deuda (Art. 36, Tesoro). Máx. 1 vez cada 3 días.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 

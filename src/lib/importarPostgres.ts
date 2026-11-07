@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { promises as fs } from "fs";
 import path from "path";
-import { DATA_DIR, STORE_PATH, BACKUPS_DIR } from "./db";
+import { DATA_DIR, STORE_PATH, BACKUPS_DIR , conBloqueoStore } from "./db";
 import type { Cliente, Usuario, BuzonMensaje } from "./types";
 
 // ============================================================
@@ -280,7 +280,7 @@ export async function leerStoreDesdePostgres(url: string): Promise<{ store: any;
  *  - "fusionar": agrega usuarios (por correo) y empresas (por RUC) que no existan
  *    en la base actual; lo que ya existe se conserva tal cual.
  */
-export async function aplicarImport(importado: any, modo: "reemplazar" | "fusionar"): Promise<{ usuariosNuevos: number; clientesNuevos: number; respaldo: string }> {
+async function aplicarImportSinBloqueo(importado: any, modo: "reemplazar" | "fusionar"): Promise<{ usuariosNuevos: number; clientesNuevos: number; respaldo: string }> {
   await fs.mkdir(BACKUPS_DIR, { recursive: true });
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const respaldo = `store-antes-importar-${ts}.json`;
@@ -324,4 +324,9 @@ export async function aplicarImport(importado: any, modo: "reemplazar" | "fusion
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(STORE_PATH, JSON.stringify(final, null, 2), "utf-8");
   return { usuariosNuevos, clientesNuevos, respaldo };
+}
+
+/** Versión pública: corre dentro del candado del store (no se cruza con otras escrituras). */
+export async function aplicarImport(importado: any, modo: "reemplazar" | "fusionar"): Promise<{ usuariosNuevos: number; clientesNuevos: number; respaldo: string }> {
+  return conBloqueoStore(() => aplicarImportSinBloqueo(importado, modo));
 }

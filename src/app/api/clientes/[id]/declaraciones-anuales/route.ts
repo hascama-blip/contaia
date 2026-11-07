@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import {
   addDeclaracionAnual,
@@ -98,5 +99,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const declId = new URL(req.url).searchParams.get("declId");
   if (!declId) return NextResponse.json({ error: "Falta declId" }, { status: 400 });
   const actualizado = await deleteDeclaracionAnual(cliente.id, declId);
-  return NextResponse.json({ cliente: actualizado });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado) });
 }

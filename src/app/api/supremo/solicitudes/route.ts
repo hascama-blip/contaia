@@ -36,8 +36,8 @@ export async function PATCH(req: NextRequest) {
 
   // Cambio de contraseña por el supremo (cuenta olvidada).
   if (typeof body?.password === "string") {
-    if (body.password.length < 6) {
-      return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+    if (body.password.length < 8) {
+      return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres." }, { status: 400 });
     }
     const u = await setPasswordUsuario(userId, hashPassword(body.password));
     if (!u) return NextResponse.json({ error: "Cuenta no encontrada." }, { status: 404 });

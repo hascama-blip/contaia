@@ -1,3 +1,4 @@
+import { bloqueoSupremo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esSupremo } from "@/lib/auth";
 import { conectarNavegador, estadoNavegadores } from "@/lib/navegador";
@@ -12,6 +13,7 @@ export const maxDuration = 120;
 //   GET  /api/diagnostico/navegador?n=5           -> usa la config del servidor
 //   POST { ws, n }                                -> prueba una URL directa (aísla Browserless)
 export async function GET(req: NextRequest) {
+  const _bloqueo = await bloqueoSupremo(); if (_bloqueo) return _bloqueo;
   const user = await getCurrentUser();
   if (!esSupremo(user)) {
     return NextResponse.json({ error: "Solo el usuario supremo puede ejecutar esta prueba." }, { status: 403 });
@@ -62,6 +64,7 @@ export async function GET(req: NextRequest) {
 // Prueba una URL de Browserless PEGADA A MANO, sin depender de la variable de
 // entorno. Sirve para saber si el problema es Browserless o es Render.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoSupremo(); if (_bloqueo) return _bloqueo;
   const user = await getCurrentUser();
   if (!esSupremo(user)) {
     return NextResponse.json({ error: "Solo el usuario supremo puede ejecutar esta prueba." }, { status: 403 });

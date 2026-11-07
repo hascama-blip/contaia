@@ -1,3 +1,5 @@
+import { resolverSecreto } from "@/lib/secretos";
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { mergeBuzon } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
@@ -16,6 +18,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  await limpiarDiagnostico(body);
 
   // Límite de 1 consulta al día (solo el admin puede forzar).
   const ultima = cliente.buzon?.consultadoAt ? new Date(cliente.buzon.consultadoAt).getTime() : 0;
@@ -42,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       solUser: typeof body.solUser === "string" ? body.solUser : "",
       solPass: typeof body.solPass === "string" ? body.solPass : "",
       clientId: typeof body.clientId === "string" ? body.clientId : undefined,
-      clientSecret: typeof body.clientSecret === "string" ? body.clientSecret : undefined,
+      clientSecret: typeof body.clientSecret === "string" ? resolverSecreto(body.clientSecret, cliente.credSire?.clientSecret) : undefined,
       dias: typeof body.dias === "number" ? body.dias : 15,
       diagnostico: body.diagnostico === true,
     });

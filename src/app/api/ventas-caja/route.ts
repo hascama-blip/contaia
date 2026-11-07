@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { unzipSync } from "fflate";
@@ -15,6 +16,7 @@ const esExcel = (n: string) => /\.xlsx?$/i.test(n);
 //   - caja:   el Excel de la Caja Virtual (un solo archivo, todo el periodo).
 // Devuelve el resumen + el Excel (base64). No persiste nada.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("ventas-caja"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });

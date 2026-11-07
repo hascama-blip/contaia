@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { lanzarNavegador } from "@/lib/navegador";
@@ -10,6 +11,7 @@ export const maxDuration = 120;
 // SIN logo/marca). Se arma un HTML autocontenido y se renderiza con el
 // navegador headless, sin encabezado/pie del navegador.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("analisis-rtp"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const body = await req.json().catch(() => null);
   const analisis = body?.analisis;

@@ -18,10 +18,14 @@ export async function GET(
 
   try {
     const data = await fs.readFile(path.join(UPLOADS_DIR, doc.storedName));
+    // Solo PDF e imágenes se muestran en el navegador; cualquier otro tipo se
+    // descarga (evita que un archivo HTML subido se ejecute dentro de la web).
+    const seguro = /^(application\/pdf|image\/(png|jpeg|webp|gif))$/i.test(doc.mimeType || "");
     return new NextResponse(data, {
       headers: {
-        "Content-Type": doc.mimeType,
-        "Content-Disposition": `inline; filename="${encodeURIComponent(doc.originalName)}"`,
+        "Content-Type": seguro ? doc.mimeType : "application/octet-stream",
+        "Content-Disposition": `${seguro ? "inline" : "attachment"}; filename="${encodeURIComponent(doc.originalName)}"`,
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

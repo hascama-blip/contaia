@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { createCliente, getClienteByRuc, listClientes, setCredSire, duenoDeRuc, registrarRucGlobal } from "@/lib/db";
 import { requireUser, studioId, esAdmin } from "@/lib/auth";
@@ -85,5 +86,5 @@ export async function POST(req: NextRequest) {
     clienteNombre: cliente.razonSocial,
     detalle: `RUC ${cliente.ruc}`,
   });
-  return NextResponse.json({ cliente }, { status: 201 });
+  return NextResponse.json({ cliente: ocultarCliente(cliente) }, { status: 201 });
 }

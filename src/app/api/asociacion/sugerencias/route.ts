@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getSugerencias, addSugerencia } from "@/lib/db";
 import { ASOC_COOKIE, cookieValida } from "@/lib/asociacion";
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
 
 // POST → enviar una sugerencia de próximo curso (público).
 export async function POST(req: NextRequest) {
+  const _lim = limitar([{ clave: `asoc-sug:${ipDe(req)}`, max: 5, ventanaMs: HORA }], "Ya enviaste varias sugerencias.");
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const tema = String(body?.tema ?? "").trim().slice(0, 300);
   const nombre = String(body?.nombre ?? "").trim().slice(0, 120);

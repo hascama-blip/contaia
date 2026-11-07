@@ -207,7 +207,7 @@ async function parseFacturaPdf(id: string, nombre: string, token: string, mes = 
   let texto = "";
   try {
     const buf = await bajar(id, token);
-    const { extractText, getDocumentProxy } = await import("unpdf");
+    const { extractText, getDocumentProxy } = await import("./pdfTexto");
     const pdf = await getDocumentProxy(new Uint8Array(buf));
     const r = await extractText(pdf, { mergePages: true });
     texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || "");
@@ -271,7 +271,7 @@ const RX_IMG = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
  *  a PNG (fast-png) y la pasa por tesseract. Hasta 3 páginas (acota tiempo). */
 async function ocrPdfBuffer(buf: Buffer): Promise<string> {
   try {
-    const { getDocumentProxy, extractImages } = await import("unpdf");
+    const { getDocumentProxy, extractImages } = await import("./pdfTexto");
     const { encode } = await import("fast-png");
     const { ocrImagen } = await import("./ocr");
     const pdf = await getDocumentProxy(new Uint8Array(buf));
@@ -306,7 +306,7 @@ async function leerEgreso(file: DFile, token: string, mes: string, hacerOcr: boo
     return { egreso: texto.trim() ? egresoDeTexto(texto, file.name, mes, true) : null, ocr: true, deferido: false };
   }
   let texto = "";
-  try { const { extractText, getDocumentProxy } = await import("unpdf"); const pdf = await getDocumentProxy(new Uint8Array(buf)); const r = await extractText(pdf, { mergePages: true }); texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || ""); } catch { /* */ }
+  try { const { extractText, getDocumentProxy } = await import("./pdfTexto"); const pdf = await getDocumentProxy(new Uint8Array(buf)); const r = await extractText(pdf, { mergePages: true }); texto = Array.isArray(r.text) ? r.text.join(" ") : String(r.text || ""); } catch { /* */ }
   if (texto.trim()) return { egreso: egresoDeTexto(texto, file.name, mes, false), ocr: false, deferido: false };
   if (!hacerOcr) return { egreso: null, ocr: false, deferido: true }; // escaneado, sin cupo OCR
   const t2 = await ocrPdfBuffer(buf);

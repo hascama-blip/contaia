@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { textoDePdf, parseEstadoBcp, excelEstadoBanco } from "@/lib/bancoPdfWord";
@@ -9,6 +10,7 @@ const MAX_SIZE = 20 * 1024 * 1024;
 
 // PDF de estado de cuenta bancario → Word (.docx) con la estructura de conciliación.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("banco-word"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   const f = form?.get("pdf");

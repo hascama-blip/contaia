@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { armarComparativo, excelComparativoIngresos, FuenteArchivo } from "@/lib/comparativoIngresos";
@@ -20,6 +21,7 @@ async function leerFuente(form: FormData, campo: string): Promise<FuenteArchivo[
 // Sube EECC (banco) + StarSoft + Caja Virtual → comparativo de ingresos por
 // empresa/fuente + conciliación de diferencias, en un Excel de 2 hojas.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("ventas-caja"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Envío inválido." }, { status: 400 });

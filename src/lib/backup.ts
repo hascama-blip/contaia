@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { zipSync, unzipSync } from "fflate";
-import { DATA_DIR, STORE_PATH, UPLOADS_DIR, BACKUPS_DIR } from "./db";
+import { DATA_DIR, STORE_PATH, UPLOADS_DIR, BACKUPS_DIR , conBloqueoStore } from "./db";
 
 // ============================================================
 //  Backup y restauración de la "base de datos" del proyecto
@@ -62,7 +62,7 @@ export interface ResultadoRestauracion {
  * (restaura store + uploads). Antes de pisar nada, guarda una copia de
  * seguridad del store actual en backups/store-antes-restaurar-<ts>.json.
  */
-export async function restaurarBackup(buf: Buffer, nombre: string): Promise<ResultadoRestauracion> {
+async function restaurarBackupSinBloqueo(buf: Buffer, nombre: string): Promise<ResultadoRestauracion> {
   const esZip = buf.length > 1 && buf[0] === 0x50 && buf[1] === 0x4b;
 
   let storeRaw: string;
@@ -134,4 +134,9 @@ export async function restaurarBackup(buf: Buffer, nombre: string): Promise<Resu
     usuarios: Array.isArray(parsed.users) ? parsed.users.length : 0,
     archivosRestaurados,
   };
+}
+
+/** Versión pública: corre dentro del candado del store (no se cruza con otras escrituras). */
+export async function restaurarBackup(buf: Buffer, nombre: string): Promise<ResultadoRestauracion> {
+  return conBloqueoStore(() => restaurarBackupSinBloqueo(buf, nombre));
 }

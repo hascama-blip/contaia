@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { visorUserByToken, addVisorCaptura, upsertVisorMatriz } from "@/lib/db";
+import { visorUserByToken, addVisorCaptura, upsertVisorMatriz, getUserById } from "@/lib/db";
+import { tieneModulo } from "@/lib/acceso";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,11 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const userId = await visorUserByToken(String(b?.token ?? ""));
   if (!userId) return NextResponse.json({ error: "Token inválido." }, { status: 401, headers: CORS });
+  // El Visor es del Plan Regular en adelante: si el estudio ya no lo tiene
+  // (plan vencido o rebajado), la extensión deja de enviar capturas.
+  if (!(await tieneModulo(await getUserById(userId), "visor"))) {
+    return NextResponse.json({ error: "Tu plan ya no incluye el Visor Tributario. Renuévalo en «Adquirir módulos»." }, { status: 403, headers: CORS });
+  }
 
   const url = String(b?.url ?? "").slice(0, 500);
   const titulo = String(b?.titulo ?? "").slice(0, 300);

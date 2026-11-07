@@ -1,9 +1,13 @@
 import Link from "next/link";
 import ClasificacionPanel from "@/components/ClasificacionPanel";
+import { exigirModuloPagina } from "@/lib/acceso";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Clasificación de compras — Radar Tributario" };
 
-export default function Page() {
+export default async function Page() {
+  await exigirModuloPagina("procesar-compras");
   return (
     <div className="space-y-4">
       <div>

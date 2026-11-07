@@ -1,3 +1,5 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { consultarDetalleSire } from "@/lib/sire";
@@ -10,10 +12,13 @@ export const maxDuration = 120;
 // Usa las credenciales de la app SIRE guardadas del cliente (credSire) y recibe
 // la Clave SOL solo para esta llamada (NO se persiste).
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
+
+  await limpiarDiagnostico(body);
   if (!body || typeof body.periodo !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
@@ -21,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const cred = cliente.credSire;
   const solUser = (typeof body.solUser === "string" && body.solUser) || cred?.solUser || "";
   const clientId = (typeof body.clientId === "string" && body.clientId) || cred?.clientId || "";
-  const clientSecret = (typeof body.clientSecret === "string" && body.clientSecret) || cred?.clientSecret || "";
+  const clientSecret = resolverSecreto(body.clientSecret, cred?.clientSecret);
 
   const periodo = String(body.periodo);
   const incluirVentas = body.incluirVentas !== false;

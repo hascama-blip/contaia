@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { parseExtractoBcp, parseExtractoBancoExcel, parseLibroBanco, parseCajaVirtual, conciliar, excelConciliacion } from "@/lib/conciliacion";
@@ -13,6 +14,7 @@ const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 //   - caja (Excel de la caja virtual, opcional — enriquece con el comprobante)
 // Devuelve el resumen + el Excel conciliado en base64 (no persiste nada).
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("conciliacion"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });

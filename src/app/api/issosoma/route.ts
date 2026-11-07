@@ -1,3 +1,5 @@
+import { puedeVerIssosoma } from "@/lib/acceso";
+import { getCurrentUser as _usuarioIsso } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { analizarIssosoma, recalcularIssosoma, leerCache, issosomaConfig } from "@/lib/issosoma";
@@ -9,6 +11,7 @@ export const dynamic = "force-dynamic";
 // GET  → análisis cacheado (rápido). Si no hay caché, intenta calcular.
 // POST → recalcula TODO desde Drive (lento: recorre bitácoras + facturas) y cachea.
 export async function GET() {
+  if (!puedeVerIssosoma(await _usuarioIsso())) return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   if (!(await getCurrentUser())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   try {
     const data = await analizarIssosoma();
@@ -22,6 +25,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!puedeVerIssosoma(await _usuarioIsso())) return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   if (!(await getCurrentUser())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   try {

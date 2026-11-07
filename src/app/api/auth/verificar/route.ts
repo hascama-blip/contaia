@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, marcarEmailVerificado } from "@/lib/db";
 import { comprobarCodigo } from "@/lib/codigos";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 // Verifica el código de 6 dígitos del registro. Si coincide, marca el correo
 // como verificado e INICIA SESIÓN (cookie de sesión).
 export async function POST(req: NextRequest) {
+  const _lim = limitar([{ clave: `verificar:${ipDe(req)}`, max: 20, ventanaMs: 15 * MIN }]);
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const email = String(body?.email ?? "").trim().toLowerCase();
   const codigo = String(body?.codigo ?? "");
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
 
   await marcarEmailVerificado(user.id);
-  const token = await createSessionToken(user.id);
+  const token = await createSessionToken(user.id, user.sesionVersion ?? 0);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });
   res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
   return res;

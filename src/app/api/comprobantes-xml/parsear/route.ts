@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { parseRelacionXlsx } from "@/lib/relacionComprobantes";
@@ -7,6 +8,7 @@ export const maxDuration = 30;
 
 // Lee el Excel de la relación subida y devuelve la lista de comprobantes.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   if (!(await getCurrentUser())) {
     return NextResponse.json({ error: "Sesión no válida." }, { status: 401 });
   }

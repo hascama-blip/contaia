@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { construirExcelCruce } from "@/lib/xlsxIO";
 import type { ResultadoCruce } from "@/lib/cruceSire";
@@ -9,6 +10,7 @@ export const maxDuration = 60;
 // genera y devuelve el Excel del comparativo. Se reenvía el resultado para no
 // re-subir los archivos.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("cruce-sire"); if (_bloqueo) return _bloqueo;
   const body = await req.json().catch(() => null);
   const resultado = body?.resultado as ResultadoCruce | undefined;
   if (!resultado || (!resultado.compras && !resultado.ventas)) {

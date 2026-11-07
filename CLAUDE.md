@@ -131,6 +131,24 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   `/api/webhooks/pagos/*` (públicos por el middleware). Sin pasarela configurada, los botones
   vuelven a WhatsApp.
 
+## Seguridad (reglas del sistema)
+- **Planes en el servidor**: toda ruta de un módulo de pago empieza con `bloqueoModulo("clave")`
+  (`src/lib/acceso.ts`); las páginas usan `exigirModuloPagina`. Al crear una ruta nueva de un
+  módulo, agrega la guarda. Solo supremo: `bloqueoSupremo()`.
+- **Store**: toda función de `db.ts` que escribe corre dentro de `conBloqueoStore` (candado
+  reentrante): no hay pérdidas por escrituras simultáneas. Funciones nuevas que escriban deben
+  envolverse igual.
+- **Modo diagnóstico**: solo el supremo (`limpiarDiagnostico(body)` tras leer el cuerpo).
+- **Límites**: `src/lib/limite.ts` (login por IP y correo, registro, códigos, pagos, Asociación,
+  consulta RUC, webhook RTT).
+- **Sesiones**: el token lleva `sesionVersion`; cambiar/restablecer la contraseña cierra las demás
+  sesiones; una cuenta rechazada pierde la sesión. Contraseña mínima 8.
+- **Secretos**: el client_secret SIRE nunca va al navegador (`ocultarCliente`/`resolverSecreto`
+  en `src/lib/secretos.ts`). Sin contraseña supremo por defecto en el código. El panel Supremo y
+  el log avisan si falta AUTH_SECRET, VIGILANCIA_KEY, SUPREMO_PASSWORD o APP_URL.
+- **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
+- **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
+
 ## Hecho
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·
 buzón (más peligroso aparte) · declaraciones PDF vs SIRE · diagnóstico · dashboard · informe de gerencia

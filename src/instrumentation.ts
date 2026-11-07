@@ -6,10 +6,13 @@
 // La ruta decide si ya corrió hoy. Un cron externo puede hacer lo mismo con
 // ?token=CRON_SECRET.
 import { tokenInterno } from "./lib/tokenInterno";
+import { revisarConfiguracion } from "./lib/seguridad";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.NEXT_PHASE === "phase-production-build") return;
+  // Avisos de configuración insegura en el registro del servidor.
+  for (const a of revisarConfiguracion()) console.error(`[seguridad] ${a.nivel.toUpperCase()}: ${a.texto}`);
   if (process.env.NOCTURNA_DESACTIVADA === "1") return;
   const g = globalThis as any;
   if (g.__radarPlanificador) return;

@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { leerFilas } from "@/lib/xlsxIO";
 import { esZipContenedor, extraerDeZip } from "@/lib/zip";
@@ -20,6 +21,7 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 // hasta 4 Excel: sireCompras, sireVentas, contableCompras, contableVentas.
 // Cruza comprobante por comprobante y devuelve el resultado (JSON). No persiste.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("cruce-sire"); if (_bloqueo) return _bloqueo;
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido" }, { status: 400 });
 

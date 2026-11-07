@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { listarHojasBanco, agruparHojasPorEmpresa, EmpresaBanco } from "@/lib/conciliacionStarsoft";
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 // Devuelve los nombres de las hojas (cuentas) del FORMATO BANCO STARSOFT subido,
 // para que el usuario elija con cuál conciliar.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("conciliacion"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   const files = (form?.getAll("banco") ?? []).filter((v): v is File => v instanceof File && v.size > 0);

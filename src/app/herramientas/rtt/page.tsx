@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { listClientes } from "@/lib/db";
-import { requireUser, studioId } from "@/lib/auth";
+import { studioId } from "@/lib/auth";
+import { exigirModuloPagina } from "@/lib/acceso";
 import RttPanel from "@/components/RttPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reporte Tributario para Terceros (RTT) — Radar Tributario" };
 
 export default async function Page() {
-  const user = await requireUser();
+  const user = await exigirModuloPagina("rtt");
   const clientes = await listClientes(studioId(user));
   const min = clientes.map((c) => ({ id: c.id, razonSocial: c.razonSocial, ruc: c.ruc, solUser: c.credSire?.solUser ?? "" }));
 

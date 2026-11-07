@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, esAdmin, studioId } from "@/lib/auth";
 import { listClientes, setSunatInfo, updateCliente } from "@/lib/db";
@@ -15,6 +16,8 @@ const CONCURRENCIA = 4; // consultas a SUNAT en paralelo.
 // quedan, para que el frontend repita hasta terminar.
 export async function POST(_req: NextRequest) {
   const user = await requireUser();
+  const _lim = limitar([{ clave: `verificar-clientes:${user.id}`, max: 6, ventanaMs: HORA }], "Ya verificaste tus empresas varias veces.");
+  if (_lim) return _lim;
   if (!esAdmin(user)) {
     return NextResponse.json({ error: "Solo el administrador puede verificar." }, { status: 403 });
   }

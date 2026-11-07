@@ -41,7 +41,7 @@ const num = (s: string) => Number(String(s).replace(/[^\d.-]/g, "")) || 0;
 
 /** Extrae el texto del PDF con unpdf (pdf.js serverless, sin OCR). */
 export async function textoDePdf(buf: Buffer): Promise<string> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
+  const { extractText, getDocumentProxy } = await import("./pdfTexto");
   const pdf = await getDocumentProxy(new Uint8Array(buf));
   const res: any = await extractText(pdf, { mergePages: true });
   const text: any = res?.text;

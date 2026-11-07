@@ -61,7 +61,7 @@ const fechaLocal = (d: Date) =>
 
 // ---- 1) Extracto bancario (PDF con capa de texto, formato BCP) ---------------
 export async function parseExtractoBcp(buf: Buffer): Promise<{ desde: string; hasta: string; movs: MovBanco[] }> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
+  const { extractText, getDocumentProxy } = await import("./pdfTexto");
   const pdf = await getDocumentProxy(new Uint8Array(buf));
   const res: any = await extractText(pdf, { mergePages: false });
   const pages: string[] = (Array.isArray(res?.text) ? res.text : [res?.text]).map((p: any) => String(p ?? ""));

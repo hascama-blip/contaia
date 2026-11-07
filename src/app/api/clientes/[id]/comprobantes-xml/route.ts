@@ -1,3 +1,4 @@
+import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerComprobantesXml } from "@/lib/comprobantesXml";
@@ -10,6 +11,7 @@ export const maxDuration = 240;
 // GET → recupera los comprobantes YA extraídos de un periodo (para no rehacerlos
 // si se cae el internet / se recarga la página).
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const periodo = new URL(req.url).searchParams.get("periodo") ?? "";
@@ -21,10 +23,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // SOL (scraping). La Clave SOL viaja en el body y NO se persiste. Consume 1 uso
 // del cupo gratis solo si el login fue correcto (clave errada NO consume).
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  await limpiarDiagnostico(body);
   const solUser =
     (typeof body.solUser === "string" && body.solUser) || cliente.credSire?.solUser || "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";

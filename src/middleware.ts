@@ -22,7 +22,12 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/api/asociacion") ||
     // Webhooks entrantes (correo de SUNAT para el RTT): los llama el proveedor
     // de correo, sin sesión; se protegen con su propio secreto compartido.
-    pathname.startsWith("/api/webhooks/")
+    pathname.startsWith("/api/webhooks/") ||
+    // Rutas con su PROPIA autenticación por token (no usan la cookie):
+    //  · tarea nocturna: token interno del planificador o CRON_SECRET.
+    //  · captura del Visor: token incrustado en la extensión del navegador.
+    pathname === "/api/tareas/nocturna" ||
+    pathname === "/api/visor/captura"
   ) {
     return pasar();
   }

@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
 import { getBuzonAdjunto, setBuzonAdjunto, registrarDescargaBuzon } from "@/lib/db";
@@ -28,6 +29,7 @@ function pdfResponse(
 // Cache-first: si ya se descargó antes, se sirve guardado SIN re-loguear en SOL.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 

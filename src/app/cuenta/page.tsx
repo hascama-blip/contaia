@@ -41,9 +41,9 @@ export default function CuentaPage() {
           <div><label className="text-xs font-semibold text-slate-600">Contraseña actual</label>
             <input type="password" className={input} value={actual} onChange={(e) => setActual(e.target.value)} autoComplete="current-password" required /></div>
           <div><label className="text-xs font-semibold text-slate-600">Nueva contraseña</label>
-            <input type="password" className={input} value={nueva} onChange={(e) => setNueva(e.target.value)} autoComplete="new-password" minLength={6} required /></div>
+            <input type="password" className={input} value={nueva} onChange={(e) => setNueva(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
           <div><label className="text-xs font-semibold text-slate-600">Repetir nueva contraseña</label>
-            <input type="password" className={input} value={repetir} onChange={(e) => setRepetir(e.target.value)} autoComplete="new-password" minLength={6} required /></div>
+            <input type="password" className={input} value={repetir} onChange={(e) => setRepetir(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
           <button type="submit" className="btn-primary w-full" disabled={busy}>{busy ? "Guardando…" : "Guardar nueva contraseña"}</button>
         </form>
       </div>

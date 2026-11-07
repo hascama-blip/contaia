@@ -128,7 +128,7 @@ export default function LoginPage() {
           )}
           {modo === "olvido-codigo" && (
             <div><label className="text-xs font-semibold text-slate-600">Nueva contraseña</label>
-              <input type="password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={6} required /></div>
+              <input type="password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
           )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
             {busy ? "Un momento…" : modo === "login" ? "Entrar" : modo === "registro" ? "Crear cuenta" : modo === "verificar" ? "Verificar y entrar" : modo === "olvido" ? "Enviar código" : "Cambiar contraseña"}

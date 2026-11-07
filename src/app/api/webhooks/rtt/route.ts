@@ -1,3 +1,6 @@
+import { intentar, ipDe, MIN } from "@/lib/limite";
+import { timingSafeEqual } from "crypto";
+const igualSeguro = (a: string, b: string) => { const A = Buffer.from(a), B = Buffer.from(b); return A.length === B.length && timingSafeEqual(A, B); };
 import { NextRequest, NextResponse } from "next/server";
 import { getRttConfig, guardarArchivosRTTPorRuc, registrarWebhookRTT, guardarReporteRentasPorRuc } from "@/lib/db";
 
@@ -15,8 +18,11 @@ export async function POST(req: NextRequest) {
   const { secret } = await getRttConfig();
   const url = new URL(req.url);
   const enviado = req.headers.get("x-webhook-secret") || url.searchParams.get("secret") || "";
-  if (!secret || enviado !== secret) {
-    await registrarWebhookRTT({ resultado: "secreto inválido (401)" }).catch(() => {});
+  if (!secret || !igualSeguro(enviado, secret)) {
+    // Solo se anotan en la bitácora los primeros fallos por IP (evita llenar el store).
+    if (!intentar(`rtt-fallo:${ipDe(req)}`, 10, 10 * MIN)) {
+      await registrarWebhookRTT({ resultado: "secreto inválido (401)" }).catch(() => {});
+    }
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

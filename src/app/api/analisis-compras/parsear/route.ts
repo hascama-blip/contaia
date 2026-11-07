@@ -1,3 +1,4 @@
+import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { parseLibroDiario, analizarCompras, type MovDiario } from "@/lib/analisisCompras";
@@ -8,6 +9,7 @@ export const maxDuration = 60;
 // POST (multipart) file(s) = Libro(s) Diario(s) en Excel (uno o varios meses,
 // p. ej. enero…diciembre) → análisis combinado de compras/gastos.
 export async function POST(req: NextRequest) {
+  const _bloqueo = await bloqueoModulo("analisis-rtp"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   const files = form ? (form.getAll("file").filter((f) => f instanceof File) as File[]) : [];

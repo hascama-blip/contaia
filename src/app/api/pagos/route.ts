@@ -1,3 +1,4 @@
+import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esAdmin, esSupremo, planEfectivo } from "@/lib/auth";
 import { listPagos } from "@/lib/db";
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest) {
   if (!esAdmin(u) || esSupremo(u)) {
     return NextResponse.json({ error: "Solo el líder del estudio puede pagar el plan (los operadores heredan su plan)." }, { status: 403 });
   }
+  const _lim = limitar([{ clave: `pagos:${u.id}`, max: 10, ventanaMs: 10 * MIN }], "Demasiados intentos de pago.");
+  if (_lim) return _lim;
   const body = await req.json().catch(() => ({}));
   const plan = String(body.plan ?? "") as PlanPago;
   if (!PRECIOS[plan]) return NextResponse.json({ error: "Plan inválido." }, { status: 400 });

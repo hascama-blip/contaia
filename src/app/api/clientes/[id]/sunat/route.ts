@@ -1,3 +1,4 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { setSunatInfo, setFechasSunat } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -14,7 +15,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   try {
     const info = await consultarSunat(cliente.ruc);
     const actualizado = await setSunatInfo(cliente.id, info);
-    return NextResponse.json({ cliente: actualizado, sunat: info });
+    return NextResponse.json({ cliente: ocultarCliente(actualizado), sunat: info });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "Error consultando SUNAT" },
@@ -43,5 +44,5 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     clienteId: cliente.id,
     clienteNombre: cliente.razonSocial,
   });
-  return NextResponse.json({ cliente: actualizado, sunat: actualizado.sunat });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado), sunat: actualizado.sunat });
 }

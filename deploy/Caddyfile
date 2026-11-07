@@ -6,6 +6,11 @@
 
 {$DOMINIO} {
 	encode zstd gzip
+	# HTTPS obligatorio en el navegador por 1 año y sin delatar el servidor.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
 	# Archivos estáticos de Next con caché larga (van con hash en el nombre).
 	@estaticos path /_next/static/* /favicon.ico /logo-sunat.png
 	header @estaticos Cache-Control "public, max-age=31536000, immutable"

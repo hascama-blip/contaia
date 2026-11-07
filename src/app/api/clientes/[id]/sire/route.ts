@@ -1,3 +1,5 @@
+import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { clearSire, setSireResumen, setCredSire } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -13,7 +15,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const actualizado = await clearSire(cliente.id);
-  return NextResponse.json({ cliente: actualizado });
+  return NextResponse.json({ cliente: ocultarCliente(actualizado) });
 }
 
 // Consulta el resumen SIRE (compras/ventas) de un periodo.
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
+
+  await limpiarDiagnostico(body);
   if (!body || typeof body.periodo !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
@@ -36,6 +40,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const cupo = await verificarCupo(cliente.ruc, "sire", lote);
   if (!cupo.ok && !esDiag) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
+  // El navegador recibe el client_secret oculto: si lo devuelve así, se usa el guardado.
+  if (typeof body.clientSecret === "string") body.clientSecret = resolverSecreto(body.clientSecret, cliente.credSire?.clientSecret);
   try {
     const resultado = await consultarResumenSire({
       ruc: cliente.ruc,
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (cupo.ok && !esDiag) await consumirCupo(cupo.ticket);
     return NextResponse.json({
       resumen: resultado.resumen,
-      cliente: actualizado,
+      cliente: ocultarCliente(actualizado),
     });
   } catch (err: any) {
     return NextResponse.json(

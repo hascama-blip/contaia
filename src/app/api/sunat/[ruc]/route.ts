@@ -1,3 +1,5 @@
+import { limitar, ipDe, HORA } from "@/lib/limite";
+import { getCurrentUser, esSupremo } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { consultarSunat, rucValido, debugDecolecta } from "@/lib/sunat";
 
@@ -10,6 +12,10 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { ruc: string } }
 ) {
+  // Cada consulta cuesta (token decolecta): 120 por hora por usuario.
+  const u = await getCurrentUser();
+  const _lim = limitar([{ clave: `sunat-ruc:${u?.id ?? ipDe(_req)}`, max: 120, ventanaMs: HORA }], "Demasiadas consultas de RUC.");
+  if (_lim) return _lim;
   const ruc = (params.ruc ?? "").trim();
   if (!rucValido(ruc)) {
     return NextResponse.json(
@@ -18,7 +24,7 @@ export async function GET(
     );
   }
   // ?debug=1 → respuestas crudas de decolecta (para calibrar el mapeo).
-  if (_req.nextUrl.searchParams.get("debug") === "1") {
+  if (_req.nextUrl.searchParams.get("debug") === "1" && esSupremo(u)) {
     return NextResponse.json(await debugDecolecta(ruc));
   }
   try {

@@ -130,7 +130,7 @@ function aMonto(s: string): number {
  */
 export async function extraerFilasPdf(buffer: Buffer): Promise<string[][]> {
   try {
-    const { getDocumentProxy } = await import("unpdf");
+    const { getDocumentProxy } = await import("./pdfTexto");
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const filas: string[][] = [];
     for (let p = 1; p <= pdf.numPages; p++) {

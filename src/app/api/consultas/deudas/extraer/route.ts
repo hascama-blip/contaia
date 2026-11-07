@@ -1,3 +1,4 @@
+import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerDeudasF36 } from "@/lib/fraccionamiento";
@@ -19,6 +20,7 @@ function diasRestantes(at: string) {
 // muestra lo guardado sin tocar SUNAT. Después, la nueva extracción reemplaza.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
 

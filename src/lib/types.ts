@@ -145,6 +145,9 @@ export interface Usuario {
    *  "RUC:paso" y comprobantes descargados en la Descarga masiva. Al cambiar de
    *  mes se reinicia. `lotes` = tandas ya contadas (SIRE de varios periodos). */
   cupos?: { mes: string; usos: Record<string, number>; lotes?: Record<string, string>; comprobantes?: number };
+  /** Versión de sesión: al cambiar/restablecer la contraseña sube y las
+   *  sesiones abiertas en otros equipos dejan de valer. */
+  sesionVersion?: number;
   /** Compró con el precio de lanzamiento (−50 %): lo conserva al renovar. */
   precioLanzamiento?: boolean;
   /** Plan Empresas (a cotizar): límites pactados con el cliente. 0 = sin límite;

@@ -1,6 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
+import { AsyncLocalStorage } from "async_hooks";
+import { hoyLima } from "./fechas";
 import type { AsociacionContenido, RatingAgg, Sugerencia } from "./asociacion";
 import { CONTENIDO_DEFAULT, normalizarContenido } from "./asociacion";
 import type {
@@ -58,6 +60,10 @@ interface Store {
   /** Memoria de honorarios: emisor+concepto → cuentas del asiento (aprendido de
    *  la plantilla del mes anterior). Clave = "<emisor>::<CONCEPTO NORMALIZADO>". */
   cuentasHonorarios?: Record<string, CuentaHonorario>;
+  /** Memorias de cuentas POR ESTUDIO (id del admin): proveedores y honorarios.
+   *  Las globales `cuentasProveedor`/`cuentasHonorarios` quedan como memoria del
+   *  supremo (datos anteriores a la separación por estudio). */
+  memoriasEstudio?: Record<string, { proveedores?: Record<string, ProveedorCuenta>; honorarios?: Record<string, CuentaHonorario> }>;
   /** Caché de rubro por RUC (para consultar decolecta 1 sola vez por RUC). */
   rubrosProveedor?: Record<string, { razonSocial: string; actividad: string; at: string }>;
   /** Bitácora de auditoría: acciones de todos los usuarios (la ve el líder). */
@@ -139,10 +145,12 @@ export async function getAsociacion(): Promise<AsociacionContenido> {
 }
 /** Guarda el contenido editado (normalizado). */
 export async function setAsociacion(contenido: any): Promise<AsociacionContenido> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   store.asociacion = normalizarContenido(contenido);
   await writeStore(store);
   return store.asociacion;
+});
 }
 
 /** Todas las valoraciones (id curso → {suma, conteo}). */
@@ -152,6 +160,7 @@ export async function getRatings(): Promise<Record<string, RatingAgg>> {
 }
 /** Agrega una valoración (1..5) a un curso y devuelve el agregado del curso. */
 export async function addRating(cursoId: string, valor: number): Promise<RatingAgg> {
+  return conBloqueoStore(async () => {
   const v = Math.max(1, Math.min(5, Math.round(valor)));
   const store = await readStore();
   if (!store.asociacionRatings) store.asociacionRatings = {};
@@ -160,6 +169,7 @@ export async function addRating(cursoId: string, valor: number): Promise<RatingA
   store.asociacionRatings[cursoId] = next;
   await writeStore(store);
   return next;
+});
 }
 /** Sugerencias de próximos cursos (más recientes primero). */
 export async function getSugerencias(): Promise<Sugerencia[]> {
@@ -167,11 +177,13 @@ export async function getSugerencias(): Promise<Sugerencia[]> {
   return (store.asociacionSugerencias ?? []).slice().reverse();
 }
 export async function addSugerencia(sug: Sugerencia): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.asociacionSugerencias)) store.asociacionSugerencias = [];
   store.asociacionSugerencias.push(sug);
   if (store.asociacionSugerencias.length > 500) store.asociacionSugerencias = store.asociacionSugerencias.slice(-500);
   await writeStore(store);
+});
 }
 
 // ---- Usuarios --------------------------------------------------------------
@@ -181,12 +193,14 @@ export async function updateUserById(
   id: string,
   patch: Partial<Pick<Usuario, "passHash" | "rol" | "estado" | "nombre" | "parentId" | "decididoAt" | "soloRtp">>
 ): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === id);
   if (!u) return null;
   Object.assign(u, patch);
   await writeStore(store);
   return u;
+});
 }
 
 export async function getUserById(id: string): Promise<Usuario | null> {
@@ -211,6 +225,7 @@ export async function createUser(data: {
   /** false = registro con verificación de correo pendiente (no puede entrar aún). */
   emailVerificado?: boolean;
 }): Promise<Usuario> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.users) store.users = [];
   const user: Usuario = {
@@ -228,6 +243,7 @@ export async function createUser(data: {
   store.users.push(user);
   await writeStore(store);
   return user;
+});
 }
 
 // ---- Cupo del módulo gratis: 3 consultas por ventana de 7 días -------------
@@ -262,6 +278,7 @@ export async function estadoUsos(
 
 /** Consume 1 uso del cupo gratis (los pagos no consumen). */
 export async function consumirUso(adminId: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === adminId);
   if (!u) return;
@@ -271,6 +288,7 @@ export async function consumirUso(adminId: string): Promise<void> {
   const usados = c.expirado ? 1 : (u.usosGratis?.usados ?? 0) + 1;
   u.usosGratis = { usados, desde };
   await writeStore(store);
+});
 }
 
 // ---- Cupos del mes por estudio (generaciones por empresa+paso y comprobantes)
@@ -298,6 +316,7 @@ function cuposDelMes(u: Usuario) {
 /** Suma 1 generación a "RUC:paso". Si viene `lote` y esa tanda ya se contó,
  *  no suma (p. ej. el SIRE de 12 periodos = 1 sola generación). Devuelve los usados. */
 export async function sumarCupo(adminId: string, clave: string, lote?: string): Promise<number> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === adminId);
   if (!u) return 0;
@@ -313,10 +332,12 @@ export async function sumarCupo(adminId: string, clave: string, lote?: string): 
   c.usos[clave] = (c.usos[clave] ?? 0) + 1;
   await writeStore(store);
   return c.usos[clave];
+});
 }
 
 /** Suma `n` comprobantes descargados en el mes. Devuelve el acumulado. */
 export async function sumarComprobantesMes(adminId: string, n: number): Promise<number> {
+  return conBloqueoStore(async () => {
   if (!(n > 0)) return (await getCuposMes(adminId)).comprobantes;
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === adminId);
@@ -325,21 +346,25 @@ export async function sumarComprobantesMes(adminId: string, n: number): Promise<
   c.comprobantes = (c.comprobantes ?? 0) + n;
   await writeStore(store);
   return c.comprobantes;
+});
 }
 
 /** Límites pactados del Plan Empresas (los fija el supremo). */
 export async function setLimitesCotizados(userId: string, lim: { generaciones?: number; comprobantes?: number } | null): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
   u.limitesCotizados = lim ?? undefined;
   await writeStore(store);
   return u;
+});
 }
 
 // ---- Pagos de planes (pasarela) ---------------------------------------------
 
 export async function crearPago(p: Omit<Pago, "id" | "creadoAt" | "estado">): Promise<Pago> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.pagos)) store.pagos = [];
   const pago: Pago = { ...p, id: newId(), estado: "pendiente", creadoAt: new Date().toISOString() };
@@ -349,6 +374,7 @@ export async function crearPago(p: Omit<Pago, "id" | "creadoAt" | "estado">): Pr
   store.pagos = store.pagos.filter((x) => x.estado !== "pendiente" || new Date(x.creadoAt).getTime() > lim);
   await writeStore(store);
   return pago;
+});
 }
 
 export async function getPago(id: string): Promise<Pago | null> {
@@ -372,12 +398,14 @@ export async function contarLanzamiento(): Promise<number> {
 }
 
 export async function marcarPago(id: string, cambios: Partial<Pick<Pago, "estado" | "referencia" | "detalle">>): Promise<Pago | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const p = (store.pagos ?? []).find((x) => x.id === id);
   if (!p || p.estado === "pagado") return p ?? null;
   Object.assign(p, cambios);
   await writeStore(store);
   return p;
+});
 }
 
 const sumarDias = (iso: string, dias: number) => {
@@ -395,6 +423,7 @@ export async function acreditarPago(
   datos: { referencia?: string; montoCentimos?: number; detalle?: string },
   dias = 30,
 ): Promise<{ pago: Pago | null; nuevo: boolean; error?: string }> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const p = (store.pagos ?? []).find((x) => x.id === id);
   if (!p) return { pago: null, nuevo: false, error: "Pago no encontrado." };
@@ -407,7 +436,7 @@ export async function acreditarPago(
   }
   const u = (store.users ?? []).find((x) => x.id === p.userId);
   if (!u) return { pago: p, nuevo: false, error: "Usuario no encontrado." };
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLima();
   const vigente = !!u.planVence && u.planVence >= hoy && (u.plan ?? "basico") !== "basico";
   if (u.plan === p.plan && vigente) {
     // Renovación del mismo plan: los días se suman al vencimiento actual.
@@ -433,6 +462,7 @@ export async function acreditarPago(
   if (datos.detalle) p.detalle = datos.detalle;
   await writeStore(store);
   return { pago: p, nuevo: true };
+});
 }
 
 // ---- Solicitudes de acceso (las gestiona el usuario supremo) ---------------
@@ -451,6 +481,7 @@ export async function listSolicitudes(
 /** Borra TODOS los usuarios (cuentas). Devuelve cuántos eliminó. Luego se debe
  *  recrear el supremo con ensureSupremo(). Acción destructiva del supremo. */
 export async function eliminarTodosLosUsuarios(): Promise<number> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const n = (store.users ?? []).length;
   // Reset total de cuentas: borra usuarios, clientes y el registro global de
@@ -462,51 +493,62 @@ export async function eliminarTodosLosUsuarios(): Promise<number> {
   store.acciones = [];
   await writeStore(store);
   return n;
+});
 }
 
 /** Cambia la contraseña (hash) de un usuario y limpia cualquier token de reset. */
 export async function setPasswordUsuario(userId: string, passHash: string): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return null;
   u.passHash = passHash;
+  u.sesionVersion = (u.sesionVersion ?? 0) + 1; // cierra las sesiones abiertas
   u.resetTokenHash = undefined;
   u.resetTokenExp = undefined;
   u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
   await writeStore(store);
   return u;
+});
 }
 
 // ---- Códigos de 6 dígitos (verificación de correo / cambio de contraseña) ---
 
 /** Guarda un código (hash + vencimiento + tipo) y reinicia intentos. */
 export async function setCodigoUsuario(userId: string, d: { hash: string; exp: string; tipo: "verificacion" | "reset" }): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return;
   u.codigoHash = d.hash; u.codigoExp = d.exp; u.codigoTipo = d.tipo;
   u.codigoIntentos = 0; u.codigoEnviadoAt = new Date().toISOString();
   await writeStore(store);
+});
 }
 /** Invalida el código vigente (conserva la hora del último envío para el throttle). */
 export async function limpiarCodigoUsuario(userId: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return;
   u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
   await writeStore(store);
+});
 }
 /** Suma un intento fallido y devuelve el total. */
 export async function incIntentosCodigo(userId: string): Promise<number> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return 0;
   u.codigoIntentos = (u.codigoIntentos ?? 0) + 1;
   await writeStore(store);
   return u.codigoIntentos;
+});
 }
 /** Marca el correo como verificado y limpia el código. */
 export async function marcarEmailVerificado(userId: string): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return null;
@@ -514,16 +556,19 @@ export async function marcarEmailVerificado(userId: string): Promise<Usuario | n
   u.codigoHash = undefined; u.codigoExp = undefined; u.codigoTipo = undefined; u.codigoIntentos = undefined;
   await writeStore(store);
   return u;
+});
 }
 
 /** Guarda el token de recuperación (hash + expiración) de un usuario. */
 export async function setResetTokenUsuario(userId: string, hash: string, exp: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return;
   u.resetTokenHash = hash;
   u.resetTokenExp = exp;
   await writeStore(store);
+});
 }
 
 /** El supremo desbloquea/bloquea los módulos de paga de un estudio. */
@@ -531,12 +576,14 @@ export async function setModulosUsuario(
   userId: string,
   modulos: string[]
 ): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
   u.modulos = Array.from(new Set(modulos));
   await writeStore(store);
   return u;
+});
 }
 
 /** El supremo asigna el PLAN de un estudio (basico/regular/premium/equipo) y,
@@ -546,6 +593,7 @@ export async function setPlanUsuario(
   plan: "basico" | "regular" | "premium" | "equipo",
   planVence?: string
 ): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
@@ -554,20 +602,24 @@ export async function setPlanUsuario(
   if (plan === "basico") u.planVence = undefined;
   await writeStore(store);
   return u;
+});
 }
 
 /** Cambia solo el vencimiento del plan ("" = sin vencimiento). */
 export async function setPlanVenceUsuario(userId: string, planVence: string): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
   u.planVence = planVence || undefined;
   await writeStore(store);
   return u;
+});
 }
 
 // --- Alertas por usuario (Telegram / correo) ---------------------------------
 export async function setAlertasUsuario(userId: string, patch: Partial<AlertasUsuario>): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId);
   if (!u) return null;
@@ -576,6 +628,7 @@ export async function setAlertasUsuario(userId: string, patch: Partial<AlertasUs
   for (const k of Object.keys(u.alertas) as (keyof AlertasUsuario)[]) if (u.alertas[k] === undefined) delete u.alertas[k];
   await writeStore(store);
   return u;
+});
 }
 /** Usuario que tiene pendiente el código de vinculación de Telegram. */
 export async function getUserPorCodigoTelegram(codigo: string): Promise<Usuario | null> {
@@ -591,19 +644,23 @@ export async function listAdmins(): Promise<Usuario[]> {
 
 // --- Vigilancia nocturna del buzón (por empresa) -----------------------------
 export async function setVigilancia(clienteId: string, v: VigilanciaBuzon | null): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const c = store.clientes.find((x) => x.id === clienteId);
   if (!c) return null;
   c.vigilancia = v;
   await writeStore(store);
   return c;
+});
 }
 export async function patchVigilancia(clienteId: string, patch: Partial<VigilanciaBuzon>): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const c = store.clientes.find((x) => x.id === clienteId);
   if (!c?.vigilancia) return;
   Object.assign(c.vigilancia, patch);
   await writeStore(store);
+});
 }
 export async function listClientesVigilados(): Promise<Cliente[]> {
   const store = await readStore();
@@ -616,6 +673,7 @@ export async function alertaYaEnviada(clave: string): Promise<boolean> {
   return Boolean(store.alertas?.enviadas?.[clave]);
 }
 export async function marcarAlertaEnviada(clave: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.alertas) store.alertas = {};
   if (!store.alertas.enviadas) store.alertas.enviadas = {};
@@ -624,15 +682,18 @@ export async function marcarAlertaEnviada(clave: string): Promise<void> {
   const lim = Date.now() - 90 * 86400000;
   for (const [k, v] of Object.entries(store.alertas.enviadas)) if (new Date(v).getTime() < lim) delete store.alertas.enviadas[k];
   await writeStore(store);
+});
 }
 export async function getEstadoAlertas(): Promise<NonNullable<Store["alertas"]>> {
   const store = await readStore();
   return store.alertas ?? {};
 }
 export async function setEstadoAlertas(patch: Partial<NonNullable<Store["alertas"]>>): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   store.alertas = { ...(store.alertas ?? {}), ...patch };
   await writeStore(store);
+});
 }
 
 // --- Avisos informativos (los publica el supremo; los ven todas las cuentas) ---
@@ -643,6 +704,7 @@ export async function listAvisos(soloVigentes = true): Promise<Aviso[]> {
   return soloVigentes ? todos.filter((a) => !a.hasta || a.hasta >= hoy) : todos;
 }
 export async function addAviso(titulo: string, texto: string, hasta?: string): Promise<Aviso> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.avisos) store.avisos = [];
   const aviso: Aviso = { id: crypto.randomUUID(), titulo, texto, at: new Date().toISOString(), hasta: hasta || undefined };
@@ -650,11 +712,14 @@ export async function addAviso(titulo: string, texto: string, hasta?: string): P
   store.avisos = store.avisos.slice(0, 50);
   await writeStore(store);
   return aviso;
+});
 }
 export async function deleteAviso(id: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   store.avisos = (store.avisos ?? []).filter((a) => a.id !== id);
   await writeStore(store);
+});
 }
 
 /** El supremo aprueba o rechaza el acceso de un estudio. */
@@ -662,6 +727,7 @@ export async function setEstadoUsuario(
   userId: string,
   estado: "pendiente" | "aprobado" | "rechazado"
 ): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const u = (store.users ?? []).find((x) => x.id === userId && !x.parentId && x.rol !== "supremo");
   if (!u) return null;
@@ -669,6 +735,7 @@ export async function setEstadoUsuario(
   u.decididoAt = new Date().toISOString();
   await writeStore(store);
   return u;
+});
 }
 
 /** Sub-usuarios (operadores) de un admin/estudio. */
@@ -691,12 +758,14 @@ export async function conteoOperadores(): Promise<Record<string, number>> {
 
 /** Elimina un sub-usuario, solo si pertenece a ese admin. */
 export async function deleteSubUsuario(adminId: string, userId: string): Promise<boolean> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const i = (store.users ?? []).findIndex((u) => u.id === userId && u.parentId === adminId);
   if (i < 0) return false;
   store.users!.splice(i, 1);
   await writeStore(store);
   return true;
+});
 }
 
 // ---- Bitácora de auditoría -------------------------------------------------
@@ -707,6 +776,7 @@ const MAX_ACCIONES = 5000; // tope para no inflar el store.json indefinidamente.
 export async function registrarAccion(
   data: Omit<AccionAuditoria, "id" | "at">
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.acciones)) store.acciones = [];
   store.acciones.push({ id: newId(), at: new Date().toISOString(), ...data });
@@ -715,6 +785,7 @@ export async function registrarAccion(
     store.acciones = store.acciones.slice(store.acciones.length - MAX_ACCIONES);
   }
   await writeStore(store);
+});
 }
 
 /** Lista las acciones de un estudio (más recientes primero), con filtros. */
@@ -742,10 +813,12 @@ export async function getBrowserWsUrl(): Promise<string> {
 }
 
 export async function setBrowserWsUrl(url: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.config) store.config = {};
   store.config.browserWsUrl = url.trim();
   await writeStore(store);
+});
 }
 
 // ---- Integraciones antibloqueo SUNAT (captcha + proxy) ---------------------
@@ -774,6 +847,7 @@ export async function getIntegraciones(): Promise<IntegracionesConfig> {
 
 /** Guarda las integraciones (solo lo que venga definido). "" borra el valor. */
 export async function setIntegraciones(patch: Partial<IntegracionesConfig>): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.config) store.config = {};
   if (patch.capsolverKey !== undefined) store.config.capsolverKey = patch.capsolverKey.trim();
@@ -781,6 +855,7 @@ export async function setIntegraciones(patch: Partial<IntegracionesConfig>): Pro
   if (patch.proxyUser !== undefined) store.config.proxyUser = patch.proxyUser.trim();
   if (patch.proxyPass !== undefined) store.config.proxyPass = patch.proxyPass.trim();
   await writeStore(store);
+});
 }
 
 // ---- RTT: Reporte Tributario para Terceros (trazabilidad + webhook) ---------
@@ -795,11 +870,13 @@ export async function getRttConfig(): Promise<{ dominio: string; secret: string 
   };
 }
 export async function setRttConfig(cfg: { dominio?: string; secret?: string }): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.config) store.config = {};
   if (cfg.dominio !== undefined) store.config.rttDominio = cfg.dominio.trim();
   if (cfg.secret !== undefined) store.config.rttSecret = cfg.secret.trim();
   await writeStore(store);
+});
 }
 
 const RTT_DIR = path.join(UPLOADS_DIR, "rtt");
@@ -808,6 +885,7 @@ const RTT_DIR = path.join(UPLOADS_DIR, "rtt");
 export async function crearSolicitudRTT(datos: {
   ruc: string; razonSocial?: string; emailDestino: string; solicitadoPor?: string;
 }): Promise<SolicitudRTT> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rtt)) store.rtt = [];
   const now = new Date().toISOString();
@@ -825,10 +903,12 @@ export async function crearSolicitudRTT(datos: {
   store.rtt.push(sol);
   await writeStore(store);
   return sol;
+});
 }
 
 /** Cambia el estado de una solicitud y registra la transición. */
 export async function setEstadoRTT(id: string, estado: EstadoRTT, nota?: string, extra?: Partial<SolicitudRTT>): Promise<SolicitudRTT | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const sol = (store.rtt ?? []).find((s) => s.id === id);
   if (!sol) return null;
@@ -839,6 +919,7 @@ export async function setEstadoRTT(id: string, estado: EstadoRTT, nota?: string,
   if (extra) Object.assign(sol, extra);
   await writeStore(store);
   return sol;
+});
 }
 
 export async function getSolicitudRTT(id: string): Promise<SolicitudRTT | null> {
@@ -870,6 +951,7 @@ export async function guardarArchivosRTTPorRuc(
   ruc: string,
   archivos: { pdf?: Buffer; xml?: Buffer }
 ): Promise<SolicitudRTT | null> {
+  return conBloqueoStore(async () => {
   await fs.mkdir(RTT_DIR, { recursive: true });
   const store = await readStore();
   const candidatas = (store.rtt ?? [])
@@ -887,10 +969,12 @@ export async function guardarArchivosRTTPorRuc(
   sol.historial.push({ estado: "listo", at: now });
   await writeStore(store);
   return sol;
+});
 }
 
 /** Registra un evento del webhook (para verificar que el correo llegó). */
 export async function registrarWebhookRTT(ev: { ruc?: string; tienePdf?: boolean; tieneXml?: boolean; resultado: string; from?: string }): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rttWebhookLog)) store.rttWebhookLog = [];
   store.rttWebhookLog.unshift({
@@ -903,6 +987,7 @@ export async function registrarWebhookRTT(ev: { ruc?: string; tienePdf?: boolean
   });
   store.rttWebhookLog = store.rttWebhookLog.slice(0, 25);
   await writeStore(store);
+});
 }
 export async function getWebhookLogRTT(): Promise<Store["rttWebhookLog"]> {
   const store = await readStore();
@@ -922,6 +1007,7 @@ const RENTAS_DIR = path.join(UPLOADS_DIR, "rentas");
 export async function upsertSolicitudRentas(datos: {
   clienteId: string; ruc: string; emailDestino: string; solicitadoPor?: string;
 }): Promise<SolicitudRentas> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rentas)) store.rentas = [];
   const now = new Date().toISOString();
@@ -934,9 +1020,11 @@ export async function upsertSolicitudRentas(datos: {
   }
   await writeStore(store);
   return s;
+});
 }
 
 export async function setEstadoRentas(clienteId: string, estado: SolicitudRentas["estado"], extra?: Partial<SolicitudRentas>): Promise<SolicitudRentas | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const s = (store.rentas ?? []).find((x) => x.clienteId === clienteId);
   if (!s) return null;
@@ -944,6 +1032,7 @@ export async function setEstadoRentas(clienteId: string, estado: SolicitudRentas
   if (extra) Object.assign(s, extra);
   await writeStore(store);
   return s;
+});
 }
 
 export async function getSolicitudRentas(clienteId: string): Promise<SolicitudRentas | null> {
@@ -959,6 +1048,7 @@ export async function leerPdfRentas(nombre: string): Promise<Buffer | null> {
  *  PARSEA y deja la solicitud "listo". Devuelve la solicitud o null si no hay
  *  una "en_proceso" para ese RUC. */
 export async function guardarReporteRentasPorRuc(ruc: string, pdf: Buffer): Promise<SolicitudRentas | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const s = (store.rentas ?? []).find((x) => x.ruc === ruc && (x.estado === "en_proceso" || x.estado === "listo"));
   if (!s) return null;
@@ -973,6 +1063,7 @@ export async function guardarReporteRentasPorRuc(ruc: string, pdf: Buffer): Prom
   s.rutaPdf = base; s.reporte = reporte; s.estado = "listo"; s.error = undefined; s.actualizadoEn = new Date().toISOString();
   await writeStore(store);
   return s;
+});
 }
 
 // ---- Comprobantes XML: persistencia de lo extraído por cliente + periodo ------
@@ -1012,6 +1103,7 @@ export async function listarComprobantesExtraidos(clienteId: string, periodo: st
 export async function upsertSolicitudRTT(datos: {
   ruc: string; razonSocial?: string; emailDestino: string; solicitadoPor?: string;
 }): Promise<SolicitudRTT> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rtt)) store.rtt = [];
   const now = new Date().toISOString();
@@ -1039,12 +1131,14 @@ export async function upsertSolicitudRTT(datos: {
   }
   await writeStore(store);
   return sol;
+});
 }
 
 /** Resuelve un fallo de generación SIN dejar casilla roja: si había un reporte
  *  previo, vuelve a "listo" (se conserva el anterior); si nunca hubo, BORRA la
  *  casilla. Devuelve true si quedó un reporte descargable. */
 export async function resolverFalloRTT(id: string): Promise<boolean> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rtt)) return false;
   const i = store.rtt.findIndex((s) => s.id === id);
@@ -1062,6 +1156,7 @@ export async function resolverFalloRTT(id: string): Promise<boolean> {
   store.rtt.splice(i, 1); // nunca tuvo reporte → no dejar casilla
   await writeStore(store);
   return false;
+});
 }
 
 /** Limpia la lista de RTT: quita casillas en "error" y resuelve las atascadas
@@ -1072,6 +1167,7 @@ export async function resolverFalloRTT(id: string): Promise<boolean> {
 const RTT_RETENCION_DIAS = Math.max(1, Number(process.env.RTT_RETENCION_DIAS ?? "7") || 7);
 
 export async function limpiarRTT(minutos = 30): Promise<number> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!Array.isArray(store.rtt)) return 0;
   const limite = Date.now() - minutos * 60_000;
@@ -1098,6 +1194,7 @@ export async function limpiarRTT(minutos = 30): Promise<number> {
   });
   if (dirty) await writeStore(store);
   return dirty ? 1 : 0;
+});
 }
 
 /** Caché de rubro por RUC: decolecta se consulta 1 sola vez por RUC. */
@@ -1111,6 +1208,7 @@ export async function getRubros(): Promise<
 export async function mergeRubros(
   entradas: Record<string, { razonSocial: string; actividad: string }>
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   const keys = Object.keys(entradas);
   if (keys.length === 0) return;
   const store = await readStore();
@@ -1119,10 +1217,13 @@ export async function mergeRubros(
     store.rubrosProveedor[ruc] = { ...entradas[ruc], at: new Date().toISOString() };
   }
   await writeStore(store);
+});
 }
 
-export async function getCuentasProveedor(): Promise<Record<string, ProveedorCuenta>> {
+// `estudio` = id del admin del estudio; sin él (supremo) se usa la memoria global.
+export async function getCuentasProveedor(estudio?: string): Promise<Record<string, ProveedorCuenta>> {
   const store = await readStore();
+  if (estudio) return store.memoriasEstudio?.[estudio]?.proveedores ?? {};
   return store.cuentasProveedor ?? {};
 }
 
@@ -1137,39 +1238,60 @@ export interface CuentaHonorario {
   at: string;
 }
 
-export async function getCuentasHonorarios(): Promise<Record<string, CuentaHonorario>> {
+export async function getCuentasHonorarios(estudio?: string): Promise<Record<string, CuentaHonorario>> {
   const store = await readStore();
+  if (estudio) return store.memoriasEstudio?.[estudio]?.honorarios ?? {};
   return store.cuentasHonorarios ?? {};
 }
 
 /** Aprende/actualiza el mapa de cuentas de honorarios (merge en la memoria). */
 export async function mergeCuentasHonorarios(
-  entradas: Record<string, Omit<CuentaHonorario, "at">>
+  entradas: Record<string, Omit<CuentaHonorario, "at">>,
+  estudio?: string,
 ): Promise<number> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
-  if (!store.cuentasHonorarios) store.cuentasHonorarios = {};
+  let destino: Record<string, CuentaHonorario>;
+  if (estudio) {
+    if (!store.memoriasEstudio) store.memoriasEstudio = {};
+    const m = (store.memoriasEstudio[estudio] ??= {});
+    destino = m.honorarios ??= {};
+  } else {
+    destino = store.cuentasHonorarios ??= {};
+  }
   let n = 0;
   const now = new Date().toISOString();
   for (const [k, v] of Object.entries(entradas)) {
-    store.cuentasHonorarios[k] = { ...v, at: now };
+    destino[k] = { ...v, at: now };
     n++;
   }
   await writeStore(store);
   return n;
+});
 }
 
 /** Aprende/actualiza cuentas por proveedor (merge en la memoria del estudio). */
 export async function setCuentasProveedor(
-  nuevas: ProveedorCuenta[]
+  nuevas: ProveedorCuenta[],
+  estudio?: string,
 ): Promise<Record<string, ProveedorCuenta>> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
-  if (!store.cuentasProveedor) store.cuentasProveedor = {};
+  let destino: Record<string, ProveedorCuenta>;
+  if (estudio) {
+    if (!store.memoriasEstudio) store.memoriasEstudio = {};
+    const m = (store.memoriasEstudio[estudio] ??= {});
+    destino = m.proveedores ??= {};
+  } else {
+    destino = store.cuentasProveedor ??= {};
+  }
   for (const p of nuevas) {
     if (!/^\d{11}$/.test(p.ruc)) continue;
-    store.cuentasProveedor[p.ruc] = { ...p, fuente: "aprendido", actualizadoAt: new Date().toISOString() };
+    destino[p.ruc] = { ...p, fuente: "aprendido", actualizadoAt: new Date().toISOString() };
   }
   await writeStore(store);
-  return store.cuentasProveedor;
+  return destino;
+});
 }
 
 // --- Backup automático: 1 snapshot del store por día (conserva los últimos 14) ---
@@ -1196,6 +1318,31 @@ async function snapshotDiario(raw: string): Promise<void> {
     }
   } catch {
     ultimoSnapshotDia = ""; // reintenta en el próximo write
+  }
+}
+
+// ---- Transacciones sobre el store ---------------------------------------------
+// Cada función que LEE → MODIFICA → ESCRIBE el store corre dentro de
+// conBloqueoStore: una a la vez, en orden de llegada. Antes dos operaciones
+// simultáneas leían la misma versión y la última en escribir borraba los
+// cambios de la otra (p. ej. un pago acreditado o una empresa nueva). Es
+// reentrante: si una transacción llama a otra, la interna corre directo.
+// El estado vive en globalThis para que todas las rutas compartan el mismo
+// candado aunque Next cargue el módulo más de una vez.
+const gBloqueo = globalThis as unknown as { __radarCtxStore?: AsyncLocalStorage<boolean>; __radarColaStore?: Promise<void> };
+const ctxStore: AsyncLocalStorage<boolean> = gBloqueo.__radarCtxStore ?? (gBloqueo.__radarCtxStore = new AsyncLocalStorage<boolean>());
+
+export async function conBloqueoStore<T>(fn: () => Promise<T>): Promise<T> {
+  if (ctxStore.getStore()) return fn(); // ya estamos dentro de una transacción
+  const anterior = gBloqueo.__radarColaStore ?? Promise.resolve();
+  let liberar!: () => void;
+  const turno = new Promise<void>((r) => (liberar = r));
+  gBloqueo.__radarColaStore = anterior.then(() => turno);
+  await anterior;
+  try {
+    return await ctxStore.run(true, fn);
+  } finally {
+    liberar();
   }
 }
 
@@ -1266,6 +1413,7 @@ export async function getClienteByRuc(
 export async function duenoDeRuc(
   ruc: string
 ): Promise<{ studioId: string; ownerNombre?: string } | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const r = ruc.trim();
   const reg = store.rucsRegistrados?.[r];
@@ -1284,6 +1432,7 @@ export async function duenoDeRuc(
     if (duenoVive) return { studioId: c.ownerId };
   }
   return null;
+});
 }
 
 /** Marca el RUC como tomado por un estudio (idempotente). */
@@ -1293,19 +1442,23 @@ export async function registrarRucGlobal(
   clienteId: string,
   ownerNombre?: string
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.rucsRegistrados) store.rucsRegistrados = {};
   store.rucsRegistrados[ruc.trim()] = { studioId, clienteId, ownerNombre, at: new Date().toISOString() };
   await writeStore(store);
+});
 }
 
 /** Libera un RUC del registro global (al eliminar la empresa). */
 export async function liberarRucGlobal(ruc: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (store.rucsRegistrados) {
     delete store.rucsRegistrados[ruc.trim()];
     await writeStore(store);
   }
+});
 }
 
 /** Guarda las credenciales SIRE del cliente (sin la Clave SOL). */
@@ -1313,12 +1466,14 @@ export async function setCredSire(
   clienteId: string,
   cred: CredencialesSire
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.credSire = cred;
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function createCliente(data: {
@@ -1330,6 +1485,7 @@ export async function createCliente(data: {
   ownerId?: string;
   negocio?: "con" | "sin";
 }): Promise<Cliente> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente: Cliente = {
     id: newId(),
@@ -1353,21 +1509,25 @@ export async function createCliente(data: {
   store.clientes.push(cliente);
   await writeStore(store);
   return cliente;
+});
 }
 
 /** Guarda el último reporte de ITF consultado (para mostrarlo en el informe). */
 export async function setItfReporte(clienteId: string, itf: { ejercicio: string; filas: any[]; total: number } | null): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
   cliente.itf = itf ? { ...itf, consultadoEn: new Date().toISOString() } : null;
   await writeStore(store);
+});
 }
 
 export async function updateCliente(
   id: string,
   patch: Partial<Pick<Cliente, "razonSocial" | "ruc" | "email" | "telefono" | "negocio">>
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === id);
   if (!cliente) return null;
@@ -1379,21 +1539,25 @@ export async function updateCliente(
   }
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function deleteCliente(id: string): Promise<boolean> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const before = store.clientes.length;
   store.clientes = store.clientes.filter((c) => c.id !== id);
   if (store.clientes.length === before) return false;
   await writeStore(store);
   return true;
+});
 }
 
 export async function setSunatInfo(
   clienteId: string,
   sunat: SunatInfo
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1406,6 +1570,7 @@ export async function setSunatInfo(
   };
   await writeStore(store);
   return cliente;
+});
 }
 
 /** Actualiza SOLO las fechas (inscripción / inicio de actividades) del SUNAT del
@@ -1414,6 +1579,7 @@ export async function setFechasSunat(
   clienteId: string,
   fechas: { fechaInscripcion?: string; fechaInicioActividades?: string }
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente || !cliente.sunat) return null;
@@ -1421,18 +1587,21 @@ export async function setFechasSunat(
   if (fechas.fechaInicioActividades !== undefined) cliente.sunat.fechaInicioActividades = fechas.fechaInicioActividades || undefined;
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function addDocumento(
   clienteId: string,
   doc: Documento
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.documentos.push(doc);
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function updateDocumento(
@@ -1440,6 +1609,7 @@ export async function updateDocumento(
   docId: string,
   patch: Partial<Documento>
 ): Promise<Documento | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1448,12 +1618,14 @@ export async function updateDocumento(
   Object.assign(doc, patch);
   await writeStore(store);
   return doc;
+});
 }
 
 export async function setSireResumen(
   clienteId: string,
   resumen: SireResumen
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1464,6 +1636,7 @@ export async function setSireResumen(
   cliente.sire.sort((a, b) => b.periodo.localeCompare(a.periodo));
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function setSireDetalleCache(
@@ -1472,18 +1645,21 @@ export async function setSireDetalleCache(
   periodo: string,
   bloque: { columnas: string[]; filas: string[][]; comprobantes: number }
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
   if (!cliente.sireDetalle) cliente.sireDetalle = {};
   cliente.sireDetalle[`${tipo}-${periodo}`] = { ...bloque, at: new Date().toISOString() };
   await writeStore(store);
+});
 }
 
 export async function addDeclaracion(
   clienteId: string,
   decl: DeclaracionMensual
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1494,24 +1670,28 @@ export async function addDeclaracion(
   cliente.declaraciones.sort((a, b) => b.periodo.localeCompare(a.periodo));
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function deleteDeclaracion(
   clienteId: string,
   declId: string
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.declaraciones = (cliente.declaraciones ?? []).filter((d) => d.id !== declId);
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function addDeclaracionAnual(
   clienteId: string,
   decl: DeclaracionAnual
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1524,12 +1704,14 @@ export async function addDeclaracionAnual(
   cliente.declaracionesAnuales.sort((a, b) => a.ejercicio.localeCompare(b.ejercicio));
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function deleteDeclaracionAnual(
   clienteId: string,
   declId: string
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1538,9 +1720,11 @@ export async function deleteDeclaracionAnual(
   );
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function addDeuda(clienteId: string, deuda: Deuda): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1548,15 +1732,18 @@ export async function addDeuda(clienteId: string, deuda: Deuda): Promise<Cliente
   cliente.deudas.unshift(deuda);
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function deleteDeuda(clienteId: string, deudaId: string): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.deudas = (cliente.deudas ?? []).filter((d) => d.id !== deudaId);
   await writeStore(store);
   return cliente;
+});
 }
 
 // ---- Caché de PDFs del buzón ----------------------------------------------
@@ -1569,6 +1756,7 @@ export async function setBuzonAdjunto(
   nombre: string,
   usuario?: { id: string; nombre: string }
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   await ensureDirs();
   const archivo = `buzon_${clienteId}_${codMensaje}.pdf`;
   await fs.writeFile(path.join(UPLOADS_DIR, archivo), pdf);
@@ -1587,6 +1775,7 @@ export async function setBuzonAdjunto(
     descargadoPorNombre: usuario?.nombre,
   };
   await writeStore(store);
+});
 }
 
 /** Registra una descarga (incluida la servida desde caché): actualiza la fecha
@@ -1596,6 +1785,7 @@ export async function registrarDescargaBuzon(
   codMensaje: string,
   usuario?: { id: string; nombre: string }
 ): Promise<{ descargadaAt: string; descargadoPorNombre?: string } | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   const meta = cliente?.buzonAdjuntos?.[codMensaje];
@@ -1606,6 +1796,7 @@ export async function registrarDescargaBuzon(
   meta.descargadoPorNombre = usuario?.nombre;
   await writeStore(store);
   return { descargadaAt: ahora, descargadoPorNombre: usuario?.nombre };
+});
 }
 
 /** Lee el PDF cacheado de un mensaje (o null si no está). */
@@ -1626,6 +1817,7 @@ export async function getBuzonAdjunto(
 
 /** Guarda (reemplaza) las deudas F36 extraídas del portal SOL. */
 export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[], nota?: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
@@ -1638,6 +1830,7 @@ export async function setDeudasF36(clienteId: string, tablas: DeudaF36Tabla[], n
     verificadoAt: new Date().toISOString(),
   };
   await writeStore(store);
+});
 }
 
 /** Marca el pedido de deuda recién generado (queda "en proceso" en SUNAT). */
@@ -1645,6 +1838,7 @@ export async function setDeudaGenerado(
   clienteId: string,
   info?: { numPedido?: string; fechaPedido?: string }
 ): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return;
@@ -1658,6 +1852,7 @@ export async function setDeudaGenerado(
     verificadoAt: new Date().toISOString(),
   };
   await writeStore(store);
+});
 }
 
 /** Actualiza el ESTADO del pedido (trazabilidad de la fase asíncrona). */
@@ -1665,6 +1860,7 @@ export async function setDeudaEstadoF36(
   clienteId: string,
   info: { estado: "sin-pedido" | "en-proceso" | "listo" | "vencido"; numPedido?: string; fechaPedido?: string; estadoTexto?: string; accion?: string }
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1680,15 +1876,18 @@ export async function setDeudaEstadoF36(
   };
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function clearSire(clienteId: string): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.sire = [];
   await writeStore(store);
   return cliente;
+});
 }
 
 // ---- Seguimiento de mensajes del buzón (plazo de atención + comentario) ----
@@ -1699,6 +1898,7 @@ export async function setSeguimientoBuzon(
   clienteId: string,
   datos: { codMensaje: string; asunto: string; fecha: string; origen?: "notificaciones" | "mensajes"; diasAtencion: number; comentario: string; creadoPorId?: string; creadoPorNombre?: string }
 ): Promise<SeguimientoBuzon | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
@@ -1722,6 +1922,7 @@ export async function setSeguimientoBuzon(
   else cliente.seguimientosBuzon.push(seg);
   await writeStore(store);
   return seg;
+});
 }
 
 export async function atenderSeguimientoBuzon(
@@ -1729,6 +1930,7 @@ export async function atenderSeguimientoBuzon(
   codMensaje: string,
   atendido: boolean
 ): Promise<boolean> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   const seg = cliente?.seguimientosBuzon?.find((s) => s.codMensaje === codMensaje);
@@ -1736,6 +1938,7 @@ export async function atenderSeguimientoBuzon(
   seg.atendido = atendido;
   await writeStore(store);
   return true;
+});
 }
 
 /** Recordatorios del usuario: seguimientos no atendidos, con su empresa, marcando
@@ -1762,12 +1965,14 @@ export async function setBuzon(
   clienteId: string,
   buzon: BuzonResumen
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.buzon = buzon;
   await writeStore(store);
   return cliente;
+});
 }
 
 // Fecha de un mensaje del buzón ("dd/mm/aaaa hh:mm:ss" o ISO) → epoch, para ordenar.
@@ -1789,6 +1994,7 @@ export async function mergeBuzon(
   recientes: BuzonMensaje[],
   consultadoAt = new Date().toISOString()
 ): Promise<{ nuevos: BuzonMensaje[]; mensajes: BuzonMensaje[]; cliente: Cliente | null }> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return { nuevos: [], mensajes: [], cliente: null };
@@ -1815,6 +2021,7 @@ export async function mergeBuzon(
   };
   await writeStore(store);
   return { nuevos, mensajes, cliente };
+});
 }
 
 /** Guarda el estado de presentación SIRE (presentado/no presentado por periodo). */
@@ -1823,24 +2030,28 @@ export async function setSireEstado(
   estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[],
   noObligado?: boolean
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.sireEstado = { estados, noObligado: Boolean(noObligado), at: new Date().toISOString() };
   await writeStore(store);
   return cliente;
+});
 }
 
 export async function setDiagnostico(
   clienteId: string,
   diagnostico: Diagnostico
 ): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.diagnostico = diagnostico;
   await writeStore(store);
   return cliente;
+});
 }
 
 // ---- Visor Tributario (extensión de navegador) -----------------------------
@@ -1889,6 +2100,7 @@ export async function visorUserByToken(token: string): Promise<string | null> {
 
 /** Guarda una captura (máx. 200 por usuario). */
 export async function addVisorCaptura(c: Omit<VisorCaptura, "id" | "at">): Promise<VisorCaptura> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.visor) store.visor = {};
   if (!store.visor.capturas) store.visor.capturas = [];
@@ -1902,6 +2114,7 @@ export async function addVisorCaptura(c: Omit<VisorCaptura, "id" | "at">): Promi
   }
   await writeStore(store);
   return cap;
+});
 }
 
 export async function listVisorCapturas(userId: string): Promise<VisorCaptura[]> {
@@ -1910,10 +2123,12 @@ export async function listVisorCapturas(userId: string): Promise<VisorCaptura[]>
 }
 
 export async function clearVisorCapturas(userId: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.visor?.capturas) return;
   store.visor.capturas = store.visor.capturas.filter((c) => c.userId !== userId);
   await writeStore(store);
+});
 }
 
 // ---- Visor: matriz año×mes (SIRE / DJ mensual / DJ anual) -------------------
@@ -1986,6 +2201,7 @@ export async function upsertVisorMatriz(userId: string, d: {
   empresa?: string; ruc?: string; tipo?: string;
   celdas?: Record<string, "P" | "NP">; anios?: Record<string, "P" | "NP">;
 }): Promise<VisorMatriz> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (!store.visor) store.visor = {};
   if (!store.visor.matriz) store.visor.matriz = {};
@@ -2015,6 +2231,7 @@ export async function upsertVisorMatriz(userId: string, d: {
   await writeStore(store);
   const claveM = claveMatriz(m.empresa, m.ruc, tipo);
   return store.visor.matriz[userId].find((x) => x.tipo === tipo && claveMatriz(x.empresa, x.ruc, tipo) === claveM) || m;
+});
 }
 
 export async function getVisorMatriz(userId: string): Promise<VisorMatriz[]> {
@@ -2023,6 +2240,8 @@ export async function getVisorMatriz(userId: string): Promise<VisorMatriz[]> {
 }
 
 export async function clearVisorMatriz(userId: string): Promise<void> {
+  return conBloqueoStore(async () => {
   const store = await readStore();
   if (store.visor?.matriz) { delete store.visor.matriz[userId]; await writeStore(store); }
+});
 }
