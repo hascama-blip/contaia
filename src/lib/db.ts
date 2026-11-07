@@ -1486,16 +1486,17 @@ export async function duenoDeRuc(
     // Auto-limpieza: si el registro apunta a un estudio o cliente que ya NO
     // existe (huérfano de una eliminación previa), se libera el RUC.
     const estudioVive = (store.users ?? []).some((u) => u.id === reg.studioId);
-    const clienteVive = store.clientes.some((c) => c.id === reg.clienteId || c.ruc === r);
+    // La empresa del dueño sigue viva (la copia de otro, p. ej. del supremo, no cuenta).
+    const clienteVive = store.clientes.some((c) => c.id === reg.clienteId || (c.ruc === r && c.ownerId === reg.studioId));
     if (estudioVive && clienteVive) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
     delete store.rucsRegistrados![r];
     await writeStore(store);
   }
-  const c = store.clientes.find((x) => x.ruc === r);
-  if (c && c.ownerId) {
-    const duenoVive = (store.users ?? []).some((u) => u.id === c.ownerId);
-    if (duenoVive) return { studioId: c.ownerId };
-  }
+  // Compatibilidad (empresas previas al registro global). Las copias del
+  // supremo no adueñan el RUC: no bloquean a los demás usuarios.
+  const supremos = new Set((store.users ?? []).filter((u) => u.rol === "supremo").map((u) => u.id));
+  const c = store.clientes.find((x) => x.ruc === r && x.ownerId && !supremos.has(x.ownerId) && (store.users ?? []).some((u) => u.id === x.ownerId));
+  if (c && c.ownerId) return { studioId: c.ownerId };
   return null;
 });
 }
@@ -1515,12 +1516,15 @@ export async function registrarRucGlobal(
 });
 }
 
-/** Libera un RUC del registro global (al eliminar la empresa). */
-export async function liberarRucGlobal(ruc: string): Promise<void> {
+/** Libera un RUC del registro global (al eliminar la empresa). Si se indica
+ *  `clienteId`, solo lo libera si el registro es de ESA empresa (borrar la copia
+ *  del supremo no libera el RUC del dueño). */
+export async function liberarRucGlobal(ruc: string, clienteId?: string): Promise<void> {
   return conBloqueoStore(async () => {
   const store = await readStore();
-  if (store.rucsRegistrados) {
-    delete store.rucsRegistrados[ruc.trim()];
+  const reg = store.rucsRegistrados?.[ruc.trim()];
+  if (reg && (!clienteId || reg.clienteId === clienteId)) {
+    delete store.rucsRegistrados![ruc.trim()];
     await writeStore(store);
   }
 });

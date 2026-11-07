@@ -34,7 +34,7 @@ export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: s
   }
   const ok = await deleteCliente(params.id);
   if (!ok) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  await liberarRucGlobal(propio.ruc).catch(() => {}); // el RUC vuelve a estar libre
+  await liberarRucGlobal(propio.ruc, propio.id).catch(() => {}); // el RUC vuelve a estar libre (si era el dueño)
   await logAccion({
     area: "Cliente",
     accion: "Eliminó una empresa",

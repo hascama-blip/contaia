@@ -1,7 +1,7 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { createCliente, getClienteByRuc, listClientes, setCredSire, duenoDeRuc, registrarRucGlobal } from "@/lib/db";
-import { requireUser, studioId, esAdmin } from "@/lib/auth";
+import { requireUser, studioId, esAdmin, esSupremo } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
 import { logAccion } from "@/lib/auditoria";
 
@@ -44,9 +44,13 @@ export async function POST(req: NextRequest) {
     );
   }
   // Unicidad GLOBAL: si el RUC ya lo tomó OTRO estudio, no se puede registrar
-  // (evita crear cuentas falsas para reconsultar la misma empresa).
+  // (evita crear cuentas falsas para reconsultar la misma empresa). ÚNICA
+  // excepción: el supremo puede registrarlo igual (su copia no le quita la
+  // empresa al dueño: el RUC sigue bloqueado para los demás).
   const dueno = await duenoDeRuc(body.ruc);
-  if (dueno && dueno.studioId !== studioId(user)) {
+  const supremo = esSupremo(user);
+  const deOtro = Boolean(dueno && dueno.studioId !== studioId(user));
+  if (deOtro && !supremo) {
     return NextResponse.json(
       { error: `El RUC ${body.ruc.trim()} ya está registrado en la plataforma por otro usuario. No se puede volver a agregar.` },
       { status: 409 }
@@ -78,13 +82,14 @@ export async function POST(req: NextRequest) {
     });
     if (actualizado) cliente.credSire = actualizado.credSire;
   }
-  await registrarRucGlobal(cliente.ruc, studioId(user), cliente.id, user.nombre).catch(() => {});
+  // El supremo no se adueña del RUC (no aparece en el registro global).
+  if (!supremo) await registrarRucGlobal(cliente.ruc, studioId(user), cliente.id, user.nombre).catch(() => {});
   await logAccion({
     area: "Cliente",
     accion: "Creó una empresa",
     clienteId: cliente.id,
     clienteNombre: cliente.razonSocial,
-    detalle: `RUC ${cliente.ruc}`,
+    detalle: `RUC ${cliente.ruc}${deOtro ? ` · ya registrado por ${dueno?.ownerNombre || "otro estudio"} (excepción del supremo)` : ""}`,
   });
   return NextResponse.json({ cliente: ocultarCliente(cliente) }, { status: 201 });
 }
