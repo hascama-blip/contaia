@@ -9,9 +9,11 @@ interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: st
 // Herramienta única de Detalle SIRE: elige la empresa una vez y alterna entre
 // Compras (RCE) y Ventas (RVIE). Cada libro se EXTRAE por separado (su propio
 // botón); ambos paneles quedan montados para no perder lo ya extraído al cambiar.
-export default function DetalleSireTool({ clientes }: { clientes: ClienteMin[] }) {
-  const [id, setId] = useState("");
-  const [tab, setTab] = useState<"compras" | "ventas">("compras");
+export default function DetalleSireTool({ clientes, inicialId, inicialTab, inicialPeriodo }: {
+  clientes: ClienteMin[]; inicialId?: string; inicialTab?: "compras" | "ventas"; inicialPeriodo?: string;
+}) {
+  const [id, setId] = useState(inicialId ?? "");
+  const [tab, setTab] = useState<"compras" | "ventas">(inicialTab ?? "compras");
   const sel = clientes.find((c) => c.id === id) ?? null;
 
   return (
@@ -54,10 +56,10 @@ export default function DetalleSireTool({ clientes }: { clientes: ClienteMin[] }
 
           {/* Ambos paneles montados; se oculta el inactivo para conservar estado. */}
           <div className={tab === "compras" ? "" : "hidden"}>
-            <DetalleSirePanel clienteId={sel.id} tipo="compras" />
+            <DetalleSirePanel key={`c-${sel.id}`} clienteId={sel.id} tipo="compras" periodoInicial={inicialPeriodo} />
           </div>
           <div className={tab === "ventas" ? "" : "hidden"}>
-            <DetalleSirePanel clienteId={sel.id} tipo="ventas" />
+            <DetalleSirePanel key={`v-${sel.id}`} clienteId={sel.id} tipo="ventas" periodoInicial={inicialPeriodo} />
           </div>
         </>
       )}

@@ -68,7 +68,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   queda como vista opcional.
 - `src/lib/conciliacionSire.ts` — **Conciliación SIRE vs contabilidad por empresa** (sección al
   final del mismo módulo, `ConciliacionSireRtp.tsx`, `/api/analisis-compras/conciliacion` + `/excel`
-  ZIP por empresa). **Ventas**: SIRE RVIE vs **Registro de Ventas** contable (Excel con una pestaña
+  ZIP por empresa). **El SIRE no se sube**: se toma del módulo **Detalle SIRE** (caché
+  `Cliente.sireDetalle["ventas-AAAAMM"]` / `["compras-AAAAMM"]` del cliente del estudio con el mismo
+  RUC; periodo = el mes más frecuente del archivo contable o el elegido). Si falta, la UI enlaza a
+  `/herramientas/detalle-sire?cliente=&tab=&periodo=` (o a `/clientes/nuevo?ruc=` si no está en
+  Clientes) y se pulsa "Volver a conciliar". Subir el SIRE a mano queda como alternativa.
+  **Ventas**: SIRE RVIE vs **Registro de Ventas** contable (Excel con una pestaña
   por empresa; empresa en A1, RUC en la fila 2; columnas Fecha · [T/D] · Documento "B002 0005839" ·
   R.U.C. · Afecto · IGV e IPM · Total). Llave = **tipo + serie + número** (las NC usan las mismas
   series que boletas/facturas); NC siempre en negativo en ambos lados. **Compras**: SIRE RCE vs

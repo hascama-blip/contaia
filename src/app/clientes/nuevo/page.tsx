@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SunatInfo } from "@/lib/types";
 import { esPersonaNatural } from "@/lib/types";
 import { CondicionBadge, EstadoBadge } from "@/components/ui";
@@ -28,6 +28,12 @@ export default function NuevoClientePage() {
   const [error, setError] = useState<string | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Prellenado por enlace (?ruc=…), p. ej. desde la conciliación del Análisis RTP.
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("ruc")?.replace(/\D/g, "").slice(0, 11);
+    if (r) setForm((f) => ({ ...f, ruc: r }));
+  }, []);
 
   function set(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

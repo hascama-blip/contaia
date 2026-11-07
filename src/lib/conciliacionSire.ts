@@ -212,12 +212,28 @@ export async function leerSire(buf: Buffer, nombreArchivo: string, nArchivo: num
   }
   const leidos: SireLeido[] = [];
   partes.forEach((p, i) => {
+    const r = sireDesdeFilas(p.rows, `${nArchivo}:${i}`, p.nombre);
+    if (typeof r === "string") avisos.push(r);
+    else leidos.push(r);
+  });
+  return { leidos, avisos };
+}
+
+/** SIRE ya descargado en el módulo Detalle SIRE (caché del cliente: columnas + filas). */
+export function sireDesdeDetalle(bloque: { columnas: string[]; filas: string[][] }, id: string, nombre: string): SireLeido | string {
+  return sireDesdeFilas([bloque.columnas, ...bloque.filas], id, nombre);
+}
+
+/** Convierte una matriz con encabezado SIRE (RVIE o RCE) en comprobantes listos para cruzar. */
+function sireDesdeFilas(filas: unknown[][], id: string, nombre: string): SireLeido | string {
+  {
+    const p = { nombre, rows: filas };
     const rows = desdeEncabezado(p.rows);
-    if (!rows) { avisos.push(`"${p.nombre}": no parece un SIRE (no tiene la columna "Serie del CDP").`); return; }
+    if (!rows) return `"${p.nombre}": no parece un SIRE (no tiene la columna "Serie del CDP").`;
     const h = rows[0].map(normH);
     const libro: TipoLibro = h.some((x) => x === "bi gravada") && !h.some((x) => x.startsWith("bi gravado")) ? "ventas" : "compras";
     const s = libro === "ventas" ? parseSireVentas(rows) : parseSireCompras(rows);
-    if (!s.comprobantes.length) { avisos.push(`"${p.nombre}": sin comprobantes.`); return; }
+    if (!s.comprobantes.length) return `"${p.nombre}": sin comprobantes.`;
     // Moneda extranjera: se lleva a soles con su tipo de cambio (el Diario está en S/).
     for (const c of s.comprobantes) {
       if (esMonedaExtranjera(c.moneda) && c.tipoCambio > 0) {
@@ -229,9 +245,17 @@ export async function leerSire(buf: Buffer, nombreArchivo: string, nArchivo: num
       // Ventas: tipo + serie + número. Compras: serie + número + RUC (el Diario usa prefijos propios: FT, RC…).
       c.clave = libro === "ventas" ? claveVenta(c.tipoDoc, c.serie, c.numero) : `${c.serie}|${c.numero}|${c.rucContraparte}`;
     }
-    leidos.push({ id: `${nArchivo}:${i}`, libro, nombre: p.nombre, ruc: s.ruc ?? "", razonSocial: s.razonSocial ?? "", periodo: s.periodo ?? "", comprobantes: s.comprobantes });
-  });
-  return { leidos, avisos };
+    return { id, libro, nombre: p.nombre, ruc: s.ruc ?? "", razonSocial: s.razonSocial ?? "", periodo: s.periodo ?? "", comprobantes: s.comprobantes };
+  }
+}
+
+/** Periodo (AAAAMM) más frecuente en un conjunto de fechas "AAAA-MM-DD". */
+export function periodoMasFrecuente(fechas: string[]): string {
+  const cont = new Map<string, number>();
+  for (const f of fechas) if (/^\d{4}-\d{2}/.test(f)) { const k = f.slice(0, 4) + f.slice(5, 7); cont.set(k, (cont.get(k) ?? 0) + 1); }
+  let mejor = "", max = 0;
+  for (const [k, n] of Array.from(cont.entries())) if (n > max) { max = n; mejor = k; }
+  return mejor;
 }
 
 // ---- Conciliación por empresa ----------------------------------------------

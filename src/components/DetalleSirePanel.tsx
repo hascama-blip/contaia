@@ -9,12 +9,12 @@ const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "
 // Extrae el DETALLE SIRE (propuesta comprobante por comprobante) de un periodo
 // desde la API oficial de SUNAT y lo muestra en tabla + Excel. `tipo` fija si
 // es Ventas (RVIE) o Compras (RCE) — cada módulo trabaja uno solo.
-export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: string; tipo: "ventas" | "compras" }) {
+export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { clienteId: string; tipo: "ventas" | "compras"; periodoInicial?: string }) {
   const esVentas = tipo === "ventas";
   const libro = esVentas ? "RVIE (ventas)" : "RCE (compras)";
   const hoy = new Date();
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [mes, setMes] = useState(periodoInicial ? Number(periodoInicial.slice(4, 6)) : hoy.getMonth() + 1);
+  const [anio, setAnio] = useState(periodoInicial ? Number(periodoInicial.slice(0, 4)) : hoy.getFullYear());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
