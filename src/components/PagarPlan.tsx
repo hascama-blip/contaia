@@ -110,7 +110,7 @@ export default function PagarPlan({ plan, whatsapp }: { plan: PlanPago; whatsapp
         const { result } = await kr.attachForm("#izipay-form");
         await kr.showForm(result.formId);
         kr.onSubmit(async (resp: any) => {
-          try { await confirmar("/api/pagos/izipay", { krAnswer: resp.rawClientAnswer, krHash: resp.hash }); setIzipay(false); }
+          try { await confirmar("/api/pagos/izipay", { krAnswer: resp.rawClientAnswer, krHash: resp.hash, krHashKey: resp.hashKey }); setIzipay(false); }
           catch (e: any) { setError(e.message); }
           return false; // no redirigir: ya confirmamos en el servidor
         });
@@ -184,7 +184,8 @@ export default function PagarPlan({ plan, whatsapp }: { plan: PlanPago; whatsapp
         </>
       )}
 
-      {izipay && <div id="izipay-form" ref={izipayRef} className="kr-embedded mt-5" />}
+      {/* Contenedor del formulario de Izipay (KR.attachForm lo dibuja aquí). */}
+      {izipay && <div id="izipay-form" ref={izipayRef} className="mt-5 flex justify-center" />}
       {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       <p className="mt-4 text-xs text-slate-400">
         <Link href="/planes" className="text-brand-600 hover:underline">← Ver todos los planes</Link>

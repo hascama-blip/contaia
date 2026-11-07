@@ -11,7 +11,8 @@ export async function POST(req: NextRequest) {
   const form = await req.formData().catch(() => null);
   const krAnswer = String(form?.get("kr-answer") ?? "");
   const krHash = String(form?.get("kr-hash") ?? "");
-  if (!izipayFirmaValida(krAnswer, krHash, "ipn")) return new NextResponse("firma invalida", { status: 400 });
+  const krHashKey = String(form?.get("kr-hash-key") ?? "");
+  if (!izipayFirmaValida(krAnswer, krHash, "ipn", krHashKey)) return new NextResponse("firma invalida", { status: 400 });
   const a = izipayLeerRespuesta(krAnswer);
   if (!a?.pagoId) return new NextResponse("OK", { status: 200 });
   const pago = await getPago(a.pagoId);

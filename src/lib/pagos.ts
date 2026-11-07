@@ -200,9 +200,13 @@ async function izipayFormToken(pago: Pago): Promise<string> {
   return String(d.answer.formToken);
 }
 
-/** Verifica la firma de Izipay: retorno del navegador (clave HMAC) o IPN (contraseña REST). */
-export function izipayFirmaValida(krAnswer: string, krHash: string, origen: "navegador" | "ipn"): boolean {
-  const clave = origen === "ipn" ? env("IZIPAY_PASSWORD") : env("IZIPAY_HMAC_KEY");
+/** Verifica la firma de Izipay (HMAC-SHA256 en hex de kr-answer). Izipay indica
+ *  con qué clave firmó en `kr-hash-key`: "sha256_hmac" (retorno al navegador,
+ *  clave HMAC-SHA-256) o "password" (IPN, contraseña REST). Si no lo indica, se
+ *  usa la del canal. */
+export function izipayFirmaValida(krAnswer: string, krHash: string, origen: "navegador" | "ipn", krHashKey?: string): boolean {
+  const usarPassword = krHashKey === "password" || (krHashKey !== "sha256_hmac" && origen === "ipn");
+  const clave = usarPassword ? env("IZIPAY_PASSWORD") : env("IZIPAY_HMAC_KEY");
   if (!clave || !krAnswer || !krHash) return false;
   const calc = crypto.createHmac("sha256", clave).update(krAnswer, "utf8").digest("hex");
   const a = Buffer.from(calc), b = Buffer.from(String(krHash).toLowerCase());

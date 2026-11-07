@@ -124,7 +124,8 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Empresas sin límite (env `CUPO_*`). Solo consume tras éxito (`verificarCupo` → `consumirCupo`).
   SIRE de varios periodos manda un `lote` = 1 generación. Tope de comprobantes (`TOPE_COMPROBANTES_*`).
   Empresas: límites pactados por cuenta (`Usuario.limitesCotizados`, panel del supremo).
-- Pagos (`pagos.ts`): `PASARELA` = culqi | mercadopago | izipay. Confirmación SIEMPRE del lado
+- Pagos (`pagos.ts`): `PASARELA` = **izipay** (la del cliente; formulario incrustado REST V4 de
+  micuentaweb) · también soporta culqi | mercadopago. Confirmación SIEMPRE del lado
   servidor (cargo Culqi con sk, consulta a la API de MP, firma HMAC de Izipay) → `acreditarPago`
   (idempotente, +30 días; renovar suma; cambiar de plan convierte los días restantes). Webhooks en
   `/api/webhooks/pagos/*` (públicos por el middleware). Sin pasarela configurada, los botones

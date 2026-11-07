@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const krAnswer = typeof body.krAnswer === "string" ? body.krAnswer : "";
   const krHash = typeof body.krHash === "string" ? body.krHash : "";
-  if (!izipayFirmaValida(krAnswer, krHash, "navegador")) return NextResponse.json({ error: "Firma de Izipay inválida." }, { status: 400 });
+  const krHashKey = typeof body.krHashKey === "string" ? body.krHashKey : undefined;
+  if (!izipayFirmaValida(krAnswer, krHash, "navegador", krHashKey)) return NextResponse.json({ error: "Firma de Izipay inválida." }, { status: 400 });
   const a = izipayLeerRespuesta(krAnswer);
   if (!a) return NextResponse.json({ error: "Respuesta de Izipay ilegible." }, { status: 400 });
   const pago = await getPago(a.pagoId);
