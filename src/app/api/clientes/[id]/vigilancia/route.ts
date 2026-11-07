@@ -20,7 +20,8 @@ function estadoDe(c: NonNullable<Awaited<ReturnType<typeof getClienteAutorizado>
 }
 
 // GET → estado de la vigilancia (nunca devuelve la clave).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getClienteAutorizado(params.id);
   if (!c) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const user = await getCurrentUser();
@@ -30,7 +31,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // POST { solUser, solPass, acepto:true } → activa: guarda la Clave SOL CIFRADA
 // con vigencia de 30 días. Solo Premium / Equipo y con consentimiento explícito.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getClienteAutorizado(params.id);
   if (!c) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const user = await getCurrentUser();
@@ -58,7 +60,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE → desactiva y BORRA la clave guardada.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getClienteAutorizado(params.id);
   if (!c) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   await setVigilancia(c.id, null);

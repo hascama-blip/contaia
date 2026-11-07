@@ -14,7 +14,7 @@ export default async function Page() {
   bloquearSiSoloRtp(user);
 
   // Link de "perfil" del solicitante (para que el supremo lo identifique y le dé el acceso).
-  const h = headers();
+  const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host") ?? "radartributaria.com"}`;
   const perfil = `${origin}/supremo?u=${user.id}`;
 

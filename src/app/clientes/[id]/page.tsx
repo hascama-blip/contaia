@@ -6,7 +6,8 @@ import { ocultarCliente } from "@/lib/secretos";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientePage({ params }: { params: { id: string } }) {
+export default async function ClientePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   // El usuario "solo RTP" solo crea/lista empresas; no ve el módulo analítico.
   if (esSoloRtp(user)) redirect("/clientes");

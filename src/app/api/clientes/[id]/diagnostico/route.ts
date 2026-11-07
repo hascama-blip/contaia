@@ -7,7 +7,8 @@ import { generarDiagnostico } from "@/lib/diagnostico";
 export const runtime = "nodejs";
 
 // Genera (o regenera) el diagnóstico tributario combinando SUNAT + documentos.
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

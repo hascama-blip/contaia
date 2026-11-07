@@ -17,7 +17,8 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 // POST multipart: lee uno o varios PDF de DJ anual (Formulario 710), detecta el
 // ejercicio y guarda cada uno (reemplaza el mismo año). Devuelve resultados +
 // diagnóstico opcional.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const declId = new URL(req.url).searchParams.get("declId");

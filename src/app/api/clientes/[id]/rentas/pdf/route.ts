@@ -5,7 +5,8 @@ import { getSolicitudRentas, leerPdfRentas } from "@/lib/db";
 export const runtime = "nodejs";
 
 // Descarga el PDF del reporte de rentas de este cliente (el que envió SUNAT).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const sol = await getSolicitudRentas(params.id);

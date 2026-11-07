@@ -17,7 +17,8 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 //      Con `diagnostico=true` incluye el texto crudo y las casillas detectadas.
 // POST con JSON { declaracion }:
 //   -> guarda/actualiza la declaración del periodo.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
@@ -169,7 +170,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const declId = new URL(req.url).searchParams.get("declId");

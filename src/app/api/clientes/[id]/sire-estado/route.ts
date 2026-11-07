@@ -14,7 +14,8 @@ export const maxDuration = 120;
 const PAUSA = Math.max(0, Number(process.env.SIRE_ESTADO_PAUSA_MIN ?? "60") || 0) * 60 * 1000;
 
 // GET: estado SIRE guardado (sin clave/API), para mostrarlo sin re-consultar.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   return NextResponse.json({
@@ -26,7 +27,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // Estado SIRE (presentado / no presentado) de un rango de periodos, SIN bajar
 // montos. Usa la API guardada del cliente + la Clave SOL (que NO se persiste).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

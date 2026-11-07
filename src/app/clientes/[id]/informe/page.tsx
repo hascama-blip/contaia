@@ -12,7 +12,8 @@ import type { BuzonMensaje } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function InformePage({ params }: { params: { id: string } }) {
+export default async function InformePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const cliente = await getClienteDeUsuario(params.id, studioId(user));
   if (!cliente) notFound();

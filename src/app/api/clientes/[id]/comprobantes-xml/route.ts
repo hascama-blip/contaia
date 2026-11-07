@@ -10,8 +10,9 @@ export const maxDuration = 240;
 
 // GET → recupera los comprobantes YA extraídos de un periodo (para no rehacerlos
 // si se cae el internet / se recarga la página).
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("comprobantes-xml");if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const periodo = new URL(req.url).searchParams.get("periodo") ?? "";
@@ -22,8 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // Descarga los XML de comprobantes RECIBIDOS (compras) del periodo desde SUNAT
 // SOL (scraping). La Clave SOL viaja en el body y NO se persiste. Consume 1 uso
 // del cupo gratis solo si el login fue correcto (clave errada NO consume).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("comprobantes-xml");if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

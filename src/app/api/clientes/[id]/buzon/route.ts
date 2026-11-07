@@ -13,7 +13,8 @@ const UN_DIA = 24 * 60 * 60 * 1000;
 
 // Consulta el buzón electrónico SUNAT. La Clave SOL se usa solo para esta
 // llamada y NO se persiste. Límite: 1 consulta al día por empresa.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

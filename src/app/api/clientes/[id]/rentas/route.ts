@@ -10,7 +10,8 @@ export const runtime = "nodejs";
 export const maxDuration = 200;
 
 // GET → estado + detalle del reporte de rentas de este cliente.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   let sol = await getSolicitudRentas(params.id);
@@ -38,7 +39,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // POST → dispara el bot: login → menú → Reporte de Rentas → Generar. SUNAT lo
 // envía por correo (nube) y el webhook lo captura y parsea. La Clave SOL NO se
 // persiste.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });

@@ -8,13 +8,14 @@ import PagarPlan from "@/components/PagarPlan";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pagar plan — Radar Tributario" };
 
-export default async function Page({ searchParams }: { searchParams: { plan?: string } }) {
+export default async function Page(props: { searchParams: Promise<{ plan?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
   bloquearSiSoloRtp(user);
   const plan = searchParams.plan === "premium" ? "premium" : searchParams.plan === "regular" ? "regular" : null;
   if (!plan) redirect("/planes");
   const info = PLANES.find((p) => p.planId === plan)!;
-  const h = headers();
+  const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host") ?? "radartributaria.com"}`;
 
   return (

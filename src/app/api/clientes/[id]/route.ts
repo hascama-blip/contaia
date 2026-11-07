@@ -6,13 +6,15 @@ import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   return NextResponse.json({ cliente: ocultarCliente(cliente) });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Verifica que la empresa sea del usuario antes de modificarla.
   const propio = await getClienteAutorizado(params.id);
   if (!propio) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
@@ -22,7 +24,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ cliente: ocultarCliente(cliente) });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const propio = await getClienteAutorizado(params.id);
   if (!propio) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   // Eliminar empresa es solo del admin del estudio (los operadores no pueden).

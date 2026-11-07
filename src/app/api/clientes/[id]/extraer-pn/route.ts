@@ -19,7 +19,8 @@ const TRES_DIAS = 3 * 24 * 60 * 60 * 1000;
 // Respeta los límites de cada módulo (buzón 1/día, fraccionamiento cada 3 días).
 // Cada módulo persiste su resultado apenas termina (una caída parcial no pierde
 // lo ya extraído). La Clave SOL NO se persiste.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });

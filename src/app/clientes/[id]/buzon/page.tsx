@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 // Reporte imprimible de las NOTIFICACIONES DEL BUZÓN SUNAT.
 // Recicla el mismo procedimiento del informe analítico: membrete corporativo +
 // botón "Imprimir / Guardar PDF" (window.print) + estilos de impresión.
-export default async function BuzonPdfPage({ params }: { params: { id: string } }) {
+export default async function BuzonPdfPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const cliente = await getClienteDeUsuario(params.id, studioId(user));
   if (!cliente) notFound();

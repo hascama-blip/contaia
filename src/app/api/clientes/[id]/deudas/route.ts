@@ -30,7 +30,8 @@ function aDeuda(d: any): Deuda {
 // POST multipart (uno o varios `file`): OCR de cada foto, detecta la sección
 //   (pestaña del F36) y extrae las filas (periodo + monto) como borradores.
 // POST JSON { deudas:[...] } o { deuda:{...} }: guarda las deudas confirmadas.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
@@ -110,7 +111,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const deudaId = new URL(req.url).searchParams.get("deudaId");

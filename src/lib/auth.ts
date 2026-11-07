@@ -120,7 +120,7 @@ export async function resetUsuarios(): Promise<number> {
 
 /** Usuario de la sesión actual (o null si no hay sesión válida). */
 export async function getCurrentUser(): Promise<Usuario | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const t = await leerSessionToken(token);
   if (!t) return null;

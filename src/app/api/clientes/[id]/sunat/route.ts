@@ -8,7 +8,8 @@ import { logAccion } from "@/lib/auditoria";
 export const runtime = "nodejs";
 
 // Consulta el estado tributario del cliente en SUNAT y lo persiste.
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
@@ -26,7 +27,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
 // PATCH: guarda a mano las fechas que decolecta NO entrega (inscripción /
 // inicio de actividades), sin re-consultar SUNAT.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   if (!cliente.sunat) return NextResponse.json({ error: "Primero consulta el RUC en SUNAT." }, { status: 400 });

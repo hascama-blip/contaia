@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest) {
   const _bloqueo = await bloqueoModulo("visor"); if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   const token = await getVisorToken(user.id);
-  const h = headers();
+  const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host") ?? "radartributaria.com"}`;
 
   const sub = (s: string) => s.replaceAll("__TOKEN__", token).replaceAll("__RADAR__", origin);

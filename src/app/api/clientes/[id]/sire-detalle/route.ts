@@ -11,8 +11,9 @@ export const maxDuration = 120;
 // Extrae el DETALLE SIRE (propuesta comprobante por comprobante) de un periodo.
 // Usa las credenciales de la app SIRE guardadas del cliente (credSire) y recibe
 // la Clave SOL solo para esta llamada (NO se persiste).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("detalle-sire");if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

@@ -22,7 +22,7 @@ export default async function RootLayout({
   // rol supremo aunque la sesión sea anterior al cambio. Nunca rompe el render.
   // Sitio público de la Asociación Mutualista: se renderiza SIN el chrome de
   // Radar (sin header/menú/footer), como un sitio independiente.
-  const pathname = headers().get("x-pathname") || "";
+  const pathname = (await headers()).get("x-pathname") || "";
   // Páginas INDEPENDIENTES a pantalla completa (sin header/menú/footer de Radar):
   // el sitio público de la Mutualista y el dashboard ISSOSOMA (este sí requiere
   // sesión, que impone el middleware; solo se omite el chrome).

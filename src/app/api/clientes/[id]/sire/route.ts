@@ -11,7 +11,8 @@ export const maxDuration = 120;
 
 // Limpia (borra) todos los resúmenes SIRE guardados del cliente, para volver a
 // descargar otro rango/periodo desde cero.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const actualizado = await clearSire(cliente.id);
@@ -21,7 +22,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 // Consulta el resumen SIRE (compras/ventas) de un periodo.
 // Recibe la Clave SOL del cliente SOLO para esta llamada; NO se persiste.
 // Se guardan únicamente los totales resultantes.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

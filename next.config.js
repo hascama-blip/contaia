@@ -21,11 +21,10 @@ const nextConfig = {
   },
   // Paquetes que deben quedar como externos del servidor (usan binarios/ESM
   // pesados): unpdf (pdf.js) para leer PDFs, y el navegador headless del buzón.
-  experimental: {
-    serverComponentsExternalPackages: ["unpdf", "tesseract.js", "exceljs", "fast-xml-parser", "playwright-core", "@sparticuz/chromium", "pg"],
-    // src/instrumentation.ts: planificador de la tarea nocturna de alertas.
-    instrumentationHook: true,
-  },
+  // Next 15: paquetes externos del servidor (antes experimental.serverComponentsExternalPackages).
+  // src/instrumentation.ts (planificador de la tarea nocturna) ya es estable: no
+  // necesita la opción instrumentationHook.
+  serverExternalPackages: ["unpdf", "tesseract.js", "exceljs", "fast-xml-parser", "playwright-core", "@sparticuz/chromium", "pg"],
 };
 
 module.exports = nextConfig;

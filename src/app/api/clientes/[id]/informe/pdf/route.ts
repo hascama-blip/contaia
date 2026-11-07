@@ -11,12 +11,13 @@ export const maxDuration = 120;
 // Genera el informe en PDF con el navegador headless SIN encabezado/pie del
 // navegador (fecha, hora, URL, número de página). Renderiza la MISMA página del
 // informe autenticada con la cookie de sesión del usuario.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
   const cliente = await getClienteDeUsuario(params.id, studioId(user));
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
 
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return NextResponse.json({ error: "Sesión no válida." }, { status: 401 });
 
   const proto = req.headers.get("x-forwarded-proto") ?? "https";

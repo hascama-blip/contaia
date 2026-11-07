@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 // Guarda (y "bloquea") las credenciales del cliente: Usuario SOL + API
 // (client_id/client_secret). La Clave SOL NUNCA se guarda aquí.
 // Se usa para colocar el API "en campo" y habilitar la extracción del SIRE.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

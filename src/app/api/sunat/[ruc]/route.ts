@@ -8,10 +8,8 @@ export const runtime = "nodejs";
 // Consulta SUNAT por RUC sin necesidad de un cliente existente.
 // Se usa en el formulario de alta para autocompletar la razón social
 // y demás datos a partir del RUC.
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { ruc: string } }
-) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ ruc: string }> }) {
+  const params = await props.params;
   // Cada consulta cuesta (token decolecta): 120 por hora por usuario.
   const u = await getCurrentUser();
   const _lim = limitar([{ clave: `sunat-ruc:${u?.id ?? ipDe(_req)}`, max: 120, ventanaMs: HORA }], "Demasiadas consultas de RUC.");

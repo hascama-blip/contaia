@@ -6,8 +6,9 @@ import { getSolicitudRTT, leerArchivoRTT, getUserById } from "@/lib/db";
 export const runtime = "nodejs";
 
 // GET ?tipo=pdf|xml → descarga el archivo del RTT (cuando está "listo").
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("rtt"); if (_bloqueo) return _bloqueo;
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("rtt");if (_bloqueo) return _bloqueo;
   const user = await requireUser();
   const { searchParams } = new URL(req.url);
   const tipo = (searchParams.get("tipo") ?? "pdf") === "xml" ? "xml" : "pdf";

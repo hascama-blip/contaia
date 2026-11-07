@@ -124,6 +124,7 @@ async function readStore(): Promise<Store> {
     if (!store.rucsRegistrados) store.rucsRegistrados = {};
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
+      if (!Array.isArray(c.documentos)) c.documentos = [];
       if (!Array.isArray(c.sire)) c.sire = [];
       if (c.buzon === undefined) c.buzon = null;
       if (!Array.isArray(c.declaraciones)) c.declaraciones = [];

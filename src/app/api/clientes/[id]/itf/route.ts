@@ -10,7 +10,8 @@ export const maxDuration = 200;
 
 // POST → dispara el bot de ITF: login → módulo de ITF → lee el reporte en
 // pantalla. La Clave SOL NO se persiste. Modo diagnóstico vuelca menú/estructura.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });

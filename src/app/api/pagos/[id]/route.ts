@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 // GET → estado de un pago del usuario. Al volver de Mercado Pago llega con
 // ?payment_id=: se CONSULTA ese pago a la API de Mercado Pago (no se confía en
 // los parámetros de la URL) y, si está aprobado y es de este pago, se activa.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const u = await getCurrentUser();
   if (!u) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   let pago = await getPago(params.id);

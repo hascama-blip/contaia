@@ -7,8 +7,9 @@ export const runtime = "nodejs";
 
 // GET ?periodo=AAAAMM&tipo=compras → relación de comprobantes (para descargar
 // XML) armada desde el DETALLE SIRE guardado (caché) de ese cliente/periodo.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("detalle-sire"); if (_bloqueo) return _bloqueo;
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("detalle-sire");if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

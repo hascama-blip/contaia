@@ -14,8 +14,9 @@ export const maxDuration = 240;
 // se configura CPE_XML_API_URL, baja el XML por fetch directo (sin clics).
 // La Clave SOL viaja en el body y NO se persiste. Consume 1 uso solo si el login
 // fue correcto (clave errada NO consume).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const _bloqueo = await bloqueoModulo("comprobantes-xml"); if (_bloqueo) return _bloqueo;
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const _bloqueo = await bloqueoModulo("comprobantes-xml");if (_bloqueo) return _bloqueo;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 

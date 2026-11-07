@@ -6,7 +6,8 @@ import { MEDIA_DIR, contentTypeDe, idMediaValido, ASOC_COOKIE, cookieValida } fr
 export const runtime = "nodejs";
 
 // GET → sirve el medio (público). Soporta Range para video.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = params.id;
   if (!idMediaValido(id)) return new NextResponse("No encontrado", { status: 404 });
   const file = path.join(MEDIA_DIR, id);
@@ -43,7 +44,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE → borra un medio (requiere cookie de edición).
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!cookieValida(req.cookies.get(ASOC_COOKIE)?.value)) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const id = params.id;
   if (!idMediaValido(id)) return NextResponse.json({ error: "id inválido" }, { status: 400 });

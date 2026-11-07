@@ -9,8 +9,9 @@ export const runtime = "nodejs";
 // Sirve el archivo original almacenado (para vista previa/descarga).
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string; docId: string } }
+  props: { params: Promise<{ id: string; docId: string }> }
 ) {
+  const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const doc = cliente.documentos.find((d) => d.id === params.docId);
