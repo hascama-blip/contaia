@@ -27,6 +27,15 @@ export default function AccesosSol({
   const [editar, setEditar] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Recién guardado: la tarjeta NO se encoge de inmediato (si se encogiera, el
+  // panel de vigilancia subiría bajo el cursor y un segundo clic caería ahí).
+  // Se muestra la confirmación en el mismo lugar del botón y luego se pliega.
+  const [recien, setRecien] = useState(false);
+  useEffect(() => {
+    if (!recien) return;
+    const t = setTimeout(() => setRecien(false), 4000);
+    return () => clearTimeout(t);
+  }, [recien]);
 
   useEffect(() => {
     const p = getSolPass(clienteId);
@@ -37,7 +46,7 @@ export default function AccesosSol({
   const usuarioGuardado = Boolean(solUserGuardado);
   const apiGuardada = Boolean(inicialCred?.clientId && inicialCred?.clientSecret);
   // Para clientes con SIRE, "todo listo" incluye tener el API guardado.
-  const todoListo = usuarioGuardado && cargada && !editar && (!llevaSire || apiGuardada);
+  const todoListo = usuarioGuardado && cargada && !editar && (!llevaSire || apiGuardada) && !recien;
 
   async function guardar() {
     setError(null);
@@ -64,6 +73,7 @@ export default function AccesosSol({
       setSolPass(clienteId, solPass); // clave -> solo sesión
       setCargada(true);
       setEditar(false);
+      setRecien(true);
       router.refresh();
     } catch {
       setError("Error de red al guardar los accesos.");
@@ -154,10 +164,21 @@ export default function AccesosSol({
         )}
       </div>
       {error && <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-      <div className="mt-3">
-        <button className="btn-primary" onClick={guardar} disabled={busy}>
-          {busy ? "Guardando…" : "Cargar accesos"}
-        </button>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {recien ? (
+          <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" role="status">
+            ✓ Accesos cargados
+          </span>
+        ) : (
+          <button className="btn-primary" onClick={guardar} disabled={busy}>
+            {busy ? "Guardando…" : "Cargar accesos"}
+          </button>
+        )}
+        {recien && (
+          <span className="text-sm text-emerald-700">
+            Usuario SOL{llevaSire ? " y API SIRE guardados" : " guardado"}; la Clave SOL queda en esta sesión. Ya puedes consultar el buzón{llevaSire ? ", las deudas y el SIRE" : " y las deudas"}.
+          </span>
+        )}
       </div>
     </section>
   );

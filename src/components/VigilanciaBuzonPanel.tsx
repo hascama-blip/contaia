@@ -33,6 +33,8 @@ export default function VigilanciaBuzonPanel({ clienteId, solUserGuardado }: { c
     const solUser = getSolUser(clienteId, solUserGuardado);
     if (!solPass) { setErr("Carga primero la Clave SOL en “Accesos SOL” (arriba)."); return; }
     if (!acepto) { setErr("Marca la casilla de consentimiento para guardar la clave cifrada."); return; }
+    // Confirmación explícita: activar guarda la Clave SOL cifrada en el servidor.
+    if (!confirm("¿Activar la vigilancia del buzón?\n\nLa Clave SOL de esta empresa se guardará cifrada en el servidor durante 30 días para revisar el buzón cada madrugada. Puedes desactivarla cuando quieras.")) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/clientes/${clienteId}/vigilancia`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ solUser, solPass, acepto: true }) });
