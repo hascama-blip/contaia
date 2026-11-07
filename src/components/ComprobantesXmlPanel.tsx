@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { zipSync } from "fflate";
 import { getSolPass, getSolUser } from "@/lib/solSession";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -309,7 +310,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
     <section className="card p-5">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="font-semibold text-slate-800">Facturas recibidas (XML / PDF) desde SUNAT</h2>
-        <span className="badge bg-slate-100 text-slate-500">Solo Usuario + Clave SOL</span>
+        <TiempoAprox tiempo={TIEMPOS.facturas} />
       </div>
       <p className="mb-4 text-xs text-slate-400">
         Sube la <strong>relación de comprobantes</strong> (o cárgala del SIRE) y extrae los XML

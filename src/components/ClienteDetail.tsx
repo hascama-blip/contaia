@@ -14,6 +14,7 @@ import EstadoSirePanel from "./EstadoSirePanel";
 import RentasPanel from "./RentasPanel";
 import ItfPanel from "./ItfPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 import {
   CondicionBadge,
   EstadoBadge,
@@ -217,8 +218,10 @@ export default function ClienteDetail({
         <div className="space-y-6 lg:col-span-2">
           {/* SUNAT */}
           <section className="card p-5">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-slate-800">Estado tributario SUNAT</h2>
+              <div className="flex items-center gap-2">
+              <TiempoAprox tiempo={TIEMPOS.sunatRuc} />
               <button
                 className="btn-ghost"
                 onClick={consultarSunat}
@@ -230,6 +233,7 @@ export default function ClienteDetail({
                     ? "Actualizar"
                     : "Consultar SUNAT"}
               </button>
+              </div>
             </div>
             {cliente.sunat ? (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -357,7 +361,7 @@ export default function ClienteDetail({
           {/* ═════════ MÓDULOS DE SCRAPING (login SOL) — cada uno con su botón ═════════ */}
 
           {/* 1 · Buzón electrónico */}
-          <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL (scraping)." />
+          <FaseHeader n="1" titulo="Buzón electrónico" detalle="Solo Usuario + Clave SOL (scraping)." tiempo={TIEMPOS.buzon} />
           <BuzonPanel
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
@@ -365,7 +369,7 @@ export default function ClienteDetail({
           />
 
           {/* 2 · Deudas (Fraccionamiento F36) */}
-          <FaseHeader n="2" titulo="Deudas (Fraccionamiento Art. 36)" detalle="Solo Usuario + Clave SOL (scraping)." />
+          <FaseHeader n="2" titulo="Deudas (Fraccionamiento Art. 36)" detalle="Solo Usuario + Clave SOL (scraping)." tiempo={TIEMPOS.deudas} />
           <DeudasF36Panel
             clienteId={cliente.id}
             solUserGuardado={cliente.credSire?.solUser ?? ""}
@@ -375,9 +379,9 @@ export default function ClienteDetail({
           {/* 3 y 4 · Rentas 4ta/5ta e ITF — solo persona natural (scraping) */}
           {esPersonaNatural(cliente.ruc) && (
             <>
-              <FaseHeader n="3" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." />
+              <FaseHeader n="3" titulo="Reporte de Rentas y Retenciones (4ta/5ta)" detalle="Genera el reporte de SUNAT (llega por la nube) y extrae 4ta/5ta por empleador y periodo." tiempo={TIEMPOS.rentas} />
               <RentasPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={null} />
-              <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." />
+              <FaseHeader n="4" titulo="ITF (Impuesto a las Transacciones Financieras)" detalle="Reporte de ITF (SUNAT lo genera en pantalla)." tiempo={TIEMPOS.itf} />
               <ItfPanel clienteId={cliente.id} solUserGuardado={cliente.credSire?.solUser ?? ""} inicial={cliente.itf ?? null} />
             </>
           )}
@@ -385,9 +389,9 @@ export default function ClienteDetail({
           {/* ═════════ MÓDULOS API (SIRE — client_id/secret, no login SOL) ═════════ */}
           {llevaSire(cliente) && (
             <>
-              <FaseHeader n="5" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (API)." />
+              <FaseHeader n="5" titulo="Estado SIRE" detalle="Presentado / no presentado por periodo (API)." tiempo={TIEMPOS.estadoSire} />
               <EstadoSirePanel clienteId={cliente.id} inicialCred={cliente.credSire ?? null} />
-              <FaseHeader n="6" titulo="Extracción SIRE (montos)" detalle="Compras/ventas por periodo. Coloca y bloquea la API (client_id/secret)." />
+              <FaseHeader n="6" titulo="Extracción SIRE (montos)" detalle="Compras/ventas por periodo. Coloca y bloquea la API (client_id/secret)." tiempo={TIEMPOS.montosSire} />
               <SunatPanel
                 clienteId={cliente.id}
                 inicialSire={cliente.sire ?? []}
@@ -402,15 +406,18 @@ export default function ClienteDetail({
         {/* Columna derecha: diagnóstico */}
         <div className="space-y-6">
           <section className="card p-5">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-slate-800">Diagnóstico</h2>
-              <button
-                className="btn-ghost"
-                onClick={generarDiagnostico}
-                disabled={busy === "diag"}
-              >
-                {busy === "diag" ? "Analizando…" : d ? "Regenerar" : "Generar"}
-              </button>
+              <div className="flex items-center gap-2">
+                <TiempoAprox tiempo={TIEMPOS.diagnostico} />
+                <button
+                  className="btn-ghost"
+                  onClick={generarDiagnostico}
+                  disabled={busy === "diag"}
+                >
+                  {busy === "diag" ? "Analizando…" : d ? "Regenerar" : "Generar"}
+                </button>
+              </div>
             </div>
 
             {!d ? (
@@ -471,16 +478,17 @@ export default function ClienteDetail({
   );
 }
 
-function FaseHeader({ n, titulo, detalle }: { n: string; titulo: string; detalle: string }) {
+function FaseHeader({ n, titulo, detalle, tiempo }: { n: string; titulo: string; detalle: string; tiempo?: string }) {
   return (
-    <div className="flex items-center gap-3 pt-2">
+    <div className="flex flex-wrap items-center gap-3 pt-2">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
         {n}
       </span>
-      <div>
+      <div className="min-w-0 flex-1">
         <h2 className="font-semibold text-slate-800">{titulo}</h2>
         <p className="text-xs text-slate-500">{detalle}</p>
       </div>
+      {tiempo && <TiempoAprox tiempo={tiempo} />}
     </div>
   );
 }

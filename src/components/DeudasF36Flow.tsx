@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 import { usePuedeDiag } from "./SupremoContext";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 interface ClienteOpt { id: string; razonSocial: string; ruc: string; solUser: string }
 interface Tabla { pestana: string; headers: string[]; filas: string[][] }
@@ -94,7 +95,10 @@ export default function DeudasF36Flow({ clientes }: { clientes: ClienteOpt[] }) 
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Deudas tributarias (Fraccionamiento Art. 36)</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-800">Deudas tributarias (Fraccionamiento Art. 36)</h2>
+            <TiempoAprox tiempo={TIEMPOS.deudas} />
+          </div>
           <p className="text-sm text-slate-500">
             Generas el pedido, SUNAT lo procesa (tarda distinto por empresa) y, cuando queda
             “Pendiente de Elaborar Solicitud”, recién se extraen las deudas. Verifica el estado

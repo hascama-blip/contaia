@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AccesosSol from "./AccesosSol";
 import { getSolPass, getSolUser } from "@/lib/solSession";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
@@ -165,7 +166,10 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
   return (
     <div className="space-y-4">
       <div className="card p-5">
-        <h2 className="mb-1 font-semibold text-slate-800">Subida masiva de honorarios (RxH)</h2>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-800">Subida masiva de honorarios (RxH)</h2>
+          <TiempoAprox tiempo={TIEMPOS.honorarios} />
+        </div>
         <p className="mb-4 text-xs text-slate-400">
           El bot inicia sesión en SOL, entra a <strong>Recibo por Honorarios Electrónicos → Consulta Receptor</strong>,
           lee los recibos <strong>recibidos</strong> por <strong>mes(es) completo(s)</strong> (con el concepto de cada uno)

@@ -285,6 +285,8 @@ export interface AlertasUsuario {
   email?: boolean;
   /** Avisos del cronograma de DDJJ mensual (por defecto sí). */
   cronograma?: boolean;
+  /** Cuándo usó su única alerta de prueba (cada envío consume Telegram/correo). */
+  pruebaEnviadaAt?: string;
 }
 
 /** Credenciales SIRE persistidas (sin la Clave SOL, que es efímera). */

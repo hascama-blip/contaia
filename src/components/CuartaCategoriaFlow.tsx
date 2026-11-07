@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 import { usePuedeDiag } from "./SupremoContext";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 interface ClienteOpt { id: string; razonSocial: string; ruc: string; solUser: string }
 
@@ -61,7 +62,10 @@ export default function CuartaCategoriaFlow({ clientes }: { clientes: ClienteOpt
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Cuarta Categoría — consulta mensual</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xl font-bold text-slate-800">Cuarta Categoría — consulta mensual</h2>
+          <TiempoAprox tiempo={TIEMPOS.cuarta} />
+        </div>
         <p className="text-sm text-slate-500">
           Reporte de <b>Ingresos de Cuarta Categoría</b> por mes (recibos por honorarios). Solo persona
           natural (RUC 10/15). SUNAT lo muestra en pantalla; el sistema lo extrae.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getSolPass, getSolUser } from "@/lib/solSession";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -112,7 +113,7 @@ export default function DetalleSirePanel({ clienteId, tipo }: { clienteId: strin
     <section className="card p-5">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="font-semibold text-slate-800">Detalle SIRE — {esVentas ? "Ventas (RVIE)" : "Compras (RCE)"}</h2>
-        <span className="badge bg-slate-100 text-slate-500">API oficial SIRE</span>
+        <TiempoAprox tiempo={TIEMPOS.detalleSire} />
       </div>
       <p className="mb-4 text-xs text-slate-400">
         Extrae el <strong>detalle comprobante por comprobante</strong> de la propuesta SUNAT de

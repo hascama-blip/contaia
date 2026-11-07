@@ -5,6 +5,7 @@ import { getSolPass, setSolPass as setSolPassSesion } from "@/lib/solSession";
 import BuzonSeguimientoCell, { type Seguimiento } from "./BuzonSeguimientoCell";
 import { usePuedeDiag } from "./SupremoContext";
 import CuposEmpresa from "./CuposEmpresa";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 interface ClienteOpt {
   id: string;
@@ -249,7 +250,10 @@ export default function ConsultasFlow({ clientes }: { clientes: ClienteOpt[] }) 
         </div>
       ) : (
         <section className="card p-5">
-          <h2 className="mb-3 font-bold text-slate-800">Buzón electrónico</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold text-slate-800">Buzón electrónico</h2>
+            <TiempoAprox tiempo={TIEMPOS.buzon} />
+          </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="text-xs font-semibold text-slate-600">Empresa</label>

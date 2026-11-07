@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AccesosSol from "./AccesosSol";
 import { getSolPass, getSolUser } from "@/lib/solSession";
+import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
 interface ClienteMin { id: string; razonSocial: string; ruc: string; solUser: string }
 
@@ -87,7 +88,10 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
   return (
     <div className="space-y-4">
       <div className="card p-5">
-        <h2 className="mb-1 font-semibold text-slate-800">Generar Reporte Tributario para Terceros</h2>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-800">Generar Reporte Tributario para Terceros</h2>
+          <TiempoAprox tiempo={TIEMPOS.rtt} />
+        </div>
         <p className="mb-4 text-xs text-slate-400">
           Elige la empresa: el bot inicia sesión con su <strong>Clave SOL</strong>, genera su Reporte Tributario
           para Terceros y SUNAT lo envía por correo; un <strong>webhook</strong> lo captura automáticamente y aquí

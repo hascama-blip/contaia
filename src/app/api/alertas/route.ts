@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
-import { setAlertasUsuario, getUserById } from "@/lib/db";
+import { requireUser, esSupremo } from "@/lib/auth";
+import { setAlertasUsuario, getUserById, conBloqueoStore } from "@/lib/db";
 import { correoConfigurado } from "@/lib/email";
 import {
   telegramConfigurado, telegramBotUsername, enlaceVincular, nuevoCodigoTelegram,
@@ -24,6 +24,10 @@ async function estado(userId: string) {
     emailDisponible: correoConfigurado(),
     correo: u?.email ?? "",
     cronograma: a.cronograma !== false,
+    // Una sola alerta de prueba por cuenta (cada envío consume Telegram/correo).
+    // El supremo puede probar sin límite.
+    pruebaDisponible: esSupremo(u) || !a.pruebaEnviadaAt,
+    pruebaEnviadaAt: a.pruebaEnviadaAt ?? null,
   };
 }
 
@@ -58,10 +62,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(await estado(user.id));
   }
   if (accion === "prueba") {
+    const supremo = esSupremo(user);
+    // Reserva la prueba ANTES de enviar (dentro del candado del store): dos
+    // clics seguidos no pueden mandar dos pruebas.
+    const reservada = supremo || (await conBloqueoStore(async () => {
+      const actual = await getUserById(user.id);
+      if (actual?.alertas?.pruebaEnviadaAt) return false;
+      await setAlertasUsuario(user.id, { pruebaEnviadaAt: new Date().toISOString() });
+      return true;
+    }));
+    if (!reservada) {
+      return NextResponse.json({ error: "Ya usaste tu alerta de prueba. Desde ahora te llegarán solo las alertas reales." }, { status: 429 });
+    }
     const u = (await getUserById(user.id))!;
     const r = await enviarAlerta(u, { tipo: "prueba", titulo: "Prueba de alertas de Radar", texto: "Si lees esto, tus alertas están funcionando. Así te avisaremos de notificaciones SUNAT, vencimientos de declaración y de tu plan.", href: "/" });
     const canales = [r.telegram ? "Telegram" : null, r.email ? "correo" : null].filter(Boolean);
-    return NextResponse.json({ ok: canales.length > 0, mensaje: canales.length ? `Enviado por ${canales.join(" y ")}.` : `No se pudo enviar: ${r.errores.join(" · ") || "no hay canal activo"}.` });
+    if (!canales.length) {
+      // No salió por ningún canal: no se descuenta, puede volver a intentarlo.
+      if (!supremo) await setAlertasUsuario(user.id, { pruebaEnviadaAt: undefined });
+      return NextResponse.json({ error: `No se pudo enviar: ${r.errores.join(" · ") || "no hay canal activo"}. No se descontó tu prueba.` }, { status: 502 });
+    }
+    return NextResponse.json({ ok: true, mensaje: `Prueba enviada por ${canales.join(" y ")}.` });
   }
   return NextResponse.json({ error: "Acción inválida." }, { status: 400 });
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 interface Estado {
   telegramDisponible: boolean; bot: string; telegramVinculado: boolean; telegramNombre: string;
   codigo: string | null; enlace: string | null; email: boolean; emailDisponible: boolean; correo: string; cronograma: boolean;
+  pruebaDisponible: boolean; pruebaEnviadaAt: string | null;
   mensaje?: string;
 }
 
@@ -142,7 +143,9 @@ export default function AlertasConfig() {
           </p>
         ) : e.telegramVinculado ? (
           <div className="flex flex-wrap items-center gap-2">
-            <button className="btn-ghost text-sm" onClick={() => accion("prueba")} disabled={busy}>Enviar mensaje de prueba</button>
+            {e.pruebaDisponible && (
+              <button className="btn-ghost text-sm" onClick={() => accion("prueba")} disabled={busy}>Enviar mi única prueba</button>
+            )}
             <button className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => accion("desvincular")} disabled={busy}>Desvincular</button>
           </div>
         ) : (
@@ -211,7 +214,18 @@ export default function AlertasConfig() {
             <h2 className="text-[15px] font-semibold text-slate-900">Qué te avisamos</h2>
             <p className="text-sm text-slate-500">Por los canales activos de arriba.</p>
           </div>
-          <button className="btn-ghost text-sm" onClick={() => accion("prueba")} disabled={busy}>Enviar alerta de prueba</button>
+          {e.pruebaDisponible ? (
+            <div className="text-right">
+              <button className="btn-ghost text-sm" onClick={() => accion("prueba")} disabled={busy}>Enviar alerta de prueba</button>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Tienes una sola prueba{!e.telegramVinculado && e.telegramDisponible ? ": vincula Telegram antes de usarla" : ""}.
+              </p>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400">
+              Prueba usada{e.pruebaEnviadaAt ? ` el ${new Date(e.pruebaEnviadaAt).toLocaleDateString("es-PE")}` : ""}
+            </span>
+          )}
         </div>
         <ul className="divide-y divide-slate-100">
           <li className="flex items-start gap-4 px-5 py-4 sm:px-6">
