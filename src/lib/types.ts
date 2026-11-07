@@ -168,6 +168,9 @@ export interface Pago {
   moneda: "PEN";
   /** true = precio de lanzamiento (−50 %, primeras 100 personas). */
   lanzamiento: boolean;
+  /** true = pagado con las claves de TEST de la pasarela (no es dinero real):
+   *  activa el plan para probar, pero no cuenta para los cupos de lanzamiento. */
+  prueba?: boolean;
   proveedor: "culqi" | "mercadopago" | "izipay";
   estado: "pendiente" | "pagado" | "rechazado";
   /** Id del cargo/pago en la pasarela (para conciliar). */

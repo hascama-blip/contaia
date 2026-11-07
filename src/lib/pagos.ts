@@ -72,6 +72,14 @@ export function pasarelaActiva(): { pasarela: Pasarela | null; publicKey: string
   return { pasarela: falta.length ? null : p, publicKey, falta };
 }
 
+/** ¿La pasarela está con claves de TEST? (los pagos no son dinero real). */
+export function modoPrueba(p: Pasarela | null = pasarelaActiva().pasarela): boolean {
+  if (p === "izipay") return env("IZIPAY_PASSWORD").startsWith("testpassword_");
+  if (p === "culqi") return env("CULQI_SECRET_KEY").startsWith("sk_test");
+  if (p === "mercadopago") return env("MP_ACCESS_TOKEN").startsWith("TEST-");
+  return false;
+}
+
 // ---- Inicio del pago ------------------------------------------------------------
 export type InicioPago =
   | { proveedor: "culqi"; pagoId: string; publicKey: string; montoCentimos: number; email: string; descripcion: string }
@@ -82,6 +90,7 @@ export async function iniciarPago(admin: Usuario, plan: PlanPago): Promise<Inici
   const cfg = pasarelaActiva();
   if (!cfg.pasarela) throw new Error(`La pasarela de pago aún no está configurada (falta ${cfg.falta.join(", ")}).`);
   const precio = await precioPara(admin, plan);
+  const prueba = modoPrueba(cfg.pasarela);
   const pago = await crearPago({
     userId: admin.id,
     userEmail: admin.email,
@@ -89,7 +98,9 @@ export async function iniciarPago(admin: Usuario, plan: PlanPago): Promise<Inici
     plan,
     montoCentimos: precio.centimos,
     moneda: "PEN",
-    lanzamiento: precio.lanzamiento,
+    // Un pago de prueba no ocupa cupo de lanzamiento ni lo deja asegurado.
+    lanzamiento: precio.lanzamiento && !prueba,
+    ...(prueba ? { prueba: true } : {}),
     proveedor: cfg.pasarela,
   });
   const descripcion = `${PRECIOS[plan].nombre} · 30 días · Radar Tributario`;
@@ -265,7 +276,7 @@ async function avisarPago(p: Pago) {
   if (supremo) {
     await enviarCorreo(
       supremo,
-      `Nuevo pago: ${nombre} · ${soles(p.montoCentimos)}`,
+      `${p.prueba ? "[PRUEBA] " : ""}Nuevo pago: ${nombre} · ${soles(p.montoCentimos)}`,
       `<p><b>${p.userNombre}</b> (${p.userEmail}) pagó <b>${soles(p.montoCentimos)}</b> por el ${nombre}${p.lanzamiento ? " con precio de lanzamiento" : ""}.</p>` +
         `<p>Pasarela: ${p.proveedor} · Ref: ${p.referencia ?? "-"} · Vigente hasta ${vence}.</p>`,
     ).catch(() => null);

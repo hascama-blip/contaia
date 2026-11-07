@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 
 interface Pago {
   id: string; userNombre: string; userEmail: string; plan: string; montoCentimos: number; lanzamiento: boolean;
-  proveedor: string; estado: string; referencia?: string; detalle?: string; creadoAt: string; pagadoAt?: string; vigenteHasta?: string;
+  proveedor: string; estado: string; prueba?: boolean; referencia?: string; detalle?: string; creadoAt: string; pagadoAt?: string; vigenteHasta?: string;
 }
 interface Empresa { id: string; nombre: string; email: string; planVence: string | null; limites: { generaciones?: number; comprobantes?: number } | null }
 interface Datos {
-  pasarela: string | null; falta: string[];
+  pasarela: string | null; falta: string[]; modoPrueba?: boolean;
   lanzamiento: { cupos: number; usados: number; restantes: number };
   totalCentimos: number; pagos: Pago[]; empresas: Empresa[];
 }
@@ -43,12 +43,12 @@ export default function PagosSupremo() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold text-slate-800">💳 Pagos de planes</h2>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${d.pasarela ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-          {d.pasarela ? `Pasarela activa: ${d.pasarela}` : `Pasarela sin configurar (falta ${d.falta.join(", ")})`}
+          {d.pasarela ? `Pasarela activa: ${d.pasarela}${d.modoPrueba ? " · MODO PRUEBA (claves de test)" : " · producción"}` : `Pasarela sin configurar (falta ${d.falta.join(", ")})`}
         </span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs text-slate-500">Cobrado (últimos 100)</p><p className="text-lg font-bold text-slate-800">{soles(d.totalCentimos)}</p></div>
+        <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs text-slate-500">Cobrado real (últimos 100)</p><p className="text-lg font-bold text-slate-800">{soles(d.totalCentimos)}</p></div>
         <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs text-slate-500">Precio de lanzamiento usado</p><p className="text-lg font-bold text-slate-800">{d.lanzamiento.usados} de {d.lanzamiento.cupos}</p></div>
         <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs text-slate-500">Cupos de lanzamiento libres</p><p className="text-lg font-bold text-slate-800">{d.lanzamiento.restantes}</p></div>
       </div>
@@ -75,7 +75,7 @@ export default function PagosSupremo() {
                     <td className="px-2 py-1">{p.userNombre}<div className="text-[10px] text-slate-400">{p.userEmail}</div></td>
                     <td className="px-2 py-1">{p.plan}{p.lanzamiento && <span className="ml-1 rounded bg-emerald-100 px-1 text-[9px] font-bold text-emerald-700">−50%</span>}</td>
                     <td className="px-2 py-1 text-right tabular-nums">{soles(p.montoCentimos)}</td>
-                    <td className="px-2 py-1" title={p.detalle}>{p.estado}</td>
+                    <td className="px-2 py-1" title={p.detalle}>{p.estado}{p.prueba && <span className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700">PRUEBA</span>}</td>
                     <td className="px-2 py-1">{p.vigenteHasta ?? "—"}</td>
                     <td className="px-2 py-1 text-[10px] text-slate-400">{p.proveedor} {p.referencia ?? ""}</td>
                   </tr>

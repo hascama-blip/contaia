@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esAdmin, esSupremo, planEfectivo } from "@/lib/auth";
 import { listPagos } from "@/lib/db";
-import { pasarelaActiva, precioPara, estadoLanzamiento, iniciarPago, PRECIOS, type PlanPago } from "@/lib/pagos";
+import { pasarelaActiva, precioPara, estadoLanzamiento, iniciarPago, modoPrueba, PRECIOS, type PlanPago } from "@/lib/pagos";
 
 export const runtime = "nodejs";
 
@@ -21,6 +21,7 @@ export async function GET() {
   return NextResponse.json({
     pasarela: cfg.pasarela,
     configurada: !!cfg.pasarela,
+    modoPrueba: modoPrueba(cfg.pasarela),
     puedePagar,
     plan: planEfectivo(u),
     planVence: u.planVence ?? null,

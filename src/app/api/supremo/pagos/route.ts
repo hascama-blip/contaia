@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esSupremo } from "@/lib/auth";
 import { listPagos, listAdmins, setLimitesCotizados } from "@/lib/db";
-import { estadoLanzamiento, pasarelaActiva } from "@/lib/pagos";
+import { estadoLanzamiento, pasarelaActiva, modoPrueba } from "@/lib/pagos";
 
 export const runtime = "nodejs";
 
@@ -19,10 +19,11 @@ export async function GET() {
   const empresas = (await listAdmins())
     .filter((u) => u.plan === "equipo")
     .map((u) => ({ id: u.id, nombre: u.nombre, email: u.email, planVence: u.planVence ?? null, limites: u.limitesCotizados ?? null }));
-  const pagado = pagos.filter((p) => p.estado === "pagado");
+  const pagado = pagos.filter((p) => p.estado === "pagado" && !p.prueba);
   return NextResponse.json({
     pasarela: cfg.pasarela,
     falta: cfg.falta,
+    modoPrueba: modoPrueba(cfg.pasarela),
     lanzamiento: await estadoLanzamiento(),
     totalCentimos: pagado.reduce((a, p) => a + p.montoCentimos, 0),
     pagos,

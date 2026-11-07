@@ -8,6 +8,7 @@ interface Precio { centimos: number; antes: number; lanzamiento: boolean }
 interface Config {
   pasarela: "culqi" | "mercadopago" | "izipay" | null;
   configurada: boolean;
+  modoPrueba?: boolean;
   puedePagar: boolean;
   plan: string;
   planVence: string | null;
@@ -181,6 +182,11 @@ export default function PagarPlan({ plan, whatsapp }: { plan: PlanPago; whatsapp
             Pago seguro con {cfg.pasarela === "culqi" ? "Culqi (tarjeta o Yape)" : cfg.pasarela === "mercadopago" ? "Mercado Pago" : "Izipay"}.
             Radar no ve ni guarda los datos de tu tarjeta. El plan se activa en cuanto la pasarela confirma el pago.
           </p>
+          {cfg.modoPrueba && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              🧪 Modo prueba: usa una tarjeta de prueba de la pasarela. No se cobra dinero real.
+            </p>
+          )}
         </>
       )}
 
