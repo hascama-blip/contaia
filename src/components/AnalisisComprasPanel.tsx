@@ -18,7 +18,7 @@ export default function AnalisisComprasPanel() {
   // Varias empresas (un Excel con una pestaña por empresa): análisis de cada una.
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [sinGasto, setSinGasto] = useState<string[]>([]);
-  const [sel, setSel] = useState(-1); // -1 = consolidado (o la única empresa)
+  const [sel, setSel] = useState(-1); // -1 = consolidado (o la única empresa); con varias, abre en la 1.ª
   const [verDetalle, setVerDetalle] = useState(false);
   const a = sel >= 0 ? empresas[sel] : consolidado;
   const esGrupo = empresas.length > 1;
@@ -33,6 +33,8 @@ export default function AnalisisComprasPanel() {
       if (!res.ok) { setError(data.error ?? "No se pudo analizar el archivo."); return; }
       setConsolidado(data.analisis);
       setEmpresas(Array.isArray(data.empresas) ? data.empresas : []);
+      // Varias empresas: el análisis va DIVIDIDO, se abre la primera empresa.
+      if (Array.isArray(data.empresas) && data.empresas.length > 1) setSel(0);
       setSinGasto(Array.isArray(data.sinGasto) ? data.sinGasto : []);
       setArchivos(data.archivos ?? []);
     } catch {
@@ -62,6 +64,31 @@ export default function AnalisisComprasPanel() {
       setError("Error de red al generar el informe.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // ZIP con UN informe por empresa (PDF o Excel), sin el consolidado.
+  const [zipBusy, setZipBusy] = useState<"" | "pdf" | "excel">("");
+  async function descargarPorEmpresa(tipo: "excel" | "pdf") {
+    setError(null); setZipBusy(tipo);
+    try {
+      const res = await fetch("/api/analisis-compras/por-empresa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresas, tipo }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "No se pudieron generar los informes por empresa."); return; }
+      const blob = await res.blob();
+      const nombre = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") || "")?.[1] ?? `informes-por-empresa-${tipo}.zip`;
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement("a");
+      el.href = url; el.download = nombre;
+      document.body.appendChild(el); el.click(); el.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error de red al generar los informes.");
+    } finally {
+      setZipBusy("");
     }
   }
 
@@ -100,7 +127,7 @@ export default function AnalisisComprasPanel() {
           {archivos.length > 0 && (
             <span className="text-xs text-emerald-700">✓ {esGrupo ? `${empresas.length} empresas` : `${archivos.length} archivo(s)`}</span>
           )}
-          {a && (
+          {a && !esGrupo && (
             <div className="ml-auto flex gap-2">
               <button className="btn-primary text-sm" onClick={() => descargar("pdf")} disabled={busy}>
                 ⬇ Informe (PDF)
@@ -130,17 +157,42 @@ export default function AnalisisComprasPanel() {
       )}
 
       {esGrupo && (
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setSel(-1)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${sel === -1 ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-brand-500"}`}>
-            Consolidado del grupo
-          </button>
+        <div className="card space-y-3 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="mr-auto min-w-[16rem] flex-1">
+              <p className="text-sm font-semibold text-slate-800">Informes por empresa</p>
+              <p className="text-xs text-slate-500">
+                Un informe independiente por cada empresa ({empresas.length}), en un ZIP. Los PDF tardan unos segundos por empresa.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+            <button className="btn-primary text-sm" onClick={() => descargarPorEmpresa("pdf")} disabled={busy || !!zipBusy}>
+              {zipBusy === "pdf" ? "Generando PDF…" : `⬇ PDF por empresa (${empresas.length})`}
+            </button>
+            <button className="btn-ghost text-sm" onClick={() => descargarPorEmpresa("excel")} disabled={busy || !!zipBusy}>
+              {zipBusy === "excel" ? "Generando Excel…" : `⬇ Excel por empresa (${empresas.length})`}
+            </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+            <span className="text-xs text-slate-500">Ver en pantalla:</span>
           {empresas.map((e: any, i: number) => (
             <button key={i} onClick={() => setSel(i)}
               className={`rounded-full border px-3 py-1.5 text-xs ${sel === i ? "border-brand-700 bg-brand-700 font-semibold text-white" : "border-slate-300 bg-white text-slate-600 hover:border-brand-500"}`}>
               {e.empresa} <span className={sel === i ? "text-white/70" : "text-slate-400"}>· {solesK(e.totalGasto)}</span>
             </button>
           ))}
+            <button onClick={() => setSel(-1)}
+              className={`rounded-full border border-dashed px-3 py-1.5 text-xs ${sel === -1 ? "border-brand-700 bg-brand-700 font-semibold text-white" : "border-slate-300 bg-white text-slate-500 hover:border-brand-500"}`}>
+              Consolidado del grupo (opcional)
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            Descargar solo lo que estás viendo ({a?.consolidado ? "consolidado" : a?.empresa}):
+            <button className="font-semibold text-brand-600 hover:underline disabled:opacity-50" onClick={() => descargar("pdf")} disabled={busy || !!zipBusy}>PDF</button>
+            ·
+            <button className="font-semibold text-brand-600 hover:underline disabled:opacity-50" onClick={() => descargar("excel")} disabled={busy || !!zipBusy}>Excel</button>
+          </div>
         </div>
       )}
 

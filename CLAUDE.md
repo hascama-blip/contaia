@@ -60,7 +60,9 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   varios meses de una empresa se combinan; un Excel con una pestaña por empresa (p. ej.
   "EGRESOS EMPRESAS OCT") da un análisis por empresa + el **consolidado del grupo**
   (`analizarGrupo`, `porEmpresa` = comparativo). Panel `AnalisisComprasPanel.tsx`
-  (`/herramientas/analisis-compras`), PDF/Excel por empresa o del consolidado.
+  (`/herramientas/analisis-compras`): con varias empresas abre en la 1.ª y descarga un ZIP con
+  **un informe por empresa** (`/api/analisis-compras/por-empresa`, PDF o Excel); el consolidado
+  queda como vista opcional.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
