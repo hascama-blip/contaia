@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       sub: e.subdiario?.conciliados ?? 0,
       vence: e.cierre?.vence ?? "",
       habiles: e.cierre ? (e.cierre.diasCalendario < 0 ? `${-e.cierre.diasCalendario} día(s) de atraso` : e.cierre.diasHabiles) : "",
-      estadoCierre: ({ vencido: "VENCIDO", "vence-hoy": "Vence hoy", urgente: "Urgente", "en-plazo": "En plazo", "periodo-abierto": "Periodo abierto" } as Record<string, string>)[e.cierre?.estado ?? ""] ?? "",
+      estadoCierre: ({ vencido: "VENCIDO", "vence-hoy": "Vence hoy", urgente: "Urgente", "en-plazo": "En plazo" } as Record<string, string>)[e.cierre?.estado ?? ""] ?? "",
       rh: e.excluidos?.honorarios ?? 0,
     });
     for (const k of ["tSire", "tCont", "dif"]) row.getCell(k).numFmt = "#,##0.00";

@@ -121,7 +121,7 @@ export function proximosVencimientos(
 // noviembre): cuándo vence la DJ mensual de esa empresa según el último dígito
 // de su RUC y cuánto tiempo queda para regularizar las diferencias.
 
-export type EstadoCierre = "periodo-abierto" | "en-plazo" | "urgente" | "vence-hoy" | "vencido";
+export type EstadoCierre = "en-plazo" | "urgente" | "vence-hoy" | "vencido";
 
 export interface CierrePeriodo {
   periodo: string;          // YYYY-MM
@@ -132,6 +132,20 @@ export interface CierrePeriodo {
   diasCalendario: number;   // negativos = días de atraso
   diasHabiles: number;      // hábiles que quedan, contando hoy si es hábil (0 si ya venció)
   estado: EstadoCierre;
+  /** El periodo es el mes en curso (aún se registran operaciones; se declara el mes siguiente). */
+  enCurso: boolean;
+}
+
+/** ¿El análisis de cierre aplica a este periodo? Solo al periodo POR DECLARAR (mes
+ *  anterior a hoy, vence este mes) y al MES EN CURSO (vence el mes siguiente). Los
+ *  meses pasados ya debieron declararse: no se les cuenta plazo. */
+export function cierreAplica(periodo: string, hoy: string): boolean {
+  const p = /^\d{6}$/.test(periodo) ? `${periodo.slice(0, 4)}-${periodo.slice(4)}` : periodo;
+  const [y, m] = hoy.split("-").map(Number);
+  const actual = `${y}-${String(m).padStart(2, "0")}`;
+  const ant = new Date(y, m - 2, 1);
+  const anterior = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, "0")}`;
+  return p === actual || p === anterior;
 }
 
 function deIso(s: string): Date { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
@@ -154,10 +168,9 @@ export function analisisCierre(ruc: string, periodo: string, hoy: string, buenCo
   const [y, m] = p.split("-").map(Number);
   const finPeriodo = iso(new Date(y, m, 0)); // último día del periodo
   const estado: EstadoCierre =
-    hoy <= finPeriodo ? "periodo-abierto"
-    : diasCalendario < 0 ? "vencido"
+    diasCalendario < 0 ? "vencido"
     : diasCalendario === 0 ? "vence-hoy"
     : diasHabiles <= 3 ? "urgente"
     : "en-plazo";
-  return { periodo: p, ultimoDigito: ruc.slice(-1), grupo, vence: v.fecha, oficial: v.oficial, diasCalendario, diasHabiles, estado };
+  return { periodo: p, ultimoDigito: ruc.slice(-1), grupo, vence: v.fecha, oficial: v.oficial, diasCalendario, diasHabiles, estado, enCurso: hoy <= finPeriodo };
 }

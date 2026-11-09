@@ -93,7 +93,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   por último dígito del RUC (cronograma oficial `OFICIAL`, si falta = referencial), días hábiles y
   calendario que quedan desde hoy (Lima) o días de atraso, estado (periodo abierto / en plazo /
   urgente ≤3 hábiles / vence hoy / vencido) + lo que falta regularizar por empresa; va en la UI y
-  en el Excel resumen.
+  en el Excel resumen. **Solo aplica al periodo por declarar (mes anterior a hoy) y al mes en curso**
+  (`cierreAplica`; el mes en curso se cuenta hasta su vencimiento del mes siguiente, `enCurso`);
+  meses pasados → `cierreNoAplica` (solo una nota). **Informe PDF = solo resumen**
+  (`conciliacionHtml.ts`, `/api/analisis-compras/conciliacion/pdf`: KPIs + cierre + resumen por
+  empresa, A4 horizontal); el detalle comprobante por comprobante va en el Excel ZIP.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

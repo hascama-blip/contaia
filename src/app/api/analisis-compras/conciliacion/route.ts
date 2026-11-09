@@ -5,7 +5,7 @@ import { listClientes } from "@/lib/db";
 import { parseLibroDiarioHojas, claveEmpresa, type MovDiario } from "@/lib/analisisCompras";
 import { leerSire, conciliar, parseRegistroVentasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
 import type { CompNorm, TipoLibro } from "@/lib/cruceSire";
-import { analisisCierre, type CierrePeriodo } from "@/lib/cronogramaSunat";
+import { analisisCierre, cierreAplica, type CierrePeriodo } from "@/lib/cronogramaSunat";
 import { hoyLima } from "@/lib/fechas";
 
 export const runtime = "nodejs";
@@ -152,11 +152,15 @@ export async function POST(req: NextRequest) {
     // ANÁLISIS DE CIERRE: vencimiento de la DJ mensual (cronograma SUNAT por último
     // dígito del RUC) y cuánto tiempo queda para regularizar las diferencias.
     const hoy = hoyLima();
+    // Solo aplica al periodo POR DECLARAR (mes anterior) y al mes en curso; los meses
+    // pasados ya debieron declararse (no se les cuenta plazo).
     const cierre: (CierrePeriodo & { empresa: string; ruc: string; conciliada: boolean; pendientes: number; difTotal: number; difIgv: number })[] = [];
+    let cierreNoAplica = "";
     for (const [k, e] of empresas.entries()) {
       const rs = resultados.filter((r) => r.clave === k);
       const per = rs[0]?.periodo || periodoPedido || periodoMasFrecuente(e.ventas.length ? e.ventas.map((c) => c.fecha) : e.diario.map((m) => m.fecReg || m.fecDoc));
       const ruc = e.ruc || rs[0]?.ruc || "";
+      if (!cierreAplica(per, hoy)) { cierreNoAplica = per; continue; }
       const c = analisisCierre(ruc, per, hoy);
       for (const r of rs) r.cierre = c;
       if (!c) continue;
@@ -167,12 +171,13 @@ export async function POST(req: NextRequest) {
         difIgv: Math.round(rs.reduce((a, r) => a + r.cruce.totalesSire.igv - r.cruce.totalesContable.igv, 0) * 100) / 100,
       });
     }
-    const orden = { vencido: 0, "vence-hoy": 1, urgente: 2, "en-plazo": 3, "periodo-abierto": 4 } as const;
+    const orden = { vencido: 0, "vence-hoy": 1, urgente: 2, "en-plazo": 3 } as const;
     cierre.sort((a, b) => orden[a.estado] - orden[b.estado] || a.diasCalendario - b.diasCalendario || b.pendientes - a.pendientes);
 
     return NextResponse.json({
       hoy,
       cierre,
+      cierreNoAplica,
       empresas: resultados,
       sinSire,
       faltantes,
