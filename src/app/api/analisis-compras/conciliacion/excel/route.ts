@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
     { header: "Dif. fecha", key: "difFecha", width: 10 },
     { header: "Solo SIRE", key: "soloSire", width: 10 },
     { header: "Solo contable", key: "soloCont", width: 12 },
+    { header: "Conciliadas con subdiario", key: "sub", width: 14 },
+    { header: "Vence DJ mensual", key: "vence", width: 15 },
+    { header: "Días hábiles para regularizar", key: "habiles", width: 15 },
+    { header: "Estado de cierre", key: "estadoCierre", width: 16 },
     { header: "RxH excluidos", key: "rh", width: 12 },
   ];
   ws.getRow(1).eachCell((c) => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } }; });
@@ -59,6 +63,10 @@ export async function POST(req: NextRequest) {
       nCont: c.totalesContable.comprobantes, tCont: c.totalesContable.total,
       dif: Math.round((c.totalesSire.total - c.totalesContable.total) * 100) / 100,
       ok: c.ok, difMonto: c.difMonto, difFecha: c.difFecha, soloSire: c.soloSire, soloCont: c.soloContable,
+      sub: e.subdiario?.conciliados ?? 0,
+      vence: e.cierre?.vence ?? "",
+      habiles: e.cierre ? (e.cierre.diasCalendario < 0 ? `${-e.cierre.diasCalendario} día(s) de atraso` : e.cierre.diasHabiles) : "",
+      estadoCierre: ({ vencido: "VENCIDO", "vence-hoy": "Vence hoy", urgente: "Urgente", "en-plazo": "En plazo", "periodo-abierto": "Periodo abierto" } as Record<string, string>)[e.cierre?.estado ?? ""] ?? "",
       rh: e.excluidos?.honorarios ?? 0,
     });
     for (const k of ["tSire", "tCont", "dif"]) row.getCell(k).numFmt = "#,##0.00";

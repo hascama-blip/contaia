@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, studioId } from "@/lib/auth";
 import { listClientes } from "@/lib/db";
 import { parseLibroDiarioHojas, claveEmpresa, type MovDiario } from "@/lib/analisisCompras";
-import { leerSire, conciliar, parseRegistroVentasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, type SireLeido, type ConciliacionEmpresa } from "@/lib/conciliacionSire";
+import { leerSire, conciliar, parseRegistroVentasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
 import type { CompNorm, TipoLibro } from "@/lib/cruceSire";
+import { analisisCierre, type CierrePeriodo } from "@/lib/cronogramaSunat";
+import { hoyLima } from "@/lib/fechas";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,6 +22,10 @@ const MAX_ARCHIVOS = 40;
 //                   de lo YA DESCARGADO en el módulo Detalle SIRE de cada empresa (el
 //                   cliente con el mismo RUC en "Clientes", caché sireDetalle del periodo).
 //   asignaciones  = JSON { "<id SIRE>": "<clave empresa>" } para archivos que no se pudieron ubicar.
+//   subdiario     = (OPCIONAL, después del análisis) subdiario de MISCELÁNEOS u otro donde
+//                   contabilidad registró NC/comprobantes fuera del Registro de Ventas: las
+//                   diferencias "Solo SIRE" que estén ahí (mismo tipo + serie + número y
+//                   monto) quedan conciliadas.
 // → conciliación SIRE vs contabilidad POR EMPRESA, comprobante por comprobante.
 export async function POST(req: NextRequest) {
   const _bloqueo = await bloqueoModulo("analisis-rtp"); if (_bloqueo) return _bloqueo;
@@ -29,9 +35,10 @@ export async function POST(req: NextRequest) {
   const archivos = (k: string) => form.getAll(k).filter((f): f is File => f instanceof File && f.size > 0);
   const contables = archivos("contable");
   const sires = archivos("sire");
+  const subdiarios = archivos("subdiario");
   if (!contables.length) return NextResponse.json({ error: "Sube el Registro de Ventas del sistema contable (una pestaña por empresa)." }, { status: 400 });
-  if (contables.length + sires.length > MAX_ARCHIVOS) return NextResponse.json({ error: `Máximo ${MAX_ARCHIVOS} archivos por vez.` }, { status: 400 });
-  const grande = [...contables, ...sires].find((f) => f.size > MAX_ARCHIVO);
+  if (contables.length + sires.length + subdiarios.length > MAX_ARCHIVOS) return NextResponse.json({ error: `Máximo ${MAX_ARCHIVOS} archivos por vez.` }, { status: 400 });
+  const grande = [...contables, ...sires, ...subdiarios].find((f) => f.size > MAX_ARCHIVO);
   if (grande) return NextResponse.json({ error: `"${grande.name}" supera 15 MB.` }, { status: 400 });
   let asignaciones: Record<string, string> = {};
   try { asignaciones = JSON.parse(String(form.get("asignaciones") || "{}")) || {}; } catch { /* sin asignaciones */ }
@@ -113,7 +120,53 @@ export async function POST(req: NextRequest) {
         if (!ult.periodo) ult.periodo = periodo;
       }
     }
+    // Subdiario de misceláneos: anula las diferencias "Solo SIRE" que estén registradas ahí.
+    if (subdiarios.length) {
+      const porEmpresa = new Map<string, { docs: DocSubdiario[]; archivos: string[] }>();
+      const ventasRes = resultados.filter((r) => r.libro === "ventas");
+      for (const f of subdiarios) {
+        const hojas = await parseSubdiario(Buffer.from(await f.arrayBuffer()), parseLibroDiarioHojas);
+        if (!hojas.length) avisos.push(`"${f.name}": no se reconocieron comprobantes (se espera Documento + Total, o Cuenta + Debe + Haber).`);
+        for (const h of hojas) {
+          let k = (h.ruc && [...empresas.entries()].find(([, e]) => e.ruc === h.ruc)?.[0]) || "";
+          if (!k && empresas.has(claveEmpresa(h.empresa))) k = claveEmpresa(h.empresa);
+          if (!k && ventasRes.length === 1) k = ventasRes[0].clave; // una sola empresa conciliada
+          if (!k) { avisos.push(`Subdiario "${f.name}" · pestaña ${h.hoja}: no se pudo ubicar la empresa ("${h.empresa}").`); continue; }
+          const g = porEmpresa.get(k) ?? porEmpresa.set(k, { docs: [], archivos: [] }).get(k)!;
+          g.docs.push(...h.docs);
+          g.archivos.push(hojas.length > 1 ? `${f.name} · ${h.hoja}` : f.name);
+        }
+      }
+      for (const r of ventasRes) {
+        const g = porEmpresa.get(r.clave);
+        if (g) aplicarSubdiario(r, g.docs, g.archivos);
+      }
+    }
+
+    // ANÁLISIS DE CIERRE: vencimiento de la DJ mensual (cronograma SUNAT por último
+    // dígito del RUC) y cuánto tiempo queda para regularizar las diferencias.
+    const hoy = hoyLima();
+    const cierre: (CierrePeriodo & { empresa: string; ruc: string; conciliada: boolean; pendientes: number; difTotal: number; difIgv: number })[] = [];
+    for (const [k, e] of empresas.entries()) {
+      const rs = resultados.filter((r) => r.clave === k);
+      const per = rs[0]?.periodo || periodoPedido || periodoMasFrecuente(e.ventas.length ? e.ventas.map((c) => c.fecha) : e.diario.map((m) => m.fecReg || m.fecDoc));
+      const ruc = e.ruc || rs[0]?.ruc || "";
+      const c = analisisCierre(ruc, per, hoy);
+      for (const r of rs) r.cierre = c;
+      if (!c) continue;
+      const pend = rs.reduce((a, r) => a + r.cruce.difMonto + r.cruce.difFecha + r.cruce.soloSire + r.cruce.soloContable + r.docDistinto, 0);
+      cierre.push({
+        ...c, empresa: e.empresa, ruc, conciliada: rs.length > 0, pendientes: pend,
+        difTotal: Math.round(rs.reduce((a, r) => a + r.cruce.totalesSire.total - r.cruce.totalesContable.total, 0) * 100) / 100,
+        difIgv: Math.round(rs.reduce((a, r) => a + r.cruce.totalesSire.igv - r.cruce.totalesContable.igv, 0) * 100) / 100,
+      });
+    }
+    const orden = { vencido: 0, "vence-hoy": 1, urgente: 2, "en-plazo": 3, "periodo-abierto": 4 } as const;
+    cierre.sort((a, b) => orden[a.estado] - orden[b.estado] || a.diasCalendario - b.diasCalendario || b.pendientes - a.pendientes);
+
     return NextResponse.json({
+      hoy,
+      cierre,
       empresas: resultados,
       sinSire,
       faltantes,

@@ -271,6 +271,10 @@ export interface ConciliacionEmpresa {
   excluidos: ExcluidosDiario;
   /** Emparejados por importe aunque serie/número no coincidan. */
   docDistinto: number;
+  /** Cierre del periodo: vencimiento de la DJ mensual y tiempo para regularizar. */
+  cierre?: import("./cronogramaSunat").CierrePeriodo | null;
+  /** Comprobantes "solo SIRE" encontrados en un subdiario aparte (misceláneos). */
+  subdiario?: { conciliados: number; conMontoDistinto: number; archivos: string[] };
 }
 
 /**
@@ -306,7 +310,7 @@ export function conciliar(libro: TipoLibro, empresa: string, clave: string, cont
   const cruce = cruzarLibro(libro, sire, cont);
   for (const f of cruce.filas) {
     const doc = realineados.get(f.clave);
-    if (doc) f.observaciones.push(`Serie/número distinto: en contabilidad figura como ${doc}.`);
+    if (doc) { f.observaciones.push(`Serie/número distinto: en contabilidad figura como ${doc}.`); f.nota = "num-distinto"; }
   }
   return {
     empresa, clave, libro,
@@ -318,3 +322,90 @@ export function conciliar(libro: TipoLibro, empresa: string, clave: string, cont
     docDistinto: realineados.size,
   };
 }
+
+// ---- Subdiario aparte (p. ej. MISCELÁNEOS) -------------------------------------
+// Algunas notas de crédito (u otros comprobantes) no van al Registro de Ventas
+// sino a otro subdiario. Tras la conciliación salen como "Solo SIRE"; subiendo
+// ese subdiario se buscan por tipo + serie + número y, si el monto cuadra, la
+// diferencia queda anulada ("Conciliado con subdiario").
+
+export interface DocSubdiario { tipo: string; serie: string; numero: string; total: number; base?: number; igv?: number; fecha: string; doc: string }
+export interface HojaSubdiario { hoja: string; empresa: string; ruc: string; docs: DocSubdiario[] }
+
+const PREFIJO_TIPO: Record<string, string> = { NC: "7", ND: "8", FT: "1", FA: "1", BV: "3", BO: "3", TK: "12" };
+
+/** "NCB0010000545", "07 B001-0000545", "B001 0000545"… → tipo, serie, número. */
+export function partirDocumento(doc: string, tipoCol = ""): { tipo: string; serie: string; numero: string } | null {
+  const s = doc.trim().toUpperCase();
+  const tipoDe = (t: string) => sinCerosIzq((PREFIJO_TIPO[t] ?? t).replace(/\D/g, "")) || "";
+  let m = s.match(/^(\d{2})[\s-]+([A-Z0-9]{4})[\s-]*(\d+)$/);
+  if (m) return { tipo: tipoDe(m[1]), serie: sinCerosIzq(m[2]), numero: sinCerosIzq(m[3]) };
+  m = s.match(/^([A-Z]{2})[\s-]*([A-Z0-9]{4})[\s-]*(\d+)$/);
+  if (m && PREFIJO_TIPO[m[1]]) return { tipo: tipoDe(m[1]), serie: sinCerosIzq(m[2]), numero: sinCerosIzq(m[3]) };
+  m = s.match(/^([A-Z0-9]{4})[\s-]+(\d+)$/);
+  if (m) return { tipo: tipoDe(tipoCol), serie: sinCerosIzq(m[1]), numero: sinCerosIzq(m[2]) };
+  return null;
+}
+
+/** Lee el subdiario: formato Registro (Documento + Total) o formato Libro Diario (Cuenta, Debe, Haber). */
+export async function parseSubdiario(buf: Buffer, parseDiario: (b: Buffer) => Promise<{ hoja: string; empresa: string; movimientos: MovDiario[] }[]>): Promise<HojaSubdiario[]> {
+  const out: HojaSubdiario[] = [];
+  const registro = await parseRegistroVentasHojas(buf);
+  for (const h of registro) {
+    out.push({ hoja: h.hoja, empresa: h.empresa, ruc: h.ruc, docs: h.comprobantes.map((c) => ({ tipo: c.tipoDoc, serie: c.serie, numero: c.numero, total: c.total, base: c.baseGravada, igv: c.igv, fecha: c.fecha, doc: `${c.serie}-${c.numero}` })) });
+  }
+  const yaLeidas = new Set(registro.map((h) => h.hoja));
+  for (const h of await parseDiario(buf)) {
+    if (yaLeidas.has(h.hoja)) continue;
+    const porDoc = new Map<string, MovDiario[]>();
+    for (const m of h.movimientos) { const d = (m.documento || "").trim(); if (d) (porDoc.get(d) ?? porDoc.set(d, []).get(d)!).push(m); }
+    const docs: DocSubdiario[] = [];
+    for (const [d, ms] of Array.from(porDoc.entries())) {
+      const p = partirDocumento(d);
+      if (!p || !p.tipo) continue;
+      // Total = movimiento de la cuenta por cobrar (12/13/16); si no hay, el mayor de Debe/Haber.
+      const cxc = ms.filter((m) => /^1[236]/.test(m.cuenta));
+      const debe = ms.reduce((a, m) => a + m.debe, 0), haber = ms.reduce((a, m) => a + m.haber, 0);
+      const total = cxc.length ? Math.abs(cxc.reduce((a, m) => a + m.haber - m.debe, 0)) : Math.max(debe, haber);
+      const igv = Math.abs(ms.filter((m) => m.cuenta.startsWith("4011")).reduce((a, m) => a + m.debe - m.haber, 0));
+      const base = Math.abs(ms.filter((m) => /^7[0-5]/.test(m.cuenta)).reduce((a, m) => a + m.debe - m.haber, 0));
+      docs.push({ ...p, total: r2(total), base: base ? r2(base) : undefined, igv: igv ? r2(igv) : undefined, fecha: ms.find((m) => m.fecDoc)?.fecDoc || ms[0].fecReg || "", doc: d });
+    }
+    if (docs.length) out.push({ hoja: h.hoja, empresa: h.empresa, ruc: "", docs });
+  }
+  return out;
+}
+
+/** Anula las diferencias "Solo SIRE" que están en el subdiario (si el monto cuadra). */
+export function aplicarSubdiario(res: ConciliacionEmpresa, docs: DocSubdiario[], archivos: string[]): void {
+  const idx = new Map<string, DocSubdiario>();
+  for (const d of docs) idx.set(`${d.tipo}|${d.serie}|${d.numero}`, d);
+  const c = res.cruce;
+  let conciliados = 0, conMontoDistinto = 0;
+  for (const f of c.filas) {
+    if (f.estado !== "solo-sire") continue;
+    const d = idx.get(`${sinCerosIzq(f.tipoDoc)}|${f.serie}|${f.numero}`);
+    if (!d) continue;
+    const signo = f.totalSire < 0 ? -1 : 1; // el SIRE ya trae las NC en negativo
+    const total = r2(signo * Math.abs(d.total));
+    const base = d.base !== undefined ? r2(signo * Math.abs(d.base)) : f.baseSire;
+    const igv = d.igv !== undefined ? r2(signo * Math.abs(d.igv)) : f.igvSire;
+    f.totalContable = total; f.baseContable = base; f.igvContable = igv;
+    f.noGravadoContable = r2(total - base - igv);
+    f.difTotal = r2(f.totalSire - total); f.difBase = r2(f.baseSire - base); f.difIgv = r2(f.igvSire - igv);
+    f.difNoGravado = r2(f.noGravadoSire - f.noGravadoContable);
+    f.fechaContable = d.fecha;
+    f.nota = "subdiario";
+    f.observaciones = [`Registrado en el subdiario de misceláneos como ${d.doc}${d.fecha ? ` (${d.fecha})` : ""}.`];
+    c.soloSire--;
+    if (Math.abs(f.difTotal) <= 1) { f.estado = "ok"; c.ok++; conciliados++; }
+    else { f.estado = "dif-monto"; c.difMonto++; conMontoDistinto++; f.observaciones.push(`Total: SIRE ${f.totalSire.toFixed(2)} vs subdiario ${total.toFixed(2)} (dif ${f.difTotal.toFixed(2)})`); }
+    c.totalesContable.comprobantes++;
+    c.totalesContable.total = r2(c.totalesContable.total + total);
+    c.totalesContable.baseGravada = r2(c.totalesContable.baseGravada + base);
+    c.totalesContable.igv = r2(c.totalesContable.igv + igv);
+    c.totalesContable.noGravado = r2(c.totalesContable.noGravado + f.noGravadoContable);
+  }
+  res.subdiario = { conciliados, conMontoDistinto, archivos };
+}
+

@@ -80,6 +80,15 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Libro Diario (`diarioAComprobantes`: 42/46 = total, 4011 = IGV, resto = base). Cada SIRE se ubica
   en su empresa por RUC → razón social → asignación manual. 2.º paso: sueltos con mismo importe
   (+ tipo/fecha/cliente en ventas, + RUC proveedor en compras) = "Nº distinto". Motor: `cruceSire.ts`.
+  **Subdiario aparte** (p. ej. misceláneos, campo `subdiario`, se sube después del análisis): NC u
+  otros comprobantes que contabilidad registró fuera del Registro de Ventas y salen "Solo SIRE" se
+  buscan por tipo + serie + número (`parseSubdiario`: formato Registro o Libro Diario "NCB0010000545";
+  `aplicarSubdiario`): si el monto cuadra pasan a OK (nota "subdiario"), si no, "Dif. montos".
+  **Análisis de cierre** (`analisisCierre` en `cronogramaSunat.ts`): vencimiento de la DJ mensual
+  por último dígito del RUC (cronograma oficial `OFICIAL`, si falta = referencial), días hábiles y
+  calendario que quedan desde hoy (Lima) o días de atraso, estado (periodo abierto / en plazo /
+  urgente ≤3 hábiles / vence hoy / vencido) + lo que falta regularizar por empresa; va en la UI y
+  en el Excel resumen.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

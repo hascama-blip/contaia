@@ -115,3 +115,49 @@ export function proximosVencimientos(
   }
   return out.sort((a, b) => a.dias - b.dias || a.razonSocial.localeCompare(b.razonSocial));
 }
+
+// ---- Análisis de cierre ------------------------------------------------------
+// Al emitir un informe de un periodo (p. ej. octubre, generado a inicios de
+// noviembre): cuándo vence la DJ mensual de esa empresa según el último dígito
+// de su RUC y cuánto tiempo queda para regularizar las diferencias.
+
+export type EstadoCierre = "periodo-abierto" | "en-plazo" | "urgente" | "vence-hoy" | "vencido";
+
+export interface CierrePeriodo {
+  periodo: string;          // YYYY-MM
+  ultimoDigito: string;
+  grupo: Grupo;
+  vence: string;            // YYYY-MM-DD
+  oficial: boolean;         // del cronograma publicado (si no, referencial)
+  diasCalendario: number;   // negativos = días de atraso
+  diasHabiles: number;      // hábiles que quedan, contando hoy si es hábil (0 si ya venció)
+  estado: EstadoCierre;
+}
+
+function deIso(s: string): Date { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+
+/** Días hábiles desde `desde` (incluido) hasta `hasta` (incluido). */
+export function diasHabilesEntre(desde: string, hasta: string): number {
+  let n = 0;
+  for (let d = deIso(desde); d <= deIso(hasta); d.setDate(d.getDate() + 1)) if (esHabil(d)) n++;
+  return n;
+}
+
+/** Cierre del periodo para una empresa (`periodo` YYYY-MM o YYYYMM; `hoy` YYYY-MM-DD, hora de Lima). */
+export function analisisCierre(ruc: string, periodo: string, hoy: string, buenContribuyente = false): CierrePeriodo | null {
+  const p = /^\d{6}$/.test(periodo) ? `${periodo.slice(0, 4)}-${periodo.slice(4)}` : periodo;
+  if (!/^\d{4}-\d{2}$/.test(p) || !/^\d{11}$/.test(ruc)) return null;
+  const grupo: Grupo = buenContribuyente ? "BUC" : grupoDeRuc(ruc);
+  const v = vencimientoPeriodo(p, grupo);
+  const diasCalendario = Math.round((deIso(v.fecha).getTime() - deIso(hoy).getTime()) / 86400000);
+  const diasHabiles = diasCalendario >= 0 ? diasHabilesEntre(hoy, v.fecha) : 0;
+  const [y, m] = p.split("-").map(Number);
+  const finPeriodo = iso(new Date(y, m, 0)); // último día del periodo
+  const estado: EstadoCierre =
+    hoy <= finPeriodo ? "periodo-abierto"
+    : diasCalendario < 0 ? "vencido"
+    : diasCalendario === 0 ? "vence-hoy"
+    : diasHabiles <= 3 ? "urgente"
+    : "en-plazo";
+  return { periodo: p, ultimoDigito: ruc.slice(-1), grupo, vence: v.fecha, oficial: v.oficial, diasCalendario, diasHabiles, estado };
+}

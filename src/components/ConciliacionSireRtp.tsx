@@ -18,11 +18,90 @@ const ESTADO: Record<string, { txt: string; cls: string }> = {
   "solo-contable": { txt: "Solo contable", cls: "bg-orange-100 text-orange-700" },
 };
 // Por revisar: diferencias + los emparejados con serie/número distinto.
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
+const fechaLarga = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return `${d} de ${MESES[m - 1]} de ${y}`; };
+const fechaCorta = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+const ESTADO_CIERRE: Record<string, { txt: string; cls: string }> = {
+  vencido: { txt: "Vencido", cls: "bg-red-600 text-white" },
+  "vence-hoy": { txt: "Vence hoy", cls: "bg-red-100 text-red-700" },
+  urgente: { txt: "Urgente", cls: "bg-amber-100 text-amber-800" },
+  "en-plazo": { txt: "En plazo", cls: "bg-emerald-100 text-emerald-700" },
+  "periodo-abierto": { txt: "Periodo abierto", cls: "bg-slate-100 text-slate-600" },
+};
+
+// Análisis de cierre: cuándo vence la DJ mensual de cada empresa (cronograma SUNAT
+// por último dígito del RUC) y cuánto tiempo queda para regularizar.
+function AnalisisCierre({ cierre, hoy }: { cierre: any[]; hoy: string }) {
+  if (!cierre?.length) return null;
+  const per = cierre[0].periodo as string;
+  const [y, m] = per.split("-").map(Number);
+  const vencidas = cierre.filter((c) => c.estado === "vencido").length;
+  const urgentes = cierre.filter((c) => c.estado === "urgente" || c.estado === "vence-hoy").length;
+  const referencial = cierre.some((c) => !c.oficial);
+  return (
+    <div className="rounded-xl border border-slate-200">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-slate-100 bg-slate-50 px-3 py-2">
+        <h3 className="mr-auto text-sm font-bold text-slate-800">Análisis de cierre · {MESES[m - 1]} {y}</h3>
+        <span className="text-[11px] text-slate-500">Informe al {fechaLarga(hoy)}</span>
+        {vencidas > 0 && <span className="text-[11px] font-semibold text-red-600">{vencidas} vencida(s)</span>}
+        {urgentes > 0 && <span className="text-[11px] font-semibold text-amber-700">{urgentes} por vencer</span>}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full whitespace-nowrap text-[11px]">
+          <thead>
+            <tr className="text-left text-[10px] uppercase text-slate-400">
+              <th className="px-2 py-1">Empresa</th>
+              <th className="px-2 py-1 text-center" title="Último dígito del RUC">Dígito</th>
+              <th className="px-2 py-1">Vence DJ mensual</th>
+              <th className="px-2 py-1">Tiempo para regularizar</th>
+              <th className="px-2 py-1 text-right">Por regularizar</th>
+              <th className="px-2 py-1 text-right">Dif. total</th>
+              <th className="px-2 py-1 text-right">Dif. IGV</th>
+              <th className="px-2 py-1">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cierre.map((c) => (
+              <tr key={c.ruc + c.empresa} className="border-t border-slate-100">
+                <td className="min-w-[9rem] whitespace-normal px-2 py-1.5 font-semibold text-slate-700">{c.empresa}</td>
+                <td className="px-2 py-1.5 text-center tabular-nums text-slate-500">{c.ultimoDigito}</td>
+                <td className="px-2 py-1.5 tabular-nums text-slate-700">{fechaCorta(c.vence)}{!c.oficial && <span className="ml-1 text-[10px] text-slate-400">(ref.)</span>}</td>
+                <td className={`px-2 py-1.5 ${c.estado === "vencido" ? "font-semibold text-red-600" : c.estado === "urgente" || c.estado === "vence-hoy" ? "font-semibold text-amber-700" : "text-slate-600"}`}>
+                  {c.estado === "vencido" ? `Vencido hace ${-c.diasCalendario} día(s)`
+                    : c.estado === "vence-hoy" ? "Vence hoy"
+                    : c.estado === "periodo-abierto" ? "El periodo aún no termina"
+                    : `${c.diasHabiles} día(s) hábil(es) · ${c.diasCalendario} calendario`}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {!c.conciliada ? <span className="text-slate-400">Sin SIRE</span>
+                    : c.pendientes ? <span className="font-semibold text-amber-700">{c.pendientes} comprob.</span>
+                    : <span className="text-emerald-700">Nada</span>}
+                </td>
+                <td className={`px-2 py-1.5 text-right tabular-nums ${Math.abs(c.difTotal) > 1 ? "text-red-600" : "text-slate-400"}`}>{c.conciliada ? soles(c.difTotal) : "—"}</td>
+                <td className={`px-2 py-1.5 text-right tabular-nums ${Math.abs(c.difIgv) > 1 ? "text-red-600" : "text-slate-400"}`}>{c.conciliada ? soles(c.difIgv) : "—"}</td>
+                <td className="px-2 py-1.5"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${ESTADO_CIERRE[c.estado]?.cls ?? ""}`}>{ESTADO_CIERRE[c.estado]?.txt ?? c.estado}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
+        Vencimiento según el cronograma SUNAT de obligaciones mensuales por último dígito del RUC (buenos contribuyentes y UESP tienen otra fecha).
+        Las diferencias deben regularizarse (registro contable o propuesta SIRE) antes de generar el RVIE/RCE y presentar la declaración mensual (PDT 621).
+        Declarar fuera de plazo puede generar multa (art. 176, num. 1 del Código Tributario), con rebaja por gradualidad si se subsana antes de que SUNAT lo detecte.
+        {referencial && " Las fechas marcadas (ref.) son referenciales: el cronograma de ese periodo aún no está cargado."}
+      </p>
+    </div>
+  );
+}
+
 const pendientes = (x: any) => x.cruce.difMonto + x.cruce.difFecha + x.cruce.soloSire + x.cruce.soloContable + (x.docDistinto ?? 0);
 
 export default function ConciliacionSireRtp() {
   const [contables, setContables] = useState<File[]>([]);
   const [sires, setSires] = useState<File[]>([]);
+  // Subdiario aparte (misceláneos) donde contabilidad registró NC fuera del Registro de Ventas.
+  const [subdiarios, setSubdiarios] = useState<File[]>([]);
   const [asignaciones, setAsignaciones] = useState<Record<string, string>>({});
   const [periodo, setPeriodo] = useState("");
   const [manual, setManual] = useState(false);
@@ -32,19 +111,21 @@ export default function ConciliacionSireRtp() {
   const [busy, setBusy] = useState<"" | "conciliar" | "excel">("");
   const [error, setError] = useState<string | null>(null);
 
-  async function conciliar(cont: File[], archivos: File[], asig: Record<string, string>, per = periodo) {
+  async function conciliar(cont: File[], archivos: File[], asig: Record<string, string>, per = periodo, subs = subdiarios) {
     if (!cont.length) { setRes(null); return; }
     setError(null); setBusy("conciliar");
     try {
       const fd = new FormData();
       cont.forEach((f) => fd.append("contable", f));
       archivos.forEach((f) => fd.append("sire", f));
+      subs.forEach((f) => fd.append("subdiario", f));
       fd.append("asignaciones", JSON.stringify(asig));
       if (/^\d{6}$/.test(per)) fd.append("periodo", per);
       const r = await fetch("/api/analisis-compras/conciliacion", { method: "POST", body: fd });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error ?? "No se pudo conciliar."); return; }
-      setRes(d); setSel(0); setVerTodo(false);
+      setRes(d); setVerTodo(false);
+      setSel((i) => (i < (d.empresas?.length ?? 0) ? i : 0));
       if (d.periodo) setPeriodo(d.periodo);
     } catch {
       setError("Error de red al conciliar.");
@@ -79,7 +160,9 @@ export default function ConciliacionSireRtp() {
   const asignar = (id: string, clave: string) => setAsignaciones((a) => ({ ...a, [id]: clave }));
 
   const e = res?.empresas?.[sel];
-  const filas = e ? (verTodo ? e.cruce.filas : e.cruce.filas.filter((f: any) => f.estado !== "ok" || f.observaciones.length > 0)) : [];
+  // Por defecto solo lo que hay que revisar (lo conciliado con el subdiario ya no es diferencia).
+  const filas = e ? (verTodo ? e.cruce.filas : e.cruce.filas.filter((f: any) => f.estado !== "ok" || f.nota === "num-distinto")) : [];
+  const haySoloSire = (res?.empresas ?? []).some((x: any) => x.libro === "ventas" && x.cruce.soloSire > 0);
 
   return (
     <div className="card space-y-4 p-5">
@@ -193,6 +276,8 @@ export default function ConciliacionSireRtp() {
         </div>
       )}
 
+      {res?.cierre?.length > 0 && <AnalisisCierre cierre={res.cierre} hoy={res.hoy} />}
+
       {res?.empresas?.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-[11px]">
@@ -238,11 +323,39 @@ export default function ConciliacionSireRtp() {
         </div>
       )}
 
+      {res?.empresas?.some((x: any) => x.libro === "ventas") && (
+        <div className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 text-xs ${haySoloSire && !subdiarios.length ? "border-amber-200 bg-amber-50/60" : "border-slate-200 bg-slate-50"}`}>
+          <div className="mr-auto min-w-[16rem] flex-1 text-slate-600">
+            <strong className="text-slate-800">¿NC con diferencias?</strong> Si contabilidad registró notas de crédito (u otros comprobantes) en el
+            <strong> subdiario de misceláneos</strong> y no en el Registro de Ventas, salen como “Solo SIRE”. Sube ese subdiario (Excel, una
+            pestaña por empresa) y se hará el match por tipo + serie + número y monto para anular esas diferencias.
+          </div>
+          <label className={`btn-primary cursor-pointer text-xs ${busy ? "pointer-events-none opacity-50" : ""}`}>
+            {subdiarios.length ? "⬆ Agregar otro subdiario" : "⬆ Subir subdiario de misceláneos"}
+            <input type="file" multiple accept=".xlsx" className="hidden"
+              onChange={(ev) => { const f = ev.target.files; if (f && f.length) { const n = unir(subdiarios, f); setSubdiarios(n); conciliar(contables, sires, asignaciones, periodo, n); } ev.currentTarget.value = ""; }} />
+          </label>
+          {subdiarios.map((f, i) => (
+            <span key={i} className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] text-emerald-800">
+              Subdiario: {f.name}
+              <button className="ml-2 text-emerald-500 hover:text-red-600" title="Quitar" disabled={!!busy}
+                onClick={() => { const n = subdiarios.filter((_, j) => j !== i); setSubdiarios(n); conciliar(contables, sires, asignaciones, periodo, n); }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {e && (
         <div className="rounded-xl border border-slate-200">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
             <span className="mr-auto text-sm font-bold text-slate-800">{e.empresa}<span className="ml-2 font-normal capitalize text-slate-500">· {e.libro}{e.periodo && ` · periodo ${e.periodo}`}</span></span>
             {e.docDistinto > 0 && <span className="text-[11px] text-amber-700">{e.docDistinto} con serie/número distinto (emparejado por {e.libro === "compras" ? "RUC del proveedor" : "tipo, fecha y cliente"} + importe)</span>}
+            {e.subdiario && (
+              <span className="text-[11px] text-emerald-700">
+                {e.subdiario.conciliados} conciliado(s) con el subdiario de misceláneos
+                {e.subdiario.conMontoDistinto > 0 && <span className="text-red-600"> · {e.subdiario.conMontoDistinto} con monto distinto</span>}
+              </span>
+            )}
             {e.excluidos?.honorarios > 0 && <span className="text-[11px] text-slate-500">{e.excluidos.honorarios} recibo(s) por honorarios excluidos (no van al RCE)</span>}
             <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => setVerTodo((v) => !v)}>
               {verTodo ? "Ver solo diferencias" : `Ver todos (${e.cruce.filas.length})`}
@@ -268,7 +381,9 @@ export default function ConciliacionSireRtp() {
                 <tbody>
                   {filas.map((f: any) => (
                     <tr key={f.clave} className="border-t border-slate-100 align-top">
-                      <td className="px-2 py-1">{f.estado === "ok" && f.observaciones.length
+                      <td className="px-2 py-1">{f.estado === "ok" && f.nota === "subdiario"
+                        ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Subdiario</span>
+                        : f.estado === "ok" && f.nota === "num-distinto"
                         ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Nº distinto</span>
                         : <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${ESTADO[f.estado]?.cls ?? ""}`}>{ESTADO[f.estado]?.txt ?? f.estado}</span>}</td>
                       <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-700"><span className="mr-1 text-[10px] font-normal text-slate-400">{({ "1": "FAC", "3": "BOL", "7": "NC", "8": "ND" } as Record<string, string>)[f.tipoDoc] ?? f.tipoDoc}</span>{f.serie}-{f.numero}</td>

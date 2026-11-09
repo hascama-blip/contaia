@@ -88,6 +88,9 @@ export interface FilaCruce {
   estado: EstadoFila;
   /** Descripción legible de cada diferencia encontrada. */
   observaciones: string[];
+  /** Marca adicional: "num-distinto" (emparejado por importe con otra serie/número)
+   *  o "subdiario" (encontrado en un subdiario aparte, p. ej. misceláneos). */
+  nota?: "num-distinto" | "subdiario";
 }
 
 /** Totales de un lado (SIRE o contable) de un libro. */
