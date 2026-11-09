@@ -21,12 +21,20 @@ const est = (s: string): "P" | "NP" => (/no/i.test(s) ? "NP" : "P");
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const userId = await visorUserByToken(String(b?.token ?? ""));
-  if (!userId) return NextResponse.json({ error: "Token inválido." }, { status: 401, headers: CORS });
+  if (!userId) {
+    return NextResponse.json(
+      { error: "La extensión quedó desactualizada (su clave ya no es válida). Descárgala de nuevo en Radar → Visor, reemplaza la carpeta y recárgala en chrome://extensions." },
+      { status: 401, headers: CORS },
+    );
+  }
   // El Visor es del Plan Regular en adelante: si el estudio ya no lo tiene
   // (plan vencido o rebajado), la extensión deja de enviar capturas.
   if (!(await tieneModulo(await getUserById(userId), "visor"))) {
     return NextResponse.json({ error: "Tu plan ya no incluye el Visor Tributario. Renuévalo en «Adquirir módulos»." }, { status: 403, headers: CORS });
   }
+
+  // Prueba de conexión del popup: token y plan correctos.
+  if (b?.ping === true) return NextResponse.json({ ok: true, ping: true }, { headers: CORS });
 
   const url = String(b?.url ?? "").slice(0, 500);
   const titulo = String(b?.titulo ?? "").slice(0, 300);

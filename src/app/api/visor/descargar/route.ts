@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest) {
   const manifest = JSON.stringify({
     manifest_version: 3,
     name: "Radar · Visor Tributario",
-    version: "1.0.0",
+    version: "1.1.0",
     description: "Lee los datos de las páginas de SUNAT que abres y los envía a Radar para armar el reporte.",
     permissions: ["storage", "activeTab", "scripting"],
     host_permissions: ["https://*.sunat.gob.pe/*", `${origin}/*`],
@@ -82,6 +82,8 @@ async function enviar(payload) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "identidad") { identidad = mejorIdent(identidad, msg.payload); return; }
   if (msg && msg.type === "captura") { enviar(msg.payload).then(sendResponse); return true; }
+  // Prueba de conexión (la pide el popup al abrirse): valida el token y el plan.
+  if (msg && msg.type === "ping") { enviar({ ping: true }).then(sendResponse); return true; }
 });
 `);
 
@@ -376,12 +378,29 @@ h1{font-size:14px;margin:0 0 6px}.b{background:#1e3a8a;color:#fff;border:0;borde
 <script src="popup.js"></script></body></html>`;
 
   const popupJs = sub(`
+// Explica POR QUÉ no se pudo (antes solo decía "No se pudo enviar").
+function motivo(r, sinPestana) {
+  if (!r) return sinPestana ? "La pestaña de SUNAT no responde: recárgala (F5) y vuelve a intentar." : "La extensión no responde: recárgala en chrome://extensions.";
+  if (r.error) return "No se pudo conectar con Radar (__RADAR__). Revisa tu internet; si la web cambió de dirección, descarga de nuevo la extensión en Radar → Visor.";
+  return (r.d && r.d.error) || "No se pudo enviar.";
+}
+const st = document.getElementById("st");
+// Al abrir: prueba la conexión con Radar (token y plan).
+st.textContent = "Probando conexión con Radar…";
+chrome.runtime.sendMessage({ type: "ping" }, (r) => {
+  void chrome.runtime.lastError;
+  st.textContent = r && r.ok ? "✔ Conectado a Radar." : "✖ " + motivo(r, false);
+  st.style.color = r && r.ok ? "#047857" : "#b91c1c";
+});
 document.getElementById("cap").addEventListener("click", async () => {
-  const st = document.getElementById("st"); st.textContent = "Enviando…";
+  st.style.color = "#64748b"; st.textContent = "Enviando…";
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !/sunat\\.gob\\.pe/.test(tab.url || "")) { st.textContent = "Abre una página de SUNAT primero."; return; }
   chrome.tabs.sendMessage(tab.id, { type: "capturarPagina" }, (r) => {
-    st.textContent = r && r.ok ? "✔ Enviado a Radar (" + (r.d && r.d.tipo || "otro") + ")" : "No se pudo enviar.";
+    void chrome.runtime.lastError;
+    const ok = r && r.ok;
+    st.style.color = ok ? "#047857" : "#b91c1c";
+    st.textContent = ok ? "✔ Enviado a Radar" + (r.d && r.d.resumen ? " — " + r.d.resumen : "") : "✖ " + motivo(r, true);
   });
 });
 `);

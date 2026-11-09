@@ -61,6 +61,11 @@ export default function VisorPanel() {
           <li><b>Cargar descomprimida</b> → elige la carpeta.</li>
           <li>Inicia sesión en SUNAT y abre el SIRE / DJ. Las capturas aparecen abajo.</li>
         </ol>
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+          <b>¿La extensión dice “No se pudo enviar”?</b> Quedó desactualizada. Descárgala de nuevo aquí, reemplaza la carpeta anterior,
+          pulsa <b>Recargar</b> (↻) en <code>chrome://extensions</code> y recarga la pestaña de SUNAT (F5). Al abrir la extensión debe decir
+          “✔ Conectado a Radar”.
+        </p>
         <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
           <span>Token: <code className="rounded bg-slate-100 px-1">{token ? token.slice(0, 6) + "…" + token.slice(-4) : "—"}</code></span>
           <button className="text-brand-600 hover:underline" onClick={rotar}>Regenerar</button>
