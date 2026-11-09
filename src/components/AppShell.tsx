@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LogoAsenco } from "./Logo";
+import SesionGuard, { anunciarSesion } from "./SesionGuard";
 
 // ============================================================
 //  Chrome de la app: BARRA LATERAL (azul marino) + BARRA SUPERIOR
@@ -18,6 +19,8 @@ interface NavLink { href: string; label: string; icon: IconName }
 type IconName = "home" | "grid" | "users" | "activity" | "tools" | "building";
 
 export interface AppShellProps {
+  /** Id del usuario de esta pantalla (para detectar cambio de cuenta en otra pestaña). */
+  uid: string;
   nombre: string;
   admin: boolean;
   supremo: boolean;
@@ -51,12 +54,13 @@ async function cerrarSesion(setBusy: (b: boolean) => void) {
   setBusy(true);
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
   try { localStorage.removeItem("mostrar_planes"); } catch { /* */ }
+  anunciarSesion(null); // las demás pestañas se bloquean
   // Navegación COMPLETA: el layout del servidor relee las cookies y no queda
   // el chrome de la sesión anterior sobre la pantalla de login.
   window.location.replace("/login");
 }
 
-export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan, children }: AppShellProps) {
+export default function AppShell({ uid, nombre, admin, supremo, equipo, soloRtp, plan, children }: AppShellProps) {
   const pathname = usePathname() || "/";
   const [drawer, setDrawer] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -100,6 +104,7 @@ export default function AppShell({ nombre, admin, supremo, equipo, soloRtp, plan
 
   return (
     <div className="min-h-screen">
+      <SesionGuard uid={uid} />
       {/* Barra lateral (escritorio) */}
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-brand-800 text-white md:flex">
         {lateral}

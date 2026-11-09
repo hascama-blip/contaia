@@ -61,6 +61,7 @@ export default async function RootLayout({
           // Con sesión: barra lateral + barra superior (el usuario "solo RTP"
           // ve una navegación mínima: su hub, sus empresas y salir).
           <AppShell
+            uid={user!.id}
             nombre={user!.nombre + (admin ? "" : " · operador")}
             admin={admin}
             supremo={supremo}

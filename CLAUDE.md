@@ -209,6 +209,14 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   **edge**: con `runtime: "nodejs"` (Next 15.5) las subidas de archivos fallan a veces con
   "Response body object should not be disturbed or locked".
   El supremo descarga CSV (accesos por mes/RUC/correo y constancias) en `/api/supremo/accesos`.
+- **Una sesión por navegador**: todas las pestañas comparten la cookie. `SesionGuard` (en AppShell,
+  con el `uid` de la pantalla) consulta `/api/auth/sesion` al volver a la pestaña y escucha
+  `localStorage["radar:sesion"]` (lo escriben login/logout con `anunciarSesion`): si la cuenta
+  cambió en otra pestaña, bloquea la pantalla vieja y obliga a recargar. El login navega con
+  `window.location.assign` (sin páginas de la cuenta anterior en memoria).
+- **Accesos SOL por empresa** (`AccesosSol`): al cambiar de empresa se reinicia todo (usuario, clave,
+  API) y además lleva `key={cliente.id}` en las herramientas con selector de empresa; antes "Cargar
+  accesos" guardaba los datos de la empresa anterior en la nueva.
 - **Datos por estudio**: memorias de cuentas (`memoriasEstudio`), RTT con dueño, bitácora filtrada.
 - **Supremo**: con `SUPREMO_2FA=1` el login del supremo pide además un código de 6 dígitos
   (`codigos.ts`, tipo "acceso") que va a `SUPREMO_2FA_CORREO` (correo real; el del supremo es

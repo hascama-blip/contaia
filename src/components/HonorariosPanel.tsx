@@ -194,7 +194,7 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
 
         {sel && (
           <div className={`${clienteFijo ? "" : "mt-4 "}space-y-3`}>
-            {!clienteFijo && <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />}
+            {!clienteFijo && <AccesosSol key={sel.id} clienteId={sel.id} solUserGuardado={sel.solUser} />}
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="label">Mes inicial</label>

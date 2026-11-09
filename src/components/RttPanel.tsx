@@ -108,7 +108,7 @@ export default function RttPanel({ clientes }: { clientes: ClienteMin[] }) {
         )}
         {sel && (
           <div className="mt-4 space-y-3">
-            <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
+            <AccesosSol key={sel.id} clienteId={sel.id} solUserGuardado={sel.solUser} />
             <div className="flex flex-wrap items-center gap-3">
               <button className="btn-primary" onClick={solicitar} disabled={busy}>
                 {busy ? "Generando…" : "📄 Generar Reporte Tributario"}

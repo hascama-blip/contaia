@@ -37,11 +37,21 @@ export default function AccesosSol({
     return () => clearTimeout(t);
   }, [recien]);
 
+  // Al CAMBIAR DE EMPRESA se reinicia todo: usuario, clave, API y estado. Antes se
+  // quedaban los datos de la empresa anterior y "Cargar accesos" los guardaba en la
+  // nueva (cruce de usuarios SOL / claves entre RUC).
   useEffect(() => {
     const p = getSolPass(clienteId);
+    setSolUser(solUserGuardado);
     setSolPassState(p);
+    setCid(inicialCred?.clientId ?? "");
+    setCsec(inicialCred?.clientSecret ?? "");
     setCargada(Boolean(p));
-  }, [clienteId]);
+    setEditar(false);
+    setRecien(false);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId, solUserGuardado, inicialCred?.clientId]);
 
   const usuarioGuardado = Boolean(solUserGuardado);
   const apiGuardada = Boolean(inicialCred?.clientId && inicialCred?.clientSecret);

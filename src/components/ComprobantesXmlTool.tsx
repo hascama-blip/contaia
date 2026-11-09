@@ -49,7 +49,7 @@ export default function ComprobantesXmlTool({ clientes }: { clientes: ClienteMin
 
       {sel && (
         <>
-          <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
+          <AccesosSol key={sel.id} clienteId={sel.id} solUserGuardado={sel.solUser} />
 
           {/* Pestañas: facturas | honorarios */}
           <div className="flex flex-wrap gap-2 border-b border-slate-200">

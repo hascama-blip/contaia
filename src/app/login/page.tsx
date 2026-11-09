@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogoAsenco } from "@/components/Logo";
 import CasillasPoliticas from "@/components/CasillasPoliticas";
+import { anunciarSesion } from "@/components/SesionGuard";
 
 type Modo = "login" | "registro" | "verificar" | "olvido" | "olvido-codigo" | "acceso";
 
@@ -33,7 +34,9 @@ export default function LoginPage() {
     const data = await res.json().catch(() => ({}));
     return { res, data };
   };
-  const entrar = () => { router.replace(next); router.refresh(); };
+  // Navegación COMPLETA (no la del router): así no queda en memoria ninguna página
+  // de la cuenta anterior; y se avisa a las demás pestañas que la sesión cambió.
+  const entrar = (uid?: string) => { anunciarSesion(uid ?? "nuevo"); window.location.assign(next); };
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +51,7 @@ export default function LoginPage() {
         }
         if (!res.ok) { setError(data.error ?? "No se pudo ingresar."); return; }
         try { localStorage.setItem("mostrar_planes", "1"); } catch { /* */ }
-        entrar();
+        entrar(data.user?.id);
         return;
       }
       if (modo === "registro") {
@@ -56,7 +59,7 @@ export default function LoginPage() {
         const { res, data } = await post("/api/auth/register", { nombre, email, password, aceptaSeguridad, aceptaResponsabilidad });
         if (!res.ok) { setError(data.error ?? "No se pudo crear la cuenta."); return; }
         if (data.verificar) { setModo("verificar"); setAviso(data.mensaje ?? "Te enviamos un código a tu correo."); return; }
-        entrar();
+        entrar(data.user?.id);
         return;
       }
       if (modo === "verificar") {
@@ -64,7 +67,7 @@ export default function LoginPage() {
         if (!res.ok) { setError(data.error ?? "Código incorrecto."); return; }
         if (data.yaVerificado) { cambiar("login"); setAviso(data.mensaje); return; }
         try { localStorage.setItem("mostrar_planes", "1"); } catch { /* */ }
-        entrar();
+        entrar(data.user?.id);
         return;
       }
       if (modo === "olvido") {

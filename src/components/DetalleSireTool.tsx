@@ -37,7 +37,7 @@ export default function DetalleSireTool({ clientes, inicialId, inicialTab, inici
 
       {sel && (
         <>
-          <AccesosSol clienteId={sel.id} solUserGuardado={sel.solUser} />
+          <AccesosSol key={sel.id} clienteId={sel.id} solUserGuardado={sel.solUser} />
 
           {/* Selector de libro (la extracción de cada uno es independiente). */}
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
