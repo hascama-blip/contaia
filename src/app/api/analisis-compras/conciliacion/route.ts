@@ -139,7 +139,13 @@ export async function POST(req: NextRequest) {
       }
       for (const r of ventasRes) {
         const g = porEmpresa.get(r.clave);
-        if (g) aplicarSubdiario(r, g.docs, g.archivos);
+        if (!g) continue;
+        // Aviso si el subdiario es de otro mes que la conciliación (no cruzaría nada).
+        const perSub = periodoMasFrecuente(g.docs.map((d) => d.fecha));
+        if (perSub && r.periodo && perSub !== r.periodo) {
+          avisos.push(`${r.empresa}: el subdiario es del periodo ${perSub.slice(4)}/${perSub.slice(0, 4)} y la conciliación es de ${r.periodo.slice(4)}/${r.periodo.slice(0, 4)}; solo se cruzan las NC del mismo periodo.`);
+        }
+        aplicarSubdiario(r, g.docs, g.archivos);
       }
     }
 

@@ -329,10 +329,12 @@ export function conciliar(libro: TipoLibro, empresa: string, clave: string, cont
 // ese subdiario se buscan por tipo + serie + número y, si el monto cuadra, la
 // diferencia queda anulada ("Conciliado con subdiario").
 
-export interface DocSubdiario { tipo: string; serie: string; numero: string; total: number; base?: number; igv?: number; fecha: string; doc: string }
+export interface DocSubdiario { tipo: string; serie: string; numero: string; total: number; base?: number; igv?: number; fecha: string; doc: string; aplicaA?: string }
 export interface HojaSubdiario { hoja: string; empresa: string; ruc: string; docs: DocSubdiario[] }
 
-const PREFIJO_TIPO: Record<string, string> = { NC: "7", ND: "8", FT: "1", FA: "1", BV: "3", BO: "3", TK: "12" };
+// En el sistema contable (BAPU) la nota de crédito va con prefijo "CC" en el Documento
+// (CCB0010000010); también se acepta "NC". ND = nota de débito.
+const PREFIJO_TIPO: Record<string, string> = { CC: "7", NC: "7", ND: "8", FT: "1", FA: "1", BV: "3", BO: "3", TK: "12" };
 
 /** "NCB0010000545", "07 B001-0000545", "B001 0000545"… → tipo, serie, número. */
 export function partirDocumento(doc: string, tipoCol = ""): { tipo: string; serie: string; numero: string } | null {
@@ -357,19 +359,43 @@ export async function parseSubdiario(buf: Buffer, parseDiario: (b: Buffer) => Pr
   const yaLeidas = new Set(registro.map((h) => h.hoja));
   for (const h of await parseDiario(buf)) {
     if (yaLeidas.has(h.hoja)) continue;
-    const porDoc = new Map<string, MovDiario[]>();
-    for (const m of h.movimientos) { const d = (m.documento || "").trim(); if (d) (porDoc.get(d) ?? porDoc.set(d, []).get(d)!).push(m); }
+    // Formato Libro Diario (subdiario 09 MISCELÁNEOS): cada asiento aplica la NC
+    // contra el comprobante original, ambos en la 12:
+    //   12121001 · CCB0010000010 · Debe 100   ← la NOTA DE CRÉDITO
+    //   12121001 · BVB0010005087 · Haber 100  ← la boleta/factura a la que se aplica
+    // Solo se toman las NC / ND (tipo 7 / 8); la línea vecina con el mismo anexo
+    // indica a qué comprobante se aplicó.
+    const movs = h.movimientos;
+    // Nº de asiento de cada línea: la secuencia (Sec.) vuelve a 00001 en cada asiento.
+    const asiento: number[] = [];
+    movs.forEach((m, i) => asiento.push(i === 0 ? 0 : asiento[i - 1] + (Number(m.sec) === 1 ? 1 : 0)));
+    const porDoc = new Map<string, number[]>();
+    movs.forEach((m, i) => { const d = (m.documento || "").trim().toUpperCase(); if (d) (porDoc.get(d) ?? porDoc.set(d, []).get(d)!).push(i); });
     const docs: DocSubdiario[] = [];
-    for (const [d, ms] of Array.from(porDoc.entries())) {
+    for (const [d, idxs] of Array.from(porDoc.entries())) {
       const p = partirDocumento(d);
-      if (!p || !p.tipo) continue;
-      // Total = movimiento de la cuenta por cobrar (12/13/16); si no hay, el mayor de Debe/Haber.
+      if (!p || (p.tipo !== "7" && p.tipo !== "8")) continue;
+      const ms = idxs.map((i) => movs[i]);
       const cxc = ms.filter((m) => /^1[236]/.test(m.cuenta));
       const debe = ms.reduce((a, m) => a + m.debe, 0), haber = ms.reduce((a, m) => a + m.haber, 0);
-      const total = cxc.length ? Math.abs(cxc.reduce((a, m) => a + m.haber - m.debe, 0)) : Math.max(debe, haber);
+      const total = cxc.length ? Math.abs(cxc.reduce((a, m) => a + m.debe - m.haber, 0)) : Math.max(debe, haber);
       const igv = Math.abs(ms.filter((m) => m.cuenta.startsWith("4011")).reduce((a, m) => a + m.debe - m.haber, 0));
       const base = Math.abs(ms.filter((m) => /^7[0-5]/.test(m.cuenta)).reduce((a, m) => a + m.debe - m.haber, 0));
-      docs.push({ ...p, total: r2(total), base: base ? r2(base) : undefined, igv: igv ? r2(igv) : undefined, fecha: ms.find((m) => m.fecDoc)?.fecDoc || ms[0].fecReg || "", doc: d });
+      // Comprobante al que se aplica: otra línea del MISMO asiento con el mismo anexo y otro documento.
+      let aplicaA: string | undefined;
+      for (const i of idxs) {
+        for (let j = 0; j < movs.length; j++) {
+          if (asiento[j] !== asiento[i] || j === i) continue;
+          const v = movs[j];
+          if (v.documento && v.documento.trim().toUpperCase() !== d && v.anexo === movs[i].anexo) {
+            const q = partirDocumento(v.documento);
+            aplicaA = q ? `${({ "1": "FT", "3": "BV", "7": "NC", "8": "ND" } as Record<string, string>)[q.tipo] ?? q.tipo} ${q.serie}-${q.numero}` : v.documento;
+            break;
+          }
+        }
+        if (aplicaA) break;
+      }
+      docs.push({ ...p, total: r2(total), base: base ? r2(base) : undefined, igv: igv ? r2(igv) : undefined, fecha: ms.find((m) => m.fecDoc)?.fecDoc || ms[0].fecReg || "", doc: `${p.tipo === "7" ? "NC" : "ND"} ${p.serie}-${p.numero}`, aplicaA });
     }
     if (docs.length) out.push({ hoja: h.hoja, empresa: h.empresa, ruc: "", docs });
   }
@@ -396,7 +422,7 @@ export function aplicarSubdiario(res: ConciliacionEmpresa, docs: DocSubdiario[],
     f.difNoGravado = r2(f.noGravadoSire - f.noGravadoContable);
     f.fechaContable = d.fecha;
     f.nota = "subdiario";
-    f.observaciones = [`Registrado en el subdiario de misceláneos como ${d.doc}${d.fecha ? ` (${d.fecha})` : ""}.`];
+    f.observaciones = [`Registrado en el subdiario de misceláneos como ${d.doc}${d.fecha ? ` (${d.fecha})` : ""}${d.aplicaA ? `, aplicada a ${d.aplicaA}` : ""}.`];
     c.soloSire--;
     if (Math.abs(f.difTotal) <= 1) { f.estado = "ok"; c.ok++; conciliados++; }
     else { f.estado = "dif-monto"; c.difMonto++; conMontoDistinto++; f.observaciones.push(`Total: SIRE ${f.totalSire.toFixed(2)} vs subdiario ${total.toFixed(2)} (dif ${f.difTotal.toFixed(2)})`); }

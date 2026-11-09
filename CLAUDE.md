@@ -82,8 +82,13 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (+ tipo/fecha/cliente en ventas, + RUC proveedor en compras) = "Nº distinto". Motor: `cruceSire.ts`.
   **Subdiario aparte** (p. ej. misceláneos, campo `subdiario`, se sube después del análisis): NC u
   otros comprobantes que contabilidad registró fuera del Registro de Ventas y salen "Solo SIRE" se
-  buscan por tipo + serie + número (`parseSubdiario`: formato Registro o Libro Diario "NCB0010000545";
-  `aplicarSubdiario`): si el monto cuadra pasan a OK (nota "subdiario"), si no, "Dif. montos".
+  buscan por tipo + serie + número (`parseSubdiario`; `aplicarSubdiario`): si el monto cuadra pasan a
+  OK (nota "subdiario"), si no, "Dif. montos". Estructura real (subdiario 09 MISCELÁNEOS, formato Libro
+  Diario BAPU, una pestaña por empresa "VENT - SET - RTP", empresa en A1): cada asiento aplica la NC
+  contra el comprobante original, ambos en la 12121001 — `CCB0010000010` (prefijo **CC** = nota de
+  crédito) al Debe y `BVB0010005087`/`FTF…` al Haber. Solo se toman las CC/NC/ND; el otro documento
+  del MISMO asiento (Sec. vuelve a 00001 en cada asiento) se muestra como "aplicada a". Avisa si el
+  subdiario es de otro periodo que la conciliación. También acepta formato Registro.
   **Análisis de cierre** (`analisisCierre` en `cronogramaSunat.ts`): vencimiento de la DJ mensual
   por último dígito del RUC (cronograma oficial `OFICIAL`, si falta = referencial), días hábiles y
   calendario que quedan desde hoy (Lima) o días de atraso, estado (periodo abierto / en plazo /
