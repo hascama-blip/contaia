@@ -98,6 +98,13 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   meses pasados → `cierreNoAplica` (solo una nota). **Informe PDF = solo resumen**
   (`conciliacionHtml.ts`, `/api/analisis-compras/conciliacion/pdf`: KPIs + cierre + resumen por
   empresa, A4 horizontal); el detalle comprobante por comprobante va en el Excel ZIP.
+- **Empresas de SIMULACIÓN** (`src/lib/demo.ts`, `demoRutas.ts`, panel `DemoSupremo.tsx` en Supremo,
+  `/api/supremo/demo`): 4 empresas ficticias (RUC 20 sana, RUC 20 con riesgos, RUC 10 con negocio, RUC 10
+  sin negocio) con datos en todos los módulos (SUNAT, SIRE resumen/detalle/estado, buzón, DJ mensual
+  vs SIRE, DJ anual, deudas y F36, ITF, diagnóstico, Visor). Id `demo-…`, `Cliente.demo = true`, RUC con
+  dígito verificador INVÁLIDO (no existen). Las rutas que consultan SUNAT responden con datos simulados
+  (`esClienteDemo` / `demoNoDisponible` / `esRucDemo` en RTT y honorarios); `getSolPass` da la clave por
+  cargada; la tarea nocturna las excluye. Ruta nueva que consulte SUNAT → agregar el control demo.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

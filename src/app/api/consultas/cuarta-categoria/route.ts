@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  { const d = demoNoDisponible(cliente); if (d) return d; }
   if (!esPersonaNatural(cliente.ruc)) {
     return NextResponse.json({ error: "La consulta de 4ta categoría solo aplica a persona natural (RUC 10/15)." }, { status: 400 });
   }

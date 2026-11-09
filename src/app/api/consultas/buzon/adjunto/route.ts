@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
 import { getBuzonAdjunto, setBuzonAdjunto, registrarDescargaBuzon } from "@/lib/db";
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
   await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  { const d = demoNoDisponible(cliente); if (d) return d; }
 
   const codMensaje = String(body?.codMensaje ?? "");
   const forzar = body?.forzar === true;

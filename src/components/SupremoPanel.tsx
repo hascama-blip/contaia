@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Fragment } from "react";
 import EvidenciasSupremo from "@/components/EvidenciasSupremo";
+import DemoSupremo from "@/components/DemoSupremo";
 
 interface Solicitud {
   id: string;
@@ -913,6 +914,8 @@ export default function SupremoPanel() {
         </div>
         {integMsg && <p className="mt-2 text-xs text-slate-600">{integMsg}</p>}
       </div>
+
+      <DemoSupremo />
 
       <EvidenciasSupremo />
 

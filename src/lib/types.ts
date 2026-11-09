@@ -200,6 +200,9 @@ export interface Aviso {
 
 export interface Cliente {
   id: string;
+  /** Empresa de SIMULACIÓN (solo supremo, para demos/videos): datos ficticios,
+   *  nunca consulta SUNAT. Ver lib/demo.ts. */
+  demo?: boolean;
   /** Dueño (usuario) de esta empresa: cada usuario ve solo lo suyo. */
   ownerId?: string;
   razonSocial: string;

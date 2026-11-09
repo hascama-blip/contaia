@@ -70,6 +70,7 @@ export default async function ClientesPage() {
                         {c.razonSocial}
                       </Link>
                     )}
+                    {c.demo && <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-violet-700" title="Empresa ficticia para demostraciones: no consulta SUNAT">Simulación</span>}
                     {!soloRtp && c.email && <p className="text-xs text-slate-400">{c.email}</p>}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{c.ruc}</td>

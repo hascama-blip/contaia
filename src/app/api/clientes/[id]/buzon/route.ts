@@ -1,4 +1,5 @@
 import { resolverSecreto } from "@/lib/secretos";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { mergeBuzon } from "@/lib/db";
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const body = await req.json().catch(() => ({}));
 
   await limpiarDiagnostico(body);
+  if (esClienteDemo(cliente)) return demoBuzon(cliente);
 
   // Límite de 1 consulta al día (solo el admin puede forzar).
   const ultima = cliente.buzon?.consultadoAt ? new Date(cliente.buzon.consultadoAt).getTime() : 0;

@@ -1,4 +1,5 @@
 import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
+import { esRucDemo } from "@/lib/demo";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, esSupremo } from "@/lib/auth";
 import { upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfig, limpiarRTT, getWebhookLogRTT } from "@/lib/db";
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
 
   if (!/^\d{11}$/.test(ruc)) return NextResponse.json({ error: "RUC a reportar inválido (11 dígitos)." }, { status: 400 });
   if (!/^\d{11}$/.test(rucLogin)) return NextResponse.json({ error: "RUC de acceso SOL inválido." }, { status: 400 });
+  if (esRucDemo(ruc) || esRucDemo(rucLogin)) return NextResponse.json({ error: "Empresa de simulación: este módulo no consulta SUNAT con datos ficticios." }, { status: 400 });
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario SOL y la Clave SOL." }, { status: 400 });
 
   const { dominio } = await getRttConfig();

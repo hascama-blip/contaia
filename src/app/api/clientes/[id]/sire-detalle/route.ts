@@ -1,4 +1,5 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   await limpiarDiagnostico(body);
   if (!body || typeof body.periodo !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+  }
+  if (esClienteDemo(cliente) && (body.refrescar === true || !cliente.sireDetalle?.[`${body.incluirVentas !== false ? "ventas" : "compras"}-${body.periodo}`])) {
+    return demoSireDetalle(cliente, String(body.periodo), body.incluirVentas !== false ? "ventas" : "compras");
   }
 
   const cred = cliente.credSire;

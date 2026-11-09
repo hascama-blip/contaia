@@ -1,4 +1,5 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { setSunatInfo, setFechasSunat } from "@/lib/db";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -12,6 +13,7 @@ export async function POST(_req: NextRequest, props: { params: Promise<{ id: str
   const params = await props.params;
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoSunat(cliente);
 
   try {
     const info = await consultarSunat(cliente.ruc);

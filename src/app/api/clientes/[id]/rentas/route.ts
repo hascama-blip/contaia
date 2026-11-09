@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
 import { esPersonaNatural } from "@/lib/types";
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const user = await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  { const d = demoNoDisponible(cliente); if (d) return d; }
 
   const body = await req.json().catch(() => ({}));
 

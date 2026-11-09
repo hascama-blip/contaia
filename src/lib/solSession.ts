@@ -7,8 +7,13 @@
 const k = (clienteId: string) => `solpass:${clienteId}`;
 const kUser = (clienteId: string) => `soluser:${clienteId}`;
 
+// Empresas de SIMULACIÓN (id "demo-…"): la clave figura como cargada; el
+// servidor nunca la usa (responde con datos ficticios, sin llamar a SUNAT).
+const esDemo = (id: string) => id.startsWith("demo-");
+
 export function getSolPass(clienteId: string): string {
   if (typeof window === "undefined" || !clienteId) return "";
+  if (esDemo(clienteId)) return "demo";
   try { return sessionStorage.getItem(k(clienteId)) || ""; } catch { return ""; }
 }
 export function setSolPass(clienteId: string, pass: string) {
@@ -17,6 +22,7 @@ export function setSolPass(clienteId: string, pass: string) {
 }
 export function getSolUser(clienteId: string, fallback = ""): string {
   if (typeof window === "undefined" || !clienteId) return fallback;
+  if (esDemo(clienteId)) return fallback || "DEMO2026";
   try { return sessionStorage.getItem(kUser(clienteId)) || fallback; } catch { return fallback; }
 }
 export function setSolUser(clienteId: string, user: string) {

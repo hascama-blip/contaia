@@ -161,6 +161,7 @@ export default function ClienteDetail({
           </Link>
           <h1 className="mt-1 text-2xl font-bold text-slate-800">
             {cliente.razonSocial}
+            {cliente.demo && <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-violet-700" title="Empresa ficticia para demostraciones: no consulta SUNAT">Simulación</span>}
           </h1>
           <p className="text-sm text-slate-500">
             RUC {cliente.ruc}

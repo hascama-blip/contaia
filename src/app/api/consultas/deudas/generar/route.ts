@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoDeudasF36 } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { setDeudaGenerado } from "@/lib/db";
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
   await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoDeudasF36(cliente);
 
   // Límite de 3 días para no provocar bloqueo por "spam" en SUNAT.
   const genAt = cliente.deudasF36?.generadoAt;

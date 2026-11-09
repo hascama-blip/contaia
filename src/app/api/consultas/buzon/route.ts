@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { mergeBuzon } from "@/lib/db";
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
   await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoBuzon(cliente);
 
   // Pausa mínima entre consultas exitosas. Solo el admin puede forzar.
   const ultima = cliente.buzon?.consultadoAt ? new Date(cliente.buzon.consultadoAt).getTime() : 0;

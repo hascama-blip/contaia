@@ -775,6 +775,36 @@ export async function deleteSubUsuario(adminId: string, userId: string): Promise
 });
 }
 
+// ---- Empresas de SIMULACIÓN (supremo, demos/videos) ----------------------------
+
+/** Reemplaza las empresas de simulación del estudio por las dadas (ids "demo-…"). */
+export async function guardarEmpresasDemo(clientes: Cliente[]): Promise<number> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const ids = new Set(clientes.map((c) => c.id));
+  store.clientes = store.clientes.filter((c) => !ids.has(c.id)).concat(clientes);
+  await writeStore(store);
+  return clientes.length;
+});
+}
+
+/** Elimina TODAS las empresas de simulación (ids "demo-…"). */
+export async function borrarEmpresasDemo(rucsDemo: string[]): Promise<number> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const antes = store.clientes.length;
+  store.clientes = store.clientes.filter((c) => !c.id.startsWith("demo-"));
+  const n = antes - store.clientes.length;
+  // Cuadros del Visor de las empresas demo (por su RUC ficticio).
+  const rucs = new Set(rucsDemo);
+  for (const [uid, lista] of Object.entries(store.visor?.matriz ?? {})) {
+    store.visor!.matriz![uid] = lista.filter((m) => !rucs.has(String(m.ruc ?? "")));
+  }
+  await writeStore(store);
+  return n;
+});
+}
+
 // ---- Aceptación de políticas ------------------------------------------------
 
 /** Guarda la constancia de aceptación de las políticas (no borra las anteriores). */
@@ -2283,7 +2313,9 @@ export async function upsertVisorMatriz(userId: string, d: {
   // Objetivo: entrada de la misma empresa+tipo; si esta captura no trae empresa,
   // reutiliza la última entrada identificada del mismo tipo (evita duplicar).
   let m = identificado ? lista.find((x) => x.tipo === tipo && claveMatriz(x.empresa, x.ruc, tipo) === clave) : null;
-  if (!m) {
+  // Solo una captura SIN empresa se funde con la última identificada; una empresa
+  // nueva tiene su propia fila (antes se mezclaba con la de otra empresa).
+  if (!m && !identificado) {
     const mismos = lista.filter((x) => x.tipo === tipo);
     m = mismos.find((x) => x.empresa || x.ruc) || mismos[mismos.length - 1] || null;
   }

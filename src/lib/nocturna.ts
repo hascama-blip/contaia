@@ -145,7 +145,8 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
       if (!tieneCanal) continue;
 
       if (admin.alertas?.cronograma !== false) {
-        const clientes = await listClientes(admin.id);
+        // Las empresas de simulación (demos) no generan alertas reales.
+        const clientes = (await listClientes(admin.id)).filter((c) => !c.demo);
         const prox = proximosVencimientos(clientes.map((c) => ({ id: c.id, ruc: c.ruc, razonSocial: c.razonSocial })), 3, hoyLima());
         for (const p of prox) {
           if (!DIAS_AVISO_CRONO.includes(p.dias)) continue;

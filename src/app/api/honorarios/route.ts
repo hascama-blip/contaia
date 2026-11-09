@@ -1,4 +1,5 @@
 import { bloqueoModulo, limpiarDiagnostico, estudioMemoria } from "@/lib/acceso";
+import { esRucDemo } from "@/lib/demo";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { extraerHonorarios } from "@/lib/honorarios";
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   await limpiarDiagnostico(body);
   const rucLogin = String(body.rucLogin ?? body.ruc ?? "").replace(/\D/g, "");
+  if (esRucDemo(rucLogin)) return NextResponse.json({ error: "Empresa de simulación: este módulo no consulta SUNAT con datos ficticios." }, { status: 400 });
   const solUser = typeof body.solUser === "string" ? body.solUser : "";
   const solPass = typeof body.solPass === "string" ? body.solPass : "";
   const desde = typeof body.desde === "string" ? body.desde : undefined; // "YYYYMM"

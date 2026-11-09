@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
 import { setItfReporte } from "@/lib/db";
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   await requireUser();
   const cliente = await getClienteAutorizado(params.id);
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoItf(cliente);
 
   const body = await req.json().catch(() => ({}));
 

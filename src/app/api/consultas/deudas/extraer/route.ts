@@ -1,4 +1,5 @@
 import { limpiarDiagnostico } from "@/lib/acceso";
+import { esClienteDemo, demoDeudasF36 } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { extraerDeudasF36 } from "@/lib/fraccionamiento";
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
   await limpiarDiagnostico(body);
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoDeudasF36(cliente);
 
   const guardado = cliente.deudasF36;
   if (!body.forzar && !body.diagnostico && guardado?.at && Date.now() - new Date(guardado.at).getTime() < COOLDOWN_MS) {
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const cliente = await getClienteAutorizado(req.nextUrl.searchParams.get("clienteId") ?? "");
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  if (esClienteDemo(cliente)) return demoDeudasF36(cliente);
   const g = cliente.deudasF36;
   const puedeActualizar = !g?.at || Date.now() - new Date(g.at).getTime() >= COOLDOWN_MS;
   return NextResponse.json({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { getClienteAutorizado, getCurrentUser, esSupremo } from "@/lib/auth";
 import { getBuzonAdjunto, setBuzonAdjunto } from "@/lib/db";
 import { descargarAdjuntoBuzon } from "@/lib/buzon";
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const cliente = await getClienteAutorizado(String(body?.clienteId ?? ""));
   if (!cliente) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
+  { const d = demoNoDisponible(cliente); if (d) return d; }
   const codMensaje = String(body?.codMensaje ?? "");
   const todos = cliente.buzon?.mensajes?.length ? cliente.buzon.mensajes : [...(cliente.buzon?.peligrosos ?? []), ...(cliente.buzon?.urgentes ?? [])];
   const m = todos.find((x) => x.id === codMensaje);

@@ -1,4 +1,5 @@
 import { resolverSecreto } from "@/lib/secretos";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const body = await req.json().catch(() => ({}));
 
   await limpiarDiagnostico(body);
+  if (esClienteDemo(cliente)) return demoSireEstado(cliente, Array.isArray(body.periodos) ? body.periodos.map((p: any) => String(p)) : []);
 
   // Pausa mínima (salvo diagnóstico o admin que fuerza).
   const ultima = cliente.sireEstado?.at ? new Date(cliente.sireEstado.at).getTime() : 0;

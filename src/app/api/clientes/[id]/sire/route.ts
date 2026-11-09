@@ -1,4 +1,5 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { clearSire, setSireResumen, setCredSire } from "@/lib/db";
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!body || typeof body.periodo !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
+  if (esClienteDemo(cliente)) return demoSire(cliente, body.periodo);
 
   // Cupo del plan. Una corrida de VARIOS periodos ("Extraer todo" o un rango)
   // manda el mismo `lote` en cada llamada → cuenta como UNA sola generación.

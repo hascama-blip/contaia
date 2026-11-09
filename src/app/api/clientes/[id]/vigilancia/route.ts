@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { getClienteAutorizado, getCurrentUser, planDelEstudio } from "@/lib/auth";
 import { planIncluye } from "@/lib/modulos";
 import { cifrar } from "@/lib/cifrado";
@@ -25,6 +26,7 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
   const c = await getClienteAutorizado(params.id);
   if (!c) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   const user = await getCurrentUser();
+  { const d = demoNoDisponible(c); if (d) return d; }
   const plan = user ? await planDelEstudio(user) : "basico";
   return NextResponse.json({ ...estadoDe(c), permitido: planIncluye(plan, "premium"), plan });
 }
