@@ -1650,8 +1650,26 @@ export async function updateCliente(
   const store = await readStore();
   const cliente = store.clientes.find((c) => c.id === id);
   if (!cliente) return null;
-  const { negocio, ...resto } = patch as any;
-  Object.assign(cliente, resto);
+  // Lista blanca: solo estos campos (antes se copiaba cualquier cosa del cuerpo).
+  const { negocio, razonSocial, ruc, email, telefono } = patch as any;
+  if (typeof razonSocial === "string" && razonSocial.trim()) cliente.razonSocial = razonSocial.trim().slice(0, 200);
+  if (typeof email === "string") cliente.email = email.trim().slice(0, 200);
+  if (typeof telefono === "string") cliente.telefono = telefono.trim().slice(0, 50);
+  if (typeof ruc === "string" && /^\d{11}$/.test(ruc.trim()) && ruc.trim() !== cliente.ruc) {
+    // Cambio de RUC (se había registrado otra empresa por error): los datos
+    // traídos de SUNAT eran del RUC anterior, se limpian.
+    cliente.ruc = ruc.trim();
+    cliente.sunat = null;
+    cliente.diagnostico = null;
+    cliente.sire = [];
+    cliente.buzon = null;
+    cliente.sireEstado = null;
+    delete cliente.sireDetalle;
+    delete cliente.buzonAdjuntos;
+    cliente.deudasF36 = null;
+    cliente.itf = null;
+    if (!/^(10|15)/.test(cliente.ruc)) delete cliente.negocio;
+  }
   // "negocio" (con/sin) solo aplica a persona natural (RUC 10 o 15).
   if (negocio !== undefined) {
     if (/^(10|15)/.test(cliente.ruc) && (negocio === "con" || negocio === "sin")) cliente.negocio = negocio;

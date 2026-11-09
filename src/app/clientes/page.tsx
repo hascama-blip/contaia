@@ -3,6 +3,7 @@ import { listClientes } from "@/lib/db";
 import { requireUser, studioId, esAdmin, esSoloRtp } from "@/lib/auth";
 import { CondicionBadge, EstadoBadge, RiesgoBadge } from "@/components/ui";
 import VerificarSunatBtn from "@/components/VerificarSunatBtn";
+import EmpresasRtp from "@/components/EmpresasRtp";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export default async function ClientesPage() {
             Crear el primero
           </Link>
         </div>
+      ) : soloRtp ? (
+        // Cuenta "Utilitarios RTP": lista con edición (corregir RUC / razón social / usuario SOL).
+        <EmpresasRtp empresas={clientes.map((c) => ({ id: c.id, razonSocial: c.razonSocial, ruc: c.ruc, solUser: c.credSire?.solUser ?? "" }))} />
       ) : (
         <div className="card overflow-hidden">
           <table className="w-full text-sm">

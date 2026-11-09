@@ -24,6 +24,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   **salvo el supremo**, que puede registrarlo igual sin adueñarse (no entra al registro global,
   sus copias no bloquean a nadie y borrarlas no libera el RUC del dueño; queda en la bitácora). La razón social verificada por
   SUNAT queda **bloqueada** (read-only) en el alta. Export de contactos: `GET /api/clientes/export` (CSV).
+- **Editar empresa** (`PATCH /api/clientes/[id]`): lista blanca (razonSocial, email, telefono, negocio, ruc).
+  Cambiar el RUC (solo admin) aplica las reglas del alta (duplicado propio, dueño global salvo supremo),
+  mueve el registro global y borra los datos SUNAT del RUC anterior (`updateCliente`). La cuenta
+  "Utilitarios RTP" edita/elimina desde su lista (`EmpresasRtp.tsx`: RUC con "Consultar SUNAT",
+  razón social y Usuario SOL).
 - Commits terminan con `Co-Authored-By` y `Claude-Session` (ver git log).
 
 ## Arquitectura
