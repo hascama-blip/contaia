@@ -321,6 +321,10 @@ export function parseSireVentas(rows: unknown[][]): ParseSalida {
   const cFecha = idxSire(h, (x) => x.startsWith("fecha de emisi"));
   const cBase = idxSire(h, (x) => x === "bi gravada");
   const cIgv = idxSire(h, (x) => x === "igv / ipm" || x === "igv/ipm");
+  // Notas de crédito: el RVIE reporta su base e IGV en "Dscto BI" y "Dscto IGV / IPM"
+  // (con "BI Gravada" e "IGV / IPM" en 0).
+  const cDsctoBase = idxSire(h, (x) => x === "dscto bi" || x === "descuento bi");
+  const cDsctoIgv = idxSire(h, (x) => x.startsWith("dscto igv") || x.startsWith("descuento igv"));
   const cTotal = idxSire(h, (x) => x.startsWith("total cp") || x.includes("importe total"));
   const cMoneda = idxSire(h, (x) => x === "moneda");
   const cTc = idxSire(h, (x) => x.startsWith("tipo de cambio"));
@@ -341,9 +345,18 @@ export function parseSireVentas(rows: unknown[][]): ParseSalida {
     if (!periodo) periodo = soloDigitos(valor(row, cPeriodo)) || undefined;
     if (!ruc) ruc = soloDigitos(valor(row, 0)) || undefined;
     if (!razonSocial) razonSocial = String(valor(row, 1) ?? "").trim() || undefined;
-    const baseGravada = num(valor(row, cBase));
-    const igv = num(valor(row, cIgv));
+    let baseGravada = num(valor(row, cBase));
+    let igv = num(valor(row, cIgv));
     const total = num(valor(row, cTotal));
+    if (baseGravada === 0 && igv === 0) {
+      const dB = num(valor(row, cDsctoBase)), dI = num(valor(row, cDsctoIgv));
+      if (dB !== 0 || dI !== 0) {
+        // Mismo signo que el total (las NC van en negativo).
+        const s = total < 0 ? -1 : 1;
+        baseGravada = s * Math.abs(dB);
+        igv = s * Math.abs(dI);
+      }
+    }
     out.push({
       clave: claveDe(tipoDoc, serie, numero, rucC),
       tipoDoc,
