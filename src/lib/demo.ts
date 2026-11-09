@@ -325,8 +325,14 @@ function sunatDemo(p: Perfil): SunatInfo {
   };
 }
 
+/** Id de la empresa demo: "demo-<clave>" (supremo) o "demo-<clave>-<sufijo>" (otras
+ *  cuentas con permiso), para que cada cuenta tenga las suyas sin pisarse. */
+export function idDemo(clave: string, sufijo = ""): string {
+  return `${DEMO_PREFIJO}${clave}${sufijo ? `-${sufijo}` : ""}`;
+}
+
 /** Las 4 empresas de simulación, completas, para el estudio `ownerId`. */
-export function empresasDemo(ownerId: string, hoy: string): Cliente[] {
+export function empresasDemo(ownerId: string, hoy: string, sufijo = ""): Cliente[] {
   const periodos = periodosDemo(hoy);
   const anio = Number(hoy.slice(0, 4));
   const ahora = new Date().toISOString();
@@ -337,7 +343,7 @@ export function empresasDemo(ownerId: string, hoy: string): Cliente[] {
     if (p.negocio !== "sin") for (const per of ultimos) for (const t of ["ventas", "compras"] as const) sireDetalle[`${t}-${per}`] = { ...sireDetalleDemo(p, per, t), at: ahora };
     const mensajes = buzonDemo(p, hoy);
     return {
-      id: `${DEMO_PREFIJO}${p.clave}`,
+      id: idDemo(p.clave, sufijo),
       demo: true,
       ownerId,
       razonSocial: p.razonSocial,
@@ -368,5 +374,5 @@ export const esRucDemo = (ruc: string) => PERFILES.some((p) => p.ruc === String(
 
 /** Perfil de una empresa de simulación (por id de cliente). */
 export function perfilDe(clienteId: string): Perfil | null {
-  return PERFILES.find((p) => `${DEMO_PREFIJO}${p.clave}` === clienteId) ?? null;
+  return PERFILES.find((p) => clienteId === `${DEMO_PREFIJO}${p.clave}` || clienteId.startsWith(`${DEMO_PREFIJO}${p.clave}-`)) ?? null;
 }

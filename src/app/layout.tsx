@@ -62,6 +62,7 @@ export default async function RootLayout({
           // ve una navegación mínima: su hub, sus empresas y salir).
           <AppShell
             uid={user!.id}
+            demo={Boolean(user!.permisoDemo) && admin}
             nombre={user!.nombre + (admin ? "" : " · operador")}
             admin={admin}
             supremo={supremo}

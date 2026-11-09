@@ -790,17 +790,16 @@ export async function guardarEmpresasDemo(clientes: Cliente[]): Promise<number> 
 }
 
 /** Elimina TODAS las empresas de simulación (ids "demo-…"). */
-export async function borrarEmpresasDemo(rucsDemo: string[]): Promise<number> {
+export async function borrarEmpresasDemo(ownerId: string, userId: string, rucsDemo: string[]): Promise<number> {
   return conBloqueoStore(async () => {
   const store = await readStore();
   const antes = store.clientes.length;
-  store.clientes = store.clientes.filter((c) => !c.id.startsWith("demo-"));
+  // Solo las empresas demo de ESTE estudio (cada cuenta con permiso tiene las suyas).
+  store.clientes = store.clientes.filter((c) => !(c.id.startsWith("demo-") && c.ownerId === ownerId));
   const n = antes - store.clientes.length;
-  // Cuadros del Visor de las empresas demo (por su RUC ficticio).
+  // Cuadros del Visor de las empresas demo de este usuario (por su RUC ficticio).
   const rucs = new Set(rucsDemo);
-  for (const [uid, lista] of Object.entries(store.visor?.matriz ?? {})) {
-    store.visor!.matriz![uid] = lista.filter((m) => !rucs.has(String(m.ruc ?? "")));
-  }
+  if (store.visor?.matriz?.[userId]) store.visor.matriz[userId] = store.visor.matriz[userId].filter((m) => !rucs.has(String(m.ruc ?? "")));
   await writeStore(store);
   return n;
 });
@@ -1477,6 +1476,32 @@ export async function listClientes(ownerId?: string, opts: { todos?: boolean } =
     if (dueno?.modoGrabacionHasta && dueno.modoGrabacionHasta > new Date().toISOString()) lista = lista.filter((c) => c.demo);
   }
   return lista.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Habilita / quita el MODO SIMULACIÓN a una cuenta (por correo). Al habilitar le
+ *  asigna el plan Empresas (todos los módulos salvo los utilitarios) sin vencimiento. */
+export async function setPermisoDemo(email: string, activar: boolean): Promise<Usuario | null> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const e = email.trim().toLowerCase();
+  const u = (store.users ?? []).find((x) => x.email.toLowerCase() === e && x.rol !== "supremo");
+  if (!u) return null;
+  if (activar) {
+    u.permisoDemo = true;
+    if (!u.parentId) { u.plan = "equipo"; u.planVence = undefined; }
+  } else {
+    delete u.permisoDemo;
+    delete u.modoGrabacionHasta;
+  }
+  await writeStore(store);
+  return u;
+});
+}
+
+/** Cuentas con el modo simulación habilitado. */
+export async function listPermisosDemo(): Promise<{ id: string; nombre: string; email: string; plan?: string }[]> {
+  const store = await readStore();
+  return (store.users ?? []).filter((u) => u.permisoDemo).map((u) => ({ id: u.id, nombre: u.nombre, email: u.email, plan: u.plan }));
 }
 
 /** Activa (por `horas`) o desactiva (null) el modo grabación de un usuario. */

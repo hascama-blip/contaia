@@ -105,16 +105,21 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`conciliacionHtml.ts`, `/api/analisis-compras/conciliacion/pdf`: KPIs + cierre + resumen por
   empresa, A4 horizontal); el detalle comprobante por comprobante va en el Excel ZIP.
 - **Empresas de SIMULACIÓN** (`src/lib/demo.ts`, `demoRutas.ts`, panel `DemoSupremo.tsx` en Supremo,
-  `/api/supremo/demo`): 4 empresas ficticias (RUC 20 sana, RUC 20 con riesgos, RUC 10 con negocio, RUC 10
+  `/api/demo`): 4 empresas ficticias (RUC 20 sana, RUC 20 con riesgos, RUC 10 con negocio, RUC 10
   sin negocio) con datos en todos los módulos (SUNAT, SIRE resumen/detalle/estado, buzón, DJ mensual
   vs SIRE, DJ anual, deudas y F36, ITF, diagnóstico, Visor). Id `demo-…`, `Cliente.demo = true`, RUC con
   dígito verificador INVÁLIDO (no existen). Las rutas que consultan SUNAT responden con datos simulados
   (`esClienteDemo` / `demoNoDisponible` / `esRucDemo` en RTT y honorarios); `getSolPass` da la clave por
   cargada; la tarea nocturna las excluye. Ruta nueva que consulte SUNAT → agregar el control demo.
   **Modo grabación** (`Usuario.modoGrabacionHasta`, 12 h, `setModoGrabacion`, acción "grabacion" en
-  `/api/supremo/demo`): `listClientes(ownerId)` devuelve solo las empresas demo (Clientes, Dashboard,
+  `/api/demo`): `listClientes(ownerId)` devuelve solo las empresas demo (Clientes, Dashboard,
   buscador, notificaciones, selectores) y `getVisorMatriz` solo sus cuadros. La tarea nocturna usa
   `listClientes(id, { todos: true })` para no perder alertas reales.
+  **Acceso para otras cuentas**: el supremo lo habilita por correo (Supremo → Modo simulación → "Dar
+  acceso", `/api/supremo/demo-acceso`, `setPermisoDemo`): `Usuario.permisoDemo = true` + plan
+  **equipo** sin vencimiento (todos los módulos, sin utilitarios). Esa cuenta ve "Modo simulación" en su
+  menú (`/simulacion`) y usa `/api/demo` (crear/regenerar/borrar SUS empresas demo, ids
+  `demo-<clave>-<sufijo>`; modo grabación). Las del supremo siguen como `demo-<clave>`.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

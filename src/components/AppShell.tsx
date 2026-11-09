@@ -22,6 +22,8 @@ export interface AppShellProps {
   /** Id del usuario de esta pantalla (para detectar cambio de cuenta en otra pestaña). */
   uid: string;
   nombre: string;
+  /** Cuenta con el modo simulación habilitado por el supremo (ve "Modo simulación"). */
+  demo?: boolean;
   admin: boolean;
   supremo: boolean;
   equipo?: boolean;
@@ -60,7 +62,7 @@ async function cerrarSesion(setBusy: (b: boolean) => void) {
   window.location.replace("/login");
 }
 
-export default function AppShell({ uid, nombre, admin, supremo, equipo, soloRtp, plan, children }: AppShellProps) {
+export default function AppShell({ uid, nombre, demo, admin, supremo, equipo, soloRtp, plan, children }: AppShellProps) {
   const pathname = usePathname() || "/";
   const [drawer, setDrawer] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,6 +87,7 @@ export default function AppShell({ uid, nombre, admin, supremo, equipo, soloRtp,
       ];
   const menu: { href: string; label: string; clase: string }[] = soloRtp ? [] : [
     ...(supremo ? [{ href: "/supremo", label: "Supremo", clase: "font-semibold text-accent-300" }] : []),
+    ...(demo && !supremo ? [{ href: "/simulacion", label: "Modo simulación", clase: "font-semibold text-violet-200" }] : []),
     ...(mostrarPlanes ? [{ href: "/planes", label: "Adquirir módulos", clase: "font-semibold text-accent-300" }] : []),
     { href: "/alertas", label: "Alertas al celular", clase: "text-slate-100" },
   ];

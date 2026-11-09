@@ -151,6 +151,8 @@ export interface Usuario {
   /** MODO GRABACIÓN (supremo): hasta esta fecha ISO las listas solo muestran las
    *  empresas de simulación (oculta las reales para grabar videos). */
   modoGrabacionHasta?: string;
+  /** El supremo le habilitó el MODO SIMULACIÓN (empresas demo + modo grabación). */
+  permisoDemo?: boolean;
   /** Constancias de aceptación de la Política de seguridad y de la
    *  Declaración de responsabilidad (una por versión aceptada). */
   aceptaciones?: AceptacionLegal[];
