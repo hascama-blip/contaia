@@ -1544,7 +1544,8 @@ export async function duenoDeRuc(
   }
   // Compatibilidad (empresas previas al registro global). Las copias del
   // supremo no adueñan el RUC: no bloquean a los demás usuarios.
-  const supremos = new Set((store.users ?? []).filter((u) => u.rol === "supremo").map((u) => u.id));
+  // Copias del supremo y de la cuenta "Utilitarios RTP": no adueñan el RUC.
+  const supremos = new Set((store.users ?? []).filter((u) => u.rol === "supremo" || u.soloRtp === true).map((u) => u.id));
   const c = store.clientes.find((x) => x.ruc === r && x.ownerId && !supremos.has(x.ownerId) && (store.users ?? []).some((u) => u.id === x.ownerId));
   if (c && c.ownerId) return { studioId: c.ownerId };
   return null;

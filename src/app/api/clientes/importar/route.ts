@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, esAdmin, studioId, esSupremo } from "@/lib/auth";
+import { requireUser, esAdmin, studioId, esSupremo, exentoUnicidadRuc } from "@/lib/auth";
 import { createCliente, getClienteByRuc, setCredSire, duenoDeRuc, registrarRucGlobal } from "@/lib/db";
 import { leerFilas } from "@/lib/xlsxIO";
 import { logAccion } from "@/lib/auditoria";
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     // Unicidad GLOBAL: si otro estudio ya tomó el RUC, no se agrega (salvo el
     // supremo, que puede registrarlo sin adueñarse del RUC).
     const dueno = await duenoDeRuc(ruc);
-    if (dueno && dueno.studioId !== studioId(user) && !esSupremo(user)) {
+    if (dueno && dueno.studioId !== studioId(user) && !exentoUnicidadRuc(user)) {
       resultados.push({ fila: r + 1, ruc, estado: "duplicado", motivo: "Ya registrada en la plataforma por otro usuario." });
       continue;
     }
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
         sunat: null,
         ownerId: user.id,
       });
-      if (!esSupremo(user)) await registrarRucGlobal(ruc, studioId(user), cliente.id, user.nombre).catch(() => {});
+      if (!exentoUnicidadRuc(user)) await registrarRucGlobal(ruc, studioId(user), cliente.id, user.nombre).catch(() => {});
       const solUser = cel(row, iUser);
       if (solUser) {
         await setCredSire(cliente.id, {

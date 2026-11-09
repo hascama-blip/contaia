@@ -1,7 +1,7 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { createCliente, getClienteByRuc, listClientes, setCredSire, duenoDeRuc, registrarRucGlobal } from "@/lib/db";
-import { requireUser, studioId, esAdmin, esSupremo } from "@/lib/auth";
+import { requireUser, studioId, esAdmin, esSupremo, exentoUnicidadRuc } from "@/lib/auth";
 import { rucValido } from "@/lib/sunat";
 import { logAccion } from "@/lib/auditoria";
 
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
   // excepción: el supremo puede registrarlo igual (su copia no le quita la
   // empresa al dueño: el RUC sigue bloqueado para los demás).
   const dueno = await duenoDeRuc(body.ruc);
-  const supremo = esSupremo(user);
+  // Exentos: supremo y cuenta "Utilitarios RTP" (módulos propios).
+  const supremo = exentoUnicidadRuc(user);
   const deOtro = Boolean(dueno && dueno.studioId !== studioId(user));
   if (deOtro && !supremo) {
     return NextResponse.json(
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     accion: "Creó una empresa",
     clienteId: cliente.id,
     clienteNombre: cliente.razonSocial,
-    detalle: `RUC ${cliente.ruc}${deOtro ? ` · ya registrado por ${dueno?.ownerNombre || "otro estudio"} (excepción del supremo)` : ""}`,
+    detalle: `RUC ${cliente.ruc}${deOtro ? ` · ya registrado por ${dueno?.ownerNombre || "otro estudio"} (excepción ${esSupremo(user) ? "del supremo" : "de Utilitarios RTP"})` : ""}`,
   });
   return NextResponse.json({ cliente: ocultarCliente(cliente) }, { status: 201 });
 }

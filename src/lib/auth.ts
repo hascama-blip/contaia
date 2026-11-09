@@ -167,6 +167,13 @@ export function esSupremo(u: Usuario | null | undefined): boolean {
   return Boolean(u) && u!.rol === "supremo";
 }
 
+/** Cuentas EXENTAS de la unicidad global de RUC: el supremo y la cuenta
+ *  "Utilitarios RTP" (sus módulos son propios, no cruzan datos con otros). Pueden
+ *  registrar un RUC tomado por otro estudio, pero sin adueñarse de él. */
+export function exentoUnicidadRuc(u: Usuario | null | undefined): boolean {
+  return esSupremo(u) || esSoloRtp(u);
+}
+
 /** ¿Usuario RESTRINGIDO a los Utilitarios RTP? (sin menús, solo /rtputilitarios). */
 export function esSoloRtp(u: Usuario | null | undefined): boolean {
   return Boolean(u) && u!.soloRtp === true;

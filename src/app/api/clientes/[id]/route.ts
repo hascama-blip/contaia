@@ -1,7 +1,7 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { NextRequest, NextResponse } from "next/server";
 import { deleteCliente, updateCliente, liberarRucGlobal, registrarRucGlobal, getClienteByRuc, duenoDeRuc } from "@/lib/db";
-import { getClienteAutorizado, getCurrentUser, esAdmin, esSupremo, studioId } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esAdmin, studioId, exentoUnicidadRuc } from "@/lib/auth";
 import { logAccion } from "@/lib/auditoria";
 
 export const runtime = "nodejs";
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
       return NextResponse.json({ error: `Ya tienes registrada la empresa con RUC ${nuevoRuc} (${repetido.razonSocial}).` }, { status: 409 });
     }
     const dueno = await duenoDeRuc(nuevoRuc);
-    if (dueno && dueno.studioId !== studioId(user) && !esSupremo(user)) {
+    if (dueno && dueno.studioId !== studioId(user) && !exentoUnicidadRuc(user)) {
       return NextResponse.json({ error: `El RUC ${nuevoRuc} ya está registrado en la plataforma por otro usuario.` }, { status: 409 });
     }
     cambios.ruc = nuevoRuc;
@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   if (cambiaRuc) {
     await liberarRucGlobal(propio.ruc, propio.id).catch(() => {});
-    if (!esSupremo(user)) await registrarRucGlobal(nuevoRuc, studioId(user), propio.id, user.nombre).catch(() => {});
+    if (!exentoUnicidadRuc(user)) await registrarRucGlobal(nuevoRuc, studioId(user), propio.id, user.nombre).catch(() => {});
   }
   if (cambiaRuc || (cambios.razonSocial && cambios.razonSocial.trim() !== propio.razonSocial)) {
     await logAccion({

@@ -21,7 +21,8 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **RUC único**: no se permite crear dos clientes con el mismo RUC (chequeo en
   `POST /api/clientes` con `getClienteByRuc`, responde 409). Unicidad **global** entre estudios
   (`duenoDeRuc` / `rucsRegistrados`): un RUC tomado por otro estudio no se puede registrar,
-  **salvo el supremo**, que puede registrarlo igual sin adueñarse (no entra al registro global,
+  **salvo el supremo y la cuenta "Utilitarios RTP"** (`exentoUnicidadRuc`; sus módulos son propios),
+  que pueden registrarlo igual sin adueñarse (no entra al registro global,
   sus copias no bloquean a nadie y borrarlas no libera el RUC del dueño; queda en la bitácora). La razón social verificada por
   SUNAT queda **bloqueada** (read-only) en el alta. Export de contactos: `GET /api/clientes/export` (CSV).
 - **Editar empresa** (`PATCH /api/clientes/[id]`): lista blanca (razonSocial, email, telefono, negocio, ruc).
