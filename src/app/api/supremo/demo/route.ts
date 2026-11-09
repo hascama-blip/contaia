@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bloqueoSupremo } from "@/lib/acceso";
 import { getCurrentUser, studioId } from "@/lib/auth";
-import { guardarEmpresasDemo, borrarEmpresasDemo, listClientes, setDiagnostico, getCliente, upsertVisorMatriz } from "@/lib/db";
+import { guardarEmpresasDemo, borrarEmpresasDemo, listClientes, setDiagnostico, getCliente, upsertVisorMatriz, setModoGrabacion } from "@/lib/db";
 import { empresasDemo, PERFILES, DEMO_PREFIJO } from "@/lib/demo";
 import { generarDiagnostico } from "@/lib/diagnostico";
 import { hoyLima } from "@/lib/fechas";
@@ -12,17 +12,25 @@ export const runtime = "nodejs";
 //   GET                      → cuántas hay
 //   POST { accion: "crear" } → crea (o regenera) las 4 empresas ficticias con datos en todos los módulos
 //   POST { accion: "borrar" }→ las elimina (y su cuadro del Visor)
+//   POST { accion: "grabacion", activar: bool } → MODO GRABACIÓN: oculta las empresas
+//        reales en todas las listas (solo se ven las de simulación) por 12 horas.
 export async function GET() {
   const b = await bloqueoSupremo(); if (b) return b;
   const u = (await getCurrentUser())!;
-  const n = (await listClientes(studioId(u))).filter((c) => c.id.startsWith(DEMO_PREFIJO)).length;
-  return NextResponse.json({ empresas: n, total: PERFILES.length });
+  const todas = await listClientes(studioId(u), { todos: true });
+  const n = todas.filter((c) => c.id.startsWith(DEMO_PREFIJO)).length;
+  const grab = u.modoGrabacionHasta && u.modoGrabacionHasta > new Date().toISOString() ? u.modoGrabacionHasta : null;
+  return NextResponse.json({ empresas: n, total: PERFILES.length, grabacionHasta: grab, ocultas: todas.length - n });
 }
 
 export async function POST(req: NextRequest) {
   const b = await bloqueoSupremo(); if (b) return b;
   const u = (await getCurrentUser())!;
   const body = await req.json().catch(() => ({}));
+  if (body?.accion === "grabacion") {
+    const hasta = await setModoGrabacion(u.id, body.activar === true ? 12 : null);
+    return NextResponse.json({ ok: true, grabacionHasta: hasta });
+  }
   if (body?.accion === "borrar") {
     const n = await borrarEmpresasDemo(PERFILES.map((p) => p.ruc));
     return NextResponse.json({ ok: true, borradas: n });

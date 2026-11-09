@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { AsyncLocalStorage } from "async_hooks";
 import { hoyLima } from "./fechas";
 import { cifrar, descifrar, esCifrado } from "./cifrado";
+import { esRucDemo } from "./demo";
 import type { AsociacionContenido, RatingAgg, Sugerencia } from "./asociacion";
 import { CONTENIDO_DEFAULT, normalizarContenido } from "./asociacion";
 import type {
@@ -1464,12 +1465,31 @@ export function newId(): string {
 }
 
 /** Lista las empresas del usuario (o todas si no se pasa ownerId). */
-export async function listClientes(ownerId?: string): Promise<Cliente[]> {
+export async function listClientes(ownerId?: string, opts: { todos?: boolean } = {}): Promise<Cliente[]> {
   const store = await readStore();
-  const lista = ownerId
+  let lista = ownerId
     ? store.clientes.filter((c) => c.ownerId === ownerId)
     : store.clientes;
+  // MODO GRABACIÓN del dueño: solo las empresas de simulación (oculta las reales en
+  // todas las listas, el dashboard y los selectores). `todos` lo ignora (tarea nocturna).
+  if (ownerId && !opts.todos) {
+    const dueno = store.users?.find((u) => u.id === ownerId);
+    if (dueno?.modoGrabacionHasta && dueno.modoGrabacionHasta > new Date().toISOString()) lista = lista.filter((c) => c.demo);
+  }
   return lista.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Activa (por `horas`) o desactiva (null) el modo grabación de un usuario. */
+export async function setModoGrabacion(userId: string, horas: number | null): Promise<string | null> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const u = store.users?.find((x) => x.id === userId);
+  if (!u) return null;
+  if (horas && horas > 0) u.modoGrabacionHasta = new Date(Date.now() + horas * 3600_000).toISOString();
+  else delete u.modoGrabacionHasta;
+  await writeStore(store);
+  return u.modoGrabacionHasta ?? null;
+});
 }
 
 export async function getCliente(id: string): Promise<Cliente | null> {
@@ -2337,7 +2357,11 @@ export async function upsertVisorMatriz(userId: string, d: {
 
 export async function getVisorMatriz(userId: string): Promise<VisorMatriz[]> {
   const store = await readStore();
-  return coalesceMatriz(store.visor?.matriz?.[userId] ?? []);
+  const lista = coalesceMatriz(store.visor?.matriz?.[userId] ?? []);
+  // MODO GRABACIÓN: solo los cuadros de las empresas de simulación.
+  const u = store.users?.find((x) => x.id === userId);
+  if (u?.modoGrabacionHasta && u.modoGrabacionHasta > new Date().toISOString()) return lista.filter((m) => esRucDemo(String(m.ruc ?? "")));
+  return lista;
 }
 
 export async function clearVisorMatriz(userId: string): Promise<void> {

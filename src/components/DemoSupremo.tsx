@@ -6,10 +6,27 @@ import { useEffect, useState } from "react";
 // todos los módulos, para demos y videos de publicidad). Nunca consultan SUNAT.
 export default function DemoSupremo() {
   const [n, setN] = useState<number | null>(null);
-  const [busy, setBusy] = useState<"" | "crear" | "borrar">("");
+  const [grabacion, setGrabacion] = useState<string | null>(null); // activo hasta (ISO)
+  const [ocultas, setOcultas] = useState(0);
+  const [busy, setBusy] = useState<"" | "crear" | "borrar" | "grabacion">("");
   const [msg, setMsg] = useState<string | null>(null);
 
-  const cargar = () => fetch("/api/supremo/demo").then((r) => r.json()).then((d) => setN(d.empresas ?? 0)).catch(() => {});
+  const cargar = () => fetch("/api/supremo/demo").then((r) => r.json()).then((d) => { setN(d.empresas ?? 0); setGrabacion(d.grabacionHasta ?? null); setOcultas(d.ocultas ?? 0); }).catch(() => {});
+
+  async function modoGrabacion(activar: boolean) {
+    setBusy("grabacion"); setMsg(null);
+    try {
+      const r = await fetch("/api/supremo/demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "grabacion", activar }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setMsg(d.error ?? "No se pudo cambiar el modo grabación."); return; }
+      setGrabacion(d.grabacionHasta ?? null);
+      setMsg(activar ? "✓ Modo grabación activo: en Clientes, Dashboard y selectores solo se ven las empresas de simulación." : "✓ Modo grabación desactivado: vuelven a verse todas tus empresas.");
+    } catch {
+      setMsg("Error de red.");
+    } finally {
+      setBusy("");
+    }
+  }
   useEffect(() => { cargar(); }, []);
 
   async function accion(a: "crear" | "borrar") {
@@ -48,6 +65,23 @@ export default function DemoSupremo() {
           </button>
         )}
         {n !== null && <span className="text-xs text-slate-500">{n ? `${n} activas` : "Ninguna creada"}</span>}
+      </div>
+      <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg border p-3 ${grabacion ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"}`}>
+        <div className="mr-auto min-w-[14rem] flex-1 text-xs text-slate-600">
+          <b className="text-slate-800">🎬 Modo grabación</b> — oculta tus empresas reales ({ocultas}) en Clientes, Dashboard, buscador,
+          notificaciones y selectores de los módulos; solo quedan las de simulación. No borra nada y se desactiva solo a las 12 horas.
+          {grabacion && <div className="mt-1 font-semibold text-red-700">Activo hasta las {new Date(grabacion).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })} ({new Date(grabacion).toLocaleDateString("es-PE")}).</div>}
+        </div>
+        {grabacion ? (
+          <button className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50" onClick={() => modoGrabacion(false)} disabled={!!busy}>
+            {busy === "grabacion" ? "…" : "■ Desactivar modo grabación"}
+          </button>
+        ) : (
+          <button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={() => modoGrabacion(true)} disabled={!!busy || !n}
+            title={!n ? "Primero crea las empresas de simulación" : ""}>
+            {busy === "grabacion" ? "…" : "● Activar modo grabación"}
+          </button>
+        )}
       </div>
       {msg && <p className="mt-2 text-xs text-slate-700">{msg}</p>}
     </div>

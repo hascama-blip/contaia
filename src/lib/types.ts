@@ -148,6 +148,9 @@ export interface Usuario {
   /** Versión de sesión: al cambiar/restablecer la contraseña sube y las
    *  sesiones abiertas en otros equipos dejan de valer. */
   sesionVersion?: number;
+  /** MODO GRABACIÓN (supremo): hasta esta fecha ISO las listas solo muestran las
+   *  empresas de simulación (oculta las reales para grabar videos). */
+  modoGrabacionHasta?: string;
   /** Constancias de aceptación de la Política de seguridad y de la
    *  Declaración de responsabilidad (una por versión aceptada). */
   aceptaciones?: AceptacionLegal[];

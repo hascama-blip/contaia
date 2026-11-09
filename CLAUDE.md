@@ -105,6 +105,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   dígito verificador INVÁLIDO (no existen). Las rutas que consultan SUNAT responden con datos simulados
   (`esClienteDemo` / `demoNoDisponible` / `esRucDemo` en RTT y honorarios); `getSolPass` da la clave por
   cargada; la tarea nocturna las excluye. Ruta nueva que consulte SUNAT → agregar el control demo.
+  **Modo grabación** (`Usuario.modoGrabacionHasta`, 12 h, `setModoGrabacion`, acción "grabacion" en
+  `/api/supremo/demo`): `listClientes(ownerId)` devuelve solo las empresas demo (Clientes, Dashboard,
+  buscador, notificaciones, selectores) y `getVisorMatriz` solo sus cuadros. La tarea nocturna usa
+  `listClientes(id, { todos: true })` para no perder alertas reales.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
