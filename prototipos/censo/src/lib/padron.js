@@ -21,6 +21,38 @@ export function nombreCompleto(a) {
 /** Stand propio de la Asociación: lo marca `stand.deAsociacion` y no tiene un asociado como dueño. */
 export const DUENO_ASOCIACION = "Asociación (stand propio)";
 export const esDeAsociacion = (s) => Boolean(s && s.deAsociacion && !s.propietarioId);
+/** Prefijo con que el libro anota los stands de la Asociación: "APCCIC-NOMBRES APELLIDOS". */
+export const PREFIJO_ASOCIACION = "APCCIC-";
+/** Clave de nombre: palabras sin tildes y ordenadas (no importa el orden nombres/apellidos). */
+const claveNombre = (s) => normalizar(s).replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
+/** Índice nombre → ficha, para ubicar a una persona por cómo figura en el libro (null si hay dos iguales). */
+export function indiceNombres(asociados) {
+  const mapa = new Map();
+  for (const a of asociados) {
+    const k = claveNombre(`${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno}`);
+    if (k.split(" ").length >= 2) mapa.set(k, mapa.has(k) ? null : a);
+  }
+  return mapa;
+}
+/**
+ * La ficha vinculada a un stand de la Asociación: la persona que el libro nombra tras "APCCIC-"
+ * (si tiene ficha) o, si no, la última ficha que tuvo el stand (su historial). null si no hay.
+ */
+export function fichaDeAsociacion(stand, porId, indice) {
+  if (!esDeAsociacion(stand)) return null;
+  const nombre = String(stand.asociacionNota || "").replace(/^\s*APCCIC\s*-?\s*/i, "");
+  const porNombre = nombre && indice ? indice.get(claveNombre(nombre)) : null;
+  if (porNombre) return porNombre;
+  const tramo = [...(stand.historial || [])].reverse().find((t) => t.asociadoId && porId.get(t.asociadoId));
+  return tramo ? porId.get(tramo.asociadoId) : null;
+}
+/** Cómo se muestra un stand de la Asociación: "APCCIC-NOMBRES APELLIDOS" ("" si no se sabe a nombre de quién figura). */
+export function nombreEnAsociacion(stand, persona) {
+  const nota = String(stand?.asociacionNota || "").trim();
+  if (nota) return /^APCCIC/i.test(nota) ? nota : `${PREFIJO_ASOCIACION}${nota}`;
+  if (!persona) return "";
+  return `${PREFIJO_ASOCIACION}${[persona.nombres, persona.apellidoPaterno, persona.apellidoMaterno].filter(Boolean).join(" ").toUpperCase()}`;
+}
 /** Quién figura como dueño del stand, en texto: el asociado, la Asociación o "Sin propietario". */
 export function propietarioTexto(stand, porId) {
   const a = stand?.propietarioId ? porId.get(stand.propietarioId) : null;

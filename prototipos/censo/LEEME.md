@@ -146,6 +146,10 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   Al arrancar, `servidor/lib/migraciones.js` marca **una sola vez** (queda anotado en `DATOS/migraciones.json`) los 34
   stands de la revisión del libro 2026 que no tengan un asociado como dueño (los crea si no existían); los que tengan dueño
   no se tocan y quedan para el panel, que muestra a quién pasaría al historial. Cargar el Excel después completa la nota.
+  Un stand de la asociación se muestra como **"APCCIC-NOMBRE"** (`nombreEnAsociacion`: la nota del libro o, si no hay, la
+  ficha que tuvo antes con el prefijo). `fichaDeAsociacion` ubica esa ficha (por el nombre del libro, sin importar orden ni
+  tildes, o la última del historial): el mapa y Stands enlazan a ella («Ver ficha») y la ficha avisa qué stands de la
+  asociación figuran a su nombre. Un stand **sin ficha** ya no ofrece «Registrar ficha» en el mapa (se usa «+ Nueva ficha»).
 - **Actualizar con fichas del libro** (solo admin): Padrón → "Actualizar con fichas del libro" o
   Administración → `/portal#actualizar`. Carga un JSON `{ tipo: "censo-fichas-libro", fechaDocumento, fichas[], omitidas[] }`
   con la transcripción de las fichas manuscritas del Libro de Padrón y la foto de cada una (data URL). Motor puro en

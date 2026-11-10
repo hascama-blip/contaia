@@ -9,7 +9,7 @@ import { Documentos } from "../components/Documentos.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { useApp } from "../components/contexto.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido, faltantes, observacionFaltantes } from "../lib/padron.js";
+import { nombreCompleto, nombreGaleria, etiquetaNumero, tieneNumero, numeroCedido, faltantes, observacionFaltantes, fichaDeAsociacion, nombreEnAsociacion, compararCodigos } from "../lib/padron.js";
 import { registrosDe, anulacionesDe, deudaStand } from "../lib/pagos.js";
 import { incidenciasDe } from "../lib/incidencias.js";
 import { standsAnteriores } from "../lib/propietarios.js";
@@ -65,6 +65,9 @@ export function Ficha({ id }) {
 
   const incidencias = useMemo(() => incidenciasDe(id, datos.incidencias), [id, datos.incidencias]);
   const anteriores = useMemo(() => standsAnteriores(id, datos.stands, derivados.porId), [id, datos.stands, derivados.porId]);
+  // Stands de la Asociación que el libro anota como "APCCIC-<esta persona>" (no son suyos: son de la Asociación).
+  const deAsociacion = useMemo(() => datos.stands.filter((s) => fichaDeAsociacion(s, derivados.porId, derivados.indiceNombres)?.id === id).sort((x, y) => compararCodigos(x.codigo, y.codigo)),
+    [id, datos.stands, derivados.porId, derivados.indiceNombres]);
 
   if (!a || !ficha) {
     return html`<div className="pagina"><${CabPagina} miga=${{ href: "#padron", texto: "Padrón" }} titulo="Ficha no encontrada"
@@ -130,6 +133,8 @@ export function Ficha({ id }) {
     familia: html`<${FichaForm} ficha=${ficha} setFicha=${setFichaSucia} errores=${errores} numerar=${false}
       bloqueado=${!editable} secciones=${["conyuge", "hijos", "familiares"]} />`,
     stands: html`
+      ${deAsociacion.length > 0 && html`<div className="aviso aviso-info" style=${{ marginBottom: 12 }}><span>
+        <strong>Stands de la asociación:</strong> ${deAsociacion.map((s) => s.codigo).join(", ")}. Figuran como <strong>${nombreEnAsociacion(deAsociacion[0], a)}</strong>: son propiedad de la Asociación, no de esta persona.</span></div>`}
       ${!stands.length && html`<${Vacio}>${anteriores.length ? "Hoy no tiene stands a su nombre." : "Sin stands asignados."}<//>`}
       ${stands.length > 0 && html`
         <div className="tabla-caja"><table className="tabla">

@@ -4,7 +4,7 @@ import { CabPagina, Kpi, BadgeStand, Badge, Vacio, Panel, Campo, Entrada, Select
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_STAND } from "../lib/types.js";
-import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar, esDeAsociacion, etiquetaNumero } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar, esDeAsociacion, etiquetaNumero, fichaDeAsociacion, nombreEnAsociacion } from "../lib/padron.js";
 import { editarStand, marcarStandsAsociacion, quitarDeAsociacion } from "../api/stands.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { PanelStandsAsociacion } from "../components/StandsAsociacion.js";
@@ -93,9 +93,9 @@ export function Stands() {
     const q = normalizar(filtro.texto);
     return datos.stands
       .filter((s) => (!filtro.galeria || s.galeria === filtro.galeria) && (!filtro.estado || (filtro.estado === "asociacion" ? esDeAsociacion(s) : s.estado === filtro.estado)))
-      .filter((s) => !q || normalizar([s.codigo, s.giro, s.inquilino?.nombre, nombreCompleto(derivados.porId.get(s.propietarioId)), esDeAsociacion(s) ? `asociacion ${s.asociacionNota || ""}` : ""].join(" ")).includes(q))
+      .filter((s) => !q || normalizar([s.codigo, s.giro, s.inquilino?.nombre, nombreCompleto(derivados.porId.get(s.propietarioId)), esDeAsociacion(s) ? `asociacion ${nombreEnAsociacion(s, fichaDeAsociacion(s, derivados.porId, derivados.indiceNombres))}` : ""].join(" ")).includes(q))
       .sort((a, b) => compararCodigos(a.codigo, b.codigo));
-  }, [datos.stands, filtro, derivados.porId]);
+  }, [datos.stands, filtro, derivados.porId, derivados.indiceNombres]);
   const cambia = (k) => (e) => setFiltro((f) => ({ ...f, [k]: e.target.value }));
 
   return html`
@@ -131,6 +131,8 @@ export function Stands() {
               ${lista.map((s) => {
                 const dueno = derivados.porId.get(s.propietarioId);
                 const anterior = s.historial?.[s.historial.length - 1];
+                const persona = fichaDeAsociacion(s, derivados.porId, derivados.indiceNombres); // solo en stands de la asociación
+                const apccic = esDeAsociacion(s) ? nombreEnAsociacion(s, persona) : "";
                 return html`<tr key=${s.codigo} className=${puedeEscribir !== false ? "clic" : ""} onClick=${() => puedeEscribir !== false && setEditando(s)}>
                   <td className="fuerte num">${s.codigo}</td>
                   <td>${nombreGaleria(s.galeria)}</td>
@@ -138,9 +140,9 @@ export function Stands() {
                   <td>${s.giro || "—"}</td>
                   <td>
                     ${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>`
-                      : esDeAsociacion(s) ? html`<${Badge} tono="asoc">Asociación<//>${s.asociacionNota ? html`<span className="celda-sub">En el libro: ${s.asociacionNota}</span>` : ""}`
+                      : esDeAsociacion(s) ? html`<${Badge} tono="asoc">Asociación<//>${apccic ? html`<span className="celda-sub">${persona ? html`<a href=${`#ficha-${persona.id}`} onClick=${(e) => e.stopPropagation()}>${apccic}</a>` : apccic}</span>` : ""}`
                       : html`<span className="muted">Sin propietario</span>`}
-                    ${anterior && html`<span className="celda-sub">Antes: ${anterior.nombre}</span>`}
+                    ${anterior && !(persona && anterior.asociadoId === persona.id) && html`<span className="celda-sub">Antes: ${anterior.nombre}</span>`}
                   </td>
                   <td>${s.inquilino?.nombre || "—"}</td>
                   <td><${BadgeStand} estado=${s.estado} /></td>

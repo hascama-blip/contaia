@@ -5,7 +5,7 @@ import { FotoCampo } from "../components/Archivos.js";
 import { Plano } from "../components/Plano.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS, LISTAS } from "../config.js";
-import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado, existeStand, esDeAsociacion } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado, existeStand, esDeAsociacion, fichaDeAsociacion, nombreEnAsociacion } from "../lib/padron.js";
 import { MODOS } from "../lib/plano.js";
 import { fecha, hoy } from "../lib/formato.js";
 import { soloDigitos } from "../lib/validar.js";
@@ -105,8 +105,8 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
   const deAsociacion = useMemo(() => datos.stands.filter(esDeAsociacion), [datos.stands]);
   const asocVisibles = useMemo(() => {
     const q = normalizar(texto);
-    return deAsociacion.filter((s) => !q || normalizar(`asociacion ${s.codigo} ${s.asociacionNota || ""}`).includes(q));
-  }, [deAsociacion, texto]);
+    return deAsociacion.filter((s) => !q || normalizar(`asociacion ${s.codigo} ${nombreEnAsociacion(s, fichaDeAsociacion(s, derivados.porId, derivados.indiceNombres))}`).includes(q));
+  }, [deAsociacion, texto, derivados.porId, derivados.indiceNombres]);
 
   const filtrando = Boolean(texto.trim()) || soloPendientes || soloAsociacion;
   // Un número de stand del plano se ubica aunque aún no tenga ficha.

@@ -6,7 +6,7 @@ import { BadgeCenso, BadgeAtraso, BadgeStand } from "./ui.js";
 import { useApp } from "./contexto.js";
 import { PLANO } from "../plano.js";
 import { standsDelPlano, tonoStand, LEYENDAS, ZOOMS } from "../lib/plano.js";
-import { nombreCompleto, nombreGaleria, galeriaDeCodigo } from "../lib/padron.js";
+import { nombreCompleto, nombreGaleria, galeriaDeCodigo, fichaDeAsociacion, nombreEnAsociacion, etiquetaNumero } from "../lib/padron.js";
 import { registrosDe, deudaStand } from "../lib/pagos.js";
 import { soles } from "../lib/formato.js";
 
@@ -125,16 +125,20 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
               <a className="btn btn-primary btn-sm" href=${`#ficha-${asociado.id}`}>Ver detalle</a>
               ${onVerificar && puedeEscribir !== false && html`<button className="btn btn-ghost btn-sm" onClick=${() => { cerrar(); onVerificar(activo.codigo); }}>Verificar aquí</button>`}
             </div>`
-          : stand?.deAsociacion && !stand.propietarioId ? html`
-            <p className="burbuja-nombre">Stand de la asociación</p>
-            <p className="burbuja-dato">Propiedad de la Asociación (stand propio)${stand.giro ? ` · ${stand.giro}` : ""}</p>
-            ${stand.asociacionNota && html`<p className="burbuja-dato">En el libro: ${stand.asociacionNota}</p>`}
-            <div className="burbuja-badges"><${BadgeStand} estado=${stand.estado} /></div>
-            ${stand.inquilino?.nombre && html`<p className="burbuja-dato">Inquilino: ${stand.inquilino.nombre}</p>`}
-            ${stand.historial?.length > 0 && html`<p className="burbuja-dato">Antes: ${stand.historial[stand.historial.length - 1].nombre}</p>`}`
+          : stand?.deAsociacion && !stand.propietarioId ? (() => {
+            // Stand de la Asociación: figura como "APCCIC-NOMBRE"; si esa persona tiene ficha, se abre desde aquí.
+            const persona = fichaDeAsociacion(stand, derivados.porId, derivados.indiceNombres);
+            const nombre = nombreEnAsociacion(stand, persona);
+            return html`
+              <p className="burbuja-nombre">${nombre || "Stand de la asociación"}</p>
+              <p className="burbuja-dato">Stand de la asociación${stand.giro ? ` · ${stand.giro}` : ""}</p>
+              ${persona && html`<p className="burbuja-dato">Ficha: ${nombreCompleto(persona)} · ${etiquetaNumero(persona)}${persona.dni ? ` · DNI ${persona.dni}` : ""}</p>`}
+              <div className="burbuja-badges"><${BadgeStand} estado=${stand.estado} /></div>
+              ${stand.inquilino?.nombre && html`<p className="burbuja-dato">Inquilino: ${stand.inquilino.nombre}</p>`}
+              ${persona && html`<div className="burbuja-acciones"><a className="btn btn-primary btn-sm" href=${`#ficha-${persona.id}`}>Ver ficha</a></div>`}`;
+          })()
           : html`
-            <p className="burbuja-dato">Stand sin ficha en el padrón.</p>
-            ${puedeEscribir !== false && html`<div className="burbuja-acciones"><a className="btn btn-primary btn-sm" href=${`#nueva-${activo.codigo}`}>Registrar ficha</a></div>`}`}
+            <p className="burbuja-dato">Stand sin ficha en el padrón.</p>`}
       </div>`;
   })();
 
@@ -166,7 +170,7 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
                   onFocus=${(e) => abrir(c.codigo, e.currentTarget)}
                   onClick=${(e) => { setFijo(true); abrir(c.codigo, e.currentTarget); }}
                   onKeyDown=${(e) => {
-                    if (e.key === "Enter") { const a = info(c.codigo).asociado; location.hash = a ? `ficha-${a.id}` : `nueva-${c.codigo}`; }
+                    if (e.key === "Enter") { const { stand, asociado } = info(c.codigo); const a = asociado || fichaDeAsociacion(stand, derivados.porId, derivados.indiceNombres); if (a) location.hash = `ficha-${a.id}`; } // un stand sin ficha no lleva a registrar una
                     if (e.key === "Escape") cerrar();
                   }}>
                   <polygon points=${c.puntos} />
