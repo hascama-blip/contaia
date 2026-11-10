@@ -1,6 +1,7 @@
 // Utilidades HTTP mínimas (sin dependencias): JSON, cookies, cuerpo, estáticos.
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 export const TIPOS = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -55,13 +56,18 @@ export function servirArchivo(res, raiz, ruta, { cache = "no-cache", transformar
   try { st = fs.statSync(abs); } catch { return false; }
   if (!st.isFile()) return false;
   const tipo = TIPOS[path.extname(abs).toLowerCase()] || "application/octet-stream";
-  const etag = `"${st.mtimeMs.toString(36)}-${st.size.toString(36)}${transformar ? "-t" : ""}"`;
-  const cab = { "Content-Type": tipo, "Cache-Control": cache, ETag: etag, "Last-Modified": st.mtime.toUTCString() };
+  // Con `transformar` (la página del portal, que apunta al paquete compilado de turno) la huella sale del
+  // contenido que se envía: si cambia el paquete, cambia la huella aunque index.html sea el mismo. Antes salía
+  // solo de index.html y el navegador seguía con la página (y el paquete) de la versión anterior.
+  const cuerpo = transformar ? Buffer.from(transformar(fs.readFileSync(abs, "utf8"))) : null;
+  const etag = cuerpo
+    ? `"t-${crypto.createHash("sha1").update(cuerpo).digest("base64url").slice(0, 20)}"`
+    : `"${st.mtimeMs.toString(36)}-${st.size.toString(36)}"`;
+  const cab = { "Content-Type": tipo, "Cache-Control": cache, ETag: etag, ...(cuerpo ? {} : { "Last-Modified": st.mtime.toUTCString() }) };
   if (req && req.headers["if-none-match"] === etag) { res.writeHead(304, cab); res.end(); return true; }
-  if (transformar) {
-    const b = Buffer.from(transformar(fs.readFileSync(abs, "utf8")));
-    res.writeHead(200, { ...cab, "Content-Length": b.length });
-    res.end(b);
+  if (cuerpo) {
+    res.writeHead(200, { ...cab, "Content-Length": cuerpo.length });
+    res.end(cuerpo);
   } else {
     res.writeHead(200, { ...cab, "Content-Length": st.size });
     fs.createReadStream(abs).pipe(res);
