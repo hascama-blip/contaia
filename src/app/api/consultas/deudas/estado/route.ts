@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoDeudasF36 } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario y la Clave SOL." }, { status: 400 });
 
   const r = await verificarEstadoPedidoF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true, forzarLogin: body.forzarLogin === true });
+  await ocultarDiag(r);
   if (r.ok && r.estado && !body.diagnostico) {
     await setDeudaEstadoF36(cliente.id, {
       estado: r.estado,

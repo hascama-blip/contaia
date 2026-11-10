@@ -214,7 +214,7 @@ export async function consultarItf(params: ItfParams): Promise<ItfResultado> {
     const total = filas.reduce((a, x) => a + x.monto, 0);
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
-    if (!fr) return { ok: false, error: "No se encontró el módulo de ITF en el menú. Usa Modo diagnóstico y pásame la traza.", diag: { pasos } };
+    if (!fr) return { ok: false, error: "No se encontró el módulo de ITF en el menú. Vuelve a intentarlo en unos minutos; si persiste, escríbenos.", diag: { pasos } };
 
     // Llegó al formulario y consultó. Sin filas = no tiene registros de ITF en
     // el periodo (no es error): el panel muestra "No cuenta con registros de ITF".

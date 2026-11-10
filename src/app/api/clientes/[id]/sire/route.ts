@@ -1,9 +1,9 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { clearSire, setSireResumen, setCredSire } from "@/lib/db";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esSupremo } from "@/lib/auth";
 import { consultarResumenSire } from "@/lib/sire";
 import { verificarCupo, consumirCupo, cupoAgotado } from "@/lib/cupos";
 
@@ -35,6 +35,11 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
   if (esClienteDemo(cliente)) return demoSire(cliente, body.periodo);
+  // El "ejemplo" con datos simulados (real=false) fue del periodo de prueba:
+  // ahora solo el supremo; al resto se le exige la consulta real a SUNAT.
+  if (body.real !== true && !esSupremo(await getCurrentUser())) {
+    return NextResponse.json({ error: "Carga tus accesos SOL y la API (client_id/secret) para extraer el SIRE real." }, { status: 400 });
+  }
 
   // Cupo del plan. Una corrida de VARIOS periodos ("Extraer todo" o un rango)
   // manda el mismo `lote` en cada llamada → cuenta como UNA sola generación.
@@ -58,6 +63,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       real: body.real === true,
       diagnostico: body.diagnostico === true,
     });
+    await ocultarDiag(resultado);
     // Guarda las credenciales de la API (sin la Clave SOL) para reutilizarlas.
     if (
       body.real === true &&

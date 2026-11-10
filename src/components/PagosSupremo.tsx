@@ -43,7 +43,7 @@ export default function PagosSupremo() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold text-slate-800">💳 Pagos de planes</h2>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${d.pasarela ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-          {d.pasarela ? `Pasarela activa: ${d.pasarela}${d.modoPrueba ? " · MODO PRUEBA (claves de test)" : " · producción"}` : `Pasarela sin configurar (falta ${d.falta.join(", ")})`}
+          {d.pasarela ? `Pasarela activa: ${d.pasarela}${d.modoPrueba ? " · MODO PRUEBA (claves de test): solo pagan las cuentas de PAGOS_PRUEBA_CORREOS; el resto ve WhatsApp" : " · producción"}` : `Pasarela sin configurar (falta ${d.falta.join(", ")})`}
         </span>
       </div>
 

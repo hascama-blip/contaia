@@ -189,7 +189,7 @@ export async function consultarCuartaCategoria(params: CuartaParams): Promise<Cu
     pasos.push({ paso: "reporte", buscado, htmlLen: html.length });
 
     if (params.diagnostico) return { ok: false, diag: { pasos } };
-    if (!fr) return { ok: false, error: "No se encontró el formulario de Cuarta Categoría. Usa Modo diagnóstico.", diag: { pasos } };
+    if (!fr) return { ok: false, error: "No se encontró el formulario de Cuarta Categoría. Vuelve a intentarlo en unos minutos.", diag: { pasos } };
 
     // Sin tabla = sin ingresos de 4ta en ese periodo (no es error).
     return { ok: true, cuarta: { mes, anio, html }, diag: { pasos } };

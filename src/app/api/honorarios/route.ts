@@ -1,4 +1,4 @@
-import { bloqueoModulo, limpiarDiagnostico, estudioMemoria } from "@/lib/acceso";
+import { bloqueoModulo, limpiarDiagnostico, estudioMemoria, ocultarDiag } from "@/lib/acceso";
 import { esRucDemo } from "@/lib/demo";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   // Memoria del mes anterior (emisor+concepto → cuentas) para heredar cuentas.
   const mapaCuentas = await getCuentasHonorarios(await estudioMemoria()).catch(() => ({}));
   const r = await extraerHonorarios({ ruc: rucLogin, solUser, solPass, desde, hasta, diagnostico, mapaCuentas });
+  await ocultarDiag(r);
   if (!r.ok) return NextResponse.json({ error: r.error, diag: r.diag }, { status: r.loginError ? 401 : 502 });
   // Si SUNAT trae más recibos que lo disponible del mes, se entregan solo esos.
   let recibos = r.recibos ?? [];

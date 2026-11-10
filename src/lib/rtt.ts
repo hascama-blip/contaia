@@ -444,8 +444,8 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
       return {
         ok: false,
         error: opcionMenu
-          ? "Se abrió la opción del RTT en el menú, pero el formulario no cargó. Usa Modo diagnóstico y revisa 'menu-rtt' / 'estructura'."
-          : "No se encontró la opción 'Reporte Tributario para Terceros' en el menú de SOL. Usa Modo diagnóstico y revisa 'estructura'.",
+          ? "Se abrió la opción del RTT en el menú, pero el formulario no cargó. Vuelve a intentarlo en unos minutos."
+          : "No se encontró la opción 'Reporte Tributario para Terceros' en el menú de SOL. Verifica que el usuario SOL tenga ese permiso y vuelve a intentarlo.",
         diag: { pasos },
       };
     }
@@ -463,7 +463,7 @@ export async function generarRTT(params: RttParams): Promise<RttResultado> {
     }
     pasos.push({ paso: "correo", escrito, sel: selUsado, emailDestino: params.emailDestino });
     if (!escrito) {
-      return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Usa Modo diagnóstico y revisa 'acepto' / 'estructura'.", diag: { pasos } };
+      return { ok: false, error: "Se llegó al RTT pero no apareció el campo de correo (tras 'Acepto'). Vuelve a intentarlo en unos minutos.", diag: { pasos } };
     }
 
     // Buscar el frame del RTT fresco (tras enviar la pantalla se re-renderiza).

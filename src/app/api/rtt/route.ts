@@ -1,4 +1,4 @@
-import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
+import { bloqueoModulo, limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esRucDemo } from "@/lib/demo";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, esSupremo } from "@/lib/auth";
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
   // solo recorre el formulario en SOL y devuelve el volcado crudo.
   if (body.diagnostico === true) {
     const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: true });
+    await ocultarDiag(r);
     return NextResponse.json({ diag: r.diag });
   }
 
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
 
   // Dispara el bot en SOL. La Clave SOL NO se persiste.
   const r = await generarRTT({ ruc: rucLogin, solUser, solPass, emailDestino, diagnostico: false });
+  await ocultarDiag(r);
 
   if (!r.ok) {
     // Sin casilla roja: si había reporte previo se conserva "listo"; si no, se

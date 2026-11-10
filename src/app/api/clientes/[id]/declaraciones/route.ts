@@ -2,7 +2,8 @@ import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { limpiarDiagnostico } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { addDeclaracion, deleteDeclaracion, newId } from "@/lib/db";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esSupremo } from "@/lib/auth";
+import { esClienteDemo } from "@/lib/demoRutas";
 import { logAccion } from "@/lib/auditoria";
 import { extraerTextoPdf, parseDeclaracion } from "@/lib/declaracion";
 import type { DeclaracionMensual } from "@/lib/types";
@@ -75,8 +76,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (files.length === 0) {
     return NextResponse.json({ error: "Adjunta el PDF de la declaración." }, { status: 400 });
   }
-  const diagnostico = form.get("diagnostico") === "true";
+  const supremo = esSupremo(await getCurrentUser());
+  // Modo diagnóstico (texto crudo del PDF): solo el supremo.
+  const diagnostico = supremo && form.get("diagnostico") === "true";
   const autoguardar = form.get("autoguardar") === "true";
+  // PDF de OTRO contribuyente: trae un RUC y el de esta empresa no aparece. En el
+  // periodo de prueba se cargaba igual; ahora solo el supremo (y las empresas demo).
+  const permiteOtroRuc = supremo || esClienteDemo(cliente);
+  const esDeOtroRuc = (texto: string, rucPdf?: string) =>
+    !permiteOtroRuc && Boolean(rucPdf) && rucPdf !== cliente.ruc && !texto.replace(/\s/g, "").includes(cliente.ruc);
+  const avisoOtroRuc = (rucPdf?: string) => `La declaración es de otro RUC (${rucPdf}); esta empresa es ${cliente.ruc}. No se cargó.`;
 
   // Modo revisión (1 archivo, sin autoguardar): devuelve el borrador editable.
   if (!autoguardar && files.length === 1) {
@@ -94,6 +103,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       });
     }
     const parsed = parseDeclaracion(texto);
+    if (esDeOtroRuc(texto, parsed.ruc)) return NextResponse.json({ error: avisoOtroRuc(parsed.ruc) }, { status: 400 });
     return NextResponse.json({
       borrador: { ...parsed, fuente: "pdf" as const, archivoNombre: file.name },
       ...(diagnostico
@@ -123,6 +133,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const parsed = parseDeclaracion(texto);
     if (diagnostico && !primerDiag) {
       primerDiag = { archivo: file.name, texto: texto.slice(0, 8000), casillas: parsed.casillas };
+    }
+    if (esDeOtroRuc(texto, parsed.ruc)) {
+      resultados.push({ archivo: file.name, ok: false, motivo: avisoOtroRuc(parsed.ruc) });
+      continue;
     }
     if (!/^\d{6}$/.test(parsed.periodo)) {
       resultados.push({

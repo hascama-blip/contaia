@@ -776,7 +776,7 @@ export async function generarPedidoDeuda(params: FraccParams): Promise<FraccResu
     return {
       ok: false,
       error:
-        "No pude confirmar la generación. Si aparece la campaña “Valida tus datos de contacto”, ciérrala una vez (Continuar sin confirmar / Finalizar) y reintenta. Con Modo diagnóstico, pásame los pasos “abrir-generacion”, “marcar-tesoro” y “enviar”.",
+        "No pude confirmar la generación. Si aparece la campaña “Valida tus datos de contacto”, ciérrala una vez (Continuar sin confirmar / Finalizar) y reintenta.",
       diag: { pasos },
     };
   } catch (err) {

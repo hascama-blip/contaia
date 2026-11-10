@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePuedeDiag } from "./SupremoContext";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
 const soles = (n: any) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -16,6 +17,7 @@ export default function RentasPanel({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag(); // el Modo diagnóstico solo lo ve el supremo
   const [diag, setDiag] = useState<string | null>(null);
 
   async function cargar() {
@@ -87,7 +89,7 @@ export default function RentasPanel({
             ⬇ Descargar PDF
           </a>
         )}
-        {!sinGenerar && (
+        {puedeDiag && !sinGenerar && (
           <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
             <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
           </label>

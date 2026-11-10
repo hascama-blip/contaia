@@ -79,7 +79,7 @@ export default function DeclaracionesAnualesPanel({
       if (errores.length) msgs.push(errores.join(" | "));
       if (cruces.length)
         msgs.push(
-          `⚠ Aviso: el RUC del PDF no coincide con el del cliente (${clienteRuc}): ${cruces.join(", ")}. Igual se cargó (modo prueba).`
+          `⚠ Aviso: el RUC del PDF no coincide con el del cliente (${clienteRuc}): ${cruces.join(", ")}. Se cargó igual (solo supremo o empresa de simulación).`
         );
       setError(msgs.join("  ·  ") || null);
       router.refresh();

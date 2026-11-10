@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePuedeDiag } from "./SupremoContext";
 import AccesosSol from "./AccesosSol";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
@@ -59,6 +60,7 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag(); // el Modo diagnóstico solo lo ve el supremo
   const [diag, setDiag] = useState<string | null>(null);
   const [asientos, setAsientos] = useState<Asiento[]>([]);
   const [nombreBase, setNombreBase] = useState("Honorarios");
@@ -210,9 +212,11 @@ export default function HonorariosPanel({ clientes, clienteFijo }: { clientes: C
               <button className="btn-primary" onClick={extraer} disabled={busy}>
                 {busy ? "Extrayendo…" : "📥 Extraer honorarios"}
               </button>
-              <label className="flex items-center gap-2 text-xs text-slate-500">
-                <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
-              </label>
+              {puedeDiag && (
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+                </label>
+              )}
             </div>
           </div>
         )}

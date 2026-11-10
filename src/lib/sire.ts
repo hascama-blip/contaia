@@ -448,7 +448,7 @@ function parseTotales(texto: string): SireBloque {
     .map((l) => l.trim())
     .filter(Boolean);
   if (lineas.length === 0) {
-    throw new Error("reporte vacío (usa modo diagnóstico)");
+    throw new Error("reporte vacío");
   }
 
   const delim = ["|", ";", "\t", ","].find((d) => lineas[0].includes(d)) ?? "|";
@@ -502,7 +502,7 @@ function parseTotales(texto: string): SireBloque {
 
   if (colsBase.length === 0 && colTotal < 0) {
     throw new Error(
-      "formato de reporte no reconocido — ejecuta con 'Modo diagnóstico' y compártelo"
+      "formato de reporte no reconocido"
     );
   }
 
@@ -638,7 +638,7 @@ async function flujoOficial(
   }
 
   if (fV === null && fC === null) {
-    throw new Error("no se pudo obtener ni ventas ni compras (usa modo diagnóstico)");
+    throw new Error("no se pudo obtener ni ventas ni compras");
   }
   const ventas = fV ? parseTotales(fV) : bloqueCero();
   const compras = fC ? parseTotales(fC) : bloqueCero();
@@ -1173,7 +1173,7 @@ export async function consultarDetalleSire(
     throw new Error(
       hay429
         ? "SUNAT limitó las solicitudes (429 Too Many Requests). Espera 1–2 minutos y vuelve a intentar."
-        : "No se pudo obtener el detalle (usa Modo diagnóstico para ver la respuesta de SUNAT)."
+        : "No se pudo obtener el detalle. Vuelve a intentarlo en unos minutos."
     );
   }
   return {

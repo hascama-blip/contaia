@@ -1,6 +1,6 @@
 import { resolverSecreto } from "@/lib/secretos";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { mergeBuzon } from "@/lib/db";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       dias: typeof body.dias === "number" ? body.dias : 15,
       diagnostico: body.diagnostico === true,
     });
+    await ocultarDiag(resultado);
     // Persistir (no en modo diagnóstico): el buzón es un HISTORIAL acumulado;
     // cada consulta agrega los mensajes nuevos a los ya guardados.
     if (!resultado.diag && !resultado.loginError) {

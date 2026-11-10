@@ -173,8 +173,8 @@ export async function generarReporteRentas(params: RentasParams): Promise<Rentas
     pasos.push({ paso: "estructura", ...estructura });
     if (params.diagnostico) return { ok: false, diag: { pasos } };
 
-    if (!fr) return { ok: false, error: "No se encontró el formulario del Reporte de Rentas en el menú. Usa Modo diagnóstico.", diag: { pasos } };
-    if (!correoOk) return { ok: false, error: "Se llegó al formulario pero no se pudo escribir el correo. Usa Modo diagnóstico.", diag: { pasos } };
+    if (!fr) return { ok: false, error: "No se encontró el formulario del Reporte de Rentas en el menú. Vuelve a intentarlo en unos minutos.", diag: { pasos } };
+    if (!correoOk) return { ok: false, error: "Se llegó al formulario pero no se pudo escribir el correo. Vuelve a intentarlo en unos minutos.", diag: { pasos } };
 
     // 4) Generar Reporte. Si el formulario trae captcha (Cloudflare Turnstile),
     //    resolverlo ANTES de "Generar" (no-op si no hay widget o no hay key).

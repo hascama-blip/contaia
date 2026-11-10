@@ -212,9 +212,11 @@ export default function SunatPanel({
         <button className="btn-primary" onClick={recorrerRango} disabled={trabajando || !apiLista}>
           {busy === "todo" ? "Extrayendo…" : "⚡ Extraer SIRE del rango"}
         </button>
-        <button className="btn-ghost" onClick={() => consultarSire(true, periodoHasta)} disabled={trabajando} title="Ejemplo SIRE sin Clave SOL">
-          Ver ejemplo
-        </button>
+        {puedeDiag && (
+          <button className="btn-ghost" onClick={() => consultarSire(true, periodoHasta)} disabled={trabajando} title="Ejemplo SIRE sin Clave SOL (solo supremo)">
+            Ver ejemplo
+          </button>
+        )}
       </div>
 
       {diag && <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}

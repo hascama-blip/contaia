@@ -1060,7 +1060,7 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
           return {
             facturas: [], descargados: 0,
             fallidos: relacion.map((item) => ({ item, motivo: "no se pudo obtener el token de sesión de SUNAT" })),
-            error: "No se pudo obtener el token de la sesión SUNAT. Reintenta; si persiste, corre el Modo diagnóstico.",
+            error: "No se pudo obtener el token de la sesión SUNAT. Reintenta; si persiste, escríbenos.",
             diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
           };
         }
@@ -1125,7 +1125,7 @@ export async function extraerComprobantesXmlApi(params: ComprobantesParams): Pro
         facturas, descargados: facturas.length, fallidos,
         error: facturas.length
           ? (faltan > 0 ? `Descargados ${facturas.length} de ${relacion.length}. ${faltan} no los entregó SUNAT (error 500 en su plataforma); reintenta esos más tarde.` : undefined)
-          : "SUNAT no entregó ningún XML (respondió error en su plataforma). Reintenta en unos minutos o revisa el Modo diagnóstico.",
+          : "SUNAT no entregó ningún XML (respondió error en su plataforma). Reintenta en unos minutos.",
         diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
       };
     }
@@ -1453,7 +1453,7 @@ export async function extraerComprobantesPdf(
       fallidos,
       error: descargados
         ? (faltan > 0 ? `PDF descargados ${descargados} de ${relacionTotal.length} (${viaApi} por API, ${descargados - viaApi} por scraping). ${faltan} pendientes/no disponibles — reintenta.` : undefined)
-        : "No se descargó ningún PDF. Si el modo API no entrega PDF, revisa el Modo diagnóstico para calibrar el endpoint /01.",
+        : "No se descargó ningún PDF. Reintenta en unos minutos; si persiste, escríbenos.",
       diag: { pasos, apiCalls: params.diagnostico ? apiCalls : undefined },
     };
   } catch (err: any) {

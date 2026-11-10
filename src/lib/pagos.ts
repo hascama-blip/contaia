@@ -15,7 +15,7 @@
 
 import crypto from "crypto";
 import type { Pago, Usuario } from "./types";
-import { contarLanzamiento, crearPago, acreditarPago, getUserById, marcarPago } from "./db";
+import { contarLanzamiento, crearPago, acreditarPago, getPago, getUserById, marcarPago } from "./db";
 import { enviarCorreo } from "./email";
 import { enviarAlerta } from "./alertas";
 
@@ -80,6 +80,21 @@ export function modoPrueba(p: Pasarela | null = pasarelaActiva().pasarela): bool
   return false;
 }
 
+/**
+ * ¿Esta cuenta puede pagar en línea? Con claves de PRODUCCIÓN, todas. En MODO
+ * PRUEBA (claves de test: se "paga" con tarjetas de prueba, sin dinero real)
+ * SOLO las cuentas de `PAGOS_PRUEBA_CORREOS` (correos separados por coma): así
+ * nadie activa un plan gratis mientras la pasarela está en pruebas. Para el
+ * resto, la pasarela cuenta como no configurada (los botones van a WhatsApp).
+ */
+export function puedePagarEnLinea(u: { email: string } | null | undefined): boolean {
+  const cfg = pasarelaActiva();
+  if (!cfg.pasarela || !u) return false;
+  if (!modoPrueba(cfg.pasarela)) return true;
+  const lista = env("PAGOS_PRUEBA_CORREOS").toLowerCase().split(/[,;\s]+/).filter(Boolean);
+  return lista.includes(u.email.toLowerCase());
+}
+
 // ---- Inicio del pago ------------------------------------------------------------
 export type InicioPago =
   | { proveedor: "culqi"; pagoId: string; publicKey: string; montoCentimos: number; email: string; descripcion: string }
@@ -89,6 +104,7 @@ export type InicioPago =
 export async function iniciarPago(admin: Usuario, plan: PlanPago): Promise<InicioPago> {
   const cfg = pasarelaActiva();
   if (!cfg.pasarela) throw new Error(`La pasarela de pago aún no está configurada (falta ${cfg.falta.join(", ")}).`);
+  if (!puedePagarEnLinea(admin)) throw new Error("El pago en línea aún no está disponible. Escríbenos para activar tu plan.");
   const precio = await precioPara(admin, plan);
   const prueba = modoPrueba(cfg.pasarela);
   const pago = await crearPago({
@@ -246,6 +262,12 @@ export async function confirmarPago(
   pagoId: string,
   datos: { referencia?: string; montoCentimos?: number; detalle?: string },
 ): Promise<{ ok: boolean; pago: Pago | null; error?: string }> {
+  // Un pago hecho con claves de PRUEBA no activa nada salvo en las cuentas autorizadas.
+  const previo = await getPago(pagoId);
+  if (previo?.prueba && previo.estado !== "pagado" && !puedePagarEnLinea({ email: previo.userEmail })) {
+    console.warn(`[pagos] Pago de PRUEBA ${pagoId} de una cuenta no autorizada (${previo.userEmail}): no se acredita.`);
+    return { ok: false, pago: previo, error: "Pago de prueba: no activa el plan." };
+  }
   const r = await acreditarPago(pagoId, datos);
   if (!r.pago || r.error) return { ok: false, pago: r.pago, error: r.error };
   if (r.nuevo) void avisarPago(r.pago).catch(() => {});

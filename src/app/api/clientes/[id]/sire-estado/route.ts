@@ -1,6 +1,6 @@
 import { resolverSecreto } from "@/lib/secretos";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
 import { setSireEstado } from "@/lib/db";
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       clientSecret,
       diagnostico: body.diagnostico === true,
     });
+    await ocultarDiag(r);
     if (r.diag && !r.estados) return NextResponse.json({ diag: r.diag });
     // Persistir el estado para no re-consultar hasta la próxima semana.
     if (r.estados && r.estados.length && !body.diagnostico) {

@@ -62,6 +62,20 @@ export async function limpiarDiagnostico(body: any): Promise<void> {
   if (!esSupremo(await getCurrentUser())) body.diagnostico = false;
 }
 
+/** Quita de un resultado la TRAZA de diagnóstico (pasos, peticiones y respuestas
+ *  crudas de SUNAT) y las frases que mandan a usar el Modo diagnóstico, salvo
+ *  para el supremo. Las librerías arman la traza siempre; se llama justo
+ *  después de cada consulta, antes de responder al navegador. */
+export async function ocultarDiag(r: any): Promise<void> {
+  if (!r || typeof r !== "object") return;
+  if (esSupremo(await getCurrentUser())) return;
+  delete r.diag;
+  if (typeof r.error === "string" && /diagn[oó]stico|traza/i.test(r.error)) {
+    const frases = r.error.split(/(?<=[.!?])\s+/).filter((f: string) => !/diagn[oó]stico|traza/i.test(f));
+    r.error = `${frases.join(" ")} Vuelve a intentarlo en unos minutos; si continúa, escríbenos.`.trim();
+  }
+}
+
 /** Estudio dueño de las memorias (cuentas aprendidas) del usuario actual.
  *  undefined = supremo → memoria global heredada. */
 export async function estudioMemoria(): Promise<string | undefined> {

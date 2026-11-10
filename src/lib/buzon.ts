@@ -324,7 +324,7 @@ export async function consultarBuzon(params: BuzonParams): Promise<BuzonResultad
       return { mensajes: [], peligrosos: [], urgentes: [], diag: { pasos } };
     }
     throw new Error(
-      `Buzón: ${err instanceof Error ? err.message : String(err)} (usa Modo diagnóstico para más detalle)`
+      `Buzón: ${err instanceof Error ? err.message : String(err)}`
     );
   } finally {
     if (browser) await browser.close().catch(() => {});
@@ -766,7 +766,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
       }
       return {
         ok: false,
-        error: "No pude ubicar el enlace del adjunto tras abrir el mensaje. Usa Modo diagnóstico y compárteme el resultado.",
+        error: "No pude ubicar el enlace del adjunto tras abrir el mensaje. Reintenta; si persiste, escríbenos.",
         diag: { pasos },
       };
     }
@@ -847,7 +847,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     if (!sel.ok) {
       return {
         ok: false,
-        error: "No se pudo seleccionar el mensaje en la lista (reintenta). Si persiste, usa Modo diagnóstico.",
+        error: "No se pudo seleccionar el mensaje en la lista (reintenta). Si persiste, escríbenos.",
         diag: { pasos },
       };
     }
@@ -905,7 +905,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     if (!pdfB64 && docArgs && !coincide) {
       return {
         ok: false,
-        error: "Se abrió un mensaje distinto al pedido (la lista no cambió de selección). Reintenta; si persiste, usa Modo diagnóstico.",
+        error: "Se abrió un mensaje distinto al pedido (la lista no cambió de selección). Reintenta; si persiste, escríbenos.",
         diag: { pasos },
       };
     }
@@ -1046,7 +1046,7 @@ export async function descargarAdjuntoBuzon(params: AdjuntoParams): Promise<Adju
     if (pdfB64) return { ok: true, pdfBase64: pdfB64, filename: nombreArch || `resolucion-${codMensaje}.pdf` };
     return {
       ok: false,
-      error: "No pude capturar la descarga de la resolución. Usa Modo diagnóstico y compárteme el resultado.",
+      error: "No pude capturar la descarga de la resolución. Reintenta; si persiste, escríbenos.",
       diag: { pasos },
     };
   } catch (err) {

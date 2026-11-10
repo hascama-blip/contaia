@@ -462,7 +462,13 @@ export async function consultarSunat(ruc: string): Promise<SunatInfo> {
         `Puedes escribir la razón social a mano y crear el cliente igual.`
     );
   }
-  // En modo "auto" sin ninguna fuente real, degradamos a simulado (desarrollo).
+  // Sin ninguna fuente real configurada. Los datos SIMULADOS son solo para
+  // desarrollo o si se piden a propósito (SUNAT_PROVIDER=mock / SUNAT_FORCE_MOCK):
+  // en producción nunca se entregan por omisión (se confundirían con datos reales).
+  const simuladoPedido = cfg.forceMock || cfg.provider.toLowerCase() === "mock";
+  if (process.env.NODE_ENV === "production" && !simuladoPedido) {
+    throw new Error("La consulta a SUNAT no está configurada (falta DECOLECTA_TOKEN). Puedes escribir la razón social a mano y crear el cliente igual.");
+  }
   return simular(cleaned);
 }
 

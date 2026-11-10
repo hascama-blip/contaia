@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { requireUser, bloquearSiSoloRtp, planDelEstudio, esSupremo } from "@/lib/auth";
 import { getUserById } from "@/lib/db";
 import { PLANES, CONTACTO, waPlan } from "@/lib/planes";
-import { estadoLanzamiento, pasarelaActiva } from "@/lib/pagos";
+import { estadoLanzamiento, puedePagarEnLinea } from "@/lib/pagos";
 import BotonPagar from "@/components/BotonPagar";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export default async function Page() {
   const perfil = `${origin}/supremo?u=${user.id}`;
 
   const lanz = await estadoLanzamiento();
-  const pagoEnLinea = !!pasarelaActiva().pasarela;
+  const pagoEnLinea = puedePagarEnLinea(user.parentId ? await getUserById(user.parentId) : user); // en modo prueba, solo cuentas autorizadas
   const planActual = await planDelEstudio(user);
   const admin = user.parentId ? await getUserById(user.parentId) : user;
   const conLanzamiento = admin?.precioLanzamiento === true || lanz.restantes > 0;

@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!cupo.ok && body.diagnostico !== true) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio, diagnostico: body.diagnostico === true });
+  await ocultarDiag(r);
   if (body.diagnostico === true) return NextResponse.json({ diag: r.diag });
   if (!r.ok) return NextResponse.json({ error: r.error ?? "No se pudo consultar el ITF.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
   if (cupo.ok) await consumirCupo(cupo.ticket);

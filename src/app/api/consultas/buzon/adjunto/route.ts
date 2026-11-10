@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser } from "@/lib/auth";
@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
     adjuntos: typeof body.adjuntos === "number" ? body.adjuntos : undefined,
     diagnostico,
   });
+  await ocultarDiag(r);
 
   if (diagnostico || !r.ok || !r.pdfBase64) {
     return NextResponse.json(

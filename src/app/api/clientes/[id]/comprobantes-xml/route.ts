@@ -1,4 +1,4 @@
-import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
+import { bloqueoModulo, limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     relacion: relacionTope,
     diagnostico: body.diagnostico === true,
   });
+  await ocultarDiag(r);
 
   // Clave SOL errada / bloqueo → NO consume uso.
   if (r.loginError) {

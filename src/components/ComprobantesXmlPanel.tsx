@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePuedeDiag } from "./SupremoContext";
 import { zipSync } from "fflate";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
@@ -33,6 +34,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
   // Modo PDF masivo: baja el PDF OFICIAL (API /01 + scraping de respaldo).
   const [pdfMode, setPdfMode] = useState(false);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag(); // el Modo diagnóstico solo lo ve el supremo
   const [diag, setDiag] = useState<string | null>(null);
 
   const estadoDe = (i: number): EstadoFila => filas[i] ?? { estado: "pendiente" };
@@ -355,7 +357,7 @@ export default function ComprobantesXmlPanel({ clienteId }: { clienteId: string 
           <input type="checkbox" checked={pdfMode} onChange={(e) => { setPdfMode(e.target.checked); setDiag(null); }} />
           <span>📄 <strong>PDF masivo</strong> (PDF oficial)</span>
         </label>
-        {pdfMode && (
+        {puedeDiag && pdfMode && (
           <label className="flex items-center gap-2" title="Captura las llamadas de red internas de SUNAT para identificar el endpoint">
             <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
           </label>

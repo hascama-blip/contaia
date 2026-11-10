@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, getCurrentUser, esAdmin } from "@/lib/auth";
@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
       dias: typeof body.dias === "number" ? body.dias : 30,
       diagnostico: body.diagnostico === true,
     });
+    await ocultarDiag(r);
     // Clave/usuario SOL incorrectos: avisar y NO consumir uso (no persistir).
     if (r.loginError) {
       return NextResponse.json({ error: r.error ?? "Usuario o Clave SOL incorrectos." }, { status: 401 });

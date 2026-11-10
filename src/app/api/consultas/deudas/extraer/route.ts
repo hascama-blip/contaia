@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoDeudasF36 } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   if (!cupo.ok && !body.diagnostico) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   const r = await extraerDeudasF36({ ruc: cliente.ruc, solUser, solPass, diagnostico: body.diagnostico === true, forzarLogin: body.forzarLogin === true });
+  await ocultarDiag(r);
   if (r.ok && r.tablas && !body.diagnostico) {
     await setDeudasF36(cliente.id, r.tablas, r.nota).catch(() => {}); // reemplaza lo anterior
     if (cupo.ok) await consumirCupo(cupo.ticket);

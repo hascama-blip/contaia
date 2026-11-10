@@ -1,6 +1,6 @@
 import { ocultarCliente, ocultarCred, resolverSecreto } from "@/lib/secretos";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
-import { bloqueoModulo, limpiarDiagnostico } from "@/lib/acceso";
+import { bloqueoModulo, limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { consultarDetalleSire } from "@/lib/sire";
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       incluirCompras,
       diagnostico: body.diagnostico === true,
     });
+    await ocultarDiag(r);
     if (body.diagnostico) return NextResponse.json({ diag: r.diag });
     // SUNAT aún genera el reporte: no es error ni se cachea; el front reintenta.
     if (r.pendiente) {

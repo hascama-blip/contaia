@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   if (!cupo.ok && body.diagnostico !== true) return NextResponse.json(cupoAgotado(cupo), { status: 429 });
 
   const r = await consultarCuartaCategoria({ ruc: cliente.ruc, solUser, solPass, mes, anio, diagnostico: body.diagnostico === true });
+  await ocultarDiag(r);
   if (body.diagnostico === true) return NextResponse.json({ diag: r.diag });
   if (!r.ok) return NextResponse.json({ error: r.error ?? "No se pudo consultar la 4ta categoría.", diag: r.diag }, { status: r.loginError ? 401 : 502 });
   const estadoCupo = cupo.ok ? await consumirCupo(cupo.ticket) : null;

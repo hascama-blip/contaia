@@ -5,7 +5,8 @@ import {
   deleteDeclaracionAnual,
   newId,
 } from "@/lib/db";
-import { getClienteAutorizado } from "@/lib/auth";
+import { getClienteAutorizado, getCurrentUser, esSupremo } from "@/lib/auth";
+import { esClienteDemo } from "@/lib/demoRutas";
 import { extraerFilasPdf, parseAnual } from "@/lib/declaracionAnual";
 import type { DeclaracionAnual } from "@/lib/types";
 
@@ -28,7 +29,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (files.length === 0) {
     return NextResponse.json({ error: "Adjunta el PDF de la DJ anual (710)." }, { status: 400 });
   }
-  const diagnostico = form.get("diagnostico") === "true";
+  const supremo = esSupremo(await getCurrentUser());
+  // Modo diagnóstico: solo el supremo.
+  const diagnostico = supremo && form.get("diagnostico") === "true";
+  // DJ de OTRO contribuyente (RUC del PDF ≠ empresa y el de la empresa no aparece):
+  // en el periodo de prueba se cargaba con aviso; ahora solo el supremo (y las demo).
+  const permiteOtroRuc = supremo || esClienteDemo(cliente);
 
   const resultados: any[] = [];
   let primerDiag: any = null;
@@ -55,6 +61,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         ruc: parsed.ruc,
         valores: parsed.valores,
       };
+    }
+    if (!permiteOtroRuc && parsed.ruc && parsed.ruc !== cliente.ruc && !filas.some((f) => f.join("").replace(/\s/g, "").includes(cliente.ruc))) {
+      resultados.push({ archivo: file.name, ok: false, motivo: `La DJ anual es de otro RUC (${parsed.ruc}); esta empresa es ${cliente.ruc}. No se cargó.` });
+      continue;
     }
     if (!/^\d{4}$/.test(parsed.ejercicio)) {
       resultados.push({

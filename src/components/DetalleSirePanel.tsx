@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePuedeDiag } from "./SupremoContext";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
 
@@ -19,6 +20,7 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag(); // el Modo diagnóstico solo lo ve el supremo
   const [refrescar, setRefrescar] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const [bloque, setBloque] = useState<any>(null);
@@ -150,9 +152,11 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         <label className="ml-auto flex items-center gap-2 text-xs text-slate-500" title="Vuelve a consultar SUNAT en vez de usar lo guardado">
           <input type="checkbox" checked={refrescar} onChange={(e) => setRefrescar(e.target.checked)} /> 🔄 Refrescar
         </label>
-        <label className="flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
-        </label>
+        {puedeDiag && (
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+          </label>
+        )}
       </div>
 
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}

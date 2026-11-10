@@ -220,7 +220,20 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **Store**: toda función de `db.ts` que escribe corre dentro de `conBloqueoStore` (candado
   reentrante): no hay pérdidas por escrituras simultáneas. Funciones nuevas que escriban deben
   envolverse igual.
-- **Modo diagnóstico**: solo el supremo (`limpiarDiagnostico(body)` tras leer el cuerpo).
+- **Modo diagnóstico**: solo el supremo (`limpiarDiagnostico(body)` tras leer el cuerpo; en rutas con
+  formulario — declaraciones mensual y anual — `esSupremo` sobre el campo `diagnostico`). En la interfaz la
+  casilla solo se dibuja con `usePuedeDiag()` (SupremoContext): todo panel nuevo debe usarlo.
+  Las librerías SUNAT arman la traza (`diag`: pasos, peticiones, respuestas crudas) SIEMPRE: cada ruta llama
+  a `ocultarDiag(r)` justo después de la consulta para quitarla (y limpiar el mensaje) si no es el supremo.
+  Ruta nueva que devuelva el resultado de una librería SUNAT → llamar a `ocultarDiag`. Los mensajes de error
+  de las librerías ya no mencionan el Modo diagnóstico.
+- **Opciones del periodo de prueba, solo supremo**: SIRE de ejemplo/simulado (`real !== true` → 400 para
+  el resto; botón "Ver ejemplo"), "Probar envío" del buzón, `/api/rtt/probar-webhook`, cargar una DJ
+  (mensual o anual) de OTRO RUC (para el resto se rechaza si el PDF trae un RUC y el de la empresa no
+  aparece; las empresas demo quedan exentas). La consulta RUC **nunca** da datos simulados por omisión en
+  producción (solo con `SUNAT_PROVIDER=mock` / `SUNAT_FORCE_MOCK`). **Pagos en modo prueba** (claves de
+  test): solo las cuentas de `PAGOS_PRUEBA_CORREOS` ven la pasarela y se les acredita
+  (`puedePagarEnLinea`); para el resto cuenta como no configurada.
 - **Límites**: `src/lib/limite.ts` (login por IP y correo, registro, códigos, pagos, Asociación,
   consulta RUC, webhook RTT).
 - **Sesiones**: el token lleva `sesionVersion`; restablecer la contraseña cierra las demás

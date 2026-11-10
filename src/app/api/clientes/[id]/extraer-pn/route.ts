@@ -1,3 +1,4 @@
+import { ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   } else {
     try {
       const f = await generarPedidoDeuda({ ruc: cliente.ruc, solUser, solPass });
+      await ocultarDiag(f);
       if ((f as any).loginError) return errLogin(f.error);
       if (f.ok) {
         await setDeudaGenerado(cliente.id, { numPedido: f.numPedido, fechaPedido: f.fechaPedido }).catch(() => {});
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       const sol = await upsertSolicitudRentas({ clienteId: params.id, ruc: cliente.ruc, emailDestino, solicitadoPor: user.id });
       try {
         const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
+        await ocultarDiag(r);
         if (r.loginError) { await setEstadoRentas(params.id, "error", { error: r.error }); return errLogin(r.error); }
         if (!r.ok) { await setEstadoRentas(params.id, "error", { error: r.error }); salida.rentas = { ok: false, error: r.error }; }
         else salida.rentas = { ok: true, estado: sol.estado };
@@ -88,6 +91,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     // ITF — en pantalla. Reutiliza la sesión.
     try {
       const r = await consultarItf({ ruc: cliente.ruc, solUser, solPass, ejercicio });
+      await ocultarDiag(r);
       if (r.loginError) return errLogin(r.error);
       if (r.ok && r.itf) { await setItfReporte(params.id, r.itf).catch(() => {}); salida.itf = { ok: true, registros: r.itf.filas.length, total: r.itf.total }; }
       else salida.itf = { ok: false, error: r.error };

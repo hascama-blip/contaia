@@ -1,4 +1,4 @@
-import { limpiarDiagnostico } from "@/lib/acceso";
+import { limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esClienteDemo, demoNoDisponible, demoSunat, demoSire, demoSireEstado, demoSireDetalle, demoBuzon, demoItf } from "@/lib/demoRutas";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado, requireUser } from "@/lib/auth";
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   if (body.diagnostico === true) {
     const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio, diagnostico: true });
+    await ocultarDiag(r);
     return NextResponse.json({ diag: r.diag });
   }
 
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const sol = await upsertSolicitudRentas({ clienteId: params.id, ruc: cliente.ruc, emailDestino, solicitadoPor: user.id });
   const r = await generarReporteRentas({ ruc: cliente.ruc, solUser, solPass, emailDestino, ejercicio });
+  await ocultarDiag(r);
   if (!r.ok) {
     await setEstadoRentas(params.id, "error", { error: r.error });
     return NextResponse.json({ error: r.error ?? "No se pudo generar el reporte.", diag: r.diag }, { status: r.loginError ? 401 : 502 });

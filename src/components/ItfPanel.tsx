@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePuedeDiag } from "./SupremoContext";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 
 const soles = (n: any) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,6 +16,7 @@ export default function ItfPanel({ clienteId, solUserGuardado, inicial, sinConsu
   const [itf, setItf] = useState<any>(inicial ?? null);
   const [consultado, setConsultado] = useState(Boolean(inicial));
   const [diagModo, setDiagModo] = useState(false);
+  const puedeDiag = usePuedeDiag(); // el Modo diagnóstico solo lo ve el supremo
   const [diag, setDiag] = useState<string | null>(null);
 
   // Cuando "⚡ Extraer todo" guarda el ITF y refresca el server, el prop `inicial`
@@ -62,9 +64,11 @@ export default function ItfPanel({ clienteId, solUserGuardado, inicial, sinConsu
             <button className="btn-primary" onClick={consultar} disabled={busy}>
               {busy ? "Consultando…" : "🔎 Consultar ITF"}
             </button>
-            <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-              <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
-            </label>
+            {puedeDiag && (
+              <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+                <input type="checkbox" checked={diagModo} onChange={(e) => setDiagModo(e.target.checked)} /> Modo diagnóstico
+              </label>
+            )}
           </>
         )}
       </div>

@@ -2,7 +2,7 @@ import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, esAdmin, esSupremo, planEfectivo } from "@/lib/auth";
 import { listPagos } from "@/lib/db";
-import { pasarelaActiva, precioPara, estadoLanzamiento, iniciarPago, modoPrueba, PRECIOS, type PlanPago } from "@/lib/pagos";
+import { pasarelaActiva, precioPara, estadoLanzamiento, iniciarPago, modoPrueba, puedePagarEnLinea, PRECIOS, type PlanPago } from "@/lib/pagos";
 
 export const runtime = "nodejs";
 
@@ -13,6 +13,7 @@ export async function GET() {
   if (!u) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const cfg = pasarelaActiva();
   const lanz = await estadoLanzamiento();
+  const enLinea = puedePagarEnLinea(u);
   const puedePagar = esAdmin(u) && !esSupremo(u);
   const precios = {
     regular: await precioPara(u, "regular"),
@@ -20,9 +21,10 @@ export async function GET() {
   };
   const pagos = puedePagar ? (await listPagos(u.id)).filter((p) => p.estado === "pagado").slice(0, 5) : [];
   return NextResponse.json({
-    pasarela: cfg.pasarela,
-    configurada: !!cfg.pasarela,
-    modoPrueba: modoPrueba(cfg.pasarela),
+    // En modo prueba (claves de test) solo la ven las cuentas autorizadas para probar.
+    pasarela: enLinea ? cfg.pasarela : null,
+    configurada: enLinea,
+    modoPrueba: enLinea && modoPrueba(cfg.pasarela),
     puedePagar,
     plan: planEfectivo(u),
     planVence: u.planVence ?? null,
