@@ -7,8 +7,8 @@ import { leerPrimeraHoja } from "../lib/xlsx.js";
 import { standsDesdeFilas, standsDesdeTexto, planAsociacion } from "../lib/standsAsociacion.js";
 import { marcarStandsAsociacion } from "../api/stands.js";
 
-const TONO = { crear: "asoc", marcar: "asoc", dueno: "alerta", ya: "neutro" };
-const TEXTO = { crear: "Se crea", marcar: "Se marca", dueno: "Tenía dueño", ya: "Ya estaba" };
+const TONO = { crear: "asoc", marcar: "asoc", dueno: "alerta", nota: "info", ya: "neutro" };
+const TEXTO = { crear: "Se crea", marcar: "Se marca", dueno: "Tenía dueño", nota: "Se anota", ya: "Ya estaba" };
 
 export function PanelStandsAsociacion({ onCerrar }) {
   const { datos, derivados, usuario, avisar } = useApp();
@@ -39,20 +39,21 @@ export function PanelStandsAsociacion({ onCerrar }) {
   }
   async function aplicar() {
     const conDueno = plan.filter((p) => p.accion === "dueno").length;
-    if (!confirm(`Se marcarán ${pendientes.length} stands como de la asociación${conDueno ? `; ${conDueno} figuraban a nombre de un asociado, que pasa al historial del stand` : ""}. ¿Continuar?`)) return;
+    const soloNotas = pendientes.every((p) => p.accion === "nota");
+    if (!confirm(soloNotas ? `Se anotará cómo figuran en el libro ${pendientes.length} stands de la asociación. ¿Continuar?` : `Se marcarán ${pendientes.length} stands como de la asociación${conDueno ? `; ${conDueno} figuraban a nombre de un asociado, que pasa al historial del stand` : ""}. ¿Continuar?`)) return;
     setAvance({ hechos: 0, total: pendientes.length });
     const r = await marcarStandsAsociacion(pendientes.map(({ codigo, nota }) => ({ codigo, nota })), {
       asociados: datos.asociados, por: usuario?.id, documento: origen ? `Revisión del libro (${origen})` : "",
       onAvance: (hechos, total) => setAvance({ hechos, total }),
     });
     setAvance(null); setHecho(r);
-    avisar(r.errores.length ? `Marcados ${r.marcados}; ${r.errores.length} con error.` : `Listo: ${r.marcados} stands marcados como de la asociación.`, r.errores.length ? "error" : "ok");
+    avisar(r.errores.length ? `Marcados ${r.marcados}; ${r.errores.length} con error.` : `Listo: ${r.marcados + r.anotados} stands de la asociación actualizados.`, r.errores.length ? "error" : "ok");
   }
 
   return html`
     <${Panel} titulo="Stands de la asociación" onCerrar=${avance ? () => {} : onCerrar}
       pie=${html`<button className="btn btn-ghost" disabled=${!!avance} onClick=${onCerrar}>Cerrar</button>
-        ${!hecho && html`<button className="btn btn-primary" disabled=${!pendientes.length || !!avance} onClick=${aplicar}>${avance ? `Marcando ${avance.hechos} de ${avance.total}…` : `Marcar ${pendientes.length} stands`}</button>`}`}>
+        ${!hecho && html`<button className="btn btn-primary" disabled=${!pendientes.length || !!avance} onClick=${aplicar}>${avance ? `Guardando ${avance.hechos} de ${avance.total}…` : pendientes.length && pendientes.every((p) => p.accion === "nota") ? `Anotar ${pendientes.length} stands` : `Marcar ${pendientes.length} stands`}</button>`}`}>
       <p className="ayuda" style=${{ marginTop: 0 }}>
         Un stand de la asociación no tiene a un asociado como dueño: en Stands, el plano y los reportes figura como
         <b> Asociación (stand propio)</b>. Si figuraba a nombre de un asociado, ese asociado pasa al historial del stand (no se borra)
@@ -68,7 +69,7 @@ export function PanelStandsAsociacion({ onCerrar }) {
       ${aviso && html`<div className="aviso aviso-alerta" style=${{ marginTop: 10 }}><span>${aviso}</span></div>`}
       ${avance && html`<div style=${{ marginTop: 10 }}><${Barra} pct=${Math.round((avance.hechos / Math.max(1, avance.total)) * 100)} tono="ok" /></div>`}
       ${hecho && html`<div className=${`aviso ${hecho.errores.length ? "aviso-alerta" : "aviso-ok"}`} style=${{ marginTop: 10 }}><span>
-        <b>Guardado.</b> ${hecho.marcados} stands marcados${hecho.creados ? ` (${hecho.creados} creados)` : ""}${hecho.conDueno ? ` · ${hecho.conDueno} con dueño anterior en el historial` : ""}${hecho.yaEstaban ? ` · ${hecho.yaEstaban} ya estaban` : ""}.
+        <b>Guardado.</b> ${hecho.marcados} stands marcados${hecho.creados ? ` (${hecho.creados} creados)` : ""}${hecho.conDueno ? ` · ${hecho.conDueno} con dueño anterior en el historial` : ""}${hecho.anotados ? ` · ${hecho.anotados} con su nota del libro` : ""}${hecho.yaEstaban ? ` · ${hecho.yaEstaban} ya estaban` : ""}.
         ${hecho.errores.length ? html`<br />${hecho.errores.join(" · ")}` : ""}</span></div>`}
       ${plan.length > 0 && html`
         <p className="ayuda" style=${{ marginTop: 12 }}>${origen ? html`Archivo <b>${origen}</b>: ` : ""}${plan.length} stands · ${pendientes.length} por marcar${plan.length - pendientes.length ? ` · ${plan.length - pendientes.length} ya estaban` : ""}.</p>

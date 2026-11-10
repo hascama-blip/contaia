@@ -143,6 +143,9 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   toma las filas "STAND DE LA ASOCIACION", o se pegan los números; primero muestra qué pasa con cada stand. Si figuraba a
   nombre de un asociado, éste pasa a `stand.historial` (motivo "Stand de la asociación") y su ficha queda `revisar`.
   Venderlo: «Registrar venta o traspaso» (la asociación queda en el historial). Una ficha nueva no puede tomarlo sin traspaso.
+  Al arrancar, `servidor/lib/migraciones.js` marca **una sola vez** (queda anotado en `DATOS/migraciones.json`) los 34
+  stands de la revisión del libro 2026 que no tengan un asociado como dueño (los crea si no existían); los que tengan dueño
+  no se tocan y quedan para el panel, que muestra a quién pasaría al historial. Cargar el Excel después completa la nota.
 - **Actualizar con fichas del libro** (solo admin): Padrón → "Actualizar con fichas del libro" o
   Administración → `/portal#actualizar`. Carga un JSON `{ tipo: "censo-fichas-libro", fechaDocumento, fichas[], omitidas[] }`
   con la transcripción de las fichas manuscritas del Libro de Padrón y la foto de cada una (data URL). Motor puro en

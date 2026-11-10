@@ -1,6 +1,11 @@
 // Ajustes de datos que se aplican una vez al arrancar (idempotentes: si no hay nada
 // que cambiar, no tocan nada). Así una regla nueva alcanza a los datos ya cargados
 // sin que la directiva tenga que importar ni ejecutar nada.
+// Las reglas de "una sola vez" (unaVez) quedan además anotadas en DATOS/migraciones.json:
+// no se repiten aunque después alguien cambie a mano lo que hicieron.
+import fs from "node:fs";
+import path from "node:path";
+import { PLANO } from "../../src/plano.js";
 
 /**
  * Regla: toda ficha cuyos datos ya se confirmaron con RENIEC queda con estado
@@ -66,10 +71,61 @@ export function traspasosAnotadosEnElLibro(almacen) {
   return hechos;
 }
 
+// Stands propios de la Asociación según la revisión del Libro de Padrón 2026 (filas
+// "STAND DE LA ASOCIACION" del Excel de revisión). Solo números de stand: sin datos personales.
+export const STANDS_ASOCIACION_2026 = [
+  "1014", "1015", "1019", "1020", "1022", "1023", "1027", "1028", "1029", "1030", "1031", "1039", "1097",
+  "1280", "1281", "1288", "1289", "1323", "1326", "1327", "1333", "1334", "1335", "1336", "1357",
+  "1396", "1397", "1398", "1399", "1400", "1401", "1402", "1403", "1404",
+];
+const GALERIA_DE = new Map((PLANO.stands || []).map(([codigo, galeria]) => [String(codigo), galeria]));
+
+/**
+ * Marca como «de la asociación» (stand.deAsociacion) los stands propios de la Asociación.
+ * Sin dueño o sin registrar → se marca (se crea si no existía). Si el stand figura a nombre de
+ * un asociado NO se toca: queda para Stands → «Stands de la asociación…», que muestra a quién
+ * pasaría al historial antes de guardar.
+ * @returns {{ marcados:number, creados:number, yaEstaban:number, conDueno:string[] }}
+ */
+export function standsDeLaAsociacion(almacen, codigos = STANDS_ASOCIACION_2026) {
+  const ahora = new Date().toISOString(), hoy = ahora.slice(0, 10);
+  const r = { marcados: 0, creados: 0, yaEstaban: 0, conDueno: [] };
+  for (const codigo of codigos) {
+    const s = almacen.obtener("stands", codigo)?.data;
+    if (!s) {
+      almacen.establecer("stands", codigo, {
+        codigo, galeria: GALERIA_DE.get(codigo) || "", area: null, giro: "", propietarioId: null, propietarioDesde: null,
+        inquilino: null, estado: "propietario", historial: [], deAsociacion: true, asociacionNota: "", asociacionDesde: hoy,
+        creadoAt: ahora, actualizadoAt: ahora,
+      });
+      r.creados++; r.marcados++;
+    } else if (s.propietarioId) r.conDueno.push(codigo);
+    else if (s.deAsociacion) r.yaEstaban++;
+    else { almacen.actualizar("stands", codigo, { deAsociacion: true, asociacionDesde: hoy, actualizadoAt: ahora }); r.marcados++; }
+  }
+  return r;
+}
+
+/** Corre `fn` solo si esa regla aún no se aplicó en estos datos; anota el resultado. Devuelve null si ya estaba. */
+function unaVez(almacen, id, fn) {
+  const ruta = path.join(almacen.dir, "migraciones.json");
+  let hechas = {};
+  try { hechas = JSON.parse(fs.readFileSync(ruta, "utf8")); } catch { /* primera vez */ }
+  if (hechas[id]) return null;
+  const resultado = fn();
+  almacen.vaciar(); // los datos a disco antes de dar la regla por hecha
+  hechas[id] = { en: new Date().toISOString(), resultado };
+  fs.writeFileSync(ruta + ".tmp", JSON.stringify(hechas, null, 1));
+  fs.renameSync(ruta + ".tmp", ruta);
+  return resultado;
+}
+
 export function aplicarMigraciones(almacen) {
   const r = { fichasVerificadasPorReniec: fichasVerificadasPorReniec(almacen), traspasos: traspasosAnotadosEnElLibro(almacen) };
   if (r.fichasVerificadasPorReniec) console.log(`Migración: ${r.fichasVerificadasPorReniec} ficha(s) verificadas con RENIEC pasaron a estado "verificado".`);
   for (const t of r.traspasos) console.log(`Migración: traspaso anotado en el libro aplicado · ${t}`);
   if (r.fichasVerificadasPorReniec || r.traspasos.length) almacen.vaciar();
+  r.standsAsociacion = unaVez(almacen, "2026-11-stands-asociacion", () => standsDeLaAsociacion(almacen));
+  if (r.standsAsociacion) console.log(`Migración: stands de la asociación · ${r.standsAsociacion.marcados} marcados (${r.standsAsociacion.creados} creados)${r.standsAsociacion.conDueno.length ? ` · con dueño, sin tocar: ${r.standsAsociacion.conDueno.join(", ")}` : ""}.`);
   return r;
 }

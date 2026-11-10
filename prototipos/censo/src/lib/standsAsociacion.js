@@ -31,12 +31,16 @@ export function standsDesdeTexto(texto) {
   return { items: validos.sort((a, b) => compararCodigos(a.codigo, b.codigo)), invalidos };
 }
 
-/** Qué pasará con cada stand: crear | marcar | dueno (pasa al historial) | ya. */
+/** Qué pasará con cada stand: crear | marcar | dueno (pasa al historial) | nota (ya marcado, se anota cómo figura en el libro) | ya. */
 export function planAsociacion(items, stands, porId) {
   return items.map(({ codigo, nota }) => {
     const s = stands.find((x) => x.codigo === codigo);
     if (!s) return { codigo, nota, accion: "crear", texto: "No estaba registrado: se crea como stand de la asociación." };
-    if (s.deAsociacion && !s.propietarioId) return { codigo, nota, accion: "ya", texto: "Ya figura como stand de la asociación." };
+    if (s.deAsociacion && !s.propietarioId) {
+      return nota && !s.asociacionNota
+        ? { codigo, nota, accion: "nota", texto: "Ya figura como stand de la asociación: se anota cómo figura en el libro." }
+        : { codigo, nota, accion: "ya", texto: "Ya figura como stand de la asociación." };
+    }
     if (s.propietarioId) {
       const a = porId.get(s.propietarioId);
       return { codigo, nota, accion: "dueno", dueno: a || null, texto: `Figura a nombre de ${a ? `${nombreCompleto(a)} (${etiquetaNumero(a)})` : "una ficha que ya no existe"}: pasa al historial del stand y su ficha queda «por revisar».` };

@@ -88,7 +88,7 @@ export async function transferirStand(codigo, t, { asociados, stands, mapaStands
  * @returns {Promise<{ marcados:number, creados:number, conDueno:number, yaEstaban:number, errores:string[] }>}
  */
 export async function marcarStandsAsociacion(items, { asociados = [], por = null, documento = "", onAvance } = {}) {
-  const r = { marcados: 0, creados: 0, conDueno: 0, yaEstaban: 0, errores: [] };
+  const r = { marcados: 0, creados: 0, conDueno: 0, anotados: 0, yaEstaban: 0, errores: [] };
   const hoyIso = hoy().iso;
   for (const [i, { codigo, nota = "" }] of items.entries()) {
     onAvance?.(i + 1, items.length, codigo);
@@ -102,8 +102,8 @@ export async function marcarStandsAsociacion(items, { asociados = [], por = null
         continue;
       }
       if (s.deAsociacion && !s.propietarioId) {
-        if (marca.asociacionNota && !s.asociacionNota) await db.actualizarStand(codigo, { asociacionNota: marca.asociacionNota });
-        r.yaEstaban++;
+        if (marca.asociacionNota && !s.asociacionNota) { await db.actualizarStand(codigo, { asociacionNota: marca.asociacionNota }); r.anotados++; }
+        else r.yaEstaban++;
         continue;
       }
       if (s.propietarioId) {
