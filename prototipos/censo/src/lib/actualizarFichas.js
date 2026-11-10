@@ -15,7 +15,7 @@
 //    queda como conflicto para revisar a mano.
 //  - Si dos fichas del archivo piden el mismo stand, primero va la antigua (con N°) y luego la
 //    nueva: así el historial queda antiguo → nuevo.
-import { normalizar, nombreCompleto, tieneNumero, standsPorAsociado, existeStand, galeriaDeCodigo, etiquetaNumero } from "./padron.js";
+import { normalizar, nombreCompleto, tieneNumero, standsPorAsociado, existeStand, galeriaDeCodigo, etiquetaNumero, DUENO_ASOCIACION } from "./padron.js";
 import { numeroAHeredar } from "./propietarios.js";
 import { LISTAS } from "../config.js";
 
@@ -228,7 +228,7 @@ function esLlegadaNueva(f, stand, dueno) {
   return Boolean(f.fechaIngreso && desdeDueno && f.fechaIngreso > desdeDueno);
 }
 
-const describir = (a) => (a ? `${nombreCompleto(a)} (${etiquetaNumero(a)})` : "sin ficha");
+const describir = (a, stand) => (a ? `${nombreCompleto(a)} (${etiquetaNumero(a)})` : stand?.deAsociacion ? DUENO_ASOCIACION : "sin ficha");
 
 /**
  * Procesa el lote. `ops` hace los cambios (simulados o reales) y mantiene `estado` al día.
@@ -273,7 +273,7 @@ export async function procesarFichas(lote, estado, { ops, hoyIso, ahora, motivo 
           fila.stands.push({ codigo, accion: "creado", texto: `No estaba registrado: se crea a su nombre${cuenta ? ` · N° de cuenta ${cuenta}` : ""}.` });
           continue;
         }
-        if (!stand.propietarioId) {
+        if (!stand.propietarioId && !stand.deAsociacion) {
           await ops.actualizarStand(codigo, { propietarioId: id, propietarioDesde: f.fechaIngreso || stand.propietarioDesde || null, ...extraCuenta(stand) });
           fila.stands.push({ codigo, accion: "asignado", texto: `Estaba sin propietario: se le asigna${notaCuenta(stand)}.` });
           continue;
@@ -290,12 +290,12 @@ export async function procesarFichas(lote, estado, { ops, hoyIso, ahora, motivo 
           continue;
         }
         if (!esLlegadaNueva(f, stand, dueno)) {
-          fila.stands.push({ codigo, accion: "conflicto", texto: `Figura a nombre de ${describir(dueno)}. La ficha no muestra que sea una compra posterior: no se cambió. Si cambió de dueño, regístralo con «Registrar venta o traspaso».` });
+          fila.stands.push({ codigo, accion: "conflicto", texto: `Figura a nombre de ${describir(dueno, stand)}. La ficha no muestra que sea una compra posterior: no se cambió. Si cambió de dueño, regístralo con «Registrar venta o traspaso».` });
           continue;
         }
         const fecha = fechaTraspaso(f, stand, { fechaDocumento: lote.fechaDocumento, hoyIso });
         if (!fecha) {
-          fila.stands.push({ codigo, accion: "conflicto", texto: `Figura a nombre de ${describir(dueno)} desde ${stand.propietarioDesde}, fecha posterior a la de la ficha: no se cambió.` });
+          fila.stands.push({ codigo, accion: "conflicto", texto: `Figura a nombre de ${describir(dueno, stand)} desde ${stand.propietarioDesde}, fecha posterior a la de la ficha: no se cambió.` });
           continue;
         }
         const r = await ops.traspasar(codigo, {
@@ -306,7 +306,7 @@ export async function procesarFichas(lote, estado, { ops, hoyIso, ahora, motivo 
         if (extraCuenta(stand).cuenta) await ops.actualizarStand(codigo, extraCuenta(stand));
         fila.stands.push({
           codigo, accion: "traspaso",
-          texto: `Traspaso desde ${describir(dueno)} el ${fecha.split("-").reverse().join("/")} (${motivo}); el anterior queda en el historial${r?.hereda ? ` · hereda el N° ${r.hereda}` : ""}${r?.anteriorSale ? " · el anterior queda «Transferido»" : ""}${notaCuenta(stand)}.`,
+          texto: `Traspaso desde ${describir(dueno, stand)} el ${fecha.split("-").reverse().join("/")} (${motivo}); el anterior queda en el historial${r?.hereda ? ` · hereda el N° ${r.hereda}` : ""}${r?.anteriorSale ? " · el anterior queda «Transferido»" : ""}${notaCuenta(stand)}.`,
         });
       }
       for (const c of f.standsInvalidos) fila.stands.push({ codigo: c, accion: "conflicto", texto: "Ese número no existe en el plano: no se tomó." });
@@ -344,8 +344,8 @@ export function opsSimuladas(estado) {
       const comprador = asociado(tr.nuevoId);
       const hereda = numeroAHeredar({ anterior, comprador, modo: "existente", standsDelAnterior: delAnterior, codigo });
       const anteriorSale = Boolean(anterior && delAnterior.every((x) => x.codigo === codigo));
-      s.historial = [...(s.historial || []), { asociadoId: anterior?.id || null, nombre: anterior ? nombreCompleto(anterior) : "Sin ficha", hasta: tr.fecha, motivo: tr.motivo }];
-      Object.assign(s, { propietarioId: tr.nuevoId, propietarioDesde: tr.fecha });
+      s.historial = [...(s.historial || []), { asociadoId: anterior?.id || null, nombre: anterior ? nombreCompleto(anterior) : s.deAsociacion ? DUENO_ASOCIACION : "Sin ficha", hasta: tr.fecha, motivo: tr.motivo }];
+      Object.assign(s, { propietarioId: tr.nuevoId, propietarioDesde: tr.fecha, deAsociacion: false });
       if (anteriorSale) { anterior.estado = "transferido"; if (hereda) anterior.numero = ""; }
       if (comprador) { if (comprador.estado === "transferido") comprador.estado = "activo"; if (hereda) comprador.numero = hereda; }
       return { hereda, anteriorSale };

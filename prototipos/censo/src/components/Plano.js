@@ -125,6 +125,13 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
               <a className="btn btn-primary btn-sm" href=${`#ficha-${asociado.id}`}>Ver detalle</a>
               ${onVerificar && puedeEscribir !== false && html`<button className="btn btn-ghost btn-sm" onClick=${() => { cerrar(); onVerificar(activo.codigo); }}>Verificar aquí</button>`}
             </div>`
+          : stand?.deAsociacion && !stand.propietarioId ? html`
+            <p className="burbuja-nombre">Stand de la asociación</p>
+            <p className="burbuja-dato">Propiedad de la Asociación (stand propio)${stand.giro ? ` · ${stand.giro}` : ""}</p>
+            ${stand.asociacionNota && html`<p className="burbuja-dato">En el libro: ${stand.asociacionNota}</p>`}
+            <div className="burbuja-badges"><${BadgeStand} estado=${stand.estado} /></div>
+            ${stand.inquilino?.nombre && html`<p className="burbuja-dato">Inquilino: ${stand.inquilino.nombre}</p>`}
+            ${stand.historial?.length > 0 && html`<p className="burbuja-dato">Antes: ${stand.historial[stand.historial.length - 1].nombre}</p>`}`
           : html`
             <p className="burbuja-dato">Stand sin ficha en el padrón.</p>
             ${puedeEscribir !== false && html`<div className="burbuja-acciones"><a className="btn btn-primary btn-sm" href=${`#nueva-${activo.codigo}`}>Registrar ficha</a></div>`}`}

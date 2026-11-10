@@ -135,6 +135,14 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   expedientes ZIP ni respaldo, no edita la web pública y no toca cuentas `admin`), `lib/reniec.js`
   (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- **Stands de la asociación**: `stand.deAsociacion = true` (con `propietarioId: null`, `asociacionNota` = cómo figura en
+  el libro, p. ej. "APCCIC-…", y `asociacionDesde`). Se muestra como **Asociación (stand propio)** en Stands (filtro
+  propio), plano (violeta, leyenda "De la asociación"), buscador, pagos, reportes e historial (la asociación es la
+  propietaria actual). Se marca uno por uno en el panel del stand (casilla) o de a muchos en Stands → «Stands de la
+  asociación…» (admin y admingen): carga el Excel de revisión del libro (`src/lib/xlsx.js`, lector .xlsx sin librerías) y
+  toma las filas "STAND DE LA ASOCIACION", o se pegan los números; primero muestra qué pasa con cada stand. Si figuraba a
+  nombre de un asociado, éste pasa a `stand.historial` (motivo "Stand de la asociación") y su ficha queda `revisar`.
+  Venderlo: «Registrar venta o traspaso» (la asociación queda en el historial). Una ficha nueva no puede tomarlo sin traspaso.
 - **Actualizar con fichas del libro** (solo admin): Padrón → "Actualizar con fichas del libro" o
   Administración → `/portal#actualizar`. Carga un JSON `{ tipo: "censo-fichas-libro", fechaDocumento, fichas[], omitidas[] }`
   con la transcripción de las fichas manuscritas del Libro de Padrón y la foto de cada una (data URL). Motor puro en

@@ -628,3 +628,11 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
 
 /* Observación de lo que falta en una ficha verificada */
 .obs-faltan { color: var(--alerta); background: var(--alerta-fondo); padding: 6px 10px; border-radius: var(--radio-sm); }
+
+/* Stands propios de la Asociación (violeta: no es un asociado ni un stand libre).
+   Tono oscuro sobre la página blanca y claro dentro de las cajas azul marino. */
+:root { --asoc: #5b3fd6; --asoc-fondo: #ece8ff; }
+.card, .panel, .plano-azul { --asoc: #d3c8ff; --asoc-fondo: #43358c; }
+.b-asoc { background: var(--asoc-fondo); color: var(--asoc); }
+.pl-asoc polygon { fill: var(--asoc-fondo); stroke: var(--asoc); }
+.leyenda .ley-asoc { background: var(--asoc-fondo); border: 1px solid var(--asoc); }

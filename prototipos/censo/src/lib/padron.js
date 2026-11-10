@@ -18,6 +18,15 @@ export function nombreCompleto(a) {
   return `${apellidos(a)}, ${a.nombres || ""}`.trim();
 }
 
+/** Stand propio de la Asociación: lo marca `stand.deAsociacion` y no tiene un asociado como dueño. */
+export const DUENO_ASOCIACION = "Asociación (stand propio)";
+export const esDeAsociacion = (s) => Boolean(s && s.deAsociacion && !s.propietarioId);
+/** Quién figura como dueño del stand, en texto: el asociado, la Asociación o "Sin propietario". */
+export function propietarioTexto(stand, porId) {
+  const a = stand?.propietarioId ? porId.get(stand.propietarioId) : null;
+  return a ? nombreCompleto(a) : esDeAsociacion(stand) ? DUENO_ASOCIACION : "Sin propietario";
+}
+
 /** "Mendoza Ríos, J." */
 export function nombreCorto(a) {
   if (!a) return "—";

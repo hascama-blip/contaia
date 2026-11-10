@@ -43,6 +43,8 @@ export function validarFicha(f, { asociados = [], stands = [], idActual = null }
       const ocupado = validos
         .map((c) => stands.find((s) => s.id === c || s.codigo === c))
         .find((s) => s && s.propietarioId && s.propietarioId !== idActual);
+      const deAsoc = !ocupado && validos.map((c) => stands.find((s) => s.id === c || s.codigo === c)).find((s) => s && s.deAsociacion && !s.propietarioId);
+      if (deAsoc) e.stands = `El stand ${deAsoc.codigo} es un stand de la asociación. Si la asociación lo vendió o traspasó, usa «Registrar venta o traspaso» en Stands; la asociación queda en el historial.`;
       if (ocupado) {
         const dueno = asociados.find((a) => a.id === ocupado.propietarioId);
         e.stands = `El stand ${ocupado.codigo} ya figura a nombre de ${nombreCompleto(dueno)}. Si lo vendió, usa «Registrar venta o traspaso» en Stands; el anterior queda en el historial.`;

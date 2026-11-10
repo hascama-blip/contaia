@@ -4,7 +4,7 @@ import { CabPagina, Tarjeta, BadgeAtraso, Vacio } from "../components/ui.js";
 import { CuadroAnual, Leyenda, PanelPago, PanelRevertirPago, ListaAnulaciones } from "../components/Pagos.js";
 import { Buscador, opcionesStands } from "../components/Buscador.js";
 import { useApp } from "../components/contexto.js";
-import { compararCodigos, nombreCompleto, nombreGaleria } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, nombreGaleria, propietarioTexto } from "../lib/padron.js";
 import { registrosDe, anulacionesDe, deudaStand, morosidadPorGaleria } from "../lib/pagos.js";
 import { soles } from "../lib/formato.js";
 
@@ -45,7 +45,7 @@ export function Pagos({ stand: standRuta }) {
           ? html`<div className="card-cuerpo" style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style=${{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                 <div>
-                  <p style=${{ fontWeight: 700 }}>Stand ${stand.codigo} · ${dueno ? html`<a href=${`#ficha-${dueno.id}`}>${nombreCompleto(dueno)}</a>` : "Sin propietario"}</p>
+                  <p style=${{ fontWeight: 700 }}>Stand ${stand.codigo} · ${dueno ? html`<a href=${`#ficha-${dueno.id}`}>${nombreCompleto(dueno)}</a>` : propietarioTexto(stand, porId)}</p>
                   <p className="card-sub">${nombreGaleria(stand.galeria)}${stand.giro ? ` · ${stand.giro}` : ""}</p>
                 </div>
                 <div style=${{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -81,7 +81,7 @@ export function Pagos({ stand: standRuta }) {
                     ${abierta && suyos.map((m) => {
                       const d = porId.get(m.stand.propietarioId);
                       return html`<tr key=${`${f.id}-${m.stand.codigo}`} className="fila-detalle">
-                        <td><span className="num fuerte">${m.stand.codigo}</span> · ${d ? nombreCompleto(d) : "Sin propietario"}
+                        <td><span className="num fuerte">${m.stand.codigo}</span> · ${d ? nombreCompleto(d) : propietarioTexto(m.stand, porId)}
                           <br /><span style=${{ display: "inline-flex", gap: 8, alignItems: "center", marginTop: 4 }}><${BadgeAtraso} meses=${m.deuda.meses} />
                           ${d && html`<a href=${`#ficha-${d.id}`} onClick=${(e) => e.stopPropagation()}>Ver detalle</a>`}
                           <a href=${`#pagos-${m.stand.codigo}`} onClick=${(e) => e.stopPropagation()}>Ver pagos</a></span></td>

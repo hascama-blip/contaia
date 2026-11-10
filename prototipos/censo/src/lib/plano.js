@@ -17,6 +17,7 @@ export const MODOS = {
 
 /** Tono (clase CSS) de un stand según el modo elegido. */
 export function tonoStand(modo, { stand, asociado, deuda }) {
+  if (stand && !asociado && stand.deAsociacion && !stand.propietarioId) return "asoc"; // stand propio de la Asociación
   if (!stand || !asociado) return "vacio";
   if (modo === "pagos") {
     if (!deuda?.meses) return "ok";
@@ -29,7 +30,7 @@ export function tonoStand(modo, { stand, asociado, deuda }) {
 }
 
 export const LEYENDAS = {
-  censo: [["ok", "Verificado"], ["info", "Actualizado"], ["alerta", "Pendiente"], ["neutro", "Sin ubicar"], ["vacio", "Sin ficha"]],
-  pagos: [["ok", "Al día"], ["alerta", "1 a 2 meses"], ["peligro", "3 meses o más"], ["vacio", "Sin ficha"]],
-  ocupacion: [["ok", "Propietario"], ["info", "Alquilado"], ["neutro", "Cerrado"], ["peligro", "En litigio"], ["vacio", "Sin ficha"]],
+  censo: [["ok", "Verificado"], ["info", "Actualizado"], ["alerta", "Pendiente"], ["neutro", "Sin ubicar"], ["asoc", "De la asociación"], ["vacio", "Sin ficha"]],
+  pagos: [["ok", "Al día"], ["alerta", "1 a 2 meses"], ["peligro", "3 meses o más"], ["asoc", "De la asociación"], ["vacio", "Sin ficha"]],
+  ocupacion: [["ok", "Propietario"], ["info", "Alquilado"], ["neutro", "Cerrado"], ["peligro", "En litigio"], ["asoc", "De la asociación"], ["vacio", "Sin ficha"]],
 };

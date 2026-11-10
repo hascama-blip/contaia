@@ -93,6 +93,7 @@ export function PanelTraspaso({ stand, onCerrar, onListo }) {
       <div className="aviso aviso-info">
         <span>${dueno
           ? html`Propietario actual: <strong>${nombreCompleto(dueno)}</strong> (${etiquetaNumero(dueno)} · DNI ${dueno.dni}). No se borra: pasará al historial como propietario anterior.`
+          : stand.deAsociacion ? html`Es un <strong>stand de la asociación</strong>. Al registrar el traspaso, la Asociación queda en el historial como propietaria anterior.`
           : html`Este stand no tiene propietario registrado; el nuevo será el primero del historial.`}</span>
       </div>
       ${hereda && html`<div className="aviso aviso-info"><span>Al ser su único stand, <strong>${nombreCompleto(dueno)}</strong> sale del padrón y el comprador <strong>hereda su N° ${hereda}</strong>. No se crea un N° nuevo; el vendedor quedará como “Transferido · ex N° ${hereda}”.</span></div>`}

@@ -59,6 +59,9 @@
  * @property {string|null} propietarioId
  * @property {{nombre:string, dni:string, celular:string}|null} inquilino
  * @property {EstadoStand} estado
+ * @property {boolean} [deAsociacion]     stand propio de la Asociación (sin asociado dueño; propietarioId null)
+ * @property {string} [asociacionNota]     cómo figura en el libro, p. ej. "APCCIC-…"
+ * @property {string} [asociacionDesde]    AAAA-MM-DD desde que se registró como de la Asociación
  */
 
 /**

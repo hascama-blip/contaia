@@ -1,15 +1,20 @@
 // Stands e inquilinos: inventario por galería.
 import { html, useState, useMemo } from "../components/html.js";
-import { CabPagina, Kpi, BadgeStand, Vacio, Panel, Campo, Entrada, Selector, mensajeError } from "../components/ui.js";
+import { CabPagina, Kpi, BadgeStand, Badge, Vacio, Panel, Campo, Entrada, Selector, mensajeError } from "../components/ui.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_STAND } from "../lib/types.js";
-import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar } from "../lib/padron.js";
-import { editarStand } from "../api/stands.js";
+import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar, esDeAsociacion, etiquetaNumero } from "../lib/padron.js";
+import { editarStand, marcarStandsAsociacion, quitarDeAsociacion } from "../api/stands.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
+import { PanelStandsAsociacion } from "../components/StandsAsociacion.js";
 
 function PanelStand({ stand, onCerrar, onTraspaso }) {
-  const { avisar } = useApp();
+  const { avisar, datos, derivados, usuario } = useApp();
+  const eraAsoc = esDeAsociacion(stand);
+  const [asoc, setAsoc] = useState(eraAsoc);
+  const [nota, setNota] = useState(stand.asociacionNota || "");
+  const dueno = derivados.porId.get(stand.propietarioId);
   const [s, setS] = useState({
     giro: stand.giro || "",
     area: stand.area ?? "",
@@ -24,7 +29,11 @@ function PanelStand({ stand, onCerrar, onTraspaso }) {
   async function guardar() {
     setOcupado(true);
     try {
-      await editarStand(stand.codigo, s);
+      await editarStand(stand.codigo, { ...s, ...(asoc && eraAsoc ? { asociacionNota: nota } : {}) });
+      if (asoc && !eraAsoc) {
+        const r = await marcarStandsAsociacion([{ codigo: stand.codigo, nota }], { asociados: datos.asociados, por: usuario?.id });
+        if (r.errores.length) throw new Error(r.errores[0]);
+      } else if (!asoc && eraAsoc) await quitarDeAsociacion(stand.codigo);
       avisar(`Stand ${stand.codigo} actualizado.`);
       onCerrar();
     } catch (e) {
@@ -54,6 +63,11 @@ function PanelStand({ stand, onCerrar, onTraspaso }) {
           <${Campo} id="st-inq-cel" etiqueta="Celular"><${Entrada} id="st-inq-cel" valor=${s.inquilino.celular} onCambio=${cambiaInq("celular")} tipo="tel" /><//>
         </div>`}
       <div className="seccion-form">
+        <label className="check"><input type="checkbox" checked=${asoc} onChange=${(e) => setAsoc(e.target.checked)} /> Stand de la asociación (no tiene a un asociado como dueño)</label>
+        ${asoc && html`<${Campo} id="st-asoc-nota" etiqueta="Cómo figura en el libro (opcional)"><${Entrada} id="st-asoc-nota" valor=${nota} onCambio=${setNota} placeholder="APCCIC-…" /><//>`}
+        ${asoc && !eraAsoc && dueno && html`<div className="aviso aviso-alerta"><span>Figura a nombre de <strong>${nombreCompleto(dueno)}</strong> (${etiquetaNumero(dueno)}). Al guardar pasa al historial del stand (no se borra) y su ficha queda «por revisar».</span></div>`}
+      </div>
+      <div className="seccion-form">
         <div className="historial-cab">
           <h3>Propietarios del stand</h3>
           <button type="button" className="btn btn-ghost btn-sm" onClick=${onTraspaso}>Registrar venta o traspaso</button>
@@ -64,9 +78,11 @@ function PanelStand({ stand, onCerrar, onTraspaso }) {
 }
 
 export function Stands() {
-  const { datos, derivados, puedeEscribir } = useApp();
+  const { datos, derivados, puedeEscribir, usuario } = useApp();
   const [filtro, setFiltro] = useState({ texto: "", galeria: "", estado: "" });
   const [editando, setEditando] = useState(null);
+  const [panelAsoc, setPanelAsoc] = useState(false);
+  const deLaAsociacion = useMemo(() => datos.stands.filter(esDeAsociacion).length, [datos.stands]);
   const [traspaso, setTraspaso] = useState(null);
   const conteo = useMemo(() => {
     const c = { propietario: 0, alquilado: 0, cerrado: 0, litigio: 0 };
@@ -76,15 +92,16 @@ export function Stands() {
   const lista = useMemo(() => {
     const q = normalizar(filtro.texto);
     return datos.stands
-      .filter((s) => (!filtro.galeria || s.galeria === filtro.galeria) && (!filtro.estado || s.estado === filtro.estado))
-      .filter((s) => !q || normalizar([s.codigo, s.giro, s.inquilino?.nombre, nombreCompleto(derivados.porId.get(s.propietarioId))].join(" ")).includes(q))
+      .filter((s) => (!filtro.galeria || s.galeria === filtro.galeria) && (!filtro.estado || (filtro.estado === "asociacion" ? esDeAsociacion(s) : s.estado === filtro.estado)))
+      .filter((s) => !q || normalizar([s.codigo, s.giro, s.inquilino?.nombre, nombreCompleto(derivados.porId.get(s.propietarioId)), esDeAsociacion(s) ? `asociacion ${s.asociacionNota || ""}` : ""].join(" ")).includes(q))
       .sort((a, b) => compararCodigos(a.codigo, b.codigo));
   }, [datos.stands, filtro, derivados.porId]);
   const cambia = (k) => (e) => setFiltro((f) => ({ ...f, [k]: e.target.value }));
 
   return html`
     <div className="pagina">
-      <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Stands e inquilinos" sub="Inventario por galería" />
+      <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Stands e inquilinos" sub=${`Inventario por galería${deLaAsociacion ? ` · ${deLaAsociacion} stands de la asociación` : ""}`}
+        acciones=${usuario?.esAdminGeneral && puedeEscribir !== false && html`<button className="btn btn-ghost" onClick=${() => setPanelAsoc(true)}>Stands de la asociación…</button>`} />
       <div className="rejilla r-4">
         <${Kpi} etiqueta="Total de stands" valor=${datos.stands.length} />
         <${Kpi} etiqueta="Ocupados por el propietario" valor=${conteo.propietario} />
@@ -104,6 +121,7 @@ export function Stands() {
           <select id="st-estado-f" className="input" value=${filtro.estado} onChange=${cambia("estado")}>
             <option value="">Todo estado</option>
             ${Object.entries(ESTADOS_STAND).map(([k, v]) => html`<option key=${k} value=${k}>${v.label}</option>`)}
+            <option value="asociacion">Stands de la asociación</option>
           </select>
         </div>
         <div className="tabla-caja">
@@ -119,7 +137,9 @@ export function Stands() {
                   <td className="der num">${s.area ? `${s.area} m²` : "—"}</td>
                   <td>${s.giro || "—"}</td>
                   <td>
-                    ${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>` : html`<span className="muted">Sin propietario</span>`}
+                    ${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>`
+                      : esDeAsociacion(s) ? html`<${Badge} tono="asoc">Asociación<//>${s.asociacionNota ? html`<span className="celda-sub">En el libro: ${s.asociacionNota}</span>` : ""}`
+                      : html`<span className="muted">Sin propietario</span>`}
                     ${anterior && html`<span className="celda-sub">Antes: ${anterior.nombre}</span>`}
                   </td>
                   <td>${s.inquilino?.nombre || "—"}</td>
@@ -135,5 +155,6 @@ export function Stands() {
       ${editando && html`<${PanelStand} stand=${editando} onCerrar=${() => setEditando(null)}
         onTraspaso=${() => { setTraspaso(editando); setEditando(null); }} />`}
       ${traspaso && html`<${PanelTraspaso} stand=${traspaso} onCerrar=${() => setTraspaso(null)} />`}
+      ${panelAsoc && html`<${PanelStandsAsociacion} onCerrar=${() => setPanelAsoc(false)} />`}
     </div>`;
 }

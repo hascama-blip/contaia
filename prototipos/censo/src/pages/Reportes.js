@@ -2,7 +2,7 @@
 import { html, useState, useMemo } from "../components/html.js";
 import { CabPagina, Tarjeta, Barra, BadgeCenso, BadgeAtraso, Vacio, mensajeError } from "../components/ui.js";
 import { useApp } from "../components/contexto.js";
-import { avancePorGaleria, nombreCompleto, nombreGaleria, ordenarPorNumero, estadoCenso } from "../lib/padron.js";
+import { avancePorGaleria, nombreCompleto, nombreGaleria, ordenarPorNumero, estadoCenso, propietarioTexto } from "../lib/padron.js";
 import { soles, fecha, hoy } from "../lib/formato.js";
 import { aCSV, descargar, COLUMNAS_PADRON } from "../lib/exportar.js";
 import { ESTADOS_STAND, GRAVEDADES, ESTADOS_INCIDENCIA } from "../lib/types.js";
@@ -43,7 +43,7 @@ export function Reportes() {
     ], morosos)],
     ["Stands e inquilinos", () => bajar("stands", [
       { titulo: "Stand", valor: (s) => s.codigo }, { titulo: "Galería", valor: (s) => nombreGaleria(s.galeria) }, { titulo: "Área m2", valor: (s) => s.area ?? "" },
-      { titulo: "Giro", valor: (s) => s.giro }, { titulo: "Propietario", valor: (s) => nombreCompleto(porId.get(s.propietarioId)) },
+      { titulo: "Giro", valor: (s) => s.giro }, { titulo: "Propietario", valor: (s) => propietarioTexto(s, porId) },
       { titulo: "Inquilino", valor: (s) => s.inquilino?.nombre || "" }, { titulo: "Estado", valor: (s) => ESTADOS_STAND[s.estado]?.label },
     ], datos.stands)],
     ["Incidencias", () => bajar("incidencias", [

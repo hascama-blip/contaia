@@ -1,7 +1,7 @@
 // Historial de propietarios de cada stand. Regla: un dueño anterior NUNCA se
 // borra; al vender, pasa a `stand.historial` con su tramo (desde–hasta) y el
 // nuevo queda en `propietarioId` desde la fecha de la venta.
-import { nombreCompleto, compararCodigos, tieneNumero } from "./padron.js";
+import { nombreCompleto, compararCodigos, tieneNumero, DUENO_ASOCIACION } from "./padron.js";
 
 /**
  * Regla del libro de padrón: al vender NO se crea un N° nuevo. Si quien vende se
@@ -38,9 +38,9 @@ export function numeroAHeredar({ anterior, comprador, modo, standsDelAnterior, c
 export function tramoDeSalida(stand, anterior, { hasta, motivo, documento, observacion, por, ahora }) {
   return {
     asociadoId: anterior?.id || stand.propietarioId || null,
-    nombre: anterior ? nombreCompleto(anterior) : "Sin ficha",
+    nombre: anterior ? nombreCompleto(anterior) : !stand.propietarioId && stand.deAsociacion ? DUENO_ASOCIACION : "Sin ficha",
     dni: anterior?.dni || "",
-    desde: stand.propietarioDesde || anterior?.fechaIngreso || null,
+    desde: stand.propietarioDesde || (!stand.propietarioId && stand.asociacionDesde) || anterior?.fechaIngreso || null,
     hasta,
     motivo,
     documento: documento || "",
@@ -68,6 +68,8 @@ export function cadenaPropietarios(stand, porId) {
       actual: true,
       asociado: dueno,
     });
+  } else if (stand?.deAsociacion) {
+    lista.push({ asociadoId: null, nombre: DUENO_ASOCIACION, dni: "", desde: stand.asociacionDesde || null, hasta: null, actual: true, asociacion: true, nota: stand.asociacionNota || "" });
   }
   return lista.map((t, i) => ({ ...t, orden: i + 1 }));
 }
