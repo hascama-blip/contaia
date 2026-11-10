@@ -2,7 +2,7 @@ import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, marcarEmailVerificado } from "@/lib/db";
 import { comprobarCodigo } from "@/lib/codigos";
-import { ponerSesion } from "@/lib/auth";
+import { ponerSesion, verifyPassword } from "@/lib/auth";
 import { registrarAcceso } from "@/lib/registroAccesos";
 
 export const runtime = "nodejs";
@@ -26,6 +26,13 @@ export async function POST(req: NextRequest) {
   }
   const r = await comprobarCodigo(user, codigo, "verificacion");
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+  // Además del código (que solo llega al correo) se exige la contraseña del registro:
+  // así nadie deja "pre-registrado" el correo de otra persona con una contraseña propia
+  // para entrar después de que el dueño lo verifique.
+  const password = typeof body?.password === "string" ? body.password : "";
+  if (!password || !verifyPassword(password, user.passHash)) {
+    return NextResponse.json({ error: "La contraseña no coincide con la del registro. Vuelve a «Crear cuenta» con tu correo y tu contraseña, y usa el código nuevo que te llegue.", reRegistrar: true }, { status: 400 });
+  }
 
   await marcarEmailVerificado(user.id);
   const res = NextResponse.json({ ok: true, user: { id: user.id, nombre: user.nombre, email: user.email } });

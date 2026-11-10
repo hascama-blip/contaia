@@ -89,6 +89,14 @@ const normRuc = (ruc: string) => String(ruc || "").replace(/\D/g, "");
 /** Verifica (SIN consumir) si el estudio puede generar el `paso` para el RUC.
  *  `lote` agrupa varias llamadas como UNA sola generación (p. ej. SIRE por
  *  periodos): si esa tanda ya se contó, se deja pasar aunque el cupo esté lleno. */
+/** Una tanda (lote) ya contada sirve para seguir extrayendo durante 60 minutos; después
+ *  cuenta como una generación nueva (si no, repetir el mismo lote daba cupo ilimitado). */
+export const LOTE_VIGENCIA_MS = 60 * 60 * 1000;
+export function loteVigente(contadoAt: string | undefined): boolean {
+  const t = contadoAt ? Date.parse(contadoAt) : NaN;
+  return Number.isFinite(t) && Date.now() - t < LOTE_VIGENCIA_MS;
+}
+
 export async function verificarCupo(ruc: string, paso: Paso, lote?: string): Promise<
   { ok: true; ticket: TicketCupo } | { ok: false; mensaje: string; limite: number; usados: number }
 > {
@@ -100,7 +108,7 @@ export async function verificarCupo(ruc: string, paso: Paso, lote?: string): Pro
   if (limite === null) return { ok: true, ticket: { adminId: ctx.adminId, clave, lote: lot, limite: null, usados: 0 } };
   const cupos = await getCuposMes(ctx.adminId);
   const usados = cupos.usos[clave] ?? 0;
-  if (lot && cupos.lotes[`${clave}:${lot}`]) return { ok: true, ticket: { adminId: ctx.adminId, clave, lote: lot, limite, usados } };
+  if (lot && loteVigente(cupos.lotes[`${clave}:${lot}`])) return { ok: true, ticket: { adminId: ctx.adminId, clave, lote: lot, limite, usados } };
   if (usados >= limite) {
     return {
       ok: false,

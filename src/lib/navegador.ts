@@ -289,6 +289,18 @@ export async function probarProxy(sesionOverride?: string): Promise<{
   }
 }
 
+
+/**
+ * Contexto para IMPRIMIR A PDF un HTML armado por la app (`page.setContent`):
+ * sin JavaScript y sin ninguna salida a la red. Esos HTML llevan datos que vienen
+ * del navegador del usuario (o de sus Excel): si alguno llegara sin escapar, no
+ * podrá ejecutar scripts ni hacer que el servidor pida URLs internas.
+ */
+export async function contextoPdf(browser: any): Promise<any> {
+  const ctx = await browser.newContext({ javaScriptEnabled: false });
+  await ctx.route("**/*", (route: any) => route.abort()).catch(() => {});
+  return ctx;
+}
 /** Bloquea recursos pesados que NO afectan la extracción (imágenes, fuentes,
  *  media y tracking). Se conservan CSS/JS/XHR/documento para no romper nada.
  *  Reduce RAM, CPU y ancho de banda — y suele ACELERAR la navegación. */

@@ -2,7 +2,7 @@ import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { zipSync } from "fflate";
 import { requireUser } from "@/lib/auth";
-import { lanzarNavegador } from "@/lib/navegador";
+import { lanzarNavegador, contextoPdf } from "@/lib/navegador";
 import { informeComprasHtml } from "@/lib/analisisComprasHtml";
 import { informeComprasXlsx } from "@/lib/analisisComprasXlsx";
 import type { AnalisisCompras } from "@/lib/analisisCompras";
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     let browser: any;
     try {
       browser = await lanzarNavegador();
-      const ctx = await browser.newContext();
+      const ctx = await contextoPdf(browser); // sin JS ni red
       for (const [i, a] of empresas.entries()) {
         const page = await ctx.newPage();
         await page.setContent(informeComprasHtml(a), { waitUntil: "networkidle", timeout: 60000 });

@@ -332,7 +332,9 @@ export async function sumarCupo(adminId: string, clave: string, lote?: string): 
   const c = cuposDelMes(u);
   if (lote) {
     const kl = `${clave}:${lote}`;
-    if (c.lotes![kl]) return c.usos[clave] ?? 0;
+    // Tanda ya contada y aún vigente (60 min): no suma. Vencida: cuenta de nuevo.
+    const t = Date.parse(c.lotes![kl] ?? "");
+    if (Number.isFinite(t) && Date.now() - t < 60 * 60 * 1000) return c.usos[clave] ?? 0;
     c.lotes![kl] = new Date().toISOString();
     // Poda: solo se guardan las tandas del mes, con tope de 300.
     const ks = Object.keys(c.lotes!);

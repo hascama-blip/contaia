@@ -1,7 +1,7 @@
 import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { lanzarNavegador, bloquearRecursos } from "@/lib/navegador";
+import { lanzarNavegador, contextoPdf } from "@/lib/navegador";
 import { facturaHtml } from "@/lib/facturaPdfHtml";
 
 export const runtime = "nodejs";
@@ -22,8 +22,7 @@ export async function POST(req: NextRequest) {
   let browser: any = null;
   try {
     browser = await lanzarNavegador();
-    const ctx = await browser.newContext();
-    await bloquearRecursos(ctx);
+    const ctx = await contextoPdf(browser); // sin JS ni red
     const page = await ctx.newPage();
     await page.setContent(facturaHtml(f), { waitUntil: "load", timeout: 30000 });
     const buf = await page.pdf({

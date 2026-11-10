@@ -1,8 +1,8 @@
 import { bloqueoModulo, limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { esRucDemo } from "@/lib/demo";
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, esSupremo } from "@/lib/auth";
-import { upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfig, limpiarRTT, getWebhookLogRTT } from "@/lib/db";
+import { requireUser, esSupremo, studioId } from "@/lib/auth";
+import { getClienteByRuc, upsertSolicitudRTT, resolverFalloRTT, listarSolicitudesRTT, getRttConfig, limpiarRTT, getWebhookLogRTT } from "@/lib/db";
 import { generarRTT } from "@/lib/rtt";
 
 export const runtime = "nodejs";
@@ -40,6 +40,12 @@ export async function POST(req: NextRequest) {
   if (!/^\d{11}$/.test(rucLogin)) return NextResponse.json({ error: "RUC de acceso SOL inválido." }, { status: 400 });
   if (esRucDemo(ruc) || esRucDemo(rucLogin)) return NextResponse.json({ error: "Empresa de simulación: este módulo no consulta SUNAT con datos ficticios." }, { status: 400 });
   if (!solUser || !solPass) return NextResponse.json({ error: "Ingresa el Usuario SOL y la Clave SOL." }, { status: 400 });
+  // El RTT se pide con una empresa PROPIA: el reporte llega por correo y se cruza por
+  // RUC, así que pedirlo con el RUC de otro estudio podría recibir su reporte.
+  if (!esSupremo(user)) {
+    if (rucLogin !== ruc) return NextResponse.json({ error: "El RUC a reportar debe ser el de la empresa con la que inicias sesión en SOL." }, { status: 400 });
+    if (!(await getClienteByRuc(ruc, studioId(user)))) return NextResponse.json({ error: "Esa empresa no está registrada en tu cuenta." }, { status: 404 });
+  }
 
   const { dominio } = await getRttConfig();
   if (!dominio) {

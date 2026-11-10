@@ -23,5 +23,7 @@ export function ocultarCred<T extends Partial<CredencialesSire> | null | undefin
 /** Copia del cliente apta para el navegador (sin el client_secret real). */
 export function ocultarCliente<T extends Cliente | null | undefined>(c: T): T {
   if (!c) return c;
-  return { ...c, credSire: ocultarCred(c.credSire) } as T;
+  // La Clave SOL cifrada de la vigilancia del buzón tampoco sale al navegador.
+  const vigilancia = c.vigilancia ? { ...c.vigilancia, claveEnc: "" } : c.vigilancia;
+  return { ...c, credSire: ocultarCred(c.credSire), ...(c.vigilancia ? { vigilancia } : {}) } as T;
 }

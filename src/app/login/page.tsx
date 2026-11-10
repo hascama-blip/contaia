@@ -1,5 +1,6 @@
 "use client";
 
+import { rutaInterna } from "@/lib/rutaInterna";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogoAsenco } from "@/components/Logo";
@@ -15,8 +16,7 @@ export default function LoginPage() {
   const params = useSearchParams();
   // Solo se vuelve a rutas INTERNAS ("/algo"). Un enlace con ?next=https://otro-sitio
   // o //otro-sitio llevaría a la persona fuera de Radar tras iniciar sesión (phishing).
-  const nextCrudo = params.get("next") || "/";
-  const next = /^\/(?![\/\\])/.test(nextCrudo) ? nextCrudo : "/";
+  const next = rutaInterna(params.get("next"));
   const [modo, setModo] = useState<Modo>("login");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -63,7 +63,7 @@ export default function LoginPage() {
         return;
       }
       if (modo === "verificar") {
-        const { res, data } = await post("/api/auth/verificar", { email, codigo });
+        const { res, data } = await post("/api/auth/verificar", { email, codigo, password });
         if (!res.ok) { setError(data.error ?? "Código incorrecto."); return; }
         if (data.yaVerificado) { cambiar("login"); setAviso(data.mensaje); return; }
         try { localStorage.setItem("mostrar_planes", "1"); } catch { /* */ }

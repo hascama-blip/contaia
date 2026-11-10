@@ -21,7 +21,7 @@ const money = (n: any) => (Number(n) || 0).toLocaleString("es-PE", { minimumFrac
 
 export function facturaHtml(f: FacturaXml): string {
   const titulo = TIPO_LABEL[f.tipoDoc] || (f.tipo ? f.tipo.toUpperCase() : "COMPROBANTE ELECTRÓNICO");
-  const simbolo = f.moneda === "USD" ? "US$" : f.moneda === "PEN" ? "S/" : (f.moneda || "");
+  const simbolo = f.moneda === "USD" ? "US$" : f.moneda === "PEN" ? "S/" : esc(String(f.moneda || "").slice(0, 6));
 
   const filas = (f.lineas ?? []).map((l, i) => `
     <tr>

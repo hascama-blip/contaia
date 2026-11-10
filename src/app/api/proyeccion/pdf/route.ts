@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bloqueoModulo } from "@/lib/acceso";
 import { getClienteAutorizado } from "@/lib/auth";
-import { lanzarNavegador } from "@/lib/navegador";
+import { lanzarNavegador, contextoPdf } from "@/lib/navegador";
 import { hoyLima } from "@/lib/fechas";
 import { armarProyeccion, limpiarEntradas } from "@/lib/proyeccion";
 import { informeProyeccionHtml } from "@/lib/proyeccionHtml";
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   let browser: any;
   try {
     browser = await lanzarNavegador();
-    const ctx = await browser.newContext();
+    const ctx = await contextoPdf(browser); // sin JS ni red
     const page = await ctx.newPage();
     await page.setContent(informeProyeccionHtml(p, hoy), { waitUntil: "networkidle", timeout: 60000 });
     const pdf = await page.pdf({ format: "A4", printBackground: true, displayHeaderFooter: false, margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" } });

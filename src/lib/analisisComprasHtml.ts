@@ -216,8 +216,8 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   <div class="kpis">
     <div class="kpi big"><div class="lbl">Total gasto (clase 9)</div><div class="val">${soles(a.totalGasto)}</div></div>
     <div class="kpi"><div class="lbl">IGV / crédito fiscal</div><div class="val">${soles(a.totalIgv)}</div></div>
-    <div class="kpi"><div class="lbl">Comprobantes</div><div class="val">${a.nAsientos}</div></div>
-    <div class="kpi"><div class="lbl">Movimientos</div><div class="val">${a.nMovimientos}</div></div>
+    <div class="kpi"><div class="lbl">Comprobantes</div><div class="val">${Number(a.nAsientos) || 0}</div></div>
+    <div class="kpi"><div class="lbl">Movimientos</div><div class="val">${Number(a.nMovimientos) || 0}</div></div>
   </div>
 
   <div class="charts">
@@ -258,7 +258,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
     <thead><tr><th>Cuenta</th><th>Descripción</th><th class="num">Nº mov.</th><th class="num">Importe</th><th class="pct">%</th></tr></thead>
     <tbody>
       ${a.porFuncion.map((f) => `<tr><td class="mono"><strong>${esc(f.cod)}</strong></td><td>${esc(f.nombre)}</td><td class="num">${f.n}</td><td class="num">${soles(f.debe)}</td><td class="pct">${f.pct.toFixed(1)}%</td></tr>`).join("")}
-      <tr class="totalrow"><td colspan="2">TOTAL</td><td class="num">${a.nMovimientos}</td><td class="num">${soles(a.totalGasto)}</td><td class="pct">100%</td></tr>
+      <tr class="totalrow"><td colspan="2">TOTAL</td><td class="num">${Number(a.nMovimientos) || 0}</td><td class="num">${soles(a.totalGasto)}</td><td class="pct">100%</td></tr>
     </tbody>
   </table>
 
@@ -289,7 +289,7 @@ export function informeComprasHtml(a: AnalisisCompras): string {
   <table class="tbl">
     <thead><tr><th>Mes</th><th class="num">Nº mov.</th><th class="num">Importe</th></tr></thead>
     <tbody>${porMes.map((m) => `<tr><td>${esc(m.nombre)}</td><td class="num">${m.n}</td><td class="num">${soles(m.debe)}</td></tr>`).join("")}
-      <tr class="totalrow"><td>TOTAL</td><td class="num">${a.nMovimientos}</td><td class="num">${soles(a.totalGasto)}</td></tr>
+      <tr class="totalrow"><td>TOTAL</td><td class="num">${Number(a.nMovimientos) || 0}</td><td class="num">${soles(a.totalGasto)}</td></tr>
     </tbody>
   </table>` : ""}
 

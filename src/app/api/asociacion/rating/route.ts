@@ -1,6 +1,6 @@
 import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
-import { getRatings, addRating } from "@/lib/db";
+import { getRatings, addRating, getAsociacion } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const cursoId = String(body?.cursoId ?? "").trim();
   const valor = Number(body?.valor);
-  if (!/^[a-f0-9]{4,}$/i.test(cursoId)) return NextResponse.json({ error: "Curso inválido." }, { status: 400 });
+  // Tope de largo (va como llave en el store) y debe ser un curso que exista.
+  if (!/^[a-f0-9]{4,64}$/i.test(cursoId)) return NextResponse.json({ error: "Curso inválido." }, { status: 400 });
+  const cont = await getAsociacion();
+  const existe = [...(cont.cursosDisponibles ?? []), ...(cont.cursosProximos ?? [])].some((c) => c.id === cursoId);
+  if (!existe) return NextResponse.json({ error: "Curso inválido." }, { status: 400 });
   if (!(valor >= 1 && valor <= 5)) return NextResponse.json({ error: "Calificación inválida (1 a 5)." }, { status: 400 });
   const _lim = limitar([
     { clave: `asoc-rate:${ipDe(req)}`, max: 30, ventanaMs: HORA },

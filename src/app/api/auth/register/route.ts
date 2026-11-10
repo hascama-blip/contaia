@@ -1,6 +1,6 @@
 import { limitar, ipDe, MIN, HORA } from "@/lib/limite";
 import { NextRequest, NextResponse } from "next/server";
-import { createUser, getUserByEmail } from "@/lib/db";
+import { createUser, getUserByEmail, updateUserById } from "@/lib/db";
 import { hashPassword, ensureSupremo, constanciaAceptacion } from "@/lib/auth";
 import { registrarAceptacion } from "@/lib/db";
 import { registrarAcceso } from "@/lib/registroAccesos";
@@ -16,9 +16,10 @@ export async function POST(req: NextRequest) {
   const _lim = limitar([{ clave: `registro:${ipDe(req)}`, max: 6, ventanaMs: HORA }], "Demasiados registros desde esta conexión.");
   if (_lim) return _lim;
   const body = await req.json().catch(() => null);
-  const nombre = String(body?.nombre ?? "").trim();
+  const nombre = String(body?.nombre ?? "").trim().slice(0, 120);
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
+  if (email.length > 160 || password.length > 200) return NextResponse.json({ error: "Datos demasiado largos." }, { status: 400 });
   // Ambas casillas son obligatorias: Política de seguridad + Declaración de
   // responsabilidad y registro de accesos (queda constancia con IP y fecha).
   const acepta = body?.aceptaSeguridad === true && body?.aceptaResponsabilidad === true;
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
   if (existente) {
     // Si ya existe pero nunca verificó, le reenviamos el código en vez de bloquearlo.
     if (existente.emailVerificado === false) {
+      // La contraseña y el nombre son los de ESTE intento (el anterior pudo hacerlo otra
+      // persona con el correo ajeno): la cuenta solo se activa con el código que llega
+      // al correo + la contraseña del intento vigente (ver /api/auth/verificar).
+      await updateUserById(existente.id, { passHash: hashPassword(password), nombre });
       await registrarAceptacion(existente.id, constanciaAceptacion(req, ip, "registro"));
       const r = await enviarCodigo(existente, "verificacion");
       return NextResponse.json({ ok: true, verificar: true, email, mensaje: r.ok ? "Esa cuenta ya existe pero no estaba verificada: te reenviamos el código." : r.error });

@@ -15,6 +15,8 @@ const ESTADO: Record<string, [string, string]> = {
   vencido: ["Vencido", "#dc2626"], "vence-hoy": ["Vence hoy", "#dc2626"], urgente: ["Urgente", "#b45309"], "en-plazo": ["En plazo", "#047857"],
 };
 
+const n = (v: unknown) => Number(v) || 0; // contadores que llegan del navegador: siempre número
+
 export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre: FilaCierre[], hoy: string): string {
   const per = empresas[0]?.periodo || "";
   const nombrePer = /^\d{6}$/.test(per) ? `${MESES[Number(per.slice(4)) - 1]} ${per.slice(0, 4)}` : per;
@@ -25,25 +27,25 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
   const cuadran = empresas.filter((e) => pend(e) === 0).length;
 
   const filasCierre = cierre.map((c) => {
-    const [txt, color] = ESTADO[c.estado] ?? [c.estado, "#334155"];
-    const tiempo = c.estado === "vencido" ? `Vencido hace ${-c.diasCalendario} día(s)` : c.estado === "vence-hoy" ? "Vence hoy" : `${c.diasHabiles} día(s) hábil(es) · ${c.diasCalendario} calendario`;
-    return `<tr><td><strong>${esc(c.empresa)}</strong></td><td class="c">${esc(c.ultimoDigito)}</td><td>${fechaCorta(c.vence)}${c.oficial ? "" : " <span class='mut'>(ref.)</span>"}</td>
+    const [txt, color] = ESTADO[c.estado] ?? [esc(c.estado), "#334155"];
+    const tiempo = c.estado === "vencido" ? `Vencido hace ${-n(c.diasCalendario)} día(s)` : c.estado === "vence-hoy" ? "Vence hoy" : `${n(c.diasHabiles)} día(s) hábil(es) · ${n(c.diasCalendario)} calendario`;
+    return `<tr><td><strong>${esc(c.empresa)}</strong></td><td class="c">${esc(c.ultimoDigito)}</td><td>${esc(fechaCorta(String(c.vence)))}${c.oficial ? "" : " <span class='mut'>(ref.)</span>"}</td>
       <td style="color:${color}">${tiempo}</td>
-      <td class="num">${!c.conciliada ? "<span class='mut'>Sin SIRE</span>" : c.pendientes ? `${c.pendientes} comprob.` : "Nada"}</td>
+      <td class="num">${!c.conciliada ? "<span class='mut'>Sin SIRE</span>" : c.pendientes ? `${n(c.pendientes)} comprob.` : "Nada"}</td>
       <td class="num">${c.conciliada ? soles(c.difTotal) : "—"}</td><td class="num">${c.conciliada ? soles(c.difIgv) : "—"}</td>
       <td><span class="tag" style="background:${color}">${txt}</span></td></tr>`;
   }).join("");
 
   const filasEmp = empresas.map((e) => {
     const c = e.cruce, p = pend(e), dif = c.totalesSire.total - c.totalesContable.total;
-    return `<tr><td><strong>${esc(e.empresa)}</strong><div class="mut">RUC ${esc(e.ruc)}${empresas.some((x) => x.libro === "compras") ? ` · ${e.libro}` : ""}</div></td>
-      <td class="num">${soles(c.totalesSire.total)}<div class="mut">${c.totalesSire.comprobantes} comprob.</div></td>
-      <td class="num">${soles(c.totalesContable.total)}<div class="mut">${c.totalesContable.comprobantes} comprob.</div></td>
+    return `<tr><td><strong>${esc(e.empresa)}</strong><div class="mut">RUC ${esc(e.ruc)}${empresas.some((x) => x.libro === "compras") ? ` · ${esc(e.libro)}` : ""}</div></td>
+      <td class="num">${soles(c.totalesSire.total)}<div class="mut">${n(c.totalesSire.comprobantes)} comprob.</div></td>
+      <td class="num">${soles(c.totalesContable.total)}<div class="mut">${n(c.totalesContable.comprobantes)} comprob.</div></td>
       <td class="num" style="color:${Math.abs(dif) > 1 ? "#dc2626" : "#94a3b8"}">${soles(dif)}</td>
-      <td class="num">${c.ok}</td><td class="num">${c.difMonto || "—"}</td><td class="num">${c.difFecha || "—"}</td>
-      <td class="num">${c.soloSire || "—"}</td><td class="num">${c.soloContable || "—"}</td>
-      <td class="num">${e.subdiario?.conciliados ? e.subdiario.conciliados : "—"}</td>
-      <td><span class="tag" style="background:${p ? "#b45309" : "#047857"}">${p ? `Revisar ${p}` : "Cuadra"}</span></td></tr>`;
+      <td class="num">${n(c.ok)}</td><td class="num">${n(c.difMonto) || "—"}</td><td class="num">${n(c.difFecha) || "—"}</td>
+      <td class="num">${n(c.soloSire) || "—"}</td><td class="num">${n(c.soloContable) || "—"}</td>
+      <td class="num">${n(e.subdiario?.conciliados) || "—"}</td>
+      <td><span class="tag" style="background:${p ? "#b45309" : "#047857"}">${p ? `Revisar ${n(p)}` : "Cuadra"}</span></td></tr>`;
   }).join("");
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"/><style>
@@ -61,13 +63,13 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
   </style></head><body>
   <div class="head">
     <h1>Conciliación SIRE vs contabilidad · ${esc(libro)}</h1>
-    <p>Periodo ${esc(nombrePer)} · ${empresas.length} empresa(s) · Informe al ${fechaLarga(hoy)}</p>
+    <p>Periodo ${esc(nombrePer)} · ${empresas.length} empresa(s) · Informe al ${esc(fechaLarga(hoy))}</p>
   </div>
   <div class="kpis">
     <div class="kpi"><div class="l">Total SIRE</div><div class="v">${soles(tS)}</div></div>
     <div class="kpi"><div class="l">Total contabilidad</div><div class="v">${soles(tC)}</div></div>
     <div class="kpi"><div class="l">Diferencia</div><div class="v" style="color:${Math.abs(tS - tC) > 1 ? "#dc2626" : "#047857"}">${soles(tS - tC)}</div></div>
-    <div class="kpi"><div class="l">Empresas que cuadran</div><div class="v">${cuadran} de ${empresas.length}</div></div>
+    <div class="kpi"><div class="l">Empresas que cuadran</div><div class="v">${n(cuadran)} de ${empresas.length}</div></div>
   </div>
   ${cierre.length ? `<h2>Análisis de cierre</h2>
   <table><thead><tr><th>Empresa</th><th class="c">Dígito</th><th>Vence DJ mensual</th><th>Tiempo para regularizar</th><th class="num">Por regularizar</th><th class="num">Dif. total</th><th class="num">Dif. IGV</th><th>Estado</th></tr></thead>

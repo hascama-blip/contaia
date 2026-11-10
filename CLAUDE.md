@@ -276,11 +276,24 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **Entradas públicas**: avisos de pago con cuerpo ≤ 64 KB y límite por IP; ZIP subidos se
   descomprimen con `descomprimirSeguro` (topes por archivo, total y cantidad); los correos
   escapan nombres y datos del usuario.
+- **Registro**: activar la cuenta exige el código del correo **y** la contraseña del registro
+  (`/api/auth/verificar`); volver a registrarse con un correo sin verificar reemplaza la contraseña y el
+  nombre por los del nuevo intento (nadie deja "pre-registrado" el correo de otra persona).
+- **Redirecciones** tras login/aceptar: `rutaInterna()` (`src/lib/rutaInterna.ts`), solo rutas internas y
+  sin caracteres de control.
+- **PDF desde HTML de la app** (`page.setContent`): abrir el contexto con `contextoPdf(browser)`
+  (`navegador.ts`: sin JavaScript y sin red) y escapar/forzar a número todo dato que venga del navegador.
+- **RTT**: el RUC debe ser de una empresa del estudio y `rucLogin === ruc` (el reporte se cruza por RUC).
+- **Cupos**: una tanda (`lote`) ya contada vale 60 minutos (`loteVigente`); luego cuenta de nuevo.
+- **Salida al navegador**: `publicUser` quita hashes de contraseña/códigos/recuperación y el código de
+  Telegram; `ocultarCliente` quita también `vigilancia.claveEnc`. El `codMensaje` del buzón se valida
+  (`[\w-]`) porque va en el nombre del archivo guardado.
 - **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
 - **Next 15**: `params`, `searchParams`, `cookies()` y `headers()` son asíncronos (usar `await`).
 - **Contenedor** (Lightsail, `deploy/`): Dockerfile en dos etapas; la app corre como usuario
   `node` (uid 1000). `deploy/entrypoint.sh` entrega `/var/data` a ese usuario al arrancar y suelta
-  root con `setpriv`. `xlsx` (sin parche en npm) solo se usa en utilitarios del supremo.
+  root con `setpriv`. `xlsx` 0.18.5 (sin parche en npm) lo usan los utilitarios de conciliación bancaria, StarSoft, ventas-caja y
+  comparativo de ingresos (supremo, cuenta RTP y cuentas con el utilitario): pendiente pasarlos a exceljs (`xlsxIO`).
 
 ## Hecho
 RUC + autollenado · SIRE compras/ventas reales + acumulado + presentado/no presentado ·

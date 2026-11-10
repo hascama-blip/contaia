@@ -14,7 +14,7 @@ import { hoyLima } from "./fechas";
 export { SESSION_COOKIE } from "./authToken";
 
 /** Usuario sin el hash de contraseña (para mandar al cliente/UI). */
-export type UsuarioPublico = Omit<Usuario, "passHash">;
+export type UsuarioPublico = Omit<Usuario, "passHash" | "codigoHash" | "codigoExp" | "codigoTipo" | "codigoIntentos" | "codigoEnviadoAt" | "resetTokenHash" | "resetTokenExp">;
 
 export function hashPassword(pw: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -31,7 +31,13 @@ export function verifyPassword(pw: string, stored: string): boolean {
 }
 
 export function publicUser(u: Usuario): UsuarioPublico {
-  const { passHash, ...rest } = u;
+  // Fuera todo lo que sirve para entrar a la cuenta: hashes de contraseña, de códigos
+  // y de recuperación, y el código para vincular Telegram.
+  const { passHash, codigoHash, codigoExp, codigoTipo, codigoIntentos, codigoEnviadoAt, resetTokenHash, resetTokenExp, ...rest } = u;
+  if (rest.alertas) {
+    const { telegramCodigo, telegramCodigoAt, ...alertas } = rest.alertas;
+    rest.alertas = alertas;
+  }
   return rest;
 }
 
