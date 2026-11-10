@@ -32,6 +32,7 @@ const UTILITARIOS_OPC: { key: string; label: string }[] = [
   { key: "ventas-caja", label: "Ventas vs Caja Virtual" },
   { key: "banco-word", label: "Estado de cuenta → Excel" },
   { key: "analisis-rtp", label: "Análisis para RTP" },
+  { key: "proyeccion", label: "Proyección tributaria" },
   { key: "honorarios", label: "Solo honorarios (RxH) — pantalla aparte" },
 ];
 

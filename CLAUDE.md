@@ -120,15 +120,23 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   **equipo** sin vencimiento (todos los módulos, sin utilitarios). Esa cuenta ve "Modo simulación" en su
   menú (`/simulacion`) y usa `/api/demo` (crear/regenerar/borrar SUS empresas demo, ids
   `demo-<clave>-<sufijo>`; modo grabación). Las del supremo siguen como `demo-<clave>`.
-- **Planeamiento tributario** (`src/lib/planeamiento.ts`, puro; panel `PlaneamientoPanel.tsx` = sección 7
-  de la ficha, dentro de `llevaSire`): con el resumen SIRE del periodo estima la DJ mensual tipo PDT 621 —
-  IGV = débito (IGV ventas) − crédito (IGV compras) − **saldo a favor del mes anterior (casilla 145, MANUAL)**
-  − percepciones − retenciones (manuales) → IGV a pagar o saldo a favor que pasa al mes siguiente; renta =
-  pago a cuenta según régimen (`regimenSugerido` por `sunat.tributos`, editable): General coeficiente o 1.5 %,
-  MYPE 1 % hasta 300 UIT acumuladas del año (`UIT` ajustable) y luego coeficiente/1.5 %, RER 1.5 %, Nuevo RUS
-  cuota fija, sin negocio = nada. + vencimiento (`analisisCierre`) y recomendaciones. Los datos manuales se
-  guardan por periodo en `Cliente.planeamiento[AAAAMM]` (`setPlaneamiento`, `/api/clientes/[id]/planeamiento`);
-  si un mes no tiene datos, sugiere el saldo a favor que dejó el mes anterior planificado.
+- **Proyección tributaria** (UTILITARIO, clave `proyeccion`, `/herramientas/proyeccion`; solo supremo o
+  cuentas con el utilitario habilitado; `ProyeccionPanel.tsx`). **No consulta SUNAT**: se elige empresa +
+  periodo y arma el informe con lo YA generado: (1) SIRE del mes = resumen de la ficha (Reporte analítico,
+  `Cliente.sire`) y (2) Detalle SIRE ventas/compras (`Cliente.sireDetalle`). El paso 1 de la pantalla muestra
+  qué falta y enlaza a `/clientes/[id]` y a `/herramientas/detalle-sire?cliente=&tab=&periodo=`; al volver a
+  la pestaña se vuelve a comprobar. `src/lib/proyeccion.ts` (`armarProyeccion`): análisis del detalle (por
+  tipo de comprobante, top 10 clientes/proveedores, NC, moneda extranjera a soles), **cuadre resumen vs
+  detalle** y base del cálculo ("resumen" o "detalle"; si no cuadran o falta el resumen, usa el detalle).
+  Cálculo en `src/lib/planeamiento.ts` (puro, tipo PDT 621): IGV = débito − crédito − **saldo a favor del
+  mes anterior (casilla 145, MANUAL: "No tiene / Sí tiene" + monto)** − percepciones − retenciones → IGV a
+  pagar o saldo a favor siguiente; renta = pago a cuenta según régimen (`regimenSugerido` por
+  `sunat.tributos`, editable): General coeficiente o 1.5 %, MYPE 1 % hasta 300 UIT del año (`UIT` ajustable)
+  y luego coeficiente/1.5 %, RER 1.5 %, Nuevo RUS cuota fija, sin negocio = nada. + vencimiento
+  (`analisisCierre`) y recomendaciones. Datos manuales por periodo en `Cliente.planeamiento[AAAAMM]`
+  (`setPlaneamiento`); un mes sin datos sugiere el saldo que dejó el anterior. API `/api/proyeccion`
+  (GET datos, POST guardar) y `/api/proyeccion/pdf` (informe A4, `proyeccionHtml.ts`), con
+  `bloqueoModulo("proyeccion")`. (Antes fue la sección 7 de la ficha; se movió al utilitario.)
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

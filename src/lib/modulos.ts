@@ -51,6 +51,8 @@ export const MODULOS: ModuloDef[] = [
   { key: "ventas-caja", nombre: "Ventas vs Caja Virtual", href: "/herramientas/ventas-caja", soloSupremo: true },
   { key: "banco-word", nombre: "Estado de cuenta (PDF) → Excel", href: "/herramientas/banco-word", soloSupremo: true },
   { key: "analisis-rtp", nombre: "Análisis para RTP", href: "/herramientas/analisis-compras", soloSupremo: true },
+  // Proyección tributaria: IGV + renta del mes con el SIRE y el Detalle SIRE ya generados.
+  { key: "proyeccion", nombre: "Proyección tributaria", href: "/herramientas/proyeccion", soloSupremo: true },
   // Legacy (no están en el menú; se conservan como solo-supremo)
   // "honorarios" sigue existiendo como permiso (cuentas solo-RTP) y como pestaña
   // dentro de Descarga masiva; su pantalla propia queda para /rtputilitarios.
