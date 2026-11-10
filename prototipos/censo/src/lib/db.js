@@ -70,6 +70,12 @@ export async function actualizarAsociado(id, parcial) {
   const db = await base();
   return conReintento(() => db.doc(`asociados/${id}`).update(parcial));
 }
+/** Lo último guardado de un asociado (null si no existe). */
+export async function leerAsociado(id) {
+  const db = await base();
+  const snap = await conReintento(() => db.doc(`asociados/${id}`).get());
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
 
 // ---- Stands ----
 export async function leerStand(codigo) {

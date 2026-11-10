@@ -83,6 +83,13 @@ el portal responde en `http://IP-ESTATICA/` y muestra la pantalla de **primera c
    `APIDNI_TOKEN=...`, guardar y `sudo systemctl restart censo`.
 6. Abrir `https://TU-DOMINIO.com` → pantalla de entrada → listo.
 
+## 4b. Actualizar el padrón con fichas del libro
+Cuando llegan fotos de fichas del Libro de Padrón llenadas a mano, se transcriben a un archivo JSON (con la foto de cada
+ficha) y se cargan en el portal: **Padrón → «Actualizar con fichas del libro»** (solo el administrador principal; también
+desde Administración). Primero muestra la revisión sin guardar; con **«Aplicar actualización»** se actualizan las fichas,
+se crean las nuevas (por revisar), se registran los traspasos de los stands que pasaron a un nuevo propietario (el anterior
+queda en el historial del stand) y la foto de cada ficha queda en sus documentos.
+
 ## 5. Usuarios de la directiva
 Roles: **admin** (el programador: todo y manejar usuarios), **admingen** (administración
 general: todo lo de edición, crea y maneja los usuarios de la directiva y descarga todas las

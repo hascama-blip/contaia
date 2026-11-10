@@ -135,6 +135,17 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   expedientes ZIP ni respaldo, no edita la web pública y no toca cuentas `admin`), `lib/reniec.js`
   (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- **Actualizar con fichas del libro** (solo admin): Padrón → "Actualizar con fichas del libro" o
+  Administración → `/portal#actualizar`. Carga un JSON `{ tipo: "censo-fichas-libro", fechaDocumento, fichas[], omitidas[] }`
+  con la transcripción de las fichas manuscritas del Libro de Padrón y la foto de cada una (data URL). Motor puro en
+  `src/lib/actualizarFichas.js` (la revisión sin guardar usa ops simuladas sobre una copia; aplicar usa
+  `src/api/actualizarFichas.js` con las mismas decisiones). Busca por DNI y luego por nombre; identidad (nombres, DNI, N°,
+  nacimiento, ingreso) solo se completa si está vacía y las diferencias se muestran; contacto, estado civil, cónyuge, hijos y
+  familiares se actualizan. Stands: libre → se asigna; de otra persona y la ficha es de alguien nuevo en el libro (sin N°) o
+  con ingreso posterior → **traspaso con `transferirStand`** (el anterior queda en `stand.historial`, hereda N° según la
+  regla del padrón); si no, queda "Revisar". Las fichas antiguas (con N°) se procesan antes que las nuevas. Personas nuevas →
+  ficha `revisar: true`. La foto queda como documento "Ficha del libro de padrón (foto NN)". Cargar dos veces no duplica.
+  El JSON lleva datos personales: **nunca** se sube al repositorio.
 - **Expedientes de socios nuevos (ZIP)**: Administración → "Expedientes de socios nuevos (ZIP)" →
   `POST /api/importar-expedientes` (admin; `servidor/lib/expedientes.js`, lector ZIP propio sin
   dependencias: directorio central + `inflateRaw`). El ZIP trae **una carpeta por persona**
