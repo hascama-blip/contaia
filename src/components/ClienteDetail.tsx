@@ -11,6 +11,7 @@ import VigilanciaBuzonPanel from "./VigilanciaBuzonPanel";
 import CuposEmpresa from "./CuposEmpresa";
 import BuzonPanel from "./BuzonPanel";
 import EstadoSirePanel from "./EstadoSirePanel";
+import PlaneamientoPanel from "./PlaneamientoPanel";
 import RentasPanel from "./RentasPanel";
 import ItfPanel from "./ItfPanel";
 import DeudasF36Panel from "./DeudasF36Panel";
@@ -398,6 +399,15 @@ export default function ClienteDetail({
                 inicialSire={cliente.sire ?? []}
                 inicialCred={cliente.credSire ?? null}
                 puedeApi={puedeApi}
+              />
+              <FaseHeader n="7" titulo="Planeamiento tributario" detalle="Cuánto se pagará de IGV y renta este mes según el SIRE de ventas y compras + saldo a favor de la DJ anterior (manual)." />
+              <PlaneamientoPanel
+                clienteId={cliente.id}
+                ruc={cliente.ruc}
+                negocio={cliente.negocio}
+                sunat={cliente.sunat}
+                sire={cliente.sire ?? []}
+                inicial={cliente.planeamiento}
               />
             </>
           )}

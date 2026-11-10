@@ -203,6 +203,16 @@ export interface Aviso {
   hasta?: string;
 }
 
+export interface PlaneamientoEntradas {
+  regimen: "general" | "mype" | "especial" | "rus" | "ninguno";
+  coeficiente?: number | null;
+  saldoFavorIgv: number;
+  percepciones: number;
+  retenciones: number;
+  saldoFavorRenta: number;
+  at?: string;
+}
+
 export interface Cliente {
   id: string;
   /** Empresa de SIMULACIÓN (solo supremo, para demos/videos): datos ficticios,
@@ -240,6 +250,9 @@ export interface Cliente {
   declaracionesAnuales: DeclaracionAnual[];
   /** Deudas tributarias (de fotos con OCR o ingresadas a mano). */
   deudas: Deuda[];
+  /** Planeamiento tributario: datos MANUALES por periodo YYYYMM (saldo a favor del
+   *  mes anterior, percepciones, retenciones, régimen, coeficiente). Ver lib/planeamiento.ts. */
+  planeamiento?: Record<string, PlaneamientoEntradas>;
   /** Deudas del F36 (fraccionamiento Art. 36) extraídas del portal SOL. */
   deudasF36?: {
     tablas: DeudaF36Tabla[];

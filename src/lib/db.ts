@@ -32,6 +32,7 @@ import type {
   EstadoRTT,
   SolicitudRentas,
   AceptacionLegal,
+  PlaneamientoEntradas,
 } from "./types";
 
 // Almacenamiento simple basado en un único archivo JSON.
@@ -2198,6 +2199,22 @@ export async function setSireEstado(
   const cliente = store.clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   cliente.sireEstado = { estados, noObligado: Boolean(noObligado), at: new Date().toISOString() };
+  await writeStore(store);
+  return cliente;
+});
+}
+
+/** Guarda los datos manuales del planeamiento tributario de un periodo (YYYYMM). */
+export async function setPlaneamiento(
+  clienteId: string,
+  periodo: string,
+  entradas: PlaneamientoEntradas
+): Promise<Cliente | null> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  if (!cliente) return null;
+  cliente.planeamiento = { ...(cliente.planeamiento ?? {}), [periodo]: entradas };
   await writeStore(store);
   return cliente;
 });
