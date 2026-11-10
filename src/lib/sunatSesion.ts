@@ -9,6 +9,7 @@
 //     restaura las cookies y entra SIN volver a loguearse (verifica que siga viva).
 // La Clave SOL NUNCA se guarda; solo cookies de sesión efímeras en RAM.
 
+import { createHash } from "crypto";
 import { lanzarNavegador, bloquearRecursos } from "./navegador";
 import { resolverCaptchaSiHay } from "./captcha";
 
@@ -32,7 +33,11 @@ export interface SesionSunat {
 // ---- Caché de cookies en memoria (por RUC+usuario), TTL corto -----------------
 const SESION_TTL_MS = Number(process.env.SUNAT_SESION_TTL_MS || 8 * 60 * 1000);
 const cache = new Map<string, { state: any; at: number }>();
-const claveCache = (c: CredsSol) => `${c.ruc}|${(c.solUser || "").toLowerCase()}`;
+// La llave incluye una huella de la Clave SOL: solo quien presenta LA MISMA clave reutiliza
+// la sesión abierta. (Antes era RUC+usuario: durante esos minutos cualquiera que pidiera
+// una consulta de ese RUC con una clave cualquiera entraba con la sesión ya iniciada.)
+const claveCache = (c: CredsSol) =>
+  `${c.ruc}|${(c.solUser || "").toLowerCase()}|${createHash("sha256").update(String(c.solPass ?? "")).digest("hex").slice(0, 32)}`;
 
 function leerCache(c: CredsSol): any | null {
   const e = cache.get(claveCache(c));

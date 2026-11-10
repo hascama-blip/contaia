@@ -7,6 +7,8 @@ DATA="${DATA_DIR:-/var/data}"
 if [ "$(id -u)" = "0" ]; then
   mkdir -p "$DATA"
   find "$DATA" ! -user node -exec chown node:node {} + 2>/dev/null || true
+  # Datos de las empresas: solo el usuario de la app (y root) entra a la carpeta.
+  chmod 700 "$DATA" 2>/dev/null || true
   exec setpriv --reuid=node --regid=node --init-groups -- "$@"
 fi
 exec "$@"

@@ -13,6 +13,17 @@ import { TERMINOS_VERSION } from "./lib/legal";
 // Excepciones: /login y /api/auth/* (para poder entrar/registrarse).
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Entrada SIN cifrar (p. ej. http://IP-pública): se manda al dominio con HTTPS antes de
+  // que viajen contraseñas, Claves SOL o datos de las empresas en claro.
+  const appUrl = process.env.APP_URL || "";
+  // (Las rutas de máquina con su propio secreto —webhooks, tarea nocturna, Visor— no se redirigen.)
+  const deMaquina = pathname.startsWith("/api/webhooks/") || pathname === "/api/tareas/nocturna" || pathname === "/api/visor/captura";
+  // Tampoco las llamadas internas del propio servidor (chequeo de salud por 127.0.0.1).
+  const host = (req.headers.get("host") || "").replace(/:\d+$/, "").toLowerCase();
+  const interna = host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "web";
+  if (!deMaquina && !interna && appUrl.startsWith("https://") && req.headers.get("x-forwarded-proto") === "http") {
+    try { return NextResponse.redirect(new URL(pathname + req.nextUrl.search, appUrl), 308); } catch { /* APP_URL mal formada: sigue */ }
+  }
   // Exponer el pathname al layout (para decidir el "chrome" público sin sesión).
   const reqHeaders = new Headers(req.headers);
   reqHeaders.set("x-pathname", pathname);

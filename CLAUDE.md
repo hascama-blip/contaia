@@ -289,6 +289,17 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Telegram; `ocultarCliente` quita también `vigilancia.claveEnc` (solo de la respuesta; en el store sigue).
   El `codMensaje` del buzón (ruta de adjuntos) rechaza solo `/`, `\`, `..` y caracteres de control, porque
   va en el nombre del archivo guardado.
+- **Fugas de datos (2.ª revisión)**:
+  · Claves SOL del navegador (`sessionStorage`, `solSession.ts`): `borrarClavesSol()` al cerrar sesión, al
+    iniciar otra y cuando `SesionGuard` detecta que la sesión cambió (equipos compartidos).
+  · Sesión SUNAT en memoria (`sunatSesion.ts`): la llave del caché incluye una huella de la Clave SOL; solo
+    quien presenta la misma clave reutiliza la sesión abierta (antes bastaba RUC + usuario).
+  · Entrada sin HTTPS (p. ej. `http://IP_PUBLICA`): el middleware redirige a `APP_URL` (308), salvo llamadas
+    internas (127.0.0.1) y rutas de máquina con secreto propio (webhooks, tarea nocturna, captura del Visor).
+  · Respaldos (`deploy/respaldo-s3.sh`): `umask 077`, carpeta 700 y subida a S3 con `--sse AES256`;
+    `/var/data` queda 700 (`entrypoint.sh`).
+  · `revisarConfiguracion` (`seguridad.ts`) marca CRÍTICO si AUTH_SECRET / VIGILANCIA_KEY siguen con el texto
+    de ejemplo del `.env`.
 - ⚠️ **NO TOCAR sin pedido expreso del dueño: vigilancia 24 h del buzón y alertas al celular/correo**
   (servicio plus): `nocturna.ts`, `alertas.ts`, `email.ts`, `/api/alertas`, `/api/clientes/[id]/vigilancia`,
   `/api/consultas/buzon/seguimiento`, `/api/tareas/nocturna`, `VigilanciaBuzonPanel`, `AlertasConfig`. Los

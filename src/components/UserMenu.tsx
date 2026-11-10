@@ -1,5 +1,6 @@
 "use client";
 
+import { borrarClavesSol } from "@/lib/solSession";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,6 +11,7 @@ export function UserMenu({ nombre }: { nombre: string }) {
   async function salir() {
     setBusy(true);
     await fetch("/api/auth/logout", { method: "POST" });
+    borrarClavesSol();
     router.replace("/login");
     router.refresh();
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { borrarClavesSol } from "@/lib/solSession";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -56,6 +57,7 @@ async function cerrarSesion(setBusy: (b: boolean) => void) {
   setBusy(true);
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
   try { localStorage.removeItem("mostrar_planes"); } catch { /* */ }
+  borrarClavesSol(); // las Claves SOL cargadas no quedan en el navegador
   anunciarSesion(null); // las demás pestañas se bloquean
   // Navegación COMPLETA: el layout del servidor relee las cookies y no queda
   // el chrome de la sesión anterior sobre la pantalla de login.

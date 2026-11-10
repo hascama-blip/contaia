@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { borrarClavesSol } from "@/lib/solSession";
 
 // Todas las pestañas del navegador comparten UNA sola sesión. Si en otra pestaña
 // se inicia sesión con otra cuenta (p. ej. Utilitarios RTP) o se cierra la sesión,
@@ -25,6 +26,8 @@ export default function SesionGuard({ uid }: { uid: string }) {
       try {
         const r = await fetch("/api/auth/sesion", { cache: "no-store" });
         const d = await r.json();
+        // La sesión ya es de otra cuenta (o se cerró): las Claves SOL de esta pestaña se borran.
+        if (d.uid !== uid) borrarClavesSol();
         if (vivo && d.uid !== uid) setCambio({ nombre: d.nombre });
       } catch { /* sin red: no bloquea */ }
     };

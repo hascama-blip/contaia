@@ -12,6 +12,10 @@ export function revisarConfiguracion(): AvisoSeguridad[] {
   const auth = e("AUTH_SECRET");
   if (!auth) out.push({ nivel: "critico", texto: "Falta AUTH_SECRET: las sesiones se firman con una clave pública del código y cualquiera podría fabricar una. Agrégala al .env (64 caracteres al azar)." });
   else if (auth.length < 32) out.push({ nivel: "critico", texto: "AUTH_SECRET es muy corta (menos de 32 caracteres). Usa una de 64 caracteres al azar." });
+  // Valores de ejemplo del .env sin cambiar: están publicados en el código, no protegen nada.
+  const deEjemplo = (v: string) => /^cambia-esto|^otro-texto-largo|aleatorio-distinto/i.test(v);
+  if (auth && deEjemplo(auth)) out.push({ nivel: "critico", texto: "AUTH_SECRET sigue con el texto de ejemplo del .env: cualquiera podría fabricar una sesión (incluida la del supremo) y ver todos los datos. Cámbiala por 64 caracteres al azar." });
+  if (deEjemplo(e("VIGILANCIA_KEY"))) out.push({ nivel: "critico", texto: "VIGILANCIA_KEY sigue con el texto de ejemplo del .env: las Claves SOL y los client_secret guardados quedan cifrados con una llave conocida. Pon una al azar (y vuelve a ingresar esas credenciales)." });
   if (!e("VIGILANCIA_KEY")) out.push({ nivel: "advertencia", texto: "Falta VIGILANCIA_KEY: las Claves SOL de la vigilancia, los client_secret SIRE y las claves de integraciones se cifran con AUTH_SECRET. Si algún día cambias AUTH_SECRET, no se podrán leer." });
   if (!e("SUPREMO_PASSWORD")) out.push({ nivel: "advertencia", texto: "Falta SUPREMO_PASSWORD en el .env." });
   const dosPasos = /^(1|true|si|sí)$/i.test(e("SUPREMO_2FA"));

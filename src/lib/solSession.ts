@@ -29,3 +29,18 @@ export function setSolUser(clienteId: string, user: string) {
   if (typeof window === "undefined" || !clienteId) return;
   try { if (user) sessionStorage.setItem(kUser(clienteId), user); } catch { /* */ }
 }
+
+/** Borra TODAS las Claves SOL (y usuarios) recordadas en esta pestaña. Se llama al
+ *  cerrar sesión, al iniciar otra y cuando la sesión cambia: si no, en un equipo
+ *  compartido la siguiente persona podría leer las claves de las empresas del anterior. */
+export function borrarClavesSol() {
+  if (typeof window === "undefined") return;
+  try {
+    const quitar: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (key.startsWith("solpass:") || key.startsWith("soluser:"))) quitar.push(key);
+    }
+    for (const key of quitar) sessionStorage.removeItem(key);
+  } catch { /* sin storage */ }
+}

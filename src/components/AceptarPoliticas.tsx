@@ -1,5 +1,6 @@
 "use client";
 
+import { borrarClavesSol } from "@/lib/solSession";
 import { useState } from "react";
 import { LogoAsenco } from "@/components/Logo";
 import CasillasPoliticas from "@/components/CasillasPoliticas";
@@ -30,6 +31,7 @@ export default function AceptarPoliticas({ nombre, next, actualizacion }: { nomb
 
   async function salir() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    borrarClavesSol();
     window.location.assign("/login");
   }
 

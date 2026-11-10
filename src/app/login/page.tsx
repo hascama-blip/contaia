@@ -1,6 +1,7 @@
 "use client";
 
 import { rutaInterna } from "@/lib/rutaInterna";
+import { borrarClavesSol } from "@/lib/solSession";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogoAsenco } from "@/components/Logo";
@@ -36,7 +37,7 @@ export default function LoginPage() {
   };
   // Navegación COMPLETA (no la del router): así no queda en memoria ninguna página
   // de la cuenta anterior; y se avisa a las demás pestañas que la sesión cambió.
-  const entrar = (uid?: string) => { anunciarSesion(uid ?? "nuevo"); window.location.assign(next); };
+  const entrar = (uid?: string) => { borrarClavesSol(); anunciarSesion(uid ?? "nuevo"); window.location.assign(next); };
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
