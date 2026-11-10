@@ -5,7 +5,7 @@ import { FotoCampo } from "../components/Archivos.js";
 import { Plano } from "../components/Plano.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS, LISTAS } from "../config.js";
-import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado, existeStand } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, normalizar, estadoCenso, estaCensado, existeStand, esDeAsociacion } from "../lib/padron.js";
 import { MODOS } from "../lib/plano.js";
 import { fecha, hoy } from "../lib/formato.js";
 import { soloDigitos } from "../lib/validar.js";
@@ -84,6 +84,7 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
   const { datos, derivados } = useApp();
   const [texto, setTexto] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
+  const [soloAsociacion, setSoloAsociacion] = useState(false);
   const [modo, setModo] = useState("censo");
   const [abierto, setAbierto] = useState(null);
 
@@ -100,11 +101,21 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
       .filter(({ stand, asociado }) => !q || normalizar(`${stand.codigo} ${asociado.dni} ${asociado.numero} ${nombreCompleto(asociado)}`).includes(q));
   }, [filas, texto, soloPendientes]);
 
-  const filtrando = Boolean(texto.trim()) || soloPendientes;
+  // Stands propios de la Asociación: se buscan por "asociación", por su número o por cómo figuran en el libro (APCCIC-…).
+  const deAsociacion = useMemo(() => datos.stands.filter(esDeAsociacion), [datos.stands]);
+  const asocVisibles = useMemo(() => {
+    const q = normalizar(texto);
+    return deAsociacion.filter((s) => !q || normalizar(`asociacion ${s.codigo} ${s.asociacionNota || ""}`).includes(q));
+  }, [deAsociacion, texto]);
+
+  const filtrando = Boolean(texto.trim()) || soloPendientes || soloAsociacion;
   // Un número de stand del plano se ubica aunque aún no tenga ficha.
   const numero = /^\d{4}$/.test(texto.trim()) && existeStand(texto.trim()) ? texto.trim() : null;
-  const resaltar = filtrando ? new Set([...visibles.map((f) => f.stand.codigo), ...(numero ? [numero] : [])]) : null;
-  const enfocar = numero || (texto.trim() && visibles.length === 1 ? visibles[0].stand.codigo : null);
+  const resaltar = soloAsociacion
+    ? new Set(asocVisibles.map((s) => s.codigo))
+    : filtrando ? new Set([...visibles.map((f) => f.stand.codigo), ...(texto.trim() && !soloPendientes ? asocVisibles.map((s) => s.codigo) : []), ...(numero ? [numero] : [])]) : null;
+  const enfocar = numero || (texto.trim() && visibles.length === 1 && !asocVisibles.length ? visibles[0].stand.codigo
+    : texto.trim() && !visibles.length && asocVisibles.length === 1 ? asocVisibles[0].codigo : null);
   const grupos = GALERIAS.map((g) => ({ ...g, filas: visibles.filter((f) => f.stand.galeria === g.id) })).filter((g) => g.filas.length);
 
   const actual = abierto && {
@@ -116,11 +127,11 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
       <section className="card card-pad" style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <h2 className="card-titulo">Plano del C.C.</h2>
-          <p className="card-sub">Plano real: 396 stands (1001 al 1405) en las galerías A a la M. Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha.</p>
+          <p className="card-sub">Plano real: 396 stands (1001 al 1405) en las galerías A a la M. Pasa el cursor o toca un stand para ver su resumen; desde la burbuja abres la ficha.${deAsociacion.length ? ` Los ${deAsociacion.length} stands de la asociación se ven en violeta.` : ""}</p>
         </div>
         <div className="barra-herr">
           <label className="sr" htmlFor="cp-buscar">Buscar</label>
-          <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por N° de stand (1091), DNI o nombre" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
+          <input id="cp-buscar" className="input buscar" type="search" placeholder="Buscar por N° de stand (1091), DNI, nombre o «asociación»" value=${texto} onChange=${(e) => setTexto(e.target.value)} />
           <div className="segmentos en-linea" role="group" aria-label="Colorear el plano por">
             ${Object.entries(MODOS).map(([k, t]) => html`<button key=${k} aria-pressed=${modo === k} onClick=${() => setModo(k)}>${t}</button>`)}
           </div>
@@ -128,6 +139,10 @@ export function Campo({ incrustado = false, debajoDelPlano = null, antesDeLista 
             <input type="checkbox" id="cp-pend" checked=${soloPendientes} onChange=${(e) => setSoloPendientes(e.target.checked)} />
             <span>Solo pendientes</span>
           </label>
+          ${deAsociacion.length > 0 && html`<label className="check" style=${{ alignItems: "center" }}>
+            <input type="checkbox" id="cp-asoc" checked=${soloAsociacion} onChange=${(e) => setSoloAsociacion(e.target.checked)} />
+            <span>Stands de la asociación (${deAsociacion.length})</span>
+          </label>`}
         </div>
         <${Plano} modo=${modo} resaltar=${resaltar} enfocar=${enfocar} onVerificar=${setAbierto} />
         ${debajoDelPlano}

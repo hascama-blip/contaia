@@ -633,6 +633,10 @@ select.input { padding-right: 36px; text-overflow: ellipsis; }
    Tono oscuro sobre la página blanca y claro dentro de las cajas azul marino. */
 :root { --asoc: #5b3fd6; --asoc-fondo: #ece8ff; }
 .card, .panel, .plano-azul { --asoc: #d3c8ff; --asoc-fondo: #43358c; }
+/* En el plano, violeta más intenso y número en blanco para distinguirlos de un vistazo. */
+.plano-azul .pl-asoc polygon { fill: #5b43d6; stroke: #e4dcff; stroke-width: 1.5; }
+.plano-azul .pl-asoc .pl-codigo { fill: #ffffff; font-weight: 800; }
+.plano-azul .leyenda .ley-asoc { background: #5b43d6; border-color: #e4dcff; }
 .b-asoc { background: var(--asoc-fondo); color: var(--asoc); }
 .pl-asoc polygon { fill: var(--asoc-fondo); stroke: var(--asoc); }
 .leyenda .ley-asoc { background: var(--asoc-fondo); border: 1px solid var(--asoc); }
