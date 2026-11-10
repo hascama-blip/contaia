@@ -36,8 +36,9 @@ export async function POST(req: NextRequest) {
   { const d = demoNoDisponible(cliente); if (d) return d; }
 
   const codMensaje = String(body?.codMensaje ?? "");
-  // Va en el nombre del archivo guardado: nada de rutas ("../").
-  if (codMensaje && !/^[\w-]{1,60}$/.test(codMensaje)) return NextResponse.json({ error: "Mensaje inválido." }, { status: 400 });
+  // Va en el nombre del archivo guardado: solo se rechaza lo que arma una ruta
+  // ("/", "\\", "..") o caracteres de control; cualquier código que dé SUNAT pasa.
+  if (codMensaje && (codMensaje.length > 120 || /[\/\\\u0000-\u001f]|\.\./.test(codMensaje))) return NextResponse.json({ error: "Mensaje inválido." }, { status: 400 });
   const forzar = body?.forzar === true;
   const diagnostico = body?.diagnostico === true;
   const actual = await getCurrentUser();

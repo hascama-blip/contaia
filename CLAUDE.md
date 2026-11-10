@@ -286,8 +286,13 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **RTT**: el RUC debe ser de una empresa del estudio y `rucLogin === ruc` (el reporte se cruza por RUC).
 - **Cupos**: una tanda (`lote`) ya contada vale 60 minutos (`loteVigente`); luego cuenta de nuevo.
 - **Salida al navegador**: `publicUser` quita hashes de contraseña/códigos/recuperación y el código de
-  Telegram; `ocultarCliente` quita también `vigilancia.claveEnc`. El `codMensaje` del buzón se valida
-  (`[\w-]`) porque va en el nombre del archivo guardado.
+  Telegram; `ocultarCliente` quita también `vigilancia.claveEnc` (solo de la respuesta; en el store sigue).
+  El `codMensaje` del buzón (ruta de adjuntos) rechaza solo `/`, `\`, `..` y caracteres de control, porque
+  va en el nombre del archivo guardado.
+- ⚠️ **NO TOCAR sin pedido expreso del dueño: vigilancia 24 h del buzón y alertas al celular/correo**
+  (servicio plus): `nocturna.ts`, `alertas.ts`, `email.ts`, `/api/alertas`, `/api/clientes/[id]/vigilancia`,
+  `/api/consultas/buzon/seguimiento`, `/api/tareas/nocturna`, `VigilanciaBuzonPanel`, `AlertasConfig`. Los
+  ajustes de seguridad o de otros módulos no deben cambiar su comportamiento.
 - **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
 - **Next 15**: `params`, `searchParams`, `cookies()` y `headers()` son asíncronos (usar `await`).
 - **Contenedor** (Lightsail, `deploy/`): Dockerfile en dos etapas; la app corre como usuario
