@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { usePuedeDiag } from "./SupremoContext";
 import { getSolPass, getSolUser } from "@/lib/solSession";
 import TiempoAprox, { TIEMPOS } from "./TiempoAprox";
@@ -24,9 +24,19 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   const [refrescar, setRefrescar] = useState(false);
   const [diag, setDiag] = useState<string | null>(null);
   const [bloque, setBloque] = useState<any>(null);
+  // Ventana de aviso cuando SUNAT demora: "esperando" = seguimos reintentando solos;
+  // "sigue" = se agotaron los reintentos (el pedido queda en curso en SUNAT).
+  const [demora, setDemora] = useState<null | "esperando" | "sigue">(null);
+  const [sunatAcepto, setSunatAcepto] = useState(false); // SUNAT ya recibió el pedido (respondió "en proceso")
+  const avisoCerrado = useRef(false); // si la cerró con "Entendido", no se reabre en esta extracción
+  const avisarDemora = (estado: "esperando" | "sigue") => {
+    if (estado === "sigue") { avisoCerrado.current = false; setDemora("sigue"); return; }
+    if (!avisoCerrado.current) setDemora("esperando");
+  };
 
   async function extraer() {
     setError(null); setInfo(null); setDiag(null); setBloque(null);
+    setDemora(null); avisoCerrado.current = false; setSunatAcepto(false);
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
     // Con caché no hace falta la Clave SOL; sin caché (o refrescar) sí.
@@ -39,30 +49,69 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
     // aguantamos hasta que SUNAT termine (en la práctica 1–3 intentos).
     const MAX_REINTENTOS = 8;
     const ESPERA_MS = 8000;
+    // Cortes de conexión seguidos que se toleran (con SUNAT lento el pedido tarda y a
+    // veces la conexión se corta): se reintenta solo; SUNAT retoma el mismo pedido.
+    const MAX_CORTES = 3;
+    const MSG_DEMORA = "Por demoras de carga de SUNAT, las descargas del SIRE se están demorando.";
+    const esDemoraSunat = (t: string) => /fetch failed|timed? ?out|tiempo de espera|ETIMEDOUT|ECONNRESET|socket|HTTP 5\d\d|\b50[234]\b|\b429\b|Too Many Requests|limit[oó] las solicitudes/i.test(t);
+    let cortes = 0;
     try {
       for (let intento = 0; intento <= MAX_REINTENTOS; intento++) {
-        const res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
-        });
+        let res: Response;
+        try {
+          res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, diagnostico: diagModo, refrescar }),
+          });
+        } catch {
+          // Se cortó la conexión mientras SUNAT preparaba el archivo: avisar y reintentar.
+          cortes++;
+          if (cortes <= MAX_CORTES && intento < MAX_REINTENTOS) {
+            avisarDemora("esperando");
+            setInfo(`⏳ SUNAT está demorando la propuesta de ${libro}… reintentando automáticamente (${intento + 1}/${MAX_REINTENTOS}).`);
+            await new Promise((r) => setTimeout(r, ESPERA_MS));
+            continue;
+          }
+          avisarDemora("sigue");
+          setInfo(null);
+          setError(`${MSG_DEMORA} Vuelve a pulsar Extraer en unos minutos.`);
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         if (diagModo && data.diag) setDiag(JSON.stringify(data.diag, null, 2));
         if (res.status === 400 && !solPass && !data.desdeCache) {
           setError("No hay datos guardados de este periodo. Carga tus accesos SOL (arriba) para extraerlo de SUNAT.");
           return;
         }
-        if (!res.ok) { setError(data.error ?? "No se pudo extraer el detalle."); return; }
+        if (!res.ok) {
+          const msg = String(data.error ?? "");
+          // Sin respuesta del servidor (502/504) o SUNAT lento/saturado: es demora, no un error de datos.
+          if (res.status >= 502 || esDemoraSunat(msg)) {
+            avisarDemora("sigue");
+            setInfo(null);
+            setError(`${MSG_DEMORA}${msg ? ` (${msg})` : ""} Vuelve a pulsar Extraer en unos minutos.`);
+            return;
+          }
+          setError(msg || "No se pudo extraer el detalle.");
+          return;
+        }
+        cortes = 0;
         // SUNAT aún genera el reporte → reintentar (reusa el ticket en curso).
         if (data.pendiente) {
+          setSunatAcepto(true);
           if (intento < MAX_REINTENTOS) {
+            if (intento >= 1) avisarDemora("esperando"); // ya van varios minutos esperando a SUNAT
             setInfo(`⏳ SUNAT está generando la propuesta de ${libro}… reintentando automáticamente (${intento + 1}/${MAX_REINTENTOS}).`);
             await new Promise((r) => setTimeout(r, ESPERA_MS));
             continue;
           }
+          avisarDemora("sigue");
+          setInfo(null);
           setError("SUNAT sigue generando el reporte tras varios minutos. Su ticket ya está en curso: espera un momento y vuelve a pulsar Extraer (lo retomará).");
           return;
         }
+        setDemora(null);
         const b = esVentas ? data.ventas : data.compras;
         setBloque(b ?? null);
         if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); return; }
@@ -73,7 +122,8 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         return;
       }
     } catch {
-      setError("Error de red al extraer el detalle.");
+      avisarDemora("sigue");
+      setError(`${MSG_DEMORA} Vuelve a pulsar Extraer en unos minutos.`);
     } finally {
       setBusy(false);
     }
@@ -171,6 +221,32 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
       {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
       <TablaDetalle titulo={esVentas ? "Ventas (RVIE)" : "Compras (RCE)"} bloque={bloque} />
+
+      {/* Aviso de demora de SUNAT (ventana) */}
+      {demora && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-900/60 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="demora-sunat-titulo">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-100 text-xl">⏳</span>
+              <h3 id="demora-sunat-titulo" className="text-lg font-bold text-slate-800">SUNAT está demorando</h3>
+            </div>
+            <p className="mt-3 text-sm text-slate-700">
+              Por demoras de carga de SUNAT, las descargas del SIRE se están demorando.
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              {demora === "esperando"
+                ? "Seguimos intentando automáticamente. No cierres esta pestaña: el pedido ya está en curso en SUNAT y la descarga continuará sola."
+                : sunatAcepto
+                  ? "SUNAT aún no entrega el archivo. Vuelve a pulsar «Extraer» en unos minutos: el pedido ya está en curso y se retomará donde quedó."
+                  : "SUNAT no está respondiendo en este momento. Vuelve a pulsar «Extraer» en unos minutos."}
+            </p>
+            {sunatAcepto && <p className="mt-2 text-xs text-slate-400">SUNAT ya aceptó tus accesos y recibió el pedido; solo falta que entregue el archivo.</p>}
+            <button className="btn-primary mt-4 w-full" onClick={() => { avisoCerrado.current = true; setDemora(null); }}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

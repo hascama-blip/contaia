@@ -137,6 +137,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`setPlaneamiento`); un mes sin datos sugiere el saldo que dejó el anterior. API `/api/proyeccion`
   (GET datos, POST guardar) y `/api/proyeccion/pdf` (informe A4, `proyeccionHtml.ts`), con
   `bloqueoModulo("proyeccion")`. (Antes fue la sección 7 de la ficha; se movió al utilitario.)
+- **Detalle SIRE — aviso de demora de SUNAT** (`DetalleSirePanel.tsx`): si la conexión se corta mientras
+  SUNAT genera la propuesta, o SUNAT sigue "en proceso" tras el 2.º intento, o el servidor recibe de SUNAT
+  `fetch failed`/5xx/429, sale una VENTANA "SUNAT está demorando — Por demoras de carga de SUNAT, las
+  descargas del SIRE se están demorando". Los cortes de conexión se reintentan solos (hasta 3 seguidos; SUNAT
+  retoma el mismo ticket). Un rechazo de credenciales NO abre la ventana: muestra el error de SUNAT.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
