@@ -1559,6 +1559,9 @@ export async function duenoDeRuc(
   return conBloqueoStore(async () => {
   const store = await readStore();
   const r = ruc.trim();
+  // El supremo y la cuenta "Utilitarios RTP" NUNCA son dueños de un RUC: sus empresas
+  // son copias para sus módulos propios y no bloquean a la cuenta que las gestiona.
+  const supremos = new Set((store.users ?? []).filter((u) => u.rol === "supremo" || u.soloRtp === true).map((u) => u.id));
   const reg = store.rucsRegistrados?.[r];
   if (reg) {
     // Auto-limpieza: si el registro apunta a un estudio o cliente que ya NO
@@ -1566,14 +1569,14 @@ export async function duenoDeRuc(
     const estudioVive = (store.users ?? []).some((u) => u.id === reg.studioId);
     // La empresa del dueño sigue viva (la copia de otro, p. ej. del supremo, no cuenta).
     const clienteVive = store.clientes.some((c) => c.id === reg.clienteId || (c.ruc === r && c.ownerId === reg.studioId));
-    if (estudioVive && clienteVive) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
+    // Un registro a nombre del supremo o de Utilitarios RTP no vale (pudo quedar de
+    // antes de que esas cuentas fueran exentas): se borra y el RUC queda libre.
+    if (estudioVive && clienteVive && !supremos.has(reg.studioId)) return { studioId: reg.studioId, ownerNombre: reg.ownerNombre };
     delete store.rucsRegistrados![r];
     await writeStore(store);
   }
-  // Compatibilidad (empresas previas al registro global). Las copias del
-  // supremo no adueñan el RUC: no bloquean a los demás usuarios.
-  // Copias del supremo y de la cuenta "Utilitarios RTP": no adueñan el RUC.
-  const supremos = new Set((store.users ?? []).filter((u) => u.rol === "supremo" || u.soloRtp === true).map((u) => u.id));
+  // Compatibilidad (empresas previas al registro global): cuenta la empresa de
+  // cualquier otra cuenta que no sea el supremo ni Utilitarios RTP.
   const c = store.clientes.find((x) => x.ruc === r && x.ownerId && !supremos.has(x.ownerId) && (store.users ?? []).some((u) => u.id === x.ownerId));
   if (c && c.ownerId) return { studioId: c.ownerId };
   return null;
