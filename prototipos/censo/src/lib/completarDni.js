@@ -8,7 +8,7 @@ const CABECERA_DNI = /^\s*(n(ro|°|º|um(ero)?)?\.?\s*(de\s*)?)?dni\s*$/i;
 const NO_ES_PERSONA = /^(total( general)?|asociaci[oó]n|\(en blanco\)|\(blank\)|\(vac[ií]o\)|-+)$/i;
 const ORDEN_FUENTE = { asociado: 0, inquilino: 1, "cónyuge": 2, hijo: 3 };
 
-/** ".APCCIC-CRUZ URETA RONALD" → "CRUZ URETA RONALD" (sin puntos iniciales ni el prefijo de la Asociación). */
+/** ".APCCIC-APELLIDO APELLIDO NOMBRE" → "APELLIDO APELLIDO NOMBRE" (sin puntos iniciales ni el prefijo de la Asociación). */
 export const limpiarNombre = (texto) => String(texto || "").replace(/^[\s.·*-]+/, "").replace(/^APCCIC\s*-?\s*/i, "").replace(/[\s.]+$/, "").trim();
 const palabras = (s) => normalizar(s).replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter(Boolean);
 /** Misma palabra aunque cambie la ortografía usual: Gonzales/González, Ysasi/Isasi, Vilchez/Bilches, Huamán/Guaman… */
