@@ -8,6 +8,7 @@ import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquet
 import { aCSV, descargar, COLUMNAS_PADRON, pdfTodasLasFichas } from "../lib/exportar.js";
 import { Paginador, usePaginacion } from "../components/Paginador.js";
 import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
+import { PanelCompletarDni } from "../components/CompletarDni.js";
 import { reniecActivo } from "../lib/reniec.js";
 import { hoy } from "../lib/formato.js";
 
@@ -15,6 +16,7 @@ export function Padron() {
   const { datos, derivados, caps, ir, avisar, puedeEscribir, usuario } = useApp();
   const [filtro, setFiltro] = useState({ texto: "", galeria: "", censo: "" });
   const [verificando, setVerificando] = useState(false);
+  const [completando, setCompletando] = useState(false);
   const [zipAvance, setZipAvance] = useState(null); // [hechos, total] mientras se generan las fichas
   const lista = useMemo(
     () => ordenarPorNumero(filtrarPadron(datos.asociados, derivados.mapaStands, filtro)),
@@ -55,11 +57,13 @@ export function Padron() {
         sub=${`${datos.asociados.length} asociados registrados`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${exportar}>Exportar a Excel (CSV)</button>`}
+          ${caps.descargas && html`<button className="btn btn-ghost" onClick=${() => setCompletando(true)}>Completar DNI en un Excel…</button>`}
           ${caps.descargas && usuario?.esAdminGeneral && html`<button className="btn btn-ghost" disabled=${!!zipAvance} onClick=${descargarFichasZip}>${zipAvance ? `Generando ${zipAvance[0]} de ${zipAvance[1]}…` : "Descargar fichas en PDF (ZIP)"}</button>`}
           ${usuario?.esAdmin && html`<a className="btn btn-ghost" href="#actualizar">Actualizar con fichas del libro</a>`}
           ${puedeEscribir && reniecActivo() && html`<button className="btn btn-ghost" onClick=${() => setVerificando(true)}>Verificar DNI con RENIEC</button>`}
           ${puedeEscribir !== false && html`<a className="btn btn-primary" href="#nueva">+ Nueva ficha</a>`}`} />
       ${verificando && html`<${VerificacionMasiva} asociados=${lista} onCerrar=${() => setVerificando(false)} />`}
+      ${completando && html`<${PanelCompletarDni} onCerrar=${() => setCompletando(false)} />`}
 
       <section className="card">
         <div className="filtros">

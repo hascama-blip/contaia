@@ -135,6 +135,13 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   expedientes ZIP ni respaldo, no edita la web pública y no toca cuentas `admin`), `lib/reniec.js`
   (apidni con caché).
 - `usuarios.js` (crear/listar/clave/rol/borrar) · `importar.js` (carga `semilla.json`).
+- **Completar DNI en un Excel**: Padrón → «Completar DNI en un Excel…» (quien puede exportar). Sube un .xlsx con una
+  columna titulada "DNI" (o "NRO DNI") y los nombres en la columna de su izquierda; `src/lib/completarDni.js` busca cada nombre
+  en el padrón (asociados, inquilinos, cónyuges e hijos; sin importar orden, tildes ni el prefijo "APCCIC-"; ortografía distinta
+  o un nombre de más = "parecido", dos personas posibles = no adivina) y se descarga el **mismo archivo** con el DNI como texto
+  (`ponerCeldasTexto` en `src/lib/xlsx.js` solo reescribe las filas tocadas; tablas dinámicas, estilos y demás partes quedan
+  iguales). No pisa celdas que ya tenían DNI. Ojo: LibreOffice redibuja las tablas dinámicas al abrir y tapa la columna
+  vecina; Excel no.
 - **Stands de la asociación**: `stand.deAsociacion = true` (con `propietarioId: null`, `asociacionNota` = cómo figura en
   el libro, p. ej. "APCCIC-…", y `asociacionDesde`). Se muestra como **Asociación (stand propio)** en Stands (filtro
   propio), plano (violeta, leyenda "De la asociación"), buscador, pagos, reportes e historial (la asociación es la

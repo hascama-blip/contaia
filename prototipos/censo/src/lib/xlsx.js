@@ -68,3 +68,77 @@ export async function leerPrimeraHoja(archivo) {
     return Array.from(celdas, (x) => String(x ?? "").trim());
   });
 }
+
+/**
+ * Abre el libro completo (todas las hojas) y conserva sus partes para poder guardarlo con cambios.
+ * @returns {Promise<{ partes: Map<string,Uint8Array>, hojas: { nombre:string, ruta:string, filas:{ r:number, celdas:string[] }[] }[] }>}
+ */
+export async function leerLibro(archivo) {
+  const zip = leerZip(new Uint8Array(await archivo.arrayBuffer()));
+  const partes = new Map();
+  for (const [nombre, leer] of zip) partes.set(nombre, await leer());
+  const dec = new TextDecoder();
+  const texto = (n) => (partes.has(n) ? dec.decode(partes.get(n)) : null);
+  const compartidas = texto("xl/sharedStrings.xml");
+  const textos = compartidas ? [...xml(compartidas).getElementsByTagName("si")].map(textoDe) : [];
+  const libro = texto("xl/workbook.xml"), rels = texto("xl/_rels/workbook.xml.rels");
+  if (!libro || !rels) throw new Error("El archivo no es un Excel (.xlsx) válido.");
+  const destino = new Map([...xml(rels).getElementsByTagName("Relationship")].map((r) => [r.getAttribute("Id"), r.getAttribute("Target")]));
+  const hojas = [];
+  for (const s of xml(libro).getElementsByTagName("sheet")) {
+    const rid = s.getAttribute("r:id") || s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+    const ruta = "xl/" + String(destino.get(rid) || "").replace(/^\/?xl\//, "").replace(/^\//, "");
+    const contenido = texto(ruta);
+    if (!contenido) continue;
+    const filas = [...xml(contenido).getElementsByTagName("row")].map((fila) => {
+      const celdas = [];
+      for (const c of fila.getElementsByTagName("c")) {
+        const tipo = c.getAttribute("t");
+        const v = c.getElementsByTagName("v")[0]?.textContent ?? "";
+        celdas[columna(c.getAttribute("r"))] = tipo === "s" ? textos[Number(v)] ?? "" : tipo === "inlineStr" ? textoDe(c) : v;
+      }
+      return { r: Number(fila.getAttribute("r")), celdas: Array.from(celdas, (x) => String(x ?? "").trim()) };
+    });
+    hojas.push({ nombre: s.getAttribute("name"), ruta, filas });
+  }
+  return { partes, hojas };
+}
+
+const escXml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Escribe celdas de TEXTO en el XML de una hoja (así un DNI conserva sus ceros a la izquierda).
+ * Solo toca las filas indicadas; el resto del archivo queda byte por byte igual.
+ * @param {string} xmlHoja
+ * @param {Map<string,string>} celdas   "B5" → "08927693"
+ */
+export function ponerCeldasTexto(xmlHoja, celdas) {
+  const porFila = new Map();
+  for (const [ref, valor] of celdas) {
+    const r = Number(ref.replace(/\D/g, ""));
+    if (!porFila.has(r)) porFila.set(r, []);
+    porFila.get(r).push([ref, valor]);
+  }
+  let colMax = 0;
+  let salida = xmlHoja.replace(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g, (todo, attrs, dentro = "") => {
+    const nuevas = porFila.get(Number(/\br="(\d+)"/.exec(attrs)?.[1]));
+    if (!nuevas) return todo;
+    const actuales = [...dentro.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map((m) => ({ xml: m[0], ref: /\br="([A-Z]+\d+)"/.exec(m[0])?.[1] || "" }));
+    for (const [ref, valor] of nuevas) {
+      const i = actuales.findIndex((c) => c.ref === ref);
+      const estilo = i >= 0 ? /\bs="(\d+)"/.exec(actuales[i].xml)?.[1] : null;
+      const celda = { ref, xml: `<c r="${ref}"${estilo ? ` s="${estilo}"` : ""} t="inlineStr"><is><t>${escXml(valor)}</t></is></c>` };
+      if (i >= 0) actuales[i] = celda; else actuales.push(celda);
+      colMax = Math.max(colMax, columna(ref));
+    }
+    actuales.sort((a, b) => columna(a.ref) - columna(b.ref));
+    return `<row${attrs.replace(/\s+spans="[^"]*"/, "")}>${actuales.map((c) => c.xml).join("")}</row>`; // sin "spans": dejaría de ser cierto
+  });
+  // El rango usado de la hoja debe alcanzar a la columna escrita.
+  salida = salida.replace(/<dimension ref="([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?"\/>/, (todo, c1, r1, c2 = c1, r2 = r1) => {
+    if (columna(c2) >= colMax) return todo;
+    let letras = ""; for (let n = colMax + 1; n > 0; n = Math.floor((n - 1) / 26)) letras = String.fromCharCode(65 + ((n - 1) % 26)) + letras;
+    return `<dimension ref="${c1}${r1}:${letras}${r2}"/>`;
+  });
+  return salida;
+}
