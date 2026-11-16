@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import type { Cliente } from "./types";
 import { esClienteDemo, perfilDe, periodosDemo, sireResumenDemo, sireDetalleDemo } from "./demo";
-import { setSunatInfo, setSireResumen, setSireEstado, setSireDetalleCache, setSireDetalleNoIncluidos } from "./db";
+import { setSunatInfo, setSireResumen, setSireEstado, setSireDetalleCache, setSireDetalleNoIncluidos, VERSION_NO_INCLUIDOS } from "./db";
 import { ocultarCliente } from "./secretos";
 import { hoyLima } from "./fechas";
 
@@ -68,7 +68,7 @@ export async function demoSireNoIncluidos(c: Cliente, periodo: string, tipo: "ve
   }
   const ni = { columnas: base.columnas, filas, comprobantes: filas.length };
   await setSireDetalleNoIncluidos(c.id, tipo, periodo, ni);
-  return NextResponse.json({ periodo, noIncluidos: { ...ni, at: new Date().toISOString() } });
+  return NextResponse.json({ periodo, noIncluidos: { ...ni, at: new Date().toISOString(), v: VERSION_NO_INCLUIDOS } });
 }
 
 export function demoBuzon(c: Cliente): NextResponse {

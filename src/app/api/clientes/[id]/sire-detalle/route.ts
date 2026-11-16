@@ -4,7 +4,7 @@ import { bloqueoModulo, limpiarDiagnostico, ocultarDiag } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { getClienteAutorizado } from "@/lib/auth";
 import { consultarDetalleSire, consultarNoIncluidosSire } from "@/lib/sire";
-import { setSireDetalleCache, setSireDetalleNoIncluidos } from "@/lib/db";
+import { setSireDetalleCache, setSireDetalleNoIncluidos, VERSION_NO_INCLUIDOS } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   // mismo Excel. Nunca se mezclan con el detalle (no cuentan en conciliaciones). ----
   if (body.soloNoIncluidos === true) {
     const guardado = cliente.sireDetalle?.[`${tipo}-${periodo}`]?.noIncluidos;
-    if (guardado && !body.diagnostico && !refrescar) return NextResponse.json({ periodo, noIncluidos: guardado, desdeCache: true });
+    if (guardado && guardado.v === VERSION_NO_INCLUIDOS && !body.diagnostico && !refrescar) return NextResponse.json({ periodo, noIncluidos: guardado, desdeCache: true });
     try {
       const r = await consultarNoIncluidosSire({
         ruc: cliente.ruc, periodo, solUser,
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         return NextResponse.json({ periodo, noDisponible: true, noIncluidos: { columnas: [], filas: [], comprobantes: 0, nota: r.noDisponible ?? "SUNAT no entregó esta lista." } });
       }
       await setSireDetalleNoIncluidos(cliente.id, tipo, periodo, r.bloque);
-      return NextResponse.json({ periodo, noIncluidos: { ...r.bloque, at: new Date().toISOString() } });
+      return NextResponse.json({ periodo, noIncluidos: { ...r.bloque, at: new Date().toISOString(), v: VERSION_NO_INCLUIDOS } });
     } catch (err: any) {
       return NextResponse.json({ error: err?.message ?? "Error consultando los no incluidos del SIRE" }, { status: 400 });
     }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!body.diagnostico && !refrescar) {
     const cache = cliente.sireDetalle?.[`${tipo}-${periodo}`];
     if (cache) {
-      const bloque = { columnas: cache.columnas, filas: cache.filas, comprobantes: cache.comprobantes, noIncluidos: cache.noIncluidos };
+      const bloque = { columnas: cache.columnas, filas: cache.filas, comprobantes: cache.comprobantes, noIncluidos: cache.noIncluidos?.v === VERSION_NO_INCLUIDOS ? cache.noIncluidos : undefined };
       return NextResponse.json({
         periodo,
         ventas: tipo === "ventas" ? bloque : undefined,

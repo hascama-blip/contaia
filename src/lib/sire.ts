@@ -945,6 +945,9 @@ async function exportarPropuesta(
   opts: { seguirEn4xx?: boolean } = {}
 ): Promise<string | null> {
   const candidatos = Array.isArray(pathTemplate) ? pathTemplate : [pathTemplate];
+  // "Sin información" de SUNAT. En las consultas con rutas por calibrar solo vale su código
+  // 1070: un "no se ha encontrado" genérico puede ser simplemente que la ruta no existe.
+  const sinInfo = (t: string) => (opts.seguirEn4xx ? /\b1070\b/.test(t) : /1070|no se ha encontrado/i.test(t));
   try {
     let res!: Response;
     let txt = "";
@@ -978,7 +981,7 @@ async function exportarPropuesta(
         respuesta: trunc(txt, 1200),
       });
       // 200 o "sin movimiento" → dejar de probar candidatos.
-      if (res.ok || /1070|no se ha encontrado/i.test(txt)) break;
+      if (res.ok || sinInfo(txt)) break;
       // 5xx y quedan candidatos → probar el siguiente verbo/endpoint.
       if (res.status >= 500 && ci < candidatos.length - 1) continue;
       // Rutas aún por calibrar (no incluidos): un 4xx de "ruta no existe" también pasa al siguiente.
@@ -1007,7 +1010,7 @@ async function exportarPropuesta(
     };
 
     if (!res.ok) {
-      if (/1070|no se ha encontrado/i.test(txt)) return "";
+      if (sinInfo(txt)) return "";
       // 42209: ya hay un proceso de "Generar archivo exportar propuesta" EN CURSO.
       // SUNAT no deja lanzar otro y devuelve el Ticket en el mensaje → reusamos
       // ESE ticket (esperar + descargar) en vez de fallar.
@@ -1265,6 +1268,16 @@ export async function consultarNoIncluidosSire(
   if (t === null) {
     const hay429 = diag.pasos.some((x) => /429|too many/i.test(String(x.respuesta ?? "")));
     return { periodo, diag, noDisponible: hay429 ? "SUNAT limitó las solicitudes; vuelve a intentarlo en 1–2 minutos." : "SUNAT no entregó esta lista para el periodo." };
+  }
+  // Lista VACÍA: solo se da por cierta si SUNAT respondió bien (200 con archivo o ticket) o con
+  // su código 1070 ("sin información"). Un "no encontrado" genérico (p. ej. una ruta que no
+  // existe en esta versión de la API) NO significa que no haya rechazados.
+  if (t === "") {
+    const ult = [...diag.pasos].reverse().find((x) => x.paso === `propuesta-${etiqueta}`);
+    const confirmado = Boolean(ult) && (ult!.ok === true || /\b1070\b/.test(String(ult!.respuesta ?? "")));
+    if (!confirmado) {
+      return { periodo, diag, noDisponible: `SUNAT no confirmó la lista (respondió HTTP ${ult?.httpStatus ?? "desconocido"}). No se puede asegurar que no haya comprobantes fuera de la propuesta.` };
+    }
   }
   return { periodo, bloque: parseDetalle(t), diag };
 }

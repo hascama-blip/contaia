@@ -151,6 +151,10 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   `/rce/propuesta/web/excluidos/{periodo}/…`; se fijan con `SIRE_NOINCLUIDOS_VENTAS_PATH` /
   `SIRE_NOINCLUIDOS_COMPRAS_PATH`. `exportarPropuesta(..., { seguirEn4xx: true })` prueba el siguiente
   candidato ante 4xx solo en esta consulta (la propuesta normal no cambió).
+  Una lista VACÍA solo se da por cierta si SUNAT respondió 200 (archivo/ticket) o con su código 1070; un
+  "no encontrado" genérico = "no confirmado" (nota ámbar, no se guarda). Lo guardado lleva
+  `v = VERSION_NO_INCLUIDOS` (2); lo de una versión anterior se vuelve a consultar. Caso real pendiente:
+  NC F007-130 (cliente 20429350264) figura como rechazada en SUNAT y la v1 dijo "ninguna".
 - **Detalle SIRE — aviso de demora de SUNAT** (`DetalleSirePanel.tsx`): si la conexión se corta mientras
   SUNAT genera la propuesta, o SUNAT sigue "en proceso" tras el 2.º intento, o el servidor recibe de SUNAT
   `fetch failed`/5xx/429, sale una VENTANA "SUNAT está demorando — Por demoras de carga de SUNAT, las

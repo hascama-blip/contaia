@@ -1808,6 +1808,10 @@ export async function setSireResumen(
 });
 }
 
+/** Versión de la consulta de no incluidos: lo guardado con una versión anterior no se da por
+ *  bueno (la v1 podía guardar una lista vacía sin que SUNAT la hubiera confirmado). */
+export const VERSION_NO_INCLUIDOS = 2;
+
 /** Guarda los NO INCLUIDOS (rechazados / excluidos) junto al detalle SIRE ya guardado. */
 export async function setSireDetalleNoIncluidos(
   clienteId: string,
@@ -1820,7 +1824,7 @@ export async function setSireDetalleNoIncluidos(
   const cliente = store.clientes.find((c) => c.id === clienteId);
   const e = cliente?.sireDetalle?.[`${tipo}-${periodo}`];
   if (!e) return; // sin detalle guardado no hay dónde colgarlos
-  e.noIncluidos = { ...ni, at: new Date().toISOString() };
+  e.noIncluidos = { ...ni, at: new Date().toISOString(), v: VERSION_NO_INCLUIDOS };
   await writeStore(store);
 });
 }

@@ -245,7 +245,7 @@ export interface Cliente {
     columnas: string[]; filas: string[][]; comprobantes: number; at: string;
     /** Comprobantes que SUNAT dejó FUERA de la propuesta (ventas: "no incluidos", p. ej. rechazados;
      *  compras: "excluidos"). Van aparte: no cuentan en conciliaciones ni proyecciones. */
-    noIncluidos?: { columnas: string[]; filas: string[][]; comprobantes: number; at: string; nota?: string };
+    noIncluidos?: { columnas: string[]; filas: string[][]; comprobantes: number; at: string; nota?: string; /** versión de la consulta que lo obtuvo */ v?: number };
   }>;
   /** Caché de PDFs descargados del buzón, por codMensaje (para no re-bajarlos). */
   buzonAdjuntos?: Record<string, AdjuntoCache>;
