@@ -27,6 +27,8 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   // Ventana de aviso cuando SUNAT demora: "esperando" = seguimos reintentando solos;
   // "sigue" = se agotaron los reintentos (el pedido queda en curso en SUNAT).
   const [demora, setDemora] = useState<null | "esperando" | "sigue">(null);
+  // No incluidos (rechazados / excluidos): se consultan aparte, después del detalle.
+  const [niNota, setNiNota] = useState<string | null>(null);
   const [sunatAcepto, setSunatAcepto] = useState(false); // SUNAT ya recibió el pedido (respondió "en proceso")
   const avisoCerrado = useRef(false); // si la cerró con "Entendido", no se reabre en esta extracción
   const avisarDemora = (estado: "esperando" | "sigue") => {
@@ -37,6 +39,7 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   async function extraer() {
     setError(null); setInfo(null); setDiag(null); setBloque(null);
     setDemora(null); avisoCerrado.current = false; setSunatAcepto(false);
+    setNiNota(null);
     const solPass = getSolPass(clienteId);
     const solUser = getSolUser(clienteId);
     // Con caché no hace falta la Clave SOL; sin caché (o refrescar) sí.
@@ -114,11 +117,13 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         setDemora(null);
         const b = esVentas ? data.ventas : data.compras;
         setBloque(b ?? null);
-        if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); return; }
+        if (diagModo) { setInfo("Diagnóstico listo (revisa la traza cruda abajo)."); await buscarNoIncluidos(periodo, solUser, solPass, true); return; }
         const desde = data.desdeCache
           ? ` · guardado (${new Date(data.cacheAt).toLocaleString("es-PE")}) — no se reconsultó SUNAT`
           : " · recién extraído de SUNAT (guardado en caché)";
         setInfo(`${b?.comprobantes ?? 0} comprobante(s) de ${libro}${desde}.`);
+        // Si lo guardado ya trae los no incluidos, no se vuelve a preguntar a SUNAT.
+        if (b && !b.noIncluidos) await buscarNoIncluidos(periodo, solUser, solPass, false);
         return;
       }
     } catch {
@@ -127,6 +132,33 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
     } finally {
       setBusy(false);
     }
+  }
+
+  // 2.ª consulta: comprobantes que SUNAT dejó FUERA de la propuesta (ventas: "no incluidos",
+  // p. ej. rechazados; compras: excluidos). No detiene ni invalida el detalle si falla.
+  async function buscarNoIncluidos(periodo: string, solUser: string, solPass: string, conDiag: boolean) {
+    const que = esVentas ? "no incluidos (rechazados)" : "excluidos";
+    if (!solPass) { setNiNota(`Para consultar los ${que} de este periodo, carga tus accesos SOL (arriba) y vuelve a pulsar Extraer.`); return; }
+    for (let intento = 0; intento < 6; intento++) {
+      setNiNota(`⏳ Consultando en SUNAT los comprobantes ${que}…`);
+      let res: Response;
+      try {
+        res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, soloNoIncluidos: true, diagnostico: conDiag }),
+        });
+      } catch { setNiNota(`No se pudo consultar los ${que} (se cortó la conexión). El detalle sí quedó extraído; vuelve a pulsar Extraer para reintentar.`); return; }
+      const data = await res.json().catch(() => ({}));
+      if (conDiag) { if (data.diag) setDiag((d) => `${d ?? ""}\n\n// ---- ${que} ----\n${JSON.stringify(data.diag, null, 2)}`); setNiNota(null); return; }
+      if (!res.ok) { setNiNota(`No se pudo consultar los ${que}: ${String(data.error ?? "error de SUNAT").replace(/\.+$/, "")}. El detalle sí quedó extraído.`); return; }
+      if (data.pendiente) { await new Promise((r) => setTimeout(r, 8000)); continue; }
+      const ni = data.noIncluidos ?? null;
+      setBloque((b: any) => (b ? { ...b, noIncluidos: ni } : b));
+      setNiNota(data.noDisponible ? `SUNAT no entregó la lista de ${que} de este periodo${ni?.nota ? ` (${ni.nota})` : ""}.` : null);
+      return;
+    }
+    setNiNota(`SUNAT sigue generando la lista de ${que}. Vuelve a pulsar Extraer en unos minutos para completarla.`);
   }
 
   async function descargar(endpoint: string, nombre: string, extra: any = {}) {
@@ -160,6 +192,7 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
 
   const anios = [hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2];
   const hayDatos = (bloque?.filas?.length ?? 0) > 0;
+  const nNoIncl = bloque?.noIncluidos?.filas?.length ?? 0;
 
   return (
     <section className="card p-5">
@@ -191,8 +224,10 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         <button className="btn-primary" onClick={extraer} disabled={busy}>
           {busy ? "Extrayendo…" : `⬇ Extraer ${esVentas ? "ventas" : "compras"}`}
         </button>
-        {hayDatos && (
-          <button className="btn-ghost" onClick={descargarExcel} disabled={busy}>⬇ Excel</button>
+        {(hayDatos || nNoIncl > 0) && (
+          <button className="btn-ghost" onClick={descargarExcel} disabled={busy} title={bloque?.noIncluidos ? `El Excel trae una hoja aparte con los ${esVentas ? "no incluidos" : "excluidos"}` : undefined}>
+            ⬇ Excel{nNoIncl > 0 ? ` (+${nNoIncl} ${esVentas ? "no incluidos" : "excluidos"})` : ""}
+          </button>
         )}
         {!esVentas && hayDatos && (
           <button className="btn-ghost" onClick={descargarPlantilla} disabled={busy} title="Excel con el formato de la plantilla para subir al módulo de Descarga masiva de comprobantes">
@@ -221,6 +256,24 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
       {diag && <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{diag}</pre>}
 
       <TablaDetalle titulo={esVentas ? "Ventas (RVIE)" : "Compras (RCE)"} bloque={bloque} />
+
+      {/* No incluidos (rechazados / excluidos): aparte del detalle */}
+      {niNota && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{niNota}</div>}
+      {bloque?.noIncluidos && !niNota && (
+        nNoIncl > 0 ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+            <p className="text-sm font-semibold text-amber-900">
+              {esVentas ? "⚠ No incluidos en la propuesta de SUNAT (rechazados y otros que SUNAT dejó fuera)" : "⚠ Excluidos de la propuesta de compras"}
+            </p>
+            <p className="text-xs text-amber-800">No forman parte del detalle de arriba ni de los totales. Salen en una hoja aparte del mismo Excel.</p>
+            <TablaDetalle titulo={esVentas ? "No incluidos" : "Excluidos"} bloque={bloque.noIncluidos} />
+          </div>
+        ) : (
+          <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            ✓ SUNAT no reporta comprobantes {esVentas ? "no incluidos (rechazados)" : "excluidos"} en este periodo.
+          </p>
+        )
+      )}
 
       {/* Aviso de demora de SUNAT (ventana) */}
       {demora && (

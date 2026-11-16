@@ -24,8 +24,18 @@ export async function POST(req: NextRequest) {
     for (const fila of bloque.filas ?? []) ws.addRow(fila);
     ws.columns.forEach((col) => { col.width = 16; });
   };
+  // No incluidos (rechazados / excluidos): en el MISMO Excel, en su propia hoja.
+  const hojaNoIncluidos = (nombre: string, ni: any, vacio: string) => {
+    if (!ni || typeof ni !== "object") return;
+    if (Array.isArray(ni.columnas) && ni.columnas.length && (ni.filas ?? []).length) { hoja(nombre, ni); return; }
+    const ws = wb.addWorksheet(nombre);
+    ws.addRow([String(ni.nota || vacio).slice(0, 300)]);
+    ws.getColumn(1).width = 80;
+  };
   hoja("Ventas (RVIE)", body.ventas);
+  hojaNoIncluidos("Ventas - No incluidos", body.ventas?.noIncluidos, "SUNAT no reporta comprobantes no incluidos (rechazados) en este periodo.");
   hoja("Compras (RCE)", body.compras);
+  hojaNoIncluidos("Compras - Excluidos", body.compras?.noIncluidos, "SUNAT no reporta comprobantes excluidos en este periodo.");
   if (wb.worksheets.length === 0) wb.addWorksheet("Sin datos");
 
   const buf = Buffer.from(await wb.xlsx.writeBuffer());

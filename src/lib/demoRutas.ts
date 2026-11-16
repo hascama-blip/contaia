@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import type { Cliente } from "./types";
 import { esClienteDemo, perfilDe, periodosDemo, sireResumenDemo, sireDetalleDemo } from "./demo";
-import { setSunatInfo, setSireResumen, setSireEstado, setSireDetalleCache } from "./db";
+import { setSunatInfo, setSireResumen, setSireEstado, setSireDetalleCache, setSireDetalleNoIncluidos } from "./db";
 import { ocultarCliente } from "./secretos";
 import { hoyLima } from "./fechas";
 
@@ -49,6 +49,26 @@ export async function demoSireDetalle(c: Cliente, periodo: string, tipo: "ventas
   const bloque = sireDetalleDemo(p, periodo, tipo);
   await setSireDetalleCache(c.id, tipo, periodo, bloque);
   return NextResponse.json({ periodo, ventas: tipo === "ventas" ? bloque : undefined, compras: tipo === "compras" ? bloque : undefined });
+}
+
+/** "No incluidos" de simulación: en ventas, una factura RECHAZADA ficticia; en compras, ninguno. */
+export async function demoSireNoIncluidos(c: Cliente, periodo: string, tipo: "ventas" | "compras"): Promise<NextResponse> {
+  const p = perfilDe(c.id);
+  if (!p || !/^\d{6}$/.test(periodo)) return NextResponse.json({ error: AVISO }, { status: 400 });
+  const base = sireDetalleDemo(p, periodo, tipo);
+  let filas: string[][] = [];
+  if (tipo === "ventas" && base.filas.length) {
+    // Toma la forma de un comprobante del periodo y la convierte en una factura rechazada.
+    const f = [...base.filas[0]];
+    const iSerie = base.columnas.indexOf("Serie del CDP"), iNum = base.columnas.findIndex((x) => x.startsWith("Nro CP")), iNom = base.columnas.findIndex((x) => x.startsWith("Apellidos Nombres"));
+    if (iSerie >= 0) f[iSerie] = "F001";
+    if (iNum >= 0) f[iNum] = "00009901";
+    if (iNom >= 0) f[iNom] = "COMPROBANTE RECHAZADO DEMO S.A.C.";
+    filas = [f];
+  }
+  const ni = { columnas: base.columnas, filas, comprobantes: filas.length };
+  await setSireDetalleNoIncluidos(c.id, tipo, periodo, ni);
+  return NextResponse.json({ periodo, noIncluidos: { ...ni, at: new Date().toISOString() } });
 }
 
 export function demoBuzon(c: Cliente): NextResponse {

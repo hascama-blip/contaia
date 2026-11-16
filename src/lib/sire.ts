@@ -59,6 +59,8 @@ interface SireConfig {
   // Detalle (propuesta comprobante por comprobante) — RVIE ventas / RCE compras.
   propuestaVentasPath: string;
   propuestaComprasPath: string;
+  noIncluidosVentasPath: string;
+  noIncluidosComprasPath: string;
   estadoPath: string;
   descargaPath: string;
   codLibroVentas: string;
@@ -99,6 +101,11 @@ function getConfig(): SireConfig {
     propuestaComprasPath:
       process.env.SIRE_PROPUESTA_COMPRAS_PATH ??
       "/rce/propuesta/web/propuesta/{periodo}/exportacioncomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=2",
+    // NO INCLUIDOS (ventas) / EXCLUIDOS (compras): comprobantes que SUNAT dejó fuera de la
+    // propuesta (rechazados, etc.). Mismo flujo async (ticket) que la propuesta.
+    // ⚠️ AJUSTABLE por entorno; calibrar con Modo diagnóstico (varía según la versión del manual).
+    noIncluidosVentasPath: process.env.SIRE_NOINCLUIDOS_VENTAS_PATH ?? "",
+    noIncluidosComprasPath: process.env.SIRE_NOINCLUIDOS_COMPRAS_PATH ?? "",
     estadoPath:
       process.env.SIRE_ESTADO_PATH ??
       "/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&page=1&perPage=20&numTicket={ticket}",
@@ -934,7 +941,8 @@ async function exportarPropuesta(
   pathTemplate: string | string[],
   codLibro: string,
   etiqueta: string,
-  diag: SireDiag
+  diag: SireDiag,
+  opts: { seguirEn4xx?: boolean } = {}
 ): Promise<string | null> {
   const candidatos = Array.isArray(pathTemplate) ? pathTemplate : [pathTemplate];
   try {
@@ -973,6 +981,8 @@ async function exportarPropuesta(
       if (res.ok || /1070|no se ha encontrado/i.test(txt)) break;
       // 5xx y quedan candidatos → probar el siguiente verbo/endpoint.
       if (res.status >= 500 && ci < candidatos.length - 1) continue;
+      // Rutas aún por calibrar (no incluidos): un 4xx de "ruta no existe" también pasa al siguiente.
+      if (opts.seguirEn4xx && res.status >= 400 && !/42209/.test(txt) && ci < candidatos.length - 1) continue;
       break;
     }
     if (res.status === 429) {
@@ -1193,4 +1203,68 @@ export function etiquetaPeriodo(periodo: string): string {
   const anio = periodo.slice(0, 4);
   const mes = Number(periodo.slice(4, 6));
   return `${meses[mes - 1]} ${anio}`;
+}
+
+// ============================================================
+//  NO INCLUIDOS de la propuesta (comprobantes rechazados / dejados fuera por SUNAT)
+// ============================================================
+// Ventas (RVIE): "Propuesta / No incluidos" (p. ej. comprobantes RECHAZADOS).
+// Compras (RCE): comprobantes "Excluidos" de la propuesta.
+// No se mezclan con el detalle: van aparte (otra hoja del mismo Excel).
+
+export interface SireNoIncluidosResultado {
+  periodo: string;
+  bloque?: SireDetalleBloque;
+  /** SUNAT aún genera el archivo → reintentar. */
+  pendiente?: boolean;
+  /** SUNAT no entregó la lista (ruta por calibrar, servicio no disponible para ese periodo…). */
+  noDisponible?: string;
+  diag?: SireDiag;
+}
+
+export async function consultarNoIncluidosSire(
+  params: SireParams & { tipo: "ventas" | "compras" }
+): Promise<SireNoIncluidosResultado> {
+  const { ruc, periodo, solUser, solPass, tipo } = params;
+  if (!/^\d{11}$/.test(ruc)) throw new Error("RUC inválido.");
+  if (!periodoValido(periodo)) throw new Error("Periodo inválido (use AAAAMM, p. ej. 202606).");
+  if (!solUser || !solPass) throw new Error("Ingresa el Usuario SOL y la Clave SOL.");
+  const cfg = getConfig();
+  const clientId = params.clientId || cfg.defClientId;
+  const clientSecret = params.clientSecret || cfg.defClientSecret;
+  if (!clientId || !clientSecret) throw new Error("Faltan las credenciales de la app SIRE (client_id y client_secret).");
+
+  const diag: SireDiag = { periodo, pasos: [] };
+  let token: string;
+  try {
+    token = await obtenerToken(cfg, ruc, solUser, solPass, clientId, clientSecret, diag);
+  } catch (err) {
+    if (params.diagnostico) {
+      diag.pasos.push({ paso: "error", ok: false, respuesta: err instanceof Error ? err.message : String(err) });
+      return { periodo, diag };
+    }
+    throw err;
+  }
+  // Rutas candidatas (la del entorno primero). Varían según la versión del manual de SUNAT.
+  const candidatos = (tipo === "ventas"
+    ? [
+        cfg.noIncluidosVentasPath,
+        "/rvie/propuesta/web/noincluidos/{periodo}/exportanoincluidos?codTipoArchivo=0",
+        "/rvie/propuesta/web/noincluidos/{periodo}/exportanoincluidos?mtoTotalDesde=&mtoTotalHasta=&fecDocumento=&codTipoArchivo=0",
+      ]
+    : [
+        cfg.noIncluidosComprasPath,
+        "/rce/propuesta/web/excluidos/{periodo}/exportaexcluidos?codTipoArchivo=0&codOrigenEnvio=2",
+        "/rce/propuesta/web/excluidos/{periodo}/exportacioncomprobanteexcluido?codTipoArchivo=0&codOrigenEnvio=2",
+      ]
+  ).filter((v, i, a) => v && a.indexOf(v) === i);
+  const etiqueta = tipo === "ventas" ? "no-incluidos-ventas" : "excluidos-compras";
+  const t = await exportarPropuesta(cfg, token, periodo, candidatos, tipo === "ventas" ? cfg.codLibroVentas : cfg.codLibroCompras, etiqueta, diag, { seguirEn4xx: true });
+  if (params.diagnostico) return { periodo, diag };
+  if (t === PENDIENTE) return { periodo, pendiente: true, diag };
+  if (t === null) {
+    const hay429 = diag.pasos.some((x) => /429|too many/i.test(String(x.respuesta ?? "")));
+    return { periodo, diag, noDisponible: hay429 ? "SUNAT limitó las solicitudes; vuelve a intentarlo en 1–2 minutos." : "SUNAT no entregó esta lista para el periodo." };
+  }
+  return { periodo, bloque: parseDetalle(t), diag };
 }

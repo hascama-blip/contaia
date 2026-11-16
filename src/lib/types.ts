@@ -241,7 +241,12 @@ export interface Cliente {
   sireEstado?: { estados: { periodo: string; presentadoVentas: boolean | null; presentadoCompras: boolean | null }[]; noObligado?: boolean; at: string } | null;
   /** Caché del DETALLE SIRE (propuesta) por clave `${tipo}-${periodo}` (ventas/compras),
    *  para no reconsultar SUNAT y reducir el 429. */
-  sireDetalle?: Record<string, { columnas: string[]; filas: string[][]; comprobantes: number; at: string }>;
+  sireDetalle?: Record<string, {
+    columnas: string[]; filas: string[][]; comprobantes: number; at: string;
+    /** Comprobantes que SUNAT dejó FUERA de la propuesta (ventas: "no incluidos", p. ej. rechazados;
+     *  compras: "excluidos"). Van aparte: no cuentan en conciliaciones ni proyecciones. */
+    noIncluidos?: { columnas: string[]; filas: string[][]; comprobantes: number; at: string; nota?: string };
+  }>;
   /** Caché de PDFs descargados del buzón, por codMensaje (para no re-bajarlos). */
   buzonAdjuntos?: Record<string, AdjuntoCache>;
   /** Declaraciones mensuales (PDF) para comparar contra el SIRE. */

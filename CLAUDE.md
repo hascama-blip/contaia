@@ -140,6 +140,17 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`setPlaneamiento`); un mes sin datos sugiere el saldo que dejó el anterior. API `/api/proyeccion`
   (GET datos, POST guardar) y `/api/proyeccion/pdf` (informe A4, `proyeccionHtml.ts`), con
   `bloqueoModulo("proyeccion")`. (Antes fue la sección 7 de la ficha; se movió al utilitario.)
+- **Detalle SIRE — NO INCLUIDOS (rechazados) en el mismo Excel**: tras extraer el detalle, el panel hace una
+  2.ª consulta (`soloNoIncluidos: true` en `/api/clientes/[id]/sire-detalle` → `consultarNoIncluidosSire` en
+  `sire.ts`): ventas = "Propuesta / No incluidos" (comprobantes RECHAZADOS y otros que SUNAT dejó fuera);
+  compras = "Excluidos". Se guardan en `Cliente.sireDetalle[clave].noIncluidos` (aparte: NO cuentan en
+  conciliaciones ni en la proyección) y el Excel (`/api/sire-detalle/excel`) los pone en otra hoja
+  ("Ventas - No incluidos" / "Compras - Excluidos"). Si SUNAT no entrega la lista, el detalle queda igual y
+  sale una nota. ⚠️ **Rutas POR CALIBRAR con una empresa real** (Modo diagnóstico las muestra bajo
+  "---- no incluidos ----"): candidatas `/rvie/propuesta/web/noincluidos/{periodo}/exportanoincluidos…` y
+  `/rce/propuesta/web/excluidos/{periodo}/…`; se fijan con `SIRE_NOINCLUIDOS_VENTAS_PATH` /
+  `SIRE_NOINCLUIDOS_COMPRAS_PATH`. `exportarPropuesta(..., { seguirEn4xx: true })` prueba el siguiente
+  candidato ante 4xx solo en esta consulta (la propuesta normal no cambió).
 - **Detalle SIRE — aviso de demora de SUNAT** (`DetalleSirePanel.tsx`): si la conexión se corta mientras
   SUNAT genera la propuesta, o SUNAT sigue "en proceso" tras el 2.º intento, o el servidor recibe de SUNAT
   `fetch failed`/5xx/429, sale una VENTANA "SUNAT está demorando — Por demoras de carga de SUNAT, las

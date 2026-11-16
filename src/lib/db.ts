@@ -1808,6 +1808,23 @@ export async function setSireResumen(
 });
 }
 
+/** Guarda los NO INCLUIDOS (rechazados / excluidos) junto al detalle SIRE ya guardado. */
+export async function setSireDetalleNoIncluidos(
+  clienteId: string,
+  tipo: "ventas" | "compras",
+  periodo: string,
+  ni: { columnas: string[]; filas: string[][]; comprobantes: number; nota?: string }
+): Promise<void> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const cliente = store.clientes.find((c) => c.id === clienteId);
+  const e = cliente?.sireDetalle?.[`${tipo}-${periodo}`];
+  if (!e) return; // sin detalle guardado no hay dónde colgarlos
+  e.noIncluidos = { ...ni, at: new Date().toISOString() };
+  await writeStore(store);
+});
+}
+
 export async function setSireDetalleCache(
   clienteId: string,
   tipo: "ventas" | "compras",
