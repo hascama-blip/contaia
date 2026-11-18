@@ -176,7 +176,12 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   con diferencia (±3 % / S/ 50), "fin de mes" (cobro de los últimos 6 días: el depósito puede estar el mes
   siguiente) e "inicio de mes" (abono de los primeros 6 días: ventas del mes anterior). `porFecha`: por día,
   ventas (contabilidad) vs caja (efectivo + transferencias) y cuánto de esa caja llegó al banco y cuándo.
-  Excel: Resumen · Por fecha · No conciliado · Comprobantes · Caja vs Bancos · Bancos. Caso real de calibración:
+  **Salida simple en UNA hoja** (pedido del dueño): `unificada` (`FilaUnica`) = la misma fila en tres bloques,
+  Contabilidad · Caja virtual · Bancos, con el **punto en común** resaltado en dorado: ★ el comprobante
+  (contabilidad ↔ caja) y ◆ el total del cobro + fecha o N° de operación (caja ↔ banco), más las columnas
+  "Punto en común" que dicen con qué se concilió. Al final van los abonos del banco sin cobro y los cargos.
+  Excel: Conciliación (hoja única) · Resumen · Por fecha. Pantalla: pestañas Conciliación (con "Solo lo no
+  conciliado" y buscador) y Por fecha. Caso real de calibración:
   RTV San Cristóbal oct-2026 (1,640 comprobantes → 1,493 conciliados). Limitación: el N° de operación de la
   caja casi nunca está en el extracto del BBVA y el concepto viene cortado a 28 caracteres.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).

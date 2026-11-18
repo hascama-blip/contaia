@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
     const r = await conciliarArchivos(archivos);
     const excel = await excelConciliacionTresVias(r);
-    return NextResponse.json({ ...r, excelBase64: excel.toString("base64") });
+    return NextResponse.json({ resumen: r.resumen, unificada: r.unificada, porFecha: r.porFecha, avisos: r.avisos, excelBase64: excel.toString("base64") });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "No se pudo conciliar." }, { status: 400 });
   }

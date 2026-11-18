@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ResultadoConciliacion, FilaComprobante, FilaCobro, FilaBanco, FilaFecha } from "@/lib/conciliacionCaja";
+import type { ResumenConciliacion, FilaUnica, FilaFecha } from "@/lib/conciliacionCaja";
 
 const soles = (n: unknown) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fch = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "");
-const TD: Record<string, string> = { "01": "Factura", "03": "Boleta", "07": "N. crédito", "08": "N. débito" };
-type Vista = "no" | "fecha" | "comprobantes" | "cobros" | "bancos";
+type Vista = "conciliacion" | "fecha";
+interface Respuesta { resumen: ResumenConciliacion; unificada: FilaUnica[]; porFecha: FilaFecha[]; avisos: string[]; excelBase64?: string }
 const TOPE = 400; // filas en pantalla (el Excel trae todas)
 
 // Conciliación bancaria de 3 vías: Contabilidad (Registro de Ventas) ↔ Caja virtual
@@ -18,8 +18,9 @@ export default function ConciliacionPanel() {
   const [fBancos, setFBancos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [res, setRes] = useState<(ResultadoConciliacion & { excelBase64?: string }) | null>(null);
-  const [vista, setVista] = useState<Vista>("no");
+  const [res, setRes] = useState<Respuesta | null>(null);
+  const [vista, setVista] = useState<Vista>("conciliacion");
+  const [soloNo, setSoloNo] = useState(false);
   const [buscar, setBuscar] = useState("");
 
   async function conciliar() {
@@ -33,7 +34,7 @@ export default function ConciliacionPanel() {
       const r = await fetch("/api/conciliacion", { method: "POST", body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
-      setRes(data); setVista("no"); setBuscar("");
+      setRes(data); setVista("conciliacion"); setSoloNo(false); setBuscar("");
     } catch { setError("Error de red (¿archivo muy pesado?)."); }
     finally { setBusy(false); }
   }
@@ -53,10 +54,7 @@ export default function ConciliacionPanel() {
   const s = res?.resumen;
   const q = buscar.trim().toUpperCase();
   const pasa = (f: object) => !q || Object.values(f).some((v) => String(v ?? "").toUpperCase().includes(q));
-  const filasNo = useMemo(() => (res?.comprobantes ?? []).filter((f) => f.estado === "No conciliado" && pasa(f)), [res, q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filasComp = useMemo(() => (res?.comprobantes ?? []).filter(pasa), [res, q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filasCob = useMemo(() => (res?.cobros ?? []).filter(pasa), [res, q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filasBan = useMemo(() => (res?.bancos ?? []).filter(pasa), [res, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filas = useMemo(() => (res?.unificada ?? []).filter((f) => (!soloNo || f.estado === "No conciliado") && pasa(f)), [res, q, soloNo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -120,16 +118,21 @@ export default function ConciliacionPanel() {
           <div className="card p-5">
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-white p-1">
-                {([["no", `No conciliado (${s.ventas.noConciliados})`], ["fecha", "Por fecha"], ["comprobantes", `Comprobantes (${s.ventas.total})`], ["cobros", `Caja vs Bancos (${res.cobros.length})`], ["bancos", `Bancos (${res.bancos.length})`]] as [Vista, string][]).map(([k, t]) => (
+                {([["conciliacion", "Conciliación"], ["fecha", "Por fecha"]] as [Vista, string][]).map(([k, t]) => (
                   <button key={k} onClick={() => setVista(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${vista === k ? "bg-brand-600 text-white" : "text-slate-500 hover:text-brand-700"}`}>{t}</button>
                 ))}
               </div>
-              <input className="input ml-auto max-w-xs" placeholder="Buscar comprobante, cliente, monto…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+              {vista === "conciliacion" && (
+                <>
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" checked={soloNo} onChange={(e) => setSoloNo(e.target.checked)} /> Solo lo no conciliado
+                  </label>
+                  <input className="input ml-auto max-w-xs" placeholder="Buscar comprobante, cliente, monto…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+                </>
+              )}
             </div>
-            {(vista === "no" || vista === "comprobantes") && <TablaComprobantes filas={vista === "no" ? filasNo : filasComp} />}
+            {vista === "conciliacion" && <TablaUnica filas={filas} />}
             {vista === "fecha" && <TablaFechas filas={res.porFecha ?? []} />}
-            {vista === "cobros" && <TablaCobros filas={filasCob} />}
-            {vista === "bancos" && <TablaBancos filas={filasBan} />}
           </div>
         </>
       )}
@@ -168,26 +171,48 @@ const Mas = ({ n, cols }: { n: number; cols: number }) => (n > TOPE ? <tr><td co
 const Vacio = ({ cols }: { cols: number }) => <tr><td colSpan={cols} className="px-2 py-3 text-slate-500">Sin filas.</td></tr>;
 const th = "whitespace-nowrap px-2 py-1.5 text-left", td = "px-2 py-1 text-slate-600", tdr = "whitespace-nowrap px-2 py-1 text-right tabular-nums text-slate-700";
 
-function TablaComprobantes({ filas }: { filas: FilaComprobante[] }) {
+// HOJA ÚNICA: la misma fila vista en Contabilidad, en la Caja virtual y en el Banco. Las columnas
+// en dorado son el PUNTO EN COMÚN con que se concilia cada salto.
+function TablaUnica({ filas }: { filas: FilaUnica[] }) {
+  const g = "border-l-2 border-slate-300"; // separador de bloque
+  const oro = "bg-amber-100 text-amber-900"; // encabezado de punto en común
+  const pc = "bg-amber-50/70 font-medium text-slate-800"; // celda de punto en común
+  const m = (n: number | null) => (n == null ? "" : soles(n));
   return (
-    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg border border-slate-200">
+    <div className="mt-3 max-h-[36rem] overflow-auto rounded-lg border border-slate-200">
       <table className="w-full text-[11px]">
-        <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase text-slate-400"><tr>
-          <th className={th}>Fecha</th><th className={th}>Comprobante</th><th className={th}>Cliente</th><th className={`${th} text-right`}>Total</th><th className={th}>Estado</th><th className={th}>Motivo</th>
-          <th className={th}>Cobro (caja)</th><th className={th}>Medio / sede</th><th className={th}>Banco</th><th className={th}>Fecha banco</th><th className={th}>Cómo se vinculó</th>
-        </tr></thead>
+        <thead className="sticky top-0 z-10">
+          <tr className="text-[11px] font-bold uppercase tracking-wide text-white">
+            <th colSpan={4} className="bg-brand-700 px-2 py-1.5 text-left">Contabilidad</th>
+            <th colSpan={5} className={`bg-sky-800 px-2 py-1.5 text-left ${g}`}>Caja virtual</th>
+            <th colSpan={4} className={`bg-teal-700 px-2 py-1.5 text-left ${g}`}>Bancos</th>
+            <th colSpan={3} className={`bg-slate-600 px-2 py-1.5 text-left ${g}`}>Resultado</th>
+          </tr>
+          <tr className="bg-slate-50 text-[10px] uppercase text-slate-500">
+            <th className={th}>Fecha</th><th className={`${th} ${oro}`}>Comprobante ★</th><th className={th}>Cliente</th><th className={`${th} text-right`}>Total</th>
+            <th className={`${th} ${oro} ${g}`}>Comprobante ★</th><th className={th}>Cobro · medio</th><th className={`${th} ${oro}`}>Fecha ◆</th><th className={`${th} text-right`}>Cobrado</th><th className={`${th} ${oro} text-right`}>Total del cobro ◆</th>
+            <th className={`${th} ${g}`}>Cuenta</th><th className={`${th} ${oro}`}>Fecha ◆</th><th className={th}>Concepto</th><th className={`${th} ${oro} text-right`}>Importe ◆</th>
+            <th className={`${th} ${g}`}>Estado</th><th className={th}>Punto en común caja ↔ banco</th><th className={th}>Observación</th>
+          </tr>
+        </thead>
         <tbody>
           {filas.slice(0, TOPE).map((f, i) => (
-            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/40" : ""}`}>
-              <td className={`${td} whitespace-nowrap`}>{fch(f.fecha)}</td><td className={`${td} whitespace-nowrap font-medium text-slate-800`}>{TD[f.td] ?? f.td} {f.doc}</td>
-              <td className={td}><span className="line-clamp-1">{f.cliente}</span></td><td className={tdr}>{soles(f.total)}</td><td className={td}><Est e={f.estado} /></td><td className={td}>{f.motivo}</td>
-              <td className={`${td} whitespace-nowrap`}>{f.cobro}{f.cobroFecha ? ` · ${fch(f.cobroFecha)}` : ""}</td><td className={td}>{[f.medio, f.sede].filter(Boolean).join(" · ")}</td>
-              <td className={`${td} whitespace-nowrap`}>{f.banco}</td><td className={`${td} whitespace-nowrap`}>{fch(f.bancoFecha)}{f.dias ? ` (+${f.dias} d)` : ""}</td><td className={td}>{f.criterio}</td>
+            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/50" : f.estado === "Cargo" ? "bg-slate-50 text-slate-400" : ""}`}>
+              <td className={`${td} whitespace-nowrap`}>{fch(f.cFecha)}</td><td className={`${td} whitespace-nowrap ${f.cDoc ? pc : ""}`}>{f.cDoc}</td>
+              <td className={td}><span className="line-clamp-1">{f.cCliente}</span></td><td className={tdr}>{m(f.cTotal)}</td>
+              <td className={`${td} whitespace-nowrap ${g} ${f.vDoc ? pc : ""}`}>{f.vDoc}</td><td className={`${td} whitespace-nowrap`}>{[f.vCobro, f.vMedio].filter(Boolean).join(" · ")}</td>
+              <td className={`${td} whitespace-nowrap ${f.vFecha ? pc : ""}`}>{fch(f.vFecha)}</td><td className={tdr}>{m(f.vImporte)}</td><td className={`${tdr} ${f.vTotalCobro != null ? pc : ""}`}>{m(f.vTotalCobro)}</td>
+              <td className={`${td} whitespace-nowrap ${g}`}>{f.bBanco}</td><td className={`${td} whitespace-nowrap ${f.bFecha ? pc : ""}`}>{fch(f.bFecha)}</td>
+              <td className={td}><span className="line-clamp-1">{f.bDesc}</span></td><td className={`${tdr} ${f.bImporte != null ? pc : ""}`}>{m(f.bImporte)}</td>
+              <td className={`${td} ${g}`}><Est e={f.estado} /></td><td className={td}>{f.punto2}</td><td className={td}>{f.obs}</td>
             </tr>
           ))}
-          {!filas.length && <Vacio cols={11} />}<Mas n={filas.length} cols={11} />
+          {!filas.length && <Vacio cols={16} />}<Mas n={filas.length} cols={16} />
         </tbody>
       </table>
+      <p className="border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-500">
+        <b>★</b> punto en común contabilidad ↔ caja: el <b>comprobante</b> (serie y número). &nbsp; <b>◆</b> punto en común caja ↔ banco: el <b>total del cobro</b> y la <b>fecha</b> (o el N° de operación cuando el banco lo trae).
+      </p>
     </div>
   );
 }
@@ -223,50 +248,6 @@ function TablaFechas({ filas }: { filas: FilaFecha[] }) {
               <td className={tdr}>{soles(t("cajaTotal"))}</td><td className={tdr}>{soles(t("difVentasCaja"))}</td><td className={tdr}>{soles(t("depositado"))}</td><td className={tdr}>{soles(t("sinDepositar"))}</td><td /><td className={tdr}>{soles(t("abonosBanco"))}</td><td /><td />
             </tr>
           )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function TablaCobros({ filas }: { filas: FilaCobro[] }) {
-  return (
-    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg border border-slate-200">
-      <table className="w-full text-[11px]">
-        <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase text-slate-400"><tr>
-          <th className={th}>Cobro</th><th className={th}>Fecha</th><th className={th}>Medio / sede</th><th className={th}>N° operación</th><th className={`${th} text-right`}>Importe</th><th className={`${th} text-right`}>Comprob.</th><th className={th}>Estado</th>
-          <th className={th}>Banco</th><th className={th}>Fecha banco</th><th className={th}>Concepto del banco</th><th className={`${th} text-right`}>Importe banco</th><th className={th}>Cómo se vinculó</th>
-        </tr></thead>
-        <tbody>
-          {filas.slice(0, TOPE).map((f, i) => (
-            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/40" : ""}`}>
-              <td className={`${td} whitespace-nowrap font-medium text-slate-800`}>{f.cobro}</td><td className={`${td} whitespace-nowrap`}>{fch(f.fecha)}</td><td className={td}>{[f.medio, f.sede].filter(Boolean).join(" · ")}</td>
-              <td className={`${td} whitespace-nowrap`}>{f.op}</td><td className={tdr}>{soles(f.importe)}</td><td className={tdr}>{f.comprobantes}</td><td className={td}><Est e={f.estado} /></td>
-              <td className={`${td} whitespace-nowrap`}>{f.banco}</td><td className={`${td} whitespace-nowrap`}>{fch(f.bancoFecha)}{f.dias ? ` (+${f.dias} d)` : ""}</td><td className={td}>{f.bancoDesc}</td><td className={tdr}>{f.bancoImporte ? soles(f.bancoImporte) : ""}</td><td className={td}>{f.criterio}</td>
-            </tr>
-          ))}
-          {!filas.length && <Vacio cols={12} />}<Mas n={filas.length} cols={12} />
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function TablaBancos({ filas }: { filas: FilaBanco[] }) {
-  return (
-    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg border border-slate-200">
-      <table className="w-full text-[11px]">
-        <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase text-slate-400"><tr>
-          <th className={th}>Banco</th><th className={th}>Fecha</th><th className={th}>Concepto</th><th className={th}>N° operación</th><th className={`${th} text-right`}>Abono</th><th className={`${th} text-right`}>Cargo</th><th className={th}>Estado</th><th className={th}>Cobro (caja)</th><th className={th}>Corresponde a</th>
-        </tr></thead>
-        <tbody>
-          {filas.slice(0, TOPE).map((f, i) => (
-            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/40" : ""}`}>
-              <td className={`${td} whitespace-nowrap`}>{f.banco}</td><td className={`${td} whitespace-nowrap`}>{fch(f.fecha)}</td><td className={td}>{f.desc}</td><td className={`${td} whitespace-nowrap`}>{f.op}</td>
-              <td className={tdr}>{f.abono ? soles(f.abono) : ""}</td><td className={tdr}>{f.cargo ? soles(f.cargo) : ""}</td><td className={td}><Est e={f.estado} /></td><td className={`${td} whitespace-nowrap`}>{f.cobro}</td><td className={td}><span className="line-clamp-2">{f.detalle}</span></td>
-            </tr>
-          ))}
-          {!filas.length && <Vacio cols={9} />}<Mas n={filas.length} cols={9} />
         </tbody>
       </table>
     </div>

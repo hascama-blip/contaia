@@ -65,7 +65,23 @@ export interface FilaFecha {
   abonosBanco: number;
   estado: Estado; nota: string;
 }
-export interface ResultadoConciliacion { resumen: ResumenConciliacion; comprobantes: FilaComprobante[]; cobros: FilaCobro[]; bancos: FilaBanco[]; porFecha: FilaFecha[]; avisos: string[] }
+/** Una fila de la HOJA ÚNICA: el mismo movimiento visto en contabilidad, en la caja virtual y en el banco,
+ *  con el punto en común que une cada salto (comprobante · monto / fecha / N° de operación). */
+export interface FilaUnica {
+  // Contabilidad (Registro de Ventas)
+  cFecha: string; cDoc: string; cTipo: string; cCliente: string; cTotal: number | null;
+  // Caja virtual (cobranza)
+  vDoc: string; vCobro: string; vFecha: string; vMedio: string; vImporte: number | null; vTotalCobro: number | null; vOp: string;
+  // Bancos (extracto). bImporte negativo = cargo.
+  bBanco: string; bFecha: string; bDesc: string; bOp: string; bImporte: number | null;
+  estado: Estado | "Cargo";
+  /** Punto en común contabilidad ↔ caja (el comprobante). */
+  punto1: string;
+  /** Punto en común caja ↔ banco (monto y fecha, N° de operación, nombre…). */
+  punto2: string;
+  obs: string;
+}
+export interface ResultadoConciliacion { resumen: ResumenConciliacion; unificada: FilaUnica[]; comprobantes: FilaComprobante[]; cobros: FilaCobro[]; bancos: FilaBanco[]; porFecha: FilaFecha[]; avisos: string[] }
 
 // ---------------------------------------------------------------- utilidades
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
@@ -352,8 +368,10 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     if (Math.abs(cobrado - v.total) >= 0.01) return { ...lleno, estado: "No conciliado", motivo: `Diferencia de monto: comprobante ${v.total.toFixed(2)} · cobrado ${cobrado.toFixed(2)}` } as FilaComprobante;
     const sinBanco = cs.filter((x) => x.c.tipo !== "nc" && !enlace.has(x.c.id));
     if (sinBanco.length) {
-      const base = principal.c.tipo === "efectivo" ? "Cobrado en efectivo, sin depósito en el banco" : "Cobrado por transferencia, sin abono en el banco";
-      return { ...lleno, criterio: pistaCobro.get(principal.c.id) ?? "", estado: "No conciliado", motivo: esFinDeMes(principal.c.fecha) ? `${base} (${NOTA_FIN})` : base } as FilaComprobante;
+      // El motivo sale del cobro que quedó sin banco (un comprobante puede tener más de un cobro).
+      const sb = sinBanco[0];
+      const base = (sb.c.tipo === "efectivo" ? "Cobrado en efectivo, sin depósito en el banco" : "Cobrado por transferencia, sin abono en el banco") + (cs.length > 1 ? ` (cobro ${sb.c.id} por ${sb.d.importe.toFixed(2)})` : "");
+      return { ...lleno, criterio: pistaCobro.get(sb.c.id) ?? "", estado: "No conciliado", motivo: esFinDeMes(sb.c.fecha) ? `${base} (${NOTA_FIN})` : base } as FilaComprobante;
     }
     return { ...lleno, estado: "Conciliado", motivo: "" } as FilaComprobante;
   });
@@ -397,11 +415,63 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     return f;
   });
 
+  // ---- HOJA ÚNICA: contabilidad | caja virtual | bancos, con el punto en común de cada salto
+  const TIPO_DOC: Record<string, string> = { "01": "Factura", "03": "Boleta", "07": "Nota de crédito", "08": "Nota de débito" };
+  const vacia = (): FilaUnica => ({ cFecha: "", cDoc: "", cTipo: "", cCliente: "", cTotal: null, vDoc: "", vCobro: "", vFecha: "", vMedio: "", vImporte: null, vTotalCobro: null, vOp: "", bBanco: "", bFecha: "", bDesc: "", bOp: "", bImporte: null, estado: "No conciliado", punto1: "", punto2: "", obs: "" });
+  const punto2De = (c: Cobro): string => {
+    const e = enlace.get(c.id); if (!e) return "";
+    const m = e.movs[0], monto = `Monto ${c.importe.toFixed(2)}`;
+    if (e.criterio === "N° de operación") return `N° de operación ${soloDigitos(c.op)}`;
+    if (c.tipo === "efectivo") return e.movs.length > 1 ? `${monto} = ${e.movs.map((x) => x.abono.toFixed(2)).join(" + ")} (dos depósitos)` : `${monto} = depósito del ${dmy(m.fecha)}`;
+    const nombre = /nombre/.test(e.criterio) ? " + nombre del cliente" : "";
+    const grupo = /cobros iguales/.test(e.criterio) ? " (varios iguales ese día: cuadran en conjunto)" : "";
+    return m.fecha === c.fecha ? `Fecha ${dmy(c.fecha)} + ${monto.toLowerCase()}${nombre}${grupo}` : `${monto}, abono del ${dmy(m.fecha)}`;
+  };
+  const conBanco = (f: FilaUnica, c: Cobro) => {
+    const e = enlace.get(c.id); if (!e) return;
+    f.bBanco = Array.from(new Set(e.movs.map((m) => m.banco))).join(" + "); f.bFecha = e.movs[0].fecha;
+    f.bDesc = e.movs.map((m) => m.desc).join(" + "); f.bOp = e.movs.map((m) => m.op).filter(Boolean).join(" + "); f.bImporte = r2(e.movs.reduce((a, m) => a + m.abono, 0));
+  };
+  const conCaja = (f: FilaUnica, c: Cobro, doc: string, importe: number) => {
+    f.vDoc = doc; f.vCobro = c.id; f.vFecha = c.fecha; f.vMedio = [c.medio, c.sede].filter(Boolean).join(" · "); f.vImporte = importe; f.vTotalCobro = c.importe; f.vOp = c.op;
+  };
+  const ncPorClave = new Map(cobros.filter((c) => c.ncClave).map((c) => [c.ncClave!, c]));
+  const unificada: FilaUnica[] = [];
+  ventas.map((v, i) => ({ v, fc: comprobantes[i] })).sort((a, b) => a.v.fecha.localeCompare(b.v.fecha) || a.v.doc.localeCompare(b.v.doc)).forEach(({ v, fc }) => {
+    const f = vacia();
+    f.cFecha = v.fecha; f.cDoc = v.doc; f.cTipo = TIPO_DOC[v.td] ?? v.td; f.cCliente = v.nombre; f.cTotal = v.td === "07" ? -v.total : v.total;
+    f.estado = fc.estado; f.obs = fc.motivo || (fc.estado === "No conciliado" ? fc.criterio : "");
+    if (v.td === "07") {
+      const c = ncPorClave.get(v.clave);
+      if (c) { conCaja(f, c, v.doc, c.importe); f.punto1 = `Comprobante ${v.doc}`; f.punto2 = "Nota de crédito: no pasa por el banco"; }
+    } else {
+      const cs = cobrosDe.get(v.clave) ?? [];
+      const pr = cs.find((x) => x.c.tipo !== "nc") ?? cs[0];
+      if (pr) {
+        conCaja(f, pr.c, v.doc, r2(cs.reduce((a, x) => a + x.d.importe, 0)));
+        f.punto1 = `Comprobante ${v.doc}`;
+        if (pr.c.tipo === "nc") f.punto2 = "Cancelado con nota de crédito: no pasa por el banco";
+        else { conBanco(f, pr.c); f.punto2 = punto2De(pr.c); }
+        if (!f.obs && fc.estado === "No conciliado") f.obs = pistaCobro.get(pr.c.id) ?? "";
+        else if (fc.estado === "No conciliado" && pistaCobro.has(pr.c.id) && !f.obs.includes("Posible")) f.obs = `${f.obs}. ${pistaCobro.get(pr.c.id)}`;
+      }
+    }
+    unificada.push(f);
+  });
+  // Cobrado en la caja pero el comprobante no está en el Registro de Ventas.
+  for (const k of fuera) for (const x of cobrosDe.get(k) ?? []) {
+    const f = vacia(); conCaja(f, x.c, x.d.doc, x.d.importe); conBanco(f, x.c); f.punto2 = punto2De(x.c);
+    f.obs = "Cobrado en la caja virtual: el comprobante no está en el Registro de Ventas"; unificada.push(f);
+  }
+  // Lo que hay en el banco y no corresponde a ningún cobro (y, al final, los cargos).
+  for (const b of bancos.filter((x) => x.estado === "No conciliado")) { const f = vacia(); f.bBanco = b.banco; f.bFecha = b.fecha; f.bDesc = b.desc; f.bOp = b.op; f.bImporte = b.abono; f.obs = b.detalle || "Abono del banco sin cobro en la caja virtual"; unificada.push(f); }
+  for (const b of bancos.filter((x) => x.estado === "Cargo")) { const f = vacia(); f.bBanco = b.banco; f.bFecha = b.fecha; f.bDesc = b.desc; f.bOp = b.op; f.bImporte = -b.cargo; f.estado = "Cargo"; f.obs = "Cargo del banco (no es cobranza)"; unificada.push(f); }
+
   // ---- resumen
   const sum = (xs: { v: number }[]) => r2(xs.reduce((a, x) => a + x.v, 0));
   const noConc = comprobantes.filter((f) => f.estado === "No conciliado");
   const porMotivo: Record<string, { n: number; importe: number }> = {};
-  for (const f of noConc) { const k = f.motivo.replace(/ \(tiene nota.*$/, "").replace(/ \(fin de mes.*$/, " — fin de mes (puede estar depositado el mes siguiente)").replace(/:.*$/, ""); const o = (porMotivo[k] = porMotivo[k] ?? { n: 0, importe: 0 }); o.n++; o.importe = r2(o.importe + f.total); }
+  for (const f of noConc) { const k = f.motivo.replace(/ \(cobro [\w-]+ por [\d.]+\)/, "").replace(/ \(tiene nota.*$/, "").replace(/ \(fin de mes.*$/, " — fin de mes (puede estar depositado el mes siguiente)").replace(/:.*$/, ""); const o = (porMotivo[k] = porMotivo[k] ?? { n: 0, importe: 0 }); o.n++; o.importe = r2(o.importe + f.total); }
   const cobrosBanco = filaCobros.filter((f) => f.estado !== "No aplica");
   const porCriterio: Record<string, number> = {};
   for (const f of cobrosBanco.filter((x) => x.estado === "Conciliado")) { const k = f.criterio.replace(/ \(\d+ cobros.*$/, " (varios iguales el mismo día)"); porCriterio[k] = (porCriterio[k] ?? 0) + 1; }
@@ -425,7 +495,7 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
       return { banco: b, abonos: ab.length, importeAbonos: sum(ab.map((f) => ({ v: f.abono }))), conciliados: co.length, importeConciliado: sum(co.map((f) => ({ v: f.abono }))), noConciliados: nc.length, importeNoConciliado: sum(nc.map((f) => ({ v: f.abono }))), cargos: ca.length, importeCargos: sum(ca.map((f) => ({ v: f.cargo }))) };
     }),
   };
-  return { resumen, comprobantes, cobros: filaCobros, bancos, porFecha, avisos };
+  return { resumen, unificada, comprobantes, cobros: filaCobros, bancos, porFecha, avisos };
 }
 
 /** Lee los archivos subidos (cualquier hoja en cualquier casilla), los clasifica y concilia. */
@@ -474,10 +544,47 @@ function hoja(wb: ExcelJS.Workbook, nombre: string, cols: { t: string; w: number
   return ws;
 }
 const fch = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "");
-const TD: Record<string, string> = { "01": "Factura", "03": "Boleta", "07": "Nota de crédito", "08": "Nota de débito" };
+
+/** HOJA ÚNICA: tres bloques (Contabilidad · Caja virtual · Bancos) en la misma fila; las columnas en
+ *  dorado son el PUNTO EN COMÚN con que se concilia cada salto. */
+function hojaUnica(wb: ExcelJS.Workbook, filas: FilaUnica[]) {
+  const ws = wb.addWorksheet("Conciliación", { views: [{ state: "frozen", ySplit: 2, xSplit: 2 }] });
+  const DORADO = "FFFDE68A", ORO_T = "FF7C2D12";
+  // c = columna que es punto en común
+  const cols: { t: string; w: number; n?: boolean; c?: boolean }[] = [
+    { t: "Fecha", w: 11 }, { t: "Comprobante ★", w: 16, c: true }, { t: "Tipo", w: 13 }, { t: "Cliente", w: 32 }, { t: "Total", w: 11, n: true },
+    { t: "Comprobante ★", w: 16, c: true }, { t: "N° cobro", w: 10 }, { t: "Fecha cobro ◆", w: 12, c: true }, { t: "Medio · sede", w: 26 }, { t: "Importe cobrado", w: 13, n: true }, { t: "Total del cobro ◆", w: 14, n: true, c: true }, { t: "N° operación ◆", w: 15, c: true },
+    { t: "Cuenta", w: 15 }, { t: "Fecha ◆", w: 11, c: true }, { t: "Concepto", w: 34 }, { t: "N° operación ◆", w: 15, c: true }, { t: "Importe ◆", w: 13, n: true, c: true },
+    { t: "Estado", w: 15 }, { t: "Punto en común: contabilidad ↔ caja", w: 28 }, { t: "Punto en común: caja ↔ banco", w: 46 }, { t: "Observación", w: 60 },
+  ];
+  const grupos: [string, number, number, string][] = [["CONTABILIDAD (Registro de Ventas)", 1, 5, "FF102B4D"], ["CAJA VIRTUAL (cobranza)", 6, 12, "FF1E5A8A"], ["BANCOS (extracto)", 13, 17, "FF0F766E"], ["RESULTADO  ·  ★ = punto en común contabilidad ↔ caja   ◆ = punto en común caja ↔ banco", 18, 21, "FF475569"]];
+  const r1 = ws.addRow(cols.map(() => ""));
+  for (const [t, a, b, color] of grupos) {
+    ws.mergeCells(1, a, 1, b); const c = r1.getCell(a); c.value = t;
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } }; c.alignment = { horizontal: "center", vertical: "middle" };
+  }
+  r1.height = 20;
+  const r2h = ws.addRow(cols.map((c) => c.t));
+  r2h.eachCell((cell, n) => {
+    const col = cols[n - 1], grupo = grupos.find((g) => n >= g[1] && n <= g[2])!;
+    cell.font = { bold: true, color: { argb: col.c ? ORO_T : "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col.c ? DORADO : grupo[3] } };
+    cell.alignment = { vertical: "middle", wrapText: true };
+  });
+  r2h.height = 30;
+  for (const f of filas) {
+    const row = ws.addRow([fch(f.cFecha), f.cDoc, f.cTipo, f.cCliente, f.cTotal, f.vDoc, f.vCobro, fch(f.vFecha), f.vMedio, f.vImporte, f.vTotalCobro, f.vOp, f.bBanco, fch(f.bFecha), f.bDesc, f.bOp, f.bImporte, f.estado, f.punto1, f.punto2, f.obs]);
+    const color = f.estado === "No conciliado" ? ROJO : f.estado === "Cargo" ? GRIS : null;
+    if (color) row.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } }; });
+    else cols.forEach((c, i) => { if (c.c) row.getCell(i + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFBEB" } }; });
+  }
+  cols.forEach((c, i) => { const col = ws.getColumn(i + 1); col.width = c.w; if (c.n) col.numFmt = "#,##0.00"; });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: cols.length } };
+}
 
 export async function excelConciliacionTresVias(r: ResultadoConciliacion): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
+  hojaUnica(wb, r.unificada);
   // ---- Resumen
   const ws = wb.addWorksheet("Resumen");
   const s = r.resumen;
@@ -509,19 +616,5 @@ export async function excelConciliacionTresVias(r: ResultadoConciliacion): Promi
   const rt = wsF.addRow(["TOTAL", tot("comprobantes"), tot("ventas"), tot("notasCredito"), tot("cajaEfectivo"), tot("cajaTransferencias"), tot("cajaTotal"), tot("difVentasCaja"), tot("depositado"), tot("sinDepositar"), "", "", tot("abonosBanco"), "", ""]);
   rt.font = { bold: true };
 
-  // ---- Comprobantes
-  const colsC = [{ t: "Fecha", w: 11 }, { t: "Tipo", w: 14 }, { t: "Comprobante", w: 15 }, { t: "Cliente", w: 34 }, { t: "RUC / DNI", w: 13 }, { t: "Total", w: 11, n: true }, { t: "Estado", w: 15 }, { t: "Motivo", w: 44 },
-    { t: "Cobro (caja)", w: 11 }, { t: "Fecha cobro", w: 11 }, { t: "Medio", w: 16 }, { t: "Sede", w: 18 }, { t: "N° operación", w: 14 }, { t: "Cobrado", w: 11, n: true },
-    { t: "Banco", w: 16 }, { t: "Fecha banco", w: 11 }, { t: "Concepto del banco", w: 32 }, { t: "Importe banco", w: 13, n: true }, { t: "Días", w: 6 }, { t: "Cómo se vinculó", w: 40 }];
-  const filaC = (f: FilaComprobante) => [fch(f.fecha), TD[f.td] ?? f.td, f.doc, f.cliente, f.ruc, f.total, f.estado, f.motivo, f.cobro, fch(f.cobroFecha), f.medio, f.sede, f.op, f.cobrado || null, f.banco, fch(f.bancoFecha), f.bancoDesc, f.bancoImporte || null, f.dias, f.criterio];
-  hoja(wb, "No conciliado", colsC, r.comprobantes.filter((f) => f.estado === "No conciliado").map(filaC), 6);
-  hoja(wb, "Comprobantes", colsC, r.comprobantes.map(filaC), 6);
-  // ---- Cobros vs banco
-  hoja(wb, "Caja vs Bancos", [{ t: "Cobro", w: 10 }, { t: "Fecha", w: 11 }, { t: "Medio", w: 16 }, { t: "Sede", w: 18 }, { t: "N° operación (caja)", w: 16 }, { t: "Importe", w: 12, n: true }, { t: "Comprobantes", w: 12 }, { t: "Estado", w: 15 },
-    { t: "Banco", w: 16 }, { t: "Fecha banco", w: 11 }, { t: "Concepto del banco", w: 34 }, { t: "N° operación (banco)", w: 18 }, { t: "Importe banco", w: 13, n: true }, { t: "Días", w: 6 }, { t: "Cómo se vinculó", w: 44 }],
-    r.cobros.map((f) => [f.cobro, fch(f.fecha), f.medio, f.sede, f.op, f.importe, f.comprobantes, f.estado, f.banco, fch(f.bancoFecha), f.bancoDesc, f.bancoOp, f.bancoImporte || null, f.dias, f.criterio]), 7);
-  // ---- Bancos
-  hoja(wb, "Bancos", [{ t: "Banco", w: 16 }, { t: "Fecha", w: 11 }, { t: "Concepto", w: 36 }, { t: "N° operación", w: 15 }, { t: "Abono", w: 12, n: true }, { t: "Cargo", w: 12, n: true }, { t: "Estado", w: 15 }, { t: "Cobro (caja)", w: 11 }, { t: "Corresponde a", w: 60 }],
-    r.bancos.map((f) => [f.banco, fch(f.fecha), f.desc, f.op, f.abono || null, f.cargo || null, f.estado, f.cobro, f.detalle]), 6);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
