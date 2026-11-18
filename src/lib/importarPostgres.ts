@@ -305,8 +305,10 @@ async function aplicarImportSinBloqueo(importado: any, modo: "reemplazar" | "fus
       if (ex) { idsUsuarios.set(u.id, ex.id); continue; }
       final.users.push(u); emails.add(u.email); usuariosNuevos++;
     }
-    const rucs = new Set(final.clientes.map((c: any) => c.ruc));
+    const soloDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+    const rucs = new Set(final.clientes.map((c: any) => soloDigitos(c.ruc)));
     for (const c of importado.clientes ?? []) {
+      if (soloDigitos(c.ruc).length === 11) c.ruc = soloDigitos(c.ruc);
       if (rucs.has(c.ruc)) continue;
       const owner = c.ownerId ? idsUsuarios.get(c.ownerId) ?? c.ownerId : c.ownerId;
       final.clientes.push({ ...c, ownerId: owner }); rucs.add(c.ruc); clientesNuevos++;

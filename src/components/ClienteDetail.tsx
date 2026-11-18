@@ -164,7 +164,7 @@ export default function ClienteDetail({
             {cliente.demo && <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-violet-700" title="Empresa ficticia para demostraciones: no consulta SUNAT">Simulación</span>}
           </h1>
           <p className="text-sm text-slate-500">
-            RUC {cliente.ruc}
+            RUC <span className="select-all">{cliente.ruc}</span>
             {cliente.email && <> · {cliente.email}</>}
             {cliente.telefono && <> · {cliente.telefono}</>}
           </p>

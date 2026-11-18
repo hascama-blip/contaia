@@ -126,8 +126,17 @@ async function readStore(): Promise<Store> {
     if (!Array.isArray(store.users)) store.users = [];
     if (!Array.isArray(store.acciones)) store.acciones = [];
     if (!store.rucsRegistrados) store.rucsRegistrados = {};
+    // RUC siempre limpio: un espacio (u otro carácter invisible) pegado al RUC hace que SUNAT rechace
+    // el acceso al SIRE (el usuario se arma como RUC + Usuario SOL) y que no se detecten duplicados.
+    for (const k of Object.keys(store.rucsRegistrados)) {
+      const limpio = rucLimpio(k);
+      if (limpio === k) continue;
+      if (!store.rucsRegistrados[limpio]) store.rucsRegistrados[limpio] = store.rucsRegistrados[k];
+      delete store.rucsRegistrados[k];
+    }
     // Compatibilidad: clientes creados antes de SIRE/buzón no tienen el campo.
     for (const c of store.clientes) {
+      c.ruc = rucLimpio(c.ruc);
       if (!Array.isArray(c.documentos)) c.documentos = [];
       if (!Array.isArray(c.sire)) c.sire = [];
       if (c.buzon === undefined) c.buzon = null;
@@ -1399,6 +1408,12 @@ function descifrarCampo(v: string): string {
     if (!avisoLlave) { avisoLlave = true; console.error("[seguridad] No se pudo descifrar un secreto guardado: ¿cambió VIGILANCIA_KEY o AUTH_SECRET?"); }
     return v;
   }
+}
+
+/** RUC sin espacios ni caracteres extraños. Solo corrige cuando lo que queda son 11 dígitos. */
+function rucLimpio(v: unknown): string {
+  const s = String(v ?? ""), d = s.replace(/\D/g, "");
+  return d.length === 11 ? d : s.trim();
 }
 
 function descifrarSecretos(store: Store): void {

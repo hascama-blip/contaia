@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body.razonSocial !== "string" || typeof body.ruc !== "string") {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
+  body.ruc = body.ruc.replace(/\s+/g, ""); // sin espacios (se cuelan al copiar y pegar)
   if (!rucValido(body.ruc)) {
     return NextResponse.json(
       { error: "El RUC debe tener 11 dígitos numéricos." },

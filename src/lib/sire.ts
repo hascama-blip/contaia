@@ -169,6 +169,7 @@ async function obtenerToken(
   // datos, y el Usuario SOL en minúsculas (SUNAT lo maneja siempre en mayúsculas).
   const usuario = solUser.trim().toUpperCase();
   clientId = clientId.trim();
+  ruc = ruc.replace(/\D/g, "");
   const url = `${cfg.tokenUrl}/${clientId}/oauth2/token/`;
   const body = new URLSearchParams({
     grant_type: "password",

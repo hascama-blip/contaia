@@ -18,6 +18,9 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - Variables clave (Render → Environment): `DECOLECTA_TOKEN`. El **usuario SOL + API
   (client_id/secret)** se **guardan por cliente** (`Cliente.credSire`, setter `setCredSire`)
   y se prellenan; la **Clave SOL NUNCA se guarda** (se escribe en cada consulta).
+- **RUC siempre limpio**: `readStore` pasa cada `Cliente.ruc` (y las llaves de `rucsRegistrados`) por `rucLimpio`
+  (quita espacios y caracteres invisibles cuando quedan 11 dígitos; se guarda limpio en la siguiente escritura). El alta
+  (`POST /api/clientes`) quita espacios antes de validar y `obtenerToken` arma el usuario con el RUC solo en dígitos.
 - **RUC único**: no se permite crear dos clientes con el mismo RUC (chequeo en
   `POST /api/clientes` con `getClienteByRuc`, responde 409). Unicidad **global** entre estudios
   (`duenoDeRuc` / `rucsRegistrados`): un RUC tomado por otro estudio no se puede registrar,
