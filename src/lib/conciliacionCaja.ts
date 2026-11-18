@@ -2,7 +2,9 @@
 //  Conciliación bancaria de 3 vías: Contabilidad ↔ Caja virtual ↔ Bancos
 // ============================================================
 // Tres documentos (Excel):
-//   1) CONTABILIDAD  = Registro de Ventas (StarSoft): un comprobante por fila.
+//   1) CONTABILIDAD  = Registro de Ventas (StarSoft): un comprobante por fila. También vale el
+//      Libro Diario (un asiento por venta: 12… / 40… / 70…), solo o junto con el Registro; el
+//      Diario no trae el nombre del cliente, así que el Registro afina las transferencias.
 //   2) CAJA VIRTUAL  = tramas de cobranza: cada voucher (subdiario + comprobante) trae UNA
 //      línea de dinero (cuenta 10…: efectivo del día por sede, o una transferencia con su
 //      N° de operación) y debajo los comprobantes que cancela (cuenta 12…).
@@ -21,7 +23,11 @@
 import ExcelJS from "exceljs";
 
 // ---------------------------------------------------------------- tipos
-export interface Venta { td: string; clave: string; doc: string; fecha: string; ruc: string; nombre: string; total: number; ref: string }
+export interface Venta {
+  td: string; clave: string; doc: string; fecha: string; ruc: string; nombre: string; total: number; ref: string;
+  /** Solo cuando viene del Libro Diario: glosa del asiento (servicio, placa) y N° de asiento. */
+  glosa?: string; asiento?: string;
+}
 export interface DocCobro { clave: string; doc: string; td: string; importe: number }
 export interface Cobro {
   id: string; fecha: string; tipo: "efectivo" | "transferencia" | "nc";
@@ -43,7 +49,14 @@ export interface FilaCobro {
   banco: string; bancoFecha: string; bancoDesc: string; bancoOp: string; bancoImporte: number; dias: number | null;
   estado: Estado | "No aplica"; criterio: string;
 }
-export interface FilaBanco { banco: string; fecha: string; desc: string; op: string; abono: number; cargo: number; estado: Estado | "Cargo"; cobro: string; detalle: string }
+export interface FilaBanco {
+  banco: string; fecha: string; desc: string; op: string; abono: number; cargo: number; estado: Estado | "Cargo"; cobro: string; detalle: string;
+  /** Texto de conciliación del movimiento, como lo escribe contabilidad en el extracto: la glosa del
+   *  cobro de la caja ("CANCELA BV B0010007472 - TRANS.BBVA RTV ICA", "DEP. X VTAS 01/10/2026 EFECTIVO
+   *  RTV ICA"); en los cargos, una sugerencia solo si es evidente (ITF, comisión, haberes). */
+  conciliacion: string;
+  obs: string;
+}
 export interface ResumenConciliacion {
   empresa: string; ruc: string; periodo: string;
   ventas: { total: number; importe: number; conciliados: number; importeConciliado: number; noConciliados: number; importeNoConciliado: number; porMotivo: Record<string, { n: number; importe: number }> };
@@ -139,12 +152,14 @@ export async function leerHojas(buf: Buffer, archivo: string): Promise<Hoja[]> {
   return out;
 }
 
-export type TipoHoja = "ventas" | "caja" | "banco" | "desconocida";
+export type TipoHoja = "ventas" | "diario" | "caja" | "banco" | "desconocida";
 /** Reconoce qué es cada hoja por sus encabezados (no importa en qué casilla se subió). */
 export function tipoDeHoja(h: Hoja): { tipo: TipoHoja; fila: number } {
   for (let i = 0; i < Math.min(h.rows.length, 15); i++) {
     const c = h.rows[i].map(H);
     if (c.includes("cta contable") && c.includes("debe/haber")) return { tipo: "caja", fila: i };
+    // Libro Diario (StarSoft): cabecera de líneas "Sec. | Cuenta | Fec.Reg. | … | Documento | … | Debe | Haber".
+    if (c.includes("sec.") && c.includes("cuenta") && c.includes("debe") && c.includes("haber")) return { tipo: "diario", fila: i };
     if (c.includes("documento") && c.some((x) => x === "total") && c.some((x) => x.includes("t/d") || x === "afecto")) return { tipo: "ventas", fila: i };
     const fecha = c.some((x) => /^f\.? ?operaci|^fecha/.test(x));
     const montos = (c.some((x) => /cargo|debito|egreso|retiro/.test(x)) && c.some((x) => /abono|credito|ingreso|deposito/.test(x))) || c.some((x) => /^importe|^monto/.test(x));
@@ -168,6 +183,57 @@ export function parseVentas(h: Hoja, fila: number): { empresa: string; ruc: stri
   }
   const empresa = txt(h.rows[0]?.[0]); const ruc = (h.rows.slice(0, 4).flat().map(txt).find((x) => /^\d{11}$/.test(x))) ?? "";
   return { empresa, ruc, ventas };
+}
+
+/** Tipo de documento según el prefijo que el Libro Diario le pone al comprobante ("BVB0010007472"). */
+const TD_DIARIO: Record<string, string> = { BV: "03", BO: "03", FT: "01", FA: "01", FC: "01", CC: "07", NC: "07", NA: "07", ND: "08", DB: "08" };
+/**
+ * Libro Diario (StarSoft) como fuente de CONTABILIDAD: cada venta es un asiento con el comprobante en la
+ * cuenta 12… (Debe = total; nota de crédito = Haber), el IGV en la 40… y el ingreso en la 70…
+ *   cabecera del asiento:  Sub. | Comp. | Fecha | Moneda | T/C | Glosa
+ *   líneas:                Sec. | Cuenta | Fec.Reg. | Glosa | Anexo | Documento | Fec.Doc. | Cen.Cos. | Debe | Haber
+ * Solo se toman los asientos de VENTAS (tienen 12…/13… y además 70… o 40…): los de cobranza u otros
+ * subdiarios que traiga el archivo se cuentan aparte (`otros`). La fecha sale de Fec.Doc. (la de la
+ * cabecera llega con día y mes cruzados en algunas exportaciones). El Diario NO trae el nombre del cliente.
+ */
+export function parseDiario(h: Hoja, fila: number): { empresa: string; ventas: Venta[]; otros: number } {
+  const c = h.rows[fila].map(H);
+  const ix = (n: string) => c.indexOf(n);
+  const iS = ix("sec."), iC = ix("cuenta"), iFR = ix("fec.reg."), iG = ix("glosa"), iA = ix("anexo"), iD = ix("documento"), iFD = ix("fec.doc."), iDe = ix("debe"), iHa = ix("haber");
+  interface Linea { cta: string; glosa: string; anexo: string; doc: string; fecha: string; debe: number; haber: number }
+  const asientos: { id: string; lineas: Linea[] }[] = [];
+  let cur: { id: string; lineas: Linea[] } | null = null;
+  for (const row of h.rows.slice(fila + 1)) {
+    const sec = txt(row[iS]), cta = txt(row[iC]);
+    if (/^\d{4,6}$/.test(sec) && /^\d{2,}$/.test(cta)) {
+      if (!cur) { cur = { id: "", lineas: [] }; asientos.push(cur); }
+      cur.lineas.push({ cta, glosa: iG >= 0 ? txt(row[iG]).replace(/\s+/g, " ") : "", anexo: iA >= 0 ? txt(row[iA]) : "", doc: iD >= 0 ? txt(row[iD]) : "", fecha: (iFD >= 0 ? aIso(row[iFD]) : "") || (iFR >= 0 ? aIso(row[iFR]) : ""), debe: num(row[iDe]), haber: num(row[iHa]) });
+    } else if (/^\d{1,3}$/.test(sec) && /^\d+$/.test(cta) && iG >= 0 && /^(MN|ME)$/i.test(txt(row[iG]))) {
+      // Cabecera de asiento: subdiario y comprobante en las mismas columnas que Sec. y Cuenta.
+      cur = { id: `${sec.padStart(2, "0")}-${cta.padStart(4, "0")}`, lineas: [] }; asientos.push(cur);
+    }
+  }
+  const ventas = new Map<string, Venta>(); let otros = 0;
+  for (const a of asientos) {
+    if (!a.lineas.length) continue;
+    const cli = a.lineas.filter((l) => /^1[23]/.test(l.cta) && l.doc);
+    if (!cli.length || !a.lineas.some((l) => /^7/.test(l.cta) || /^40/.test(l.cta))) { otros++; continue; }
+    for (const l of cli) {
+      const d = l.doc.toUpperCase().replace(/[\s-]+/g, "");
+      const m = /^([A-Z]{2})([A-Z][A-Z0-9]{3}\d+)$/.exec(d);
+      const clave = claveDoc(m ? m[2] : d);
+      if (!/^[A-Z][A-Z0-9]{3}-\d+$/.test(clave)) continue;
+      const neto = l.debe - l.haber;
+      const td = (m && TD_DIARIO[m[1]]) || (neto < 0 ? "07" : clave.startsWith("B") ? "03" : "01");
+      const k = td + clave, ya = ventas.get(k);
+      if (ya) { ya.total = r2(ya.total + Math.abs(neto)); continue; }
+      // Anexo = tipo de anexo (2 dígitos) + DNI/RUC del cliente.
+      const ruc = /^(10|15|17|20)\d{9}$/.test(l.anexo) ? l.anexo : /^\d{2}\d{8,11}$/.test(l.anexo) ? l.anexo.slice(2) : l.anexo;
+      ventas.set(k, { td, clave, doc: docVisible(clave), fecha: l.fecha, ruc, nombre: "", total: r2(Math.abs(neto)), ref: "", glosa: l.glosa, asiento: a.id });
+    }
+  }
+  const empresa = (h.rows[0] ?? []).map(txt).find(Boolean) ?? "";
+  return { empresa, ventas: Array.from(ventas.values()), otros };
 }
 
 export function parseCaja(h: Hoja, fila: number): Cobro[] {
@@ -412,12 +478,31 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
   // ---- filas: bancos
   const usoDe = new Map<number, Cobro>();
   for (const [id, e] of Array.from(enlace.entries())) for (const m of e.movs) usoDe.set(m.id, cobros.find((c) => c.id === id)!);
+  // Cargos: solo se sugiere el texto cuando es evidente; el resto lo completa contabilidad.
+  const sugerirCargo = (desc: string): string => {
+    const d = sinAcentos(desc).toUpperCase();
+    if (/REGULARIZACION ITF/.test(d)) return "REGULARIZACIÓN ITF";
+    if (/\bITF\b/.test(d)) return "IMPUESTO ITF";
+    if (/COMIS|^\*?COM\.|MANTENIM|^MANT\b|ENVIO\.EST\.CTA|PORTES/.test(d)) return "COMISION";
+    if (/^HABER TLC/.test(d)) return "PAGO HABERES";
+    return "";
+  };
   const bancos: FilaBanco[] = movs.slice().sort((a, b) => a.banco.localeCompare(b.banco) || a.fecha.localeCompare(b.fecha) || a.id - b.id).map((m) => {
     const c = usoDe.get(m.id);
+    const esCargo = m.cargo > 0 && !m.abono;
+    let obs = "";
+    if (c && c.tipo === "transferencia") {
+      const e = enlace.get(c.id)!, cliente = ventaDe.get(c.docs[0]?.clave ?? "")?.nombre ?? "";
+      if (/cobros iguales/.test(e.criterio)) obs = "Varios cobros del mismo monto ese día: cuadran en conjunto, no se puede asegurar cuál abono es de cuál comprobante.";
+      if (e.criterio !== "N° de operación" && cliente && puntosNombre(c, m) === 0) obs = `El nombre que trae el banco no es el del cliente (${cliente}): conciliado solo por fecha y monto. Verificar.`;
+    } else if (c && c.tipo === "efectivo" && (enlace.get(c.id)?.movs.length ?? 0) > 1) obs = `El efectivo de ese día (${c.importe.toFixed(2)}) se depositó en dos partes.`;
+    const sinCobro = pistaMov.get(m.id) ?? (m.abono > 0 && esInicioDeMes(m.fecha) ? `Sin cobro en la caja de este periodo (${NOTA_INICIO})` : m.abono > 0 ? "Sin cobro en la caja virtual" : "");
+    if (!c && !esCargo) obs = sinCobro;
     return {
+      conciliacion: esCargo ? sugerirCargo(m.desc) : c ? c.glosa.replace(/\s+/g, " ").trim() : "", obs,
       banco: m.banco, fecha: m.fecha, desc: m.desc, op: m.op, abono: m.abono, cargo: m.cargo,
-      estado: m.cargo > 0 && !m.abono ? "Cargo" : c ? "Conciliado" : "No conciliado",
-      cobro: c?.id ?? "", detalle: !c ? pistaMov.get(m.id) ?? (m.abono > 0 && esInicioDeMes(m.fecha) ? `Sin cobro en la caja de este periodo (${NOTA_INICIO})` : m.abono > 0 ? "Sin cobro en la caja virtual" : "") : (c.tipo === "efectivo" ? `Efectivo del ${c.fecha.split("-").reverse().join("/")} ${c.sede} (${c.docs.length} comprobantes)` : `${c.docs.map((d) => d.doc).join(", ")}`),
+      estado: esCargo ? "Cargo" : c ? "Conciliado" : "No conciliado",
+      cobro: c?.id ?? "", detalle: !c ? sinCobro : (c.tipo === "efectivo" ? `Efectivo del ${c.fecha.split("-").reverse().join("/")} ${c.sede} (${c.docs.length} comprobantes)` : `${c.docs.map((d) => d.doc).join(", ")}`),
     };
   });
 
@@ -538,28 +623,50 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
 export async function conciliarArchivos(archivos: { nombre: string; buf: Buffer }[]): Promise<ResultadoConciliacion> {
   const avisos: string[] = [];
   let empresa = "", ruc = "";
-  const ventas: Venta[] = [], cobros: Cobro[] = [], movs: MovBanco[] = [];
+  const registro: Venta[] = [], diario: Venta[] = [], cobros: Cobro[] = [], movs: MovBanco[] = [];
   const nBancos: string[] = [];
+  let otrosDiario = 0;
   for (const a of archivos) {
     let hojas: Hoja[];
     try { hojas = await leerHojas(a.buf, a.nombre); } catch { throw new Error(`No se pudo leer "${a.nombre}". Debe ser un Excel (.xlsx).`); }
     const unaSola = hojas.length === 1;
     for (const h of hojas) {
       const t = tipoDeHoja(h);
-      if (t.tipo === "ventas") { const p = parseVentas(h, t.fila); if (!empresa) empresa = p.empresa; if (!ruc) ruc = p.ruc; ventas.push(...p.ventas); }
+      if (t.tipo === "ventas") { const p = parseVentas(h, t.fila); if (!empresa) empresa = p.empresa; if (!ruc) ruc = p.ruc; registro.push(...p.ventas); }
+      else if (t.tipo === "diario") { const p = parseDiario(h, t.fila); if (!empresa) empresa = p.empresa; diario.push(...p.ventas); otrosDiario += p.otros; }
       else if (t.tipo === "caja") cobros.push(...parseCaja(h, t.fila));
       else if (t.tipo === "banco") { const nombre = (unaSola ? a.nombre.replace(/\.xlsx?$/i, "") : h.hoja).trim(); nBancos.push(nombre); movs.push(...parseBanco(h, t.fila, nombre, movs.length)); }
-      else if (h.rows.length > 3) avisos.push(`No se reconoció la hoja "${h.hoja}" de "${a.nombre}" (no parece Registro de Ventas, caja virtual ni banco): se omitió.`);
+      else if (h.rows.length > 3) avisos.push(`No se reconoció la hoja "${h.hoja}" de "${a.nombre}" (no parece Registro de Ventas, Libro Diario, caja virtual ni banco): se omitió.`);
     }
   }
+  // Contabilidad: Registro de Ventas, Libro Diario (asientos de ventas) o los dos.
+  const kv = (v: Venta) => v.td + v.clave;
+  let ventas: Venta[] = registro;
+  if (diario.length && !registro.length) {
+    ventas = diario;
+    avisos.push(`La contabilidad se tomó del Libro Diario (${diario.length} asientos de ventas). El Diario no trae el nombre del cliente: las transferencias del mismo monto y día se concilian en conjunto, sin confirmar cuál abono es de cuál comprobante. Para afinarlo, sube también el Registro de Ventas en la casilla de Contabilidad.`);
+  } else if (diario.length) {
+    // Los dos: manda el Registro (trae el nombre) y el Diario sirve de control cruzado.
+    const enDiario = new Map(diario.map((v) => [kv(v), v])), enRegistro = new Set(registro.map(kv));
+    for (const v of registro) { const d = enDiario.get(kv(v)); if (d) { v.glosa = d.glosa; v.asiento = d.asiento; } }
+    const soloDiario = diario.filter((v) => !enRegistro.has(kv(v))), soloRegistro = registro.filter((v) => !enDiario.has(kv(v)));
+    const distinto = registro.filter((v) => { const d = enDiario.get(kv(v)); return d && Math.abs(d.total - v.total) >= 0.01; });
+    const lista = (vs: Venta[]) => `${vs.slice(0, 8).map((v) => v.doc).join(", ")}${vs.length > 8 ? "…" : ""}`;
+    if (soloDiario.length) avisos.push(`${soloDiario.length} comprobante(s) tienen asiento en el Libro Diario y no están en el Registro de Ventas: ${lista(soloDiario)}. Se incluyeron en la conciliación.`);
+    if (soloRegistro.length) avisos.push(`${soloRegistro.length} comprobante(s) del Registro de Ventas no tienen asiento en el Libro Diario: ${lista(soloRegistro)}.`);
+    if (distinto.length) avisos.push(`${distinto.length} comprobante(s) tienen distinto importe en el Libro Diario y en el Registro de Ventas: ${lista(distinto)}. Se usó el del Registro.`);
+    if (!soloDiario.length && !soloRegistro.length && !distinto.length) avisos.push(`Control: el Libro Diario y el Registro de Ventas coinciden (${registro.length} comprobantes, mismo importe).`);
+    ventas = [...registro, ...soloDiario];
+  }
+  if (otrosDiario && diario.length) avisos.push(`El Libro Diario trae ${otrosDiario} asiento(s) que no son de ventas (otros subdiarios): no se usaron.`);
   const falta: string[] = [];
-  if (!ventas.length) falta.push("la Contabilidad (Registro de Ventas)");
+  if (!ventas.length) falta.push("la Contabilidad (Registro de Ventas o Libro Diario)");
   if (!cobros.length) falta.push("la Caja virtual (tramas de cobranza)");
   if (!movs.length) falta.push("los Bancos (extractos)");
   if (falta.length) throw new Error(`Falta ${falta.join(" y ")}. Revisa que cada archivo sea el Excel correcto.`);
   // Comprobantes repetidos en el registro (dos hojas con lo mismo): se deja uno.
   const vistos = new Set<string>(); const unicas = ventas.filter((v) => (vistos.has(v.td + v.clave) ? false : (vistos.add(v.td + v.clave), true)));
-  if (unicas.length < ventas.length) avisos.push(`${ventas.length - unicas.length} comprobante(s) repetidos en el Registro de Ventas: se contó cada uno una sola vez.`);
+  if (unicas.length < ventas.length) avisos.push(`${ventas.length - unicas.length} comprobante(s) repetidos en la contabilidad: se contó cada uno una sola vez.`);
   return conciliarTresVias(unicas, cobros, movs, { empresa, ruc }, avisos);
 }
 
@@ -621,6 +728,20 @@ function hojaUnica(wb: ExcelJS.Workbook, filas: FilaUnica[]) {
 export async function excelConciliacionTresVias(r: ResultadoConciliacion): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   hojaUnica(wb, r.unificada);
+  // ---- Una hoja por cuenta: el extracto con la columna CONCILIACIÓN (como la arma contabilidad a mano)
+  const usados = new Set<string>(["conciliación", "resumen", "por fecha"]);
+  for (const b of r.resumen.bancos) {
+    let nombre = `Banco ${b.banco}`.replace(/[\\/*?:[\]]/g, " ").slice(0, 31).trim();
+    for (let i = 2; usados.has(nombre.toLowerCase()); i++) nombre = `${nombre.slice(0, 28)} ${i}`;
+    usados.add(nombre.toLowerCase());
+    const fs = r.bancos.filter((f) => f.banco === b.banco);
+    const wsB = hoja(wb, nombre, [{ t: "FECHA", w: 11 }, { t: "DESCRIPCIÓN", w: 40 }, { t: "N° OPER.", w: 14 }, { t: "IMPORTE", w: 12, n: true }, { t: "CONCILIACIÓN", w: 52 }, { t: "Comprobantes que cancela", w: 44 }, { t: "Estado", w: 15 }, { t: "Observación", w: 70 }],
+      fs.map((f) => [fch(f.fecha), f.desc, f.op, f.abono > 0 ? f.abono : -f.cargo, f.conciliacion, f.estado === "Conciliado" ? f.detalle : "", f.estado, f.obs]), 6);
+    wsB.getColumn(5).font = { bold: true };
+    wsB.getRow(1).getCell(5).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
+    const tb = wsB.addRow(["", "TOTAL ABONOS", "", b.importeAbonos, `${b.conciliados} de ${b.abonos} abonos con su conciliación`]); tb.font = { bold: true };
+    wsB.addRow(["", "TOTAL CARGOS", "", -b.importeCargos, "Los cargos sin texto los completa contabilidad"]).font = { bold: true };
+  }
   // ---- Resumen
   const ws = wb.addWorksheet("Resumen");
   const s = r.resumen;

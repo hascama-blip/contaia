@@ -10,7 +10,7 @@ const MAX_SIZE = 20 * 1024 * 1024;
 const MAX_ARCHIVOS = 12;
 
 // Conciliación bancaria de 3 vías. multipart/form-data:
-//   - contabilidad : Registro de Ventas (Excel)
+//   - contabilidad : Registro de Ventas y/o Libro Diario de ventas (Excel; uno o los dos)
 //   - caja         : caja virtual / tramas de cobranza (Excel)
 //   - bancos       : uno o varios extractos (Excel; una cuenta por hoja o por archivo)
 // Cada hoja se reconoce por su contenido, así que un solo Excel con todas las pestañas también
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
     const r = await conciliarArchivos(archivos);
     const excel = await excelConciliacionTresVias(r);
-    return NextResponse.json({ resumen: r.resumen, unificada: r.unificada, porFecha: r.porFecha, avisos: r.avisos, excelBase64: excel.toString("base64") });
+    return NextResponse.json({ resumen: r.resumen, unificada: r.unificada, bancos: r.bancos, porFecha: r.porFecha, avisos: r.avisos, excelBase64: excel.toString("base64") });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "No se pudo conciliar." }, { status: 400 });
   }

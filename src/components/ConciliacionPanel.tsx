@@ -1,19 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ResumenConciliacion, FilaUnica, FilaFecha } from "@/lib/conciliacionCaja";
+import type { ResumenConciliacion, FilaUnica, FilaFecha, FilaBanco } from "@/lib/conciliacionCaja";
 
 const soles = (n: unknown) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fch = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "");
-type Vista = "conciliacion" | "fecha";
-interface Respuesta { resumen: ResumenConciliacion; unificada: FilaUnica[]; porFecha: FilaFecha[]; avisos: string[]; excelBase64?: string }
+type Vista = "conciliacion" | "bancos" | "fecha";
+interface Respuesta { resumen: ResumenConciliacion; unificada: FilaUnica[]; bancos?: FilaBanco[]; porFecha: FilaFecha[]; avisos: string[]; excelBase64?: string }
 const TOPE = 400; // filas en pantalla (el Excel trae todas)
 
-// Conciliación bancaria de 3 vías: Contabilidad (Registro de Ventas) ↔ Caja virtual
+// Conciliación bancaria de 3 vías: Contabilidad (Registro de Ventas y/o Libro Diario) ↔ Caja virtual
 // (cobranzas) ↔ Bancos. Vincula cada comprobante con su cobro y su depósito; lo que no
 // se logra vincular sale como "No conciliado".
 export default function ConciliacionPanel() {
-  const [fCont, setFCont] = useState<File | null>(null);
+  const [fCont, setFCont] = useState<File[]>([]);
   const [fCaja, setFCaja] = useState<File | null>(null);
   const [fBancos, setFBancos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -22,19 +22,20 @@ export default function ConciliacionPanel() {
   const [vista, setVista] = useState<Vista>("conciliacion");
   const [soloNo, setSoloNo] = useState(false);
   const [buscar, setBuscar] = useState("");
+  const [cuenta, setCuenta] = useState("");
 
   async function conciliar() {
-    if (!fCont && !fCaja && !fBancos.length) return setError("Adjunta los Excel de contabilidad, caja virtual y bancos.");
+    if (!fCont.length && !fCaja && !fBancos.length) return setError("Adjunta los Excel de contabilidad, caja virtual y bancos.");
     setBusy(true); setError(null); setRes(null);
     try {
       const fd = new FormData();
-      if (fCont) fd.append("contabilidad", fCont);
+      for (const f of fCont) fd.append("contabilidad", f);
       if (fCaja) fd.append("caja", fCaja);
       for (const f of fBancos) fd.append("bancos", f);
       const r = await fetch("/api/conciliacion", { method: "POST", body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
-      setRes(data); setVista("conciliacion"); setSoloNo(false); setBuscar("");
+      setRes(data); setVista("conciliacion"); setSoloNo(false); setBuscar(""); setCuenta("");
     } catch { setError("Error de red (¿archivo muy pesado?)."); }
     finally { setBusy(false); }
   }
@@ -55,12 +56,15 @@ export default function ConciliacionPanel() {
   const q = buscar.trim().toUpperCase();
   const pasa = (f: object) => !q || Object.values(f).some((v) => String(v ?? "").toUpperCase().includes(q));
   const filas = useMemo(() => (res?.unificada ?? []).filter((f) => (!soloNo || f.estado === "No conciliado") && pasa(f)), [res, q, soloNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cuentas = (s?.bancos ?? []).map((b) => b.banco);
+  const cuentaSel = cuentas.includes(cuenta) ? cuenta : cuentas[0] ?? "";
+  const filasBanco = useMemo(() => (res?.bancos ?? []).filter((f) => f.banco === cuentaSel && (!soloNo || f.estado === "No conciliado") && pasa(f)), [res, q, soloNo, cuentaSel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
       <div className="card p-5">
         <div className="grid gap-4 md:grid-cols-3">
-          <Uploader titulo="1 · Contabilidad" detalle="Registro de Ventas del mes (Excel de StarSoft)." file={fCont ? [fCont] : []} onPick={(fs) => setFCont(fs[0] ?? null)} />
+          <Uploader titulo="1 · Contabilidad" detalle="Registro de Ventas del mes y/o Libro Diario de ventas (Excel de StarSoft). Puedes subir los dos." multiple file={fCont} onPick={setFCont} />
           <Uploader titulo="2 · Caja virtual" detalle="Tramas de cobranza: cada cobro con los comprobantes que cancela (Excel)." file={fCaja ? [fCaja] : []} onPick={(fs) => setFCaja(fs[0] ?? null)} />
           <Uploader titulo="3 · Bancos" detalle="Extractos en Excel. Puedes subir varios archivos, o uno con una pestaña por cuenta." multiple file={fBancos} onPick={setFBancos} />
         </div>
@@ -118,20 +122,26 @@ export default function ConciliacionPanel() {
           <div className="card p-5">
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-white p-1">
-                {([["conciliacion", "Conciliación"], ["fecha", "Por fecha"]] as [Vista, string][]).map(([k, t]) => (
+                {([["conciliacion", "Conciliación"], ["bancos", "Extracto conciliado"], ["fecha", "Por fecha"]] as [Vista, string][]).map(([k, t]) => (
                   <button key={k} onClick={() => setVista(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${vista === k ? "bg-brand-600 text-white" : "text-slate-500 hover:text-brand-700"}`}>{t}</button>
                 ))}
               </div>
-              {vista === "conciliacion" && (
+              {vista === "bancos" && cuentas.length > 1 && (
+                <select className="input max-w-[14rem]" value={cuentaSel} onChange={(e) => setCuenta(e.target.value)}>
+                  {cuentas.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+              {vista !== "fecha" && (
                 <>
                   <label className="flex items-center gap-2 text-sm text-slate-600">
                     <input type="checkbox" checked={soloNo} onChange={(e) => setSoloNo(e.target.checked)} /> Solo lo no conciliado
                   </label>
-                  <input className="input ml-auto max-w-xs" placeholder="Buscar comprobante, cliente, monto…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+                  <input className="input ml-auto max-w-xs" placeholder={vista === "bancos" ? "Buscar descripción, comprobante, monto…" : "Buscar comprobante, cliente, monto…"} value={buscar} onChange={(e) => setBuscar(e.target.value)} />
                 </>
               )}
             </div>
             {vista === "conciliacion" && <TablaUnica filas={filas} />}
+            {vista === "bancos" && <TablaBanco filas={filasBanco} cuenta={cuentaSel} />}
             {vista === "fecha" && <TablaFechas filas={res.porFecha ?? []} />}
           </div>
         </>
@@ -212,6 +222,35 @@ function TablaUnica({ filas }: { filas: FilaUnica[] }) {
       </table>
       <p className="border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-500">
         <b>★</b> punto en común contabilidad ↔ caja: el <b>comprobante</b> (serie y número). &nbsp; <b>◆</b> punto en común caja ↔ banco: el <b>total del cobro</b> y la <b>fecha</b> (o el N° de operación cuando el banco lo trae).
+      </p>
+    </div>
+  );
+}
+
+// EXTRACTO CONCILIADO: los movimientos de una cuenta, en el orden del banco, con la columna
+// CONCILIACIÓN (la glosa del cobro de la caja) como la arma contabilidad a mano.
+function TablaBanco({ filas, cuenta }: { filas: FilaBanco[]; cuenta: string }) {
+  return (
+    <div className="mt-3 max-h-[36rem] overflow-auto rounded-lg border border-slate-200">
+      <table className="w-full text-[11px]">
+        <thead className="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase text-slate-500"><tr>
+          <th className={th}>Fecha</th><th className={th}>Descripción ({cuenta})</th><th className={th}>N° oper.</th><th className={`${th} text-right`}>Importe</th>
+          <th className={`${th} bg-teal-700 text-white`}>Conciliación</th><th className={th}>Comprobantes que cancela</th><th className={th}>Estado</th><th className={th}>Observación</th>
+        </tr></thead>
+        <tbody>
+          {filas.slice(0, TOPE).map((f, i) => (
+            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/50" : f.estado === "Cargo" ? "bg-slate-50" : ""}`}>
+              <td className={`${td} whitespace-nowrap`}>{fch(f.fecha)}</td><td className={`${td} whitespace-nowrap`}>{f.desc}</td><td className={`${td} whitespace-nowrap`}>{f.op}</td>
+              <td className={`${tdr} ${f.cargo > 0 && !f.abono ? "text-slate-500" : ""}`}>{soles(f.abono > 0 ? f.abono : -f.cargo)}</td>
+              <td className={`${td} whitespace-nowrap font-semibold text-slate-800`}>{f.conciliacion}</td><td className={td}><span className="line-clamp-2">{f.estado === "Conciliado" ? f.detalle : ""}</span></td>
+              <td className={td}><Est e={f.estado} /></td><td className={`${td} min-w-[18rem]`}>{f.obs}</td>
+            </tr>
+          ))}
+          {!filas.length && <Vacio cols={8} />}<Mas n={filas.length} cols={8} />
+        </tbody>
+      </table>
+      <p className="border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-500">
+        La columna <b>Conciliación</b> es la glosa del cobro de la caja virtual que corresponde a cada abono. Los cargos solo traen texto cuando es evidente (ITF, comisiones, haberes): el resto lo completa contabilidad.
       </p>
     </div>
   );

@@ -184,8 +184,20 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Si una transferencia se concilió solo por fecha y monto y el nombre del banco NO es el del cliente (caso real:
   boleta de CAMPOS RAMIREZ FLAVIO ↔ "ABONO INMEDIATO 002 MARIA D"), la fila queda Conciliada pero con la
   observación "El nombre que trae el banco no es el del cliente… Verificar" (≈ 40 % de las transferencias).
-  Excel: Conciliación (hoja única) · Resumen · Por fecha. Pantalla: pestañas Conciliación (con "Solo lo no
-  conciliado" y buscador) y Por fecha. Caso real de calibración:
+  **Contabilidad también desde el Libro Diario** (`parseDiario`; hoja reconocida por "Sec. | Cuenta | … | Debe |
+  Haber"): cada venta es un asiento del subdiario 03 con el comprobante en la 12… ("BVB0010007472": prefijo BV/FT/
+  CC + serie + número; Debe = total, NC = Haber), IGV en 40…, ingreso en 70…; la fecha sale de Fec.Doc. (la de la
+  cabecera llega con día/mes cruzados). Solo cuentan los asientos con 12…/13… y además 70…/40… (otros subdiarios
+  se ignoran con aviso). El Diario NO trae el nombre del cliente: solo, las transferencias iguales del mismo día
+  cuadran "en conjunto"; con el Registro además (la casilla 1 acepta los dos) manda el Registro y el Diario hace de
+  control cruzado (avisos de faltantes o importes distintos). Caso real: diario oct-2026 = Registro, 1,640 de 1,640.
+  **Extracto conciliado** (formato de las conciliaciones manuales del cliente, ej. abril): una hoja por cuenta
+  ("Banco <cuenta>") y pestaña en pantalla, con el extracto en el orden del banco + columna CONCILIACIÓN
+  (`FilaBanco.conciliacion`) = la glosa del cobro de la caja ("CANCELA BV B0010007472 - TRANS.BBVA RTV ICA",
+  "DEP. X VTAS 01/10/2026 EFECTIVO RTV ICA"); cargos: solo sugerencia evidente (`sugerirCargo`: ITF, comisión,
+  HABER TLC = haberes), el resto lo completa contabilidad.
+  Excel: Conciliación (hoja única) · Banco <cuenta>… · Resumen · Por fecha. Pantalla: pestañas Conciliación (con
+  "Solo lo no conciliado" y buscador), Extracto conciliado y Por fecha. Caso real de calibración:
   RTV San Cristóbal oct-2026 (1,640 comprobantes → 1,493 conciliados). Limitación: el N° de operación de la
   caja casi nunca está en el extracto del BBVA y el concepto viene cortado a 28 caracteres.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
