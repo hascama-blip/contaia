@@ -169,7 +169,8 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   y **Bancos** (varios archivos u hojas, una por cuenta; columnas Cargo/Abono o Importe con signo). Cada hoja se
   reconoce por sus encabezados (`tipoDeHoja`), así que un solo Excel con todas las pestañas también sirve.
   Vínculo: comprobante ─(serie+número, `claveDoc`)→ cobro ─→ banco. Cobro→banco (`conciliarTresVias`):
-  (A) N° de operación · (B) efectivo = depósito de monto exacto en 0–7 días · (C) transferencia misma fecha y
+  (A) N° de operación · (A2/A3) nombre del cliente en el concepto del banco + monto, ±3 días (`puntosNombre`,
+  tolera la última palabra cortada) · (B) efectivo = depósito de monto exacto en 0–7 días · (C) transferencia misma fecha y
   monto, desempate por nombre del cliente en el concepto; varias iguales = "cuadran en conjunto" · (D) ±3 días ·
   (D2) monto único con abono posterior · (E) efectivo en dos depósitos · (F) depósito tardío. Lo no vinculado =
   **"No conciliado"** (pedido del dueño: no usar "por cobrar" ni reglas de plazo) con motivo; pistas: depósito
@@ -180,6 +181,9 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   Contabilidad · Caja virtual · Bancos, con el **punto en común** resaltado en dorado: ★ el comprobante
   (contabilidad ↔ caja) y ◆ el total del cobro + fecha o N° de operación (caja ↔ banco), más las columnas
   "Punto en común" que dicen con qué se concilió. Al final van los abonos del banco sin cobro y los cargos.
+  Si una transferencia se concilió solo por fecha y monto y el nombre del banco NO es el del cliente (caso real:
+  boleta de CAMPOS RAMIREZ FLAVIO ↔ "ABONO INMEDIATO 002 MARIA D"), la fila queda Conciliada pero con la
+  observación "El nombre que trae el banco no es el del cliente… Verificar" (≈ 40 % de las transferencias).
   Excel: Conciliación (hoja única) · Resumen · Por fecha. Pantalla: pestañas Conciliación (con "Solo lo no
   conciliado" y buscador) y Por fecha. Caso real de calibración:
   RTV San Cristóbal oct-2026 (1,640 comprobantes → 1,493 conciliados). Limitación: el N° de operación de la

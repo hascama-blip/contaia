@@ -246,11 +246,42 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
   const efectivo = cobros.filter((c) => c.tipo === "efectivo").sort(ordenCobro);
   const disponibles = () => Array.from(libres.values());
 
+  // Nombre del cliente dentro del concepto del banco. El banco corta el concepto (p. ej. a 28
+  // caracteres), así que la última palabra puede venir incompleta ("FERNAN" por FERNANDEZ).
+  const VACIAS = new Set(["DEL", "LOS", "LAS", "SAC", "EIRL", "SRL", "SAA", "POR", "CON", "ABONO", "INMEDIATO"]);
+  const nombreCliente = (c: Cobro) => tokens(ventaDe.get(c.docs[0]?.clave ?? "")?.nombre ?? "").filter((w) => !VACIAS.has(w));
+  const puntosNombre = (c: Cobro, m: MovBanco): number => {
+    const n = nombreCliente(c); if (!n.length) return 0;
+    const b = tokens(m.desc).filter((w) => !VACIAS.has(w)); let p = 0; const usados = new Set<string>();
+    b.forEach((w, i) => {
+      const exacto = n.find((x) => x === w && !usados.has(x));
+      if (exacto) { usados.add(exacto); p++; return; }
+      if (i === b.length - 1 && w.length >= 4) { const pref = n.find((x) => x.startsWith(w) && !usados.has(x)); if (pref) { usados.add(pref); p++; } }
+    });
+    return p;
+  };
+
   // (A) Transferencias por N° de operación (si el banco lo trae).
   for (const c of transf) {
     const op = soloDigitos(c.op); if (op.length < 5) continue;
     const m = disponibles().find((x) => igual(x.abono, c.importe) && (soloDigitos(x.op) === op || x.desc.replace(/\D/g, "").includes(op)));
     if (m) tomar(c, [m], "N° de operación");
+  }
+  // (A2) Transferencias por NOMBRE: el concepto del banco trae al cliente (2 o más palabras) con el
+  // mismo monto, aunque el abono sea de un día cercano. Va antes que "fecha y monto" porque es más seguro.
+  for (const c of transf.filter((x) => !enlace.has(x.id))) {
+    const m = disponibles().filter((x) => igual(x.abono, c.importe) && Math.abs(dias(c.fecha, x.fecha)) <= 3 && puntosNombre(c, x) >= 2)
+      .sort((a, b) => puntosNombre(c, b) - puntosNombre(c, a) || Math.abs(dias(c.fecha, a.fecha)) - Math.abs(dias(c.fecha, b.fecha)))[0];
+    if (m) tomar(c, [m], m.fecha === c.fecha ? "Fecha, monto y nombre del cliente" : "Monto y nombre del cliente");
+  }
+  // (A3) Una sola palabra del nombre (p. ej. el apellido) también vale si no hay duda: ese abono es el
+  // único con su nombre para ese cobro, y ese cobro el único pendiente que calza con ese abono.
+  for (const c of transf.filter((x) => !enlace.has(x.id))) {
+    const calza = (x: Cobro, m: MovBanco) => igual(m.abono, x.importe) && Math.abs(dias(x.fecha, m.fecha)) <= 3 && puntosNombre(x, m) >= 1;
+    const ms = disponibles().filter((m) => calza(c, m));
+    if (ms.length !== 1) continue;
+    if (transf.filter((x) => !enlace.has(x.id) && calza(x, ms[0])).length !== 1) continue;
+    tomar(c, [ms[0]], ms[0].fecha === c.fecha ? "Fecha, monto y nombre del cliente" : "Monto y nombre del cliente");
   }
   // (B) Efectivo: el total del día por sede = un depósito por el mismo monto en los 7 días siguientes.
   for (const c of efectivo) {
@@ -266,8 +297,7 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     let ms = disponibles().filter((m) => m.fecha === fecha && igual(m.abono, Number(imp)));
     if (!ms.length) continue;
     if (cs.length === 1 && ms.length === 1) { tomar(cs[0], [ms[0]], "Fecha y monto"); continue; }
-    const nombre = (c: Cobro) => tokens(ventaDe.get(c.docs[0]?.clave ?? "")?.nombre ?? "");
-    const puntos = (c: Cobro, m: MovBanco) => { const n = nombre(c); return tokens(m.desc).filter((w) => n.includes(w)).length; };
+    const puntos = puntosNombre;
     // Primero las parejas que el nombre identifica sin duda (mejor puntaje, sin empate).
     let quedan = [...cs];
     for (let vuelta = 0; vuelta < cs.length; vuelta++) {
@@ -423,9 +453,9 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     const m = e.movs[0], monto = `Monto ${c.importe.toFixed(2)}`;
     if (e.criterio === "N° de operación") return `N° de operación ${soloDigitos(c.op)}`;
     if (c.tipo === "efectivo") return e.movs.length > 1 ? `${monto} = ${e.movs.map((x) => x.abono.toFixed(2)).join(" + ")} (dos depósitos)` : `${monto} = depósito del ${dmy(m.fecha)}`;
-    const nombre = /nombre/.test(e.criterio) ? " + nombre del cliente" : "";
+    const nombre = puntosNombre(c, m) >= 1 ? " + nombre del cliente" : "";
     const grupo = /cobros iguales/.test(e.criterio) ? " (varios iguales ese día: cuadran en conjunto)" : "";
-    return m.fecha === c.fecha ? `Fecha ${dmy(c.fecha)} + ${monto.toLowerCase()}${nombre}${grupo}` : `${monto}, abono del ${dmy(m.fecha)}`;
+    return m.fecha === c.fecha ? `Fecha ${dmy(c.fecha)} + ${monto.toLowerCase()}${nombre}${grupo}` : `${monto}${nombre}, abono del ${dmy(m.fecha)}`;
   };
   const conBanco = (f: FilaUnica, c: Cobro) => {
     const e = enlace.get(c.id); if (!e) return;
@@ -451,7 +481,13 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
         conCaja(f, pr.c, v.doc, r2(cs.reduce((a, x) => a + x.d.importe, 0)));
         f.punto1 = `Comprobante ${v.doc}`;
         if (pr.c.tipo === "nc") f.punto2 = "Cancelado con nota de crédito: no pasa por el banco";
-        else { conBanco(f, pr.c); f.punto2 = punto2De(pr.c); }
+        else {
+          conBanco(f, pr.c); f.punto2 = punto2De(pr.c);
+          const e = enlace.get(pr.c.id);
+          if (e && pr.c.tipo === "transferencia" && e.criterio !== "N° de operación" && puntosNombre(pr.c, e.movs[0]) === 0 && nombreCliente(pr.c).length) {
+            f.obs = "El nombre que trae el banco no es el del cliente: se concilió solo por fecha y monto (pudo pagar otra persona). Verificar.";
+          }
+        }
         if (!f.obs && fc.estado === "No conciliado") f.obs = pistaCobro.get(pr.c.id) ?? "";
         else if (fc.estado === "No conciliado" && pistaCobro.has(pr.c.id) && !f.obs.includes("Posible")) f.obs = `${f.obs}. ${pistaCobro.get(pr.c.id)}`;
       }
