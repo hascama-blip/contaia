@@ -160,6 +160,25 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   `fetch failed`/5xx/429, sale una VENTANA "SUNAT está demorando — Por demoras de carga de SUNAT, las
   descargas del SIRE se están demorando". Los cortes de conexión se reintentan solos (hasta 3 seguidos; SUNAT
   retoma el mismo ticket). Un rechazo de credenciales NO abre la ventana: muestra el error de SUNAT.
+- **Conciliación bancaria de 3 vías** (utilitario `conciliacion`, `/herramientas/conciliacion`; reemplazó al
+  módulo anterior de extracto PDF + libro banco): `src/lib/conciliacionCaja.ts`, `ConciliacionPanel.tsx`,
+  `/api/conciliacion`. Tres cargas en Excel (.xlsx, exceljs): **Contabilidad** (Registro de Ventas StarSoft:
+  Fecha · [T/D] · Documento · R.U.C. · Nombre · Total · Referencia), **Caja virtual** (tramas de cobranza: por
+  voucher SUBDIARIO+COMPROBANTE una línea de dinero en cuenta 10… —efectivo del día por sede, o una
+  transferencia con su N° de operación— y debajo los comprobantes que cancela en cuenta 12…; NC = Debe en 12…)
+  y **Bancos** (varios archivos u hojas, una por cuenta; columnas Cargo/Abono o Importe con signo). Cada hoja se
+  reconoce por sus encabezados (`tipoDeHoja`), así que un solo Excel con todas las pestañas también sirve.
+  Vínculo: comprobante ─(serie+número, `claveDoc`)→ cobro ─→ banco. Cobro→banco (`conciliarTresVias`):
+  (A) N° de operación · (B) efectivo = depósito de monto exacto en 0–7 días · (C) transferencia misma fecha y
+  monto, desempate por nombre del cliente en el concepto; varias iguales = "cuadran en conjunto" · (D) ±3 días ·
+  (D2) monto único con abono posterior · (E) efectivo en dos depósitos · (F) depósito tardío. Lo no vinculado =
+  **"No conciliado"** (pedido del dueño: no usar "por cobrar" ni reglas de plazo) con motivo; pistas: depósito
+  con diferencia (±3 % / S/ 50), "fin de mes" (cobro de los últimos 6 días: el depósito puede estar el mes
+  siguiente) e "inicio de mes" (abono de los primeros 6 días: ventas del mes anterior). `porFecha`: por día,
+  ventas (contabilidad) vs caja (efectivo + transferencias) y cuánto de esa caja llegó al banco y cuándo.
+  Excel: Resumen · Por fecha · No conciliado · Comprobantes · Caja vs Bancos · Bancos. Caso real de calibración:
+  RTV San Cristóbal oct-2026 (1,640 comprobantes → 1,493 conciliados). Limitación: el N° de operación de la
+  caja casi nunca está en el extracto del BBVA y el concepto viene cortado a 28 caracteres.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

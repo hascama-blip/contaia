@@ -1,79 +1,48 @@
 import { bloqueoModulo } from "@/lib/acceso";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { parseExtractoBcp, parseExtractoBancoExcel, parseLibroBanco, parseCajaVirtual, conciliar, excelConciliacion } from "@/lib/conciliacion";
+import { conciliarArchivos, excelConciliacionTresVias } from "@/lib/conciliacionCaja";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_SIZE = 20 * 1024 * 1024;
+const MAX_ARCHIVOS = 12;
 
-// Conciliación bancaria: POST multipart con
-//   - extracto (PDF del banco, obligatorio)
-//   - libro (Excel del libro banco contable, obligatorio)
-//   - caja (Excel de la caja virtual, opcional — enriquece con el comprobante)
-// Devuelve el resumen + el Excel conciliado en base64 (no persiste nada).
+// Conciliación bancaria de 3 vías. multipart/form-data:
+//   - contabilidad : Registro de Ventas (Excel)
+//   - caja         : caja virtual / tramas de cobranza (Excel)
+//   - bancos       : uno o varios extractos (Excel; una cuenta por hoja o por archivo)
+// Cada hoja se reconoce por su contenido, así que un solo Excel con todas las pestañas también
+// sirve (en cualquier casilla). Devuelve el resumen, las filas y el Excel en base64. No persiste.
 export async function POST(req: NextRequest) {
   const _bloqueo = await bloqueoModulo("conciliacion"); if (_bloqueo) return _bloqueo;
   await requireUser();
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });
 
-  const getFile = (k: string): File | null => {
-    const v = form.get(k);
-    return v instanceof File && v.size > 0 ? v : null;
-  };
-  const fExtracto = getFile("extracto");
-  const fLibro = getFile("libro");
-  const fCaja = getFile("caja");
-
-  if (!fExtracto) return NextResponse.json({ error: "Adjunta el extracto bancario (PDF o Excel)." }, { status: 400 });
-  if (!fLibro) return NextResponse.json({ error: "Adjunta el libro banco (Excel)." }, { status: 400 });
-  for (const f of [fExtracto, fLibro, fCaja]) {
-    if (f && f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 20 MB.` }, { status: 400 });
+  const files: File[] = [];
+  for (const k of ["contabilidad", "caja", "bancos"]) for (const v of form.getAll(k)) if (v instanceof File && v.size > 0) files.push(v);
+  if (!files.length) return NextResponse.json({ error: "Adjunta los Excel de contabilidad, caja virtual y bancos." }, { status: 400 });
+  if (files.length > MAX_ARCHIVOS) return NextResponse.json({ error: `Máximo ${MAX_ARCHIVOS} archivos por conciliación.` }, { status: 400 });
+  for (const f of files) {
+    if (f.size > MAX_SIZE) return NextResponse.json({ error: `"${f.name}" supera 20 MB.` }, { status: 400 });
+    if (!/\.xlsx$/i.test(f.name)) return NextResponse.json({ error: `"${f.name}" no es un Excel .xlsx. Si es .xls, ábrelo y guárdalo como .xlsx.` }, { status: 400 });
   }
-
   try {
-    const bufExtracto = Buffer.from(await fExtracto.arrayBuffer());
-    // El extracto puede venir en PDF (BCP) o en Excel (FORMATO BANCO STARSOFT o
-    // export genérico del banco). Elegimos el parser por la extensión/tipo.
-    const esExcel = /\.(xlsx|xls)$/i.test(fExtracto.name) ||
-      /spreadsheet|excel|ms-excel/i.test(fExtracto.type || "");
-    const { desde, hasta, movs } = esExcel
-      ? parseExtractoBancoExcel(bufExtracto)
-      : await parseExtractoBcp(bufExtracto);
-    if (!movs.length) {
-      return NextResponse.json(
-        {
-          error: esExcel
-            ? "No se pudieron leer movimientos del Excel. Debe tener una fila de cabecera con Fecha y columnas de importe (Abono/Cargo, Ingreso/Egreso o Monto), o ser el FORMATO BANCO STARSOFT."
-            : "No se pudieron leer movimientos del PDF. Debe ser un extracto con capa de texto (no escaneado). Por ahora está calibrado para el formato BCP.",
-        },
-        { status: 422 }
-      );
+    // Un mismo archivo subido en dos casillas se lee una sola vez.
+    const vistos = new Set<string>();
+    const archivos: { nombre: string; buf: Buffer }[] = [];
+    for (const f of files) {
+      const k = `${f.name}|${f.size}`;
+      if (vistos.has(k)) continue;
+      vistos.add(k);
+      archivos.push({ nombre: f.name, buf: Buffer.from(await f.arrayBuffer()) });
     }
-    const libro = await parseLibroBanco(Buffer.from(await fLibro.arrayBuffer()));
-    if (!libro.length) {
-      return NextResponse.json(
-        { error: "No se pudieron leer registros del libro banco. Debe tener columnas Fecha / Nro. Doc. / Glosa / Ingreso / Egreso." },
-        { status: 422 }
-      );
-    }
-    const caja = fCaja ? await parseCajaVirtual(Buffer.from(await fCaja.arrayBuffer())) : [];
-
-    const r = conciliar({ desde, hasta }, movs, libro, caja);
-    const excel = await excelConciliacion(r);
-
-    return NextResponse.json({
-      ok: true,
-      resumen: r.resumen,
-      periodo: r.periodo,
-      // Muestras para la vista previa (el detalle completo va en el Excel).
-      muestraBancoSinLibro: r.bancoSinLibro.slice(0, 15),
-      muestraLibroSinBanco: r.libroSinBanco.slice(0, 15),
-      excelBase64: excel.toString("base64"),
-    });
+    const r = await conciliarArchivos(archivos);
+    const excel = await excelConciliacionTresVias(r);
+    return NextResponse.json({ ...r, excelBase64: excel.toString("base64") });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "No se pudo conciliar." }, { status: 500 });
+    return NextResponse.json({ error: e?.message ?? "No se pudo conciliar." }, { status: 400 });
   }
 }

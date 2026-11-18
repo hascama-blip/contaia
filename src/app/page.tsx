@@ -104,8 +104,8 @@ const PRINCIPALES: Opcion[] = [
 // Utilitarios (solo supremo, o cuentas con el utilitario habilitado).
 const UTILITARIOS: Opcion[] = [
   { href: "/herramientas/conciliacion", icono: "⚖️", titulo: "Conciliación bancaria", cta: "Abrir",
-    detalle: "Cruza el extracto bancario (PDF), el libro banco y la caja virtual por N° de operación y entrega el Excel conciliado.",
-    contenido: ["Extracto bancario PDF + libro banco + caja virtual.", "Cruce por N° de operación.", "Excel con lo que falta contabilizar."] },
+    detalle: "Cruza la contabilidad (Registro de Ventas), la caja virtual y los bancos: vincula cada comprobante con su cobro y su depósito, y dice qué quedó no conciliado.",
+    contenido: ["Tres Excel: contabilidad, caja virtual y bancos (varias cuentas).", "Por comprobante y por fecha: vendido, cobrado y depositado.", "Excel con lo no conciliado y el detalle completo."] },
   { href: "/herramientas/ventas-caja", icono: "🧾", titulo: "Ventas vs Caja Virtual", cta: "Abrir",
     detalle: "Cruza el Libro de Ventas por mes (o ZIP) con la Caja Virtual por N° de comprobante y entrega el Excel con lo conciliado.",
     contenido: ["Libro de ventas mensual o ZIP.", "Cruce por N° de comprobante.", "Excel con lo que falta cobrar/registrar."] },

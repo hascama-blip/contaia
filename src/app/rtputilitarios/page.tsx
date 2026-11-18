@@ -35,7 +35,7 @@ const UTILES: Util[] = [
     href: "/herramientas/conciliacion",
     icono: "⚖️",
     titulo: "Conciliación bancaria",
-    detalle: "Cruza el extracto bancario (PDF), el libro banco y la caja virtual por N° de operación y entrega el Excel conciliado.",
+    detalle: "Cruza la contabilidad (Registro de Ventas), la caja virtual y los bancos: vincula cada comprobante con su cobro y su depósito, y dice qué quedó no conciliado.",
   },
 ];
 
