@@ -230,6 +230,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
 - **Token**: POST `https://api-seguridad.sunat.gob.pe/v1/clientessol/{clientId}/oauth2/token/`
   body `grant_type=password&scope=https://api-sire.sunat.gob.pe&client_id&client_secret&username={RUC}{usuarioSOL}&password={claveSOL}`.
 - **Base**: `https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros`.
+- **Rechazo de accesos**: SUNAT devuelve HTTP 400 `access_denied · "Error en la autenticacion del usuario."` falle lo
+  que falle (usuario, clave o API; comprobado con un client_id inventado), así que `obtenerToken` lo traduce a un
+  mensaje que lista los tres datos y cómo ubicar cuál (ITF/buzón con la misma clave: si entran, falla el API).
+  Antes de enviar limpia espacios de los cuatro datos y pasa el Usuario SOL a mayúsculas. Ojo: el SIRE usa
+  `credSire.solUser`; la vigilancia del buzón guarda SU propio usuario y clave (pueden no ser los mismos).
 - **codLibro**: **VENTAS (RVIE) = 140000**, **COMPRAS (RCE) = 080000** (confirmado empíricamente; ¡no es lo intuitivo!).
 - **Resumen (totales por periodo)** — devuelve el contenido DIRECTO (sin ticket):
   `GET .../rvierce/resumen/web/resumencomprobantes/{periodo}/{codTipoResumen=1}/{codTipoArchivo=0}/exporta?codLibro={codLibro}`

@@ -165,14 +165,18 @@ async function obtenerToken(
   clientSecret: string,
   diag: SireDiag
 ): Promise<string> {
+  // Se limpia lo que suele colarse al copiar y pegar: espacios al inicio o al final en los cuatro
+  // datos, y el Usuario SOL en minúsculas (SUNAT lo maneja siempre en mayúsculas).
+  const usuario = solUser.trim().toUpperCase();
+  clientId = clientId.trim();
   const url = `${cfg.tokenUrl}/${clientId}/oauth2/token/`;
   const body = new URLSearchParams({
     grant_type: "password",
     scope: cfg.scope,
     client_id: clientId,
-    client_secret: clientSecret,
-    username: `${ruc}${solUser}`,
-    password: solPass,
+    client_secret: clientSecret.trim(),
+    username: `${ruc}${usuario}`,
+    password: solPass.trim(),
   });
   const res = await fetch(url, {
     method: "POST",
@@ -189,6 +193,16 @@ async function obtenerToken(
       ok: false,
       respuesta: trunc(detalle),
     });
+    // SUNAT contesta EXACTAMENTE lo mismo ("access_denied · Error en la autenticacion del usuario")
+    // falle el dato que falle: usuario, clave o API (comprobado contra SUNAT con un client_id inventado).
+    if (res.status === 400 && /access_denied|autenticacion del usuario/i.test(detalle)) {
+      throw new Error(
+        `SUNAT rechazó los accesos (RUC ${ruc}, usuario ${usuario}). SUNAT responde lo mismo si falla cualquiera de estos datos: ` +
+        `el Usuario SOL, la Clave SOL o el API SIRE (client_id / client_secret, que debe ser el de este mismo RUC y seguir vigente en SUNAT). ` +
+        `Para ubicar cuál: consulta el ITF o el buzón de esta empresa con la misma clave. Si entran, el usuario y la clave están bien y lo que falla es el API SIRE; ` +
+        `si no entran, vuelve a escribir la Clave SOL en "Accesos del cliente" (botón Cambiar).`
+      );
+    }
     throw new Error(`autenticación SUNAT (HTTP ${res.status})${detalle}`);
   }
   const json = (await res.json()) as Record<string, any>;

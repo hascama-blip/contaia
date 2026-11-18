@@ -18,7 +18,8 @@ export function getSolPass(clienteId: string): string {
 }
 export function setSolPass(clienteId: string, pass: string) {
   if (typeof window === "undefined" || !clienteId) return;
-  try { if (pass) sessionStorage.setItem(k(clienteId), pass); } catch { /* */ }
+  // Sin espacios al inicio o al final (se cuelan al copiar y pegar y SUNAT rechaza la clave).
+  try { if (pass.trim()) sessionStorage.setItem(k(clienteId), pass.trim()); } catch { /* */ }
 }
 export function getSolUser(clienteId: string, fallback = ""): string {
   if (typeof window === "undefined" || !clienteId) return fallback;
