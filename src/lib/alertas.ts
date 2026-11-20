@@ -104,7 +104,7 @@ function htmlCorreo(a: Alerta): string {
   <div style="font-family:system-ui,Arial,sans-serif;max-width:520px;margin:auto;color:#1e293b">
     <h2 style="color:#102b4d;margin:0 0 8px">Radar Tributar IA</h2>
     <p style="font-size:16px;font-weight:700;margin:0 0 6px">${escapar(a.titulo)}</p>
-    <p style="font-size:14px;line-height:1.5;margin:0 0 14px">${escapar(a.texto)}</p>
+    <p style="font-size:14px;line-height:1.5;margin:0 0 14px">${escapar(a.texto).replace(/\n/g, "<br>")}</p>
     <a href="${url}" style="display:inline-block;background:#edb91e;color:#081a33;font-weight:700;padding:10px 16px;border-radius:10px;text-decoration:none">Ver en Radar</a>
     <p style="font-size:11px;color:#94a3b8;margin-top:18px">Recibes este aviso porque activaste las alertas en Radar. Puedes desactivarlas en la web (Alertas).</p>
   </div>`;

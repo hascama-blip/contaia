@@ -1,6 +1,7 @@
 import { consultarBuzon, descargarAdjuntoBuzon } from "./buzon";
 import { descifrar } from "./cifrado";
 import { enviarAlerta } from "./alertas";
+import { elegirAvisosBuzon, textoAvisoBuzon } from "./avisosBuzon";
 import { proximosVencimientos } from "./cronogramaSunat";
 import { planEfectivo, diasParaVencerPlan } from "./auth";
 import { planIncluye, PLAN_LABEL } from "./modulos";
@@ -10,17 +11,21 @@ import {
   getBuzonAdjunto, setBuzonAdjunto,
 } from "./db";
 
-/** Máximo de PDFs a descargar de SUNAT por empresa y noche (cada uno abre sesión). */
-const MAX_PDF_POR_EMPRESA = 5;
-
 // ============================================================
 //  Tarea NOCTURNA de alertas
 // ============================================================
 //  1) Buzón: por cada empresa con vigilancia activa (Clave SOL cifrada, opt-in),
-//     consulta el buzón de los últimos días y avisa de los mensajes NUEVOS al
-//     dueño del estudio (Telegram + correo). Clave vencida (30 días) o
-//     rechazada 3 veces → se desactiva, se borra la clave y se avisa.
-//  2) Cronograma: empresas que declaran en 3 días, 1 día u hoy (último dígito).
+//     consulta el buzón y avisa de lo NUEVO al dueño del estudio (Telegram +
+//     correo) en UN SOLO mensaje por empresa y noche: la notificación más
+//     reciente (con su PDF) y, si llegaron más, la lista de las otras.
+//     · Primera lectura tras activar: solo la ÚLTIMA notificación; las
+//       anteriores quedan como vistas y no se envían (antes salían todas:
+//       más de 300 mensajes en una noche).
+//     · Lo que tenga más de MAX_DIAS_AVISO_BUZON días nunca se avisa.
+//     Clave vencida (30 días) o rechazada 3 veces → se desactiva, se borra la
+//     clave y se avisa.
+//  2) Cronograma: SOLO las empresas marcadas en Alertas (`avisoVencimiento`) que
+//     declaran en 3 días, 1 día u hoy (último dígito).
 //  3) Plan: vence en 7, 3 o 1 día(s), o venció hoy.
 //  Cada alerta se registra para no repetirse (clave única por día/evento).
 
@@ -97,15 +102,16 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
         // El buzón es un historial: lo leído se AGREGA a lo guardado de la empresa.
         await mergeBuzon(c.id, res.mensajes).catch(() => null);
         const vistos = new Set(v.vistos ?? []);
-        const nuevos = res.mensajes.filter((m) => m.id && !vistos.has(m.id));
+        const sel = elegirAvisosBuzon(res.mensajes, v);
+        const { nuevos, avisar } = sel;
         r.mensajesNuevos += nuevos.length;
-        let pdfsBajados = 0;
-        for (const m of nuevos) {
-          // PDF adjunto: se descarga automáticamente (y queda guardado) para
+        let avisado = false;
+        if (avisar.length) {
+          const m = avisar[0];
+          // PDF adjunto de la más reciente: se descarga (y queda guardado) para
           // enviarlo junto con el aviso por Telegram y correo.
           let adjunto: { nombre: string; pdf: Buffer } | null = await getBuzonAdjunto(c.id, m.id).catch(() => null);
-          if (!adjunto && m.adjuntos !== 0 && pdfsBajados < MAX_PDF_POR_EMPRESA) {
-            pdfsBajados++;
+          if (!adjunto && m.adjuntos !== 0) {
             try {
               const d = await descargarAdjuntoBuzon({ ruc: c.ruc, solUser: v.solUser, solPass, codMensaje: m.id, asunto: m.asunto, fecha: m.fecha, origen: m.origen, adjuntos: m.adjuntos });
               if (d.ok && d.pdfBase64) {
@@ -116,20 +122,16 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
               }
             } catch (e) { r.errores.push(`${c.razonSocial} · PDF ${m.id}: ${e instanceof Error ? e.message : "error"}`); }
           }
-          const nivel = m.nivel === "peligroso" ? "⚠️ PELIGROSO · " : m.nivel === "urgente" ? "🔴 URGENTE · " : "";
-          const env = await enviarAlerta(dueno, {
-            tipo: "buzon",
-            titulo: `${nivel}${c.razonSocial} (RUC ${c.ruc}) recibió una notificación SUNAT`,
-            texto: `${m.fecha ? `El ${m.fecha}: ` : ""}${m.asunto}. Debe ser atendida.${adjunto ? "" : " (El PDF se podrá abrir desde la web.)"}`,
-            href: `/clientes/${c.id}`,
-          }, adjunto);
-          if (env.telegram || env.email) r.alertasBuzon++;
+          const { titulo, texto } = textoAvisoBuzon(c, sel, Boolean(adjunto));
+          const env = await enviarAlerta(dueno, { tipo: "buzon", titulo, texto, href: `/clientes/${c.id}` }, adjunto);
+          if (env.telegram || env.email) { r.alertasBuzon++; avisado = true; }
           if (env.errores.length) r.errores.push(`${c.razonSocial}: ${env.errores.join(" · ")}`);
-          vistos.add(m.id);
         }
+        // Todo lo leído queda como visto (también lo pasado que no se envió).
+        for (const m of nuevos) vistos.add(m.id);
         await patchVigilancia(c.id, {
           vistos: Array.from(vistos).slice(-500), erroresSeguidos: 0, ultimoError: undefined,
-          ultimoChequeo: new Date().toISOString(), ...(nuevos.length ? { ultimaAlerta: new Date().toISOString() } : {}),
+          base: true, ultimoChequeo: new Date().toISOString(), ...(avisado ? { ultimaAlerta: new Date().toISOString() } : {}),
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "error";
@@ -146,7 +148,8 @@ export async function ejecutarNocturna(opts: { forzar?: boolean } = {}): Promise
 
       if (admin.alertas?.cronograma !== false) {
         // Las empresas de simulación (demos) no generan alertas reales.
-        const clientes = (await listClientes(admin.id, { todos: true })).filter((c) => !c.demo);
+        // Solo las empresas que el estudio marcó en Alertas (por defecto, ninguna).
+        const clientes = (await listClientes(admin.id, { todos: true })).filter((c) => !c.demo && c.avisoVencimiento === true);
         const prox = proximosVencimientos(clientes.map((c) => ({ id: c.id, ruc: c.ruc, razonSocial: c.razonSocial })), 3, hoyLima());
         for (const p of prox) {
           if (!DIAS_AVISO_CRONO.includes(p.dias)) continue;

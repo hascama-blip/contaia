@@ -6,8 +6,11 @@ interface Estado {
   telegramDisponible: boolean; bot: string; telegramVinculado: boolean; telegramNombre: string;
   codigo: string | null; enlace: string | null; email: boolean; emailDisponible: boolean; correo: string; cronograma: boolean;
   pruebaDisponible: boolean; pruebaEnviadaAt: string | null;
+  empresas?: { id: string; ruc: string; razonSocial: string; aviso: boolean; vence: string | null; dias: number | null }[];
+  puedeElegirEmpresas?: boolean;
   mensaje?: string;
 }
+const fch = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
 
 // ---- Íconos de trazo (heredan el color del texto) ----
 const Ico = ({ d, className = "h-5 w-5" }: { d: string; className?: string }) => (
@@ -69,6 +72,43 @@ function Tarjeta({ icono, titulo, sub, derecha, children }: { icono: string; tit
   );
 }
 
+// Vencimientos: lista de empresas del estudio; se avisa SOLO de las marcadas.
+function EmpresasVencimiento({ e, busy, buscar, setBuscar, accion }: { e: Estado; busy: boolean; buscar: string; setBuscar: (s: string) => void; accion: (a: string, extra?: Record<string, unknown>) => void }) {
+  const todas = e.empresas ?? [];
+  const marcadas = todas.filter((x) => x.aviso).length;
+  const q = buscar.trim().toLowerCase();
+  const lista = q ? todas.filter((x) => x.razonSocial.toLowerCase().includes(q) || x.ruc.includes(q)) : todas;
+  const puede = e.puedeElegirEmpresas !== false;
+  if (!todas.length) return <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Aún no tienes empresas registradas.</p>;
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
+        <span className="text-xs font-semibold text-slate-700">{marcadas} de {todas.length} empresa{todas.length === 1 ? "" : "s"} con aviso</span>
+        {todas.length > 8 && <input className="input h-8 max-w-[14rem] py-1 text-xs" placeholder="Buscar empresa o RUC…" value={buscar} onChange={(ev) => setBuscar(ev.target.value)} />}
+        {puede && (
+          <span className="ml-auto flex gap-1">
+            <button className="rounded-md px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50" disabled={busy || marcadas === todas.length} onClick={() => accion("vencimientoTodas", { valor: true })}>Marcar todas</button>
+            <button className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-50" disabled={busy || !marcadas} onClick={() => accion("vencimientoTodas", { valor: false })}>Quitar todas</button>
+          </span>
+        )}
+      </div>
+      <ul className="max-h-72 divide-y divide-slate-100 overflow-auto">
+        {lista.map((x) => (
+          <li key={x.id}>
+            <label className={`flex items-center gap-3 px-3 py-2 text-sm ${puede ? "cursor-pointer hover:bg-slate-50" : ""}`}>
+              <input type="checkbox" className="h-4 w-4" checked={x.aviso} disabled={busy || !puede} onChange={(ev) => accion("vencimientoEmpresa", { clienteId: x.id, valor: ev.target.checked })} />
+              <span className="min-w-0 flex-1 truncate text-slate-800">{x.razonSocial} <span className="text-xs text-slate-400">· RUC {x.ruc}</span></span>
+              {x.vence && <span className="shrink-0 text-xs text-slate-500">vence {fch(x.vence)}{x.dias != null && x.dias >= 0 && x.dias <= 7 ? ` · ${x.dias === 0 ? "hoy" : `en ${x.dias} día${x.dias === 1 ? "" : "s"}`}` : ""}</span>}
+            </label>
+          </li>
+        ))}
+        {!lista.length && <li className="px-3 py-2 text-xs text-slate-500">Sin coincidencias.</li>}
+      </ul>
+      {!puede && <p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">Solo el administrador del estudio puede cambiar esta lista.</p>}
+    </div>
+  );
+}
+
 // Configuración de alertas: vincular Telegram (sin Meta), correo de respaldo,
 // qué se avisa (buzón, cronograma, plan) y envío de prueba.
 export default function AlertasConfig() {
@@ -76,6 +116,7 @@ export default function AlertasConfig() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ texto: string; ok: boolean } | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [buscar, setBuscar] = useState("");
 
   const cargar = useCallback(async () => {
     const r = await fetch("/api/alertas", { cache: "no-store" });
@@ -233,8 +274,9 @@ export default function AlertasConfig() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-slate-900">Notificaciones del buzón SUNAT</p>
               <p className="mt-0.5 text-sm text-slate-500">
-                Cada madrugada revisamos el buzón de las empresas con vigilancia activada y te avisamos de cada notificación nueva, con el PDF adjunto.
-                La vigilancia se activa en la ficha de cada empresa (planes Premium y Empresas).
+                Cada madrugada revisamos el buzón de las empresas con vigilancia activada y te enviamos <b>un solo aviso por empresa</b> con lo nuevo
+                (la notificación más reciente con su PDF y, si llegaron más, la lista). Al activar la vigilancia solo te llega la <b>última</b> notificación:
+                las anteriores no se envían. La vigilancia se activa en la ficha de cada empresa (planes Premium y Empresas).
               </p>
             </div>
           </li>
@@ -242,7 +284,11 @@ export default function AlertasConfig() {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><Ico d={I.calendario} className="h-[18px] w-[18px]" /></div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-slate-900">Vencimientos de la declaración mensual</p>
-              <p className="mt-0.5 text-sm text-slate-500">Tres días antes, un día antes y el mismo día, según el último dígito del RUC de cada empresa.</p>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Opcional y <b>por empresa</b>: solo te avisamos de las que marques aquí (tres días antes, un día antes y el mismo día, según el último dígito del RUC).
+                Ninguna viene marcada.
+              </p>
+              {e.cronograma && <EmpresasVencimiento e={e} busy={busy} buscar={buscar} setBuscar={setBuscar} accion={accion} />}
             </div>
             <Interruptor on={e.cronograma} disabled={busy} onChange={(v) => accion("cronograma", { valor: v })} label="Avisos del cronograma" />
           </li>

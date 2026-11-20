@@ -375,6 +375,14 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (servicio plus): `nocturna.ts`, `alertas.ts`, `email.ts`, `/api/alertas`, `/api/clientes/[id]/vigilancia`,
   `/api/consultas/buzon/seguimiento`, `/api/tareas/nocturna`, `VigilanciaBuzonPanel`, `AlertasConfig`. Los
   ajustes de seguridad o de otros módulos no deben cambiar su comportamiento.
+  **Cambios pedidos por el dueño (nov-2026)**: (1) Buzón vigilado = UN SOLO aviso por empresa y noche
+  (`src/lib/avisosBuzon.ts`, puro: `elegirAvisosBuzon` + `textoAvisoBuzon`): la notificación más reciente con su PDF
+  y, si llegaron más, la lista de las otras. Primera lectura tras activar (`VigilanciaBuzon.base` aún sin marcar y sin
+  vistos) = solo la ÚLTIMA; las anteriores quedan vistas sin enviarse (antes salían las 12 del buzón por empresa:
+  más de 300 mensajes en una noche). Lo de más de `BUZON_ALERTA_MAX_DIAS` (10) días nunca se avisa. (2) Vencimiento
+  de la declaración mensual = opcional y POR EMPRESA: solo las marcadas (`Cliente.avisoVencimiento`, ninguna por
+  defecto; `setAvisoVencimiento`), lista con casillas en Alertas (`/api/alertas`: `vencimientoEmpresa` /
+  `vencimientoTodas`, solo admin del estudio); el interruptor general `alertas.cronograma` sigue como pausa global.
 - **PDF**: usar `./pdfTexto` (adaptador de unpdf 1.x que conserva el formato de texto anterior).
 - **Next 15**: `params`, `searchParams`, `cookies()` y `headers()` son asíncronos (usar `await`).
 - **Contenedor** (Lightsail, `deploy/`): Dockerfile en dos etapas; la app corre como usuario

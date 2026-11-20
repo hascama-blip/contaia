@@ -280,6 +280,9 @@ export interface Cliente {
   /** Vigilancia automática del buzón (opt-in, Premium/Equipo): la Clave SOL se
    *  guarda CIFRADA, con vencimiento a 30 días y se borra al desactivar. */
   vigilancia?: VigilanciaBuzon | null;
+  /** Aviso del vencimiento de la declaración mensual por Telegram/correo: SOLO si se marca
+   *  esta empresa en Alertas (por defecto no se avisa). */
+  avisoVencimiento?: boolean;
 }
 
 /** Vigilancia nocturna del buzón de una empresa (consentimiento explícito). */
@@ -300,6 +303,8 @@ export interface VigilanciaBuzon {
   erroresSeguidos?: number;
   /** Última vez que se avisó algo de esta empresa. */
   ultimaAlerta?: string;
+  /** Ya se hizo la primera lectura del buzón: desde ahí solo se avisa lo que llegue después. */
+  base?: boolean;
 }
 
 /** Preferencias de alertas de un usuario (canal Telegram y correo). */

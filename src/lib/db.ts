@@ -673,6 +673,21 @@ export async function setVigilancia(clienteId: string, v: VigilanciaBuzon | null
   return c;
 });
 }
+/** Marca (o desmarca) el aviso de vencimiento de la declaración mensual en empresas del estudio. */
+export async function setAvisoVencimiento(ownerId: string, clienteIds: string[] | "todas", valor: boolean): Promise<number> {
+  return conBloqueoStore(async () => {
+  const store = await readStore();
+  const ids = clienteIds === "todas" ? null : new Set(clienteIds);
+  let n = 0;
+  for (const c of store.clientes) {
+    if (c.ownerId !== ownerId || c.demo || (ids && !ids.has(c.id))) continue;
+    if (valor) c.avisoVencimiento = true; else delete c.avisoVencimiento;
+    n++;
+  }
+  if (n) await writeStore(store);
+  return n;
+});
+}
 export async function patchVigilancia(clienteId: string, patch: Partial<VigilanciaBuzon>): Promise<void> {
   return conBloqueoStore(async () => {
   const store = await readStore();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, esSupremo } from "@/lib/auth";
-import { setAlertasUsuario, getUserById, conBloqueoStore } from "@/lib/db";
+import { requireUser, esSupremo, esAdmin, studioId } from "@/lib/auth";
+import { setAlertasUsuario, getUserById, conBloqueoStore, listClientes, setAvisoVencimiento } from "@/lib/db";
+import { proximosVencimientos } from "@/lib/cronogramaSunat";
 import { correoConfigurado } from "@/lib/email";
 import {
   telegramConfigurado, telegramBotUsername, enlaceVincular, nuevoCodigoTelegram,
@@ -8,6 +9,17 @@ import {
 } from "@/lib/alertas";
 
 export const runtime = "nodejs";
+
+const hoyLima = () => new Date(new Date().toLocaleString("en-US", { timeZone: "America/Lima" }));
+
+/** Empresas del estudio con su próximo vencimiento y si tienen el aviso marcado. */
+async function empresasVencimiento(u: NonNullable<Awaited<ReturnType<typeof getUserById>>>) {
+  const clientes = (await listClientes(studioId(u), { todos: true })).filter((c) => !c.demo);
+  const prox = new Map(proximosVencimientos(clientes.map((c) => ({ id: c.id, ruc: c.ruc, razonSocial: c.razonSocial })), 400, hoyLima()).map((p) => [p.clienteId, p]));
+  return clientes
+    .map((c) => ({ id: c.id, ruc: c.ruc, razonSocial: c.razonSocial, aviso: c.avisoVencimiento === true, vence: prox.get(c.id)?.fecha ?? null, dias: prox.get(c.id)?.dias ?? null }))
+    .sort((x, y) => x.razonSocial.localeCompare(y.razonSocial));
+}
 
 async function estado(userId: string) {
   const u = await getUserById(userId);
@@ -24,6 +36,9 @@ async function estado(userId: string) {
     emailDisponible: correoConfigurado(),
     correo: u?.email ?? "",
     cronograma: a.cronograma !== false,
+    // Vencimientos: solo de las empresas marcadas (ninguna por defecto). Lo edita el admin del estudio.
+    empresas: u ? await empresasVencimiento(u) : [],
+    puedeElegirEmpresas: esAdmin(u) || esSupremo(u),
     // Una sola alerta de prueba por cuenta (cada envío consume Telegram/correo).
     // El supremo puede probar sin límite.
     pruebaDisponible: esSupremo(u) || !a.pruebaEnviadaAt,
@@ -37,7 +52,7 @@ export async function GET() {
   return NextResponse.json(await estado(user.id));
 }
 
-// POST { accion } → codigo | verificar | desvincular | email | cronograma | prueba
+// POST { accion } → codigo | verificar | desvincular | email | cronograma | vencimientoEmpresa | vencimientoTodas | prueba
 export async function POST(req: NextRequest) {
   const user = await requireUser();
   const body = await req.json().catch(() => ({}));
@@ -59,6 +74,13 @@ export async function POST(req: NextRequest) {
   }
   if (accion === "email" || accion === "cronograma") {
     await setAlertasUsuario(user.id, { [accion]: body?.valor !== false } as any);
+    return NextResponse.json(await estado(user.id));
+  }
+  if (accion === "vencimientoEmpresa" || accion === "vencimientoTodas") {
+    if (!esAdmin(user) && !esSupremo(user)) return NextResponse.json({ error: "Solo el administrador del estudio elige de qué empresas se avisa el vencimiento." }, { status: 403 });
+    const ids = accion === "vencimientoTodas" ? "todas" : [String(body?.clienteId ?? "")];
+    const n = await setAvisoVencimiento(studioId(user), ids, body?.valor !== false);
+    if (!n) return NextResponse.json({ error: "Empresa no encontrada." }, { status: 404 });
     return NextResponse.json(await estado(user.id));
   }
   if (accion === "prueba") {
