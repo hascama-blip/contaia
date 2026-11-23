@@ -101,6 +101,18 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   crédito) al Debe y `BVB0010005087`/`FTF…` al Haber. Solo se toman las CC/NC/ND; el otro documento
   del MISMO asiento (Sec. vuelve a 00001 en cada asiento) se muestra como "aplicada a". Avisa si el
   subdiario es de otro periodo que la conciliación. También acepta formato Registro.
+  **Compras con REGISTRO DE COMPRAS** (2.ª sección del módulo: `<ConciliacionSireRtp libro="compras" />`, envía
+  `libro=compras`): `parseRegistroComprasHojas` (una pestaña por empresa; empresa en A1, RUC en la fila 2, título
+  "REGISTRO DE COMPRAS NOVIEMBRE DEL 2026" → `periodoTitulo`; columnas Fecha · Fecha Venc. · [tipo, sin título] ·
+  Comprob. "F401 6643" · RUC · Proveedor · Base Imponible ×3 · Adquisiciones no Gravadas · I.G.V. ×3 · Otros · Total;
+  la fila de totales no trae Comprob.). Llave = serie + número + RUC del proveedor; base = suma de las 3 bases,
+  IGV = suma de los 3. El Registro de Compras manda sobre el Libro Diario (que sigue valiendo si no hay registro).
+  **TODAS las pestañas salen como empresa, también las vacías** (pedido del dueño; igual en ventas con
+  `parseRegistroVentasHojas(buf, true)`): lo que no está en contabilidad puede estar en el SIRE. Casos: contabilidad
+  vacía + SIRE con datos = todo "Solo SIRE"; SIRE descargado SIN movimiento (caché con 0 filas, es válido:
+  `sireDesdeDetalle(..., libro)`) = "Sin movimiento" o todo "Solo contable"; sin caché o sin cliente = fila gris
+  "Falta descargar el SIRE" / "No está en Clientes" (`faltantes` con comprobantes y total contables; van también al
+  Excel resumen y al PDF). Periodo de una pestaña vacía = título de la hoja o el más frecuente de todo el archivo.
   **Análisis de cierre** (`analisisCierre` en `cronogramaSunat.ts`): vencimiento de la DJ mensual
   por último dígito del RUC (cronograma oficial `OFICIAL`, si falta = referencial), días hábiles y
   calendario que quedan desde hoy (Lima) o días de atraso, estado (periodo abierto / en plazo /

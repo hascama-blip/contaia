@@ -7,7 +7,14 @@
 //         empresa va en la fila 2). Se empareja por TIPO + SERIE + NÚMERO (las
 //         notas de crédito pueden usar la misma serie que las boletas/facturas) y
 //         se compara base, IGV, no gravadas, total y fecha.
-// COMPRAS: SIRE RCE  vs  Libro Diario (el mismo del análisis de egresos). Cada
+// COMPRAS: SIRE RCE  vs  REGISTRO DE COMPRAS del sistema contable (Excel con una pestaña por
+//         empresa; empresa en A1, RUC en la fila 2, título "REGISTRO DE COMPRAS NOVIEMBRE DEL
+//         2026"; columnas Fecha · Fecha Venc. · [tipo] · Comprob. "F401 6643" · RUC · Proveedor ·
+//         Base Imponible (3) · Adquisiciones no Gravadas · I.G.V. (3) · Otros Tributos · Total).
+//         Llave = serie + número + RUC del proveedor.
+//         TODAS las pestañas cuentan como empresa aunque estén vacías: lo que no está en
+//         contabilidad puede estar en el SIRE (y sale como "Solo SIRE").
+//         Alternativa anterior: SIRE RCE vs Libro Diario (el mismo del análisis de egresos). Cada
 //         comprobante contabilizado (movimientos con el mismo "Documento" que
 //         tienen cuenta por pagar 42/46) se empareja por serie + número + RUC
 //         del proveedor:
@@ -103,10 +110,26 @@ function fechaCel(v: unknown): string {
   return "";
 }
 
-export interface RegistroVentasHoja { hoja: string; empresa: string; ruc: string; comprobantes: CompNorm[] }
+export interface RegistroVentasHoja { hoja: string; empresa: string; ruc: string; comprobantes: CompNorm[]; /** AAAAMM del título de la hoja ("" si no se lee). */ periodoTitulo?: string }
 
-/** Lee el Registro de Ventas contable: una pestaña por empresa (empresa en A1, RUC en la fila 2). */
-export async function parseRegistroVentasHojas(buf: Buffer): Promise<RegistroVentasHoja[]> {
+const MESES_TITULO = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SETIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+/** Periodo (AAAAMM) del título del registro: "REGISTRO DE COMPRAS NOVIEMBRE  DEL 2026", "Registro de Ventas - Mes de Octubre 2026"… */
+function periodoDeTitulo(filas: unknown[][]): string {
+  for (const c of filas.flat()) {
+    const t = String(c ?? "").toUpperCase().replace(/SEPTIEMBRE/g, "SETIEMBRE");
+    if (!t.includes("REGISTRO")) continue;
+    const mes = MESES_TITULO.findIndex((m) => t.includes(m));
+    const anio = /\b(20\d{2})\b/.exec(t)?.[1];
+    if (mes >= 0 && anio) return `${anio}${String(mes + 1).padStart(2, "0")}`;
+  }
+  return "";
+}
+const empresaDe = (rows: unknown[][], hoja: string) => String(rows[0]?.find((c) => String(c ?? "").trim()) ?? hoja).trim();
+const rucDe = (filas: unknown[][]) => filas.flat().map((c) => String(c ?? "").replace(/\D/g, "")).find((x) => /^(10|15|16|17|20)\d{9}$/.test(x)) ?? "";
+
+/** Lee el Registro de Ventas contable: una pestaña por empresa (empresa en A1, RUC en la fila 2).
+ *  `vacias`: devuelve también las pestañas sin comprobantes (la empresa debe salir igual en la conciliación). */
+export async function parseRegistroVentasHojas(buf: Buffer, vacias = false): Promise<RegistroVentasHoja[]> {
   const out: RegistroVentasHoja[] = [];
   for (const { hoja, rows } of await hojasXlsx(buf)) {
     const ih = rows.slice(0, 20).findIndex((r) => { const h = r.map(normH); return h.includes("documento") && h.some((x) => x.startsWith("afecto")) && h.includes("total"); });
@@ -136,7 +159,46 @@ export async function parseRegistroVentasHojas(buf: Buffer): Promise<RegistroVen
         moneda: "PEN", tipoCambio: 0,
       });
     }
-    if (comprobantes.length) out.push({ hoja, empresa, ruc, comprobantes });
+    if (comprobantes.length || vacias) out.push({ hoja, empresa, ruc, comprobantes, periodoTitulo: periodoDeTitulo(rows.slice(0, ih)) });
+  }
+  return out;
+}
+
+// ---- Registro de Compras del sistema contable --------------------------------
+
+/** Lee el Registro de Compras contable: una pestaña por empresa. Devuelve TODAS las pestañas con
+ *  ese formato, también las vacías (empresa sin compras registradas). */
+export async function parseRegistroComprasHojas(buf: Buffer): Promise<RegistroVentasHoja[]> {
+  const out: RegistroVentasHoja[] = [];
+  for (const { hoja, rows } of await hojasXlsx(buf)) {
+    const ih = rows.slice(0, 20).findIndex((r) => { const h = r.map(normH); return h.some((x) => x.startsWith("comprob")) && h.includes("proveedor") && h.includes("total"); });
+    if (ih < 0) continue;
+    const h = rows[ih].map(normH);
+    const col = (pred: (x: string) => boolean) => h.findIndex(pred);
+    const cols = (pred: (x: string) => boolean) => h.map((x, i) => (pred(x) ? i : -1)).filter((i) => i >= 0);
+    const cFecha = col((x) => x === "fecha"), cDoc = col((x) => x.startsWith("comprob"));
+    // El tipo de comprobante va en la columna sin título que está justo antes de "Comprob.".
+    const cTipo = col((x) => x.includes("t/d") || x === "tipo") >= 0 ? col((x) => x.includes("t/d") || x === "tipo") : cDoc - 1;
+    const cRuc = col((x) => x === "ruc" || x.includes("r.u.c")), cNom = col((x) => x === "proveedor");
+    const cBases = cols((x) => x.startsWith("base imponible") || x.startsWith("base operaci"));
+    const cIgvs = cols((x) => x.startsWith("i.g.v") || x.startsWith("igv"));
+    const cTotal = col((x) => x === "total");
+    const comprobantes: CompNorm[] = [];
+    for (const r of rows.slice(ih + 1)) {
+      const doc = String(r[cDoc] ?? "").trim().toUpperCase();
+      if (!doc) continue; // vacías y la fila de totales
+      const partes = doc.split(/[\s-]+/).filter(Boolean);
+      const serie = sinCerosIzq(partes.length > 1 ? partes[0] : doc.slice(0, 4));
+      const numero = sinCerosIzq((partes.length > 1 ? partes.slice(1).join("") : doc.slice(4)).replace(/\D/g, ""));
+      const ruc = String(r[cRuc] ?? "").replace(/\D/g, "");
+      const base = r2(cBases.reduce((a, i) => a + numCel(r[i]), 0)), igv = r2(cIgvs.reduce((a, i) => a + numCel(r[i]), 0)), total = numCel(r[cTotal]);
+      comprobantes.push({
+        clave: `${serie}|${numero}|${ruc}`, tipoDoc: sinCerosIzq(String(r[cTipo] ?? "").replace(/\D/g, "")), serie, numero,
+        rucContraparte: ruc, razonSocial: String(r[cNom] ?? "").trim(), fecha: fechaCel(r[cFecha]),
+        baseGravada: base, igv, noGravado: r2(total - base - igv), total, moneda: "PEN", tipoCambio: 0,
+      });
+    }
+    out.push({ hoja, empresa: empresaDe(rows, hoja), ruc: rucDe(rows.slice(0, ih)), comprobantes, periodoTitulo: periodoDeTitulo(rows.slice(0, ih)) });
   }
   return out;
 }
@@ -219,8 +281,10 @@ export async function leerSire(buf: Buffer, nombreArchivo: string, nArchivo: num
   return { leidos, avisos };
 }
 
-/** SIRE ya descargado en el módulo Detalle SIRE (caché del cliente: columnas + filas). */
-export function sireDesdeDetalle(bloque: { columnas: string[]; filas: string[][] }, id: string, nombre: string): SireLeido | string {
+/** SIRE ya descargado en el módulo Detalle SIRE (caché del cliente: columnas + filas).
+ *  Un periodo SIN MOVIMIENTO también queda guardado (0 filas): es un SIRE válido con cero comprobantes. */
+export function sireDesdeDetalle(bloque: { columnas: string[]; filas: string[][] }, id: string, nombre: string, libro?: TipoLibro): SireLeido | string {
+  if (libro && !bloque.filas?.length) return { id, libro, nombre: `${nombre} · sin movimiento`, ruc: "", razonSocial: "", periodo: "", comprobantes: [] };
   return sireDesdeFilas([bloque.columnas, ...bloque.filas], id, nombre);
 }
 

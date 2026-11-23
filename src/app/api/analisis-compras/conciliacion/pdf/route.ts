@@ -18,13 +18,16 @@ export async function POST(req: NextRequest) {
   if (!empresas.length) return NextResponse.json({ error: "No hay conciliación para el informe." }, { status: 400 });
   const cierre = Array.isArray(body?.cierre) ? body.cierre.slice(0, 40) : [];
   const hoy = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.hoy)) ? String(body.hoy) : hoyLima();
+  const faltantes = Array.isArray(body?.faltantes)
+    ? body.faltantes.slice(0, 80).map((f: any) => ({ empresa: String(f?.empresa ?? "").slice(0, 120), ruc: String(f?.ruc ?? "").replace(/\D/g, "").slice(0, 11), libro: f?.libro === "compras" ? "compras" : "ventas", motivo: f?.motivo === "sin-cliente" ? "sin-cliente" : "sin-detalle", comprobantes: Number(f?.comprobantes) || 0, total: Number(f?.total) || 0 }))
+    : [];
 
   let browser: any;
   try {
     browser = await lanzarNavegador();
     const ctx = await contextoPdf(browser); // sin JS ni red
     const page = await ctx.newPage();
-    await page.setContent(informeConciliacionHtml(empresas, cierre, hoy), { waitUntil: "networkidle", timeout: 60000 });
+    await page.setContent(informeConciliacionHtml(empresas, cierre, hoy, faltantes), { waitUntil: "networkidle", timeout: 60000 });
     const pdf = await page.pdf({ format: "A4", landscape: true, printBackground: true, displayHeaderFooter: false, margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" } });
     await ctx.close();
     const per = String(empresas[0]?.periodo || "").replace(/\D/g, "");

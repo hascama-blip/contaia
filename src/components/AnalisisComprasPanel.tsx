@@ -464,6 +464,8 @@ export default function AnalisisComprasPanel() {
 
       {/* Conciliación SIRE vs contabilidad (independiente del análisis de egresos) */}
       <ConciliacionSireRtp />
+      {/* Compras: SIRE RCE (Detalle SIRE) vs Registro de Compras contable */}
+      <ConciliacionSireRtp libro="compras" />
     </section>
   );
 }

@@ -17,7 +17,10 @@ const ESTADO: Record<string, [string, string]> = {
 
 const n = (v: unknown) => Number(v) || 0; // contadores que llegan del navegador: siempre número
 
-export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre: FilaCierre[], hoy: string): string {
+/** Empresa de las pestañas que aún no se pudo conciliar (sin SIRE): sale igual en el resumen. */
+export interface FilaFaltante { empresa: string; ruc: string; libro: string; motivo: string; comprobantes: number; total: number }
+
+export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre: FilaCierre[], hoy: string, faltantes: FilaFaltante[] = []): string {
   const per = empresas[0]?.periodo || "";
   const nombrePer = /^\d{6}$/.test(per) ? `${MESES[Number(per.slice(4)) - 1]} ${per.slice(0, 4)}` : per;
   const libro = empresas.every((e) => e.libro === "compras") ? "Compras (RCE)" : empresas.some((e) => e.libro === "compras") ? "Ventas y compras" : "Ventas (RVIE)";
@@ -45,8 +48,11 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
       <td class="num">${n(c.ok)}</td><td class="num">${n(c.difMonto) || "—"}</td><td class="num">${n(c.difFecha) || "—"}</td>
       <td class="num">${n(c.soloSire) || "—"}</td><td class="num">${n(c.soloContable) || "—"}</td>
       <td class="num">${n(e.subdiario?.conciliados) || "—"}</td>
-      <td><span class="tag" style="background:${p ? "#b45309" : "#047857"}">${p ? `Revisar ${n(p)}` : "Cuadra"}</span></td></tr>`;
-  }).join("");
+      <td>${!p && !n(c.totalesSire.comprobantes) && !n(c.totalesContable.comprobantes) ? `<span class="tag" style="background:#64748b">Sin movimiento</span>` : `<span class="tag" style="background:${p ? "#b45309" : "#047857"}">${p ? `Revisar ${n(p)}` : "Cuadra"}</span>`}</td></tr>`;
+  }).join("") + faltantes.map((f) => `<tr style="color:#64748b"><td><strong>${esc(f.empresa)}</strong><div class="mut">RUC ${esc(f.ruc)}${empresas.some((x) => x.libro === "compras") ? ` · ${esc(f.libro)}` : ""}</div></td>
+      <td class="num">—</td><td class="num">${soles(n(f.total))}<div class="mut">${n(f.comprobantes)} comprob.</div></td><td class="num">—</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td><span class="tag" style="background:#64748b">${f.motivo === "sin-cliente" ? "No está en Clientes" : "Falta descargar el SIRE"}</span></td></tr>`).join("");
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"/><style>
   * { box-sizing: border-box; } body { font-family: "Segoe UI", Arial, sans-serif; color: #1e293b; font-size: 10.5px; margin: 0; }
@@ -63,7 +69,7 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
   </style></head><body>
   <div class="head">
     <h1>Conciliación SIRE vs contabilidad · ${esc(libro)}</h1>
-    <p>Periodo ${esc(nombrePer)} · ${empresas.length} empresa(s) · Informe al ${esc(fechaLarga(hoy))}</p>
+    <p>Periodo ${esc(nombrePer)} · ${empresas.length + faltantes.length} empresa(s)${faltantes.length ? ` (${faltantes.length} sin SIRE)` : ""} · Informe al ${esc(fechaLarga(hoy))}</p>
   </div>
   <div class="kpis">
     <div class="kpi"><div class="l">Total SIRE</div><div class="v">${soles(tS)}</div></div>
@@ -78,7 +84,7 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
   <h2>Resumen por empresa</h2>
   <table><thead><tr><th>Empresa</th><th class="num">SIRE</th><th class="num">Contabilidad</th><th class="num">Diferencia</th><th class="num">OK</th><th class="num">Montos</th><th class="num">Fecha</th><th class="num">Solo SIRE</th><th class="num">Solo cont.</th><th class="num">Subdiario</th><th>Estado</th></tr></thead>
   <tbody>${filasEmp}</tbody></table>
-  <p class="nota">Conciliación factura por factura (tipo + serie + número) y por monto (base, IGV, total) y fecha, con tolerancia de S/ 1. "Subdiario" = comprobantes encontrados en el subdiario de misceláneos. El detalle comprobante por comprobante está en el Excel de conciliación.</p>
+  <p class="nota">Salen todas las empresas del registro contable, también las que no tienen movimiento. Conciliación factura por factura (${empresas.every((e) => e.libro === "compras") ? "serie + número + RUC del proveedor" : "tipo + serie + número"}) y por monto (base, IGV, total) y fecha, con tolerancia de S/ 1. "Subdiario" = comprobantes encontrados en el subdiario de misceláneos. El detalle comprobante por comprobante está en el Excel de conciliación.</p>
   <div class="foot">Documento generado automáticamente para uso de gerencia. Cifras en soles (S/).</div>
   </body></html>`;
 }

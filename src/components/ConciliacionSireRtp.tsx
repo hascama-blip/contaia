@@ -4,7 +4,10 @@ import { useState } from "react";
 
 // Conciliación SIRE vs contabilidad, POR EMPRESA (análisis RTP).
 //  · Ventas: SIRE RVIE vs Registro de Ventas contable (una pestaña por empresa).
-//  · Compras: SIRE RCE vs Libro Diario (si se sube el Diario como archivo contable).
+//  · Compras (prop libro="compras"): SIRE RCE vs Registro de Compras contable (una pestaña por
+//    empresa); también acepta el Libro Diario.
+//  Todas las pestañas del registro salen como empresa, aunque estén vacías: lo que no está en
+//  contabilidad puede estar en el SIRE.
 // El SIRE NO se sube: se toma de lo ya descargado en el módulo Detalle SIRE de
 // cada empresa (el cliente con el mismo RUC). Subir el SIRE a mano queda como
 // alternativa. Se empareja por comprobante (tipo + serie + número) y monto.
@@ -100,7 +103,9 @@ function AnalisisCierre({ cierre, hoy }: { cierre: any[]; hoy: string }) {
 
 const pendientes = (x: any) => x.cruce.difMonto + x.cruce.difFecha + x.cruce.soloSire + x.cruce.soloContable + (x.docDistinto ?? 0);
 
-export default function ConciliacionSireRtp() {
+export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ventas" | "compras" }) {
+  const esCompras = libro === "compras";
+  const REG = esCompras ? "Registro de Compras" : "Registro de Ventas";
   const [contables, setContables] = useState<File[]>([]);
   const [sires, setSires] = useState<File[]>([]);
   // Subdiario aparte (misceláneos) donde contabilidad registró NC fuera del Registro de Ventas.
@@ -123,6 +128,7 @@ export default function ConciliacionSireRtp() {
       archivos.forEach((f) => fd.append("sire", f));
       subs.forEach((f) => fd.append("subdiario", f));
       fd.append("asignaciones", JSON.stringify(asig));
+      if (esCompras) fd.append("libro", "compras");
       if (/^\d{6}$/.test(per)) fd.append("periodo", per);
       const r = await fetch("/api/analisis-compras/conciliacion", { method: "POST", body: fd });
       const d = await r.json().catch(() => ({}));
@@ -142,7 +148,7 @@ export default function ConciliacionSireRtp() {
     try {
       const r = await fetch(`/api/analisis-compras/conciliacion/${tipo}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tipo === "pdf" ? { empresas: res.empresas, cierre: res.cierre, hoy: res.hoy } : { empresas: res.empresas }),
+        body: JSON.stringify(tipo === "pdf" ? { empresas: res.empresas, cierre: res.cierre, hoy: res.hoy, faltantes: res.faltantes } : { empresas: res.empresas, faltantes: res.faltantes }),
       });
       if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.error ?? "No se pudo generar el Excel."); return; }
       const blob = await r.blob();
@@ -160,7 +166,8 @@ export default function ConciliacionSireRtp() {
   const unir = (prev: File[], lista: FileList) => [...prev, ...Array.from(lista).filter((f) => !prev.some((s) => s.name === f.name && s.size === f.size))];
   const agregarContable = (lista: FileList) => { const n = unir(contables, lista); setContables(n); conciliar(n, sires, asignaciones); };
   const agregarSire = (lista: FileList) => { const n = unir(sires, lista); setSires(n); conciliar(contables, n, asignaciones); };
-  const hayCompras = (res?.empresas ?? []).some((x: any) => x.libro === "compras");
+  // En el panel de compras todo es compras: la columna "Libro" sobra.
+  const hayCompras = !esCompras && [...(res?.empresas ?? []), ...(res?.faltantes ?? [])].some((x: any) => x.libro === "compras");
   const asignar = (id: string, clave: string) => setAsignaciones((a) => ({ ...a, [id]: clave }));
 
   const e = res?.empresas?.[sel];
@@ -172,18 +179,19 @@ export default function ConciliacionSireRtp() {
     <div className="card space-y-4 p-5">
       <div className="flex flex-wrap items-start gap-3">
         <div className="mr-auto min-w-[16rem] flex-1">
-          <h2 className="font-semibold text-slate-800">Conciliación SIRE vs contabilidad (ventas)</h2>
+          <h2 className="font-semibold text-slate-800">Conciliación SIRE vs contabilidad ({libro})</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Sube el <strong>Registro de Ventas</strong> del sistema contable (un Excel con una pestaña por empresa). El SIRE de
-            ventas se toma <strong>solo</strong> de lo que ya descargaste en <a href="/herramientas/detalle-sire" target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">Detalle SIRE</a>{" "}
+            Sube el <strong>{REG}</strong> del sistema contable (un Excel con una pestaña por empresa). El SIRE de
+            {" "}{libro} se toma <strong>solo</strong> de lo que ya descargaste en <a href="/herramientas/detalle-sire" target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">Detalle SIRE</a>{" "}
             para cada empresa (la registrada en Clientes con el mismo RUC) y el mismo periodo. Se concilia
-            <strong> factura por factura</strong> (tipo + serie + número) y por <strong>monto</strong> (base, IGV, total) y fecha.
-            Con el Libro Diario, concilia compras contra el Detalle SIRE de compras.
+            <strong> factura por factura</strong> ({esCompras ? "serie + número + RUC del proveedor" : "tipo + serie + número"}) y por <strong>monto</strong> (base, IGV, total) y fecha.
+            {" "}<strong>Todas las empresas de las pestañas salen en el análisis</strong>, aunque no tengan nada registrado: lo que no está en contabilidad puede estar en el SIRE.
+            {esCompras ? " También acepta el Libro Diario." : " Con el Libro Diario, concilia compras contra el Detalle SIRE de compras."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className={`cursor-pointer text-sm ${contables.length ? "btn-ghost" : "btn-primary"} ${busy ? "pointer-events-none opacity-50" : ""}`}>
-            {busy === "conciliar" ? "Conciliando…" : contables.length ? "✓ Registro de Ventas · cambiar" : "⬆ Subir Registro de Ventas (contable)"}
+            {busy === "conciliar" ? "Conciliando…" : contables.length ? `✓ ${REG} · cambiar` : `⬆ Subir ${REG} (contable)`}
             <input type="file" multiple accept=".xlsx" className="hidden"
               onChange={(ev) => { const f = ev.target.files; if (f && f.length) { const n = Array.from(f); setContables(n); setPeriodo(""); conciliar(n, sires, asignaciones, ""); } ev.currentTarget.value = ""; }} />
           </label>
@@ -293,7 +301,7 @@ export default function ConciliacionSireRtp() {
         </p>
       )}
 
-      {res?.empresas?.length > 0 && (
+      {(res?.empresas?.length > 0 || res?.faltantes?.length > 0) && (
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-[11px]">
             <thead>
@@ -328,11 +336,24 @@ export default function ConciliacionSireRtp() {
                     <td className={`px-2 py-1.5 text-right tabular-nums ${c.soloSire ? "font-semibold text-orange-700" : "text-slate-400"}`}>{c.soloSire}</td>
                     <td className={`px-2 py-1.5 text-right tabular-nums ${c.soloContable ? "font-semibold text-orange-700" : "text-slate-400"}`}>{c.soloContable}</td>
                     <td className="px-2 py-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${p ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>{p ? `Revisar ${p}` : "Cuadra"}</span>
+                      {!p && !c.totalesSire.comprobantes && !c.totalesContable.comprobantes
+                        ? <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500" title="Sin comprobantes en contabilidad ni en el SIRE descargado">Sin movimiento</span>
+                        : <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${p ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>{p ? `Revisar ${p}` : "Cuadra"}</span>}
                     </td>
                   </tr>
                 );
               })}
+              {/* Empresas de las pestañas que aún no se pudieron conciliar: salen igual, con lo de contabilidad. */}
+              {(res.faltantes ?? []).map((f: any, i: number) => (
+                <tr key={`f${i}`} className="border-t border-slate-100 bg-slate-50/60 text-slate-500">
+                  <td className="min-w-[9rem] whitespace-normal px-2 py-1.5 font-semibold text-slate-600">{f.empresa}</td>
+                  {hayCompras && <td className="px-2 py-1.5 capitalize">{f.libro}</td>}
+                  <td className="px-2 py-1.5 text-right">—</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{soles(f.total)}<div className="text-[10px] text-slate-400">{f.comprobantes} comprob.</div></td>
+                  <td className="px-2 py-1.5 text-right">—</td><td /><td /><td /><td /><td />
+                  <td className="px-2 py-1.5"><span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">{f.motivo === "sin-detalle" ? "Falta descargar el SIRE" : "No está en Clientes"}</span></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -377,7 +398,9 @@ export default function ConciliacionSireRtp() {
             </button>
           </div>
           {filas.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-emerald-700">✓ Todos los comprobantes coinciden: misma factura y mismo monto en el SIRE y en la contabilidad.</p>
+            !e.cruce.filas.length
+              ? <p className="px-3 py-3 text-sm text-slate-500">Sin movimiento: no hay comprobantes de {e.libro} en contabilidad ni en el SIRE descargado de este periodo.</p>
+              : <p className="px-3 py-3 text-sm text-emerald-700">✓ Todos los comprobantes coinciden: misma factura y mismo monto en el SIRE y en la contabilidad.</p>
           ) : (
             <div className="max-h-[32rem] overflow-auto">
               <table className="w-full text-xs">

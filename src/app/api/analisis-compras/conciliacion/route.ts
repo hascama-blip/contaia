@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, studioId } from "@/lib/auth";
 import { listClientes } from "@/lib/db";
 import { parseLibroDiarioHojas, claveEmpresa, type MovDiario } from "@/lib/analisisCompras";
-import { leerSire, conciliar, parseRegistroVentasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
+import { leerSire, conciliar, parseRegistroVentasHojas, parseRegistroComprasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
 import type { CompNorm, TipoLibro } from "@/lib/cruceSire";
 import { analisisCierre, cierreAplica, type CierrePeriodo } from "@/lib/cronogramaSunat";
 import { hoyLima } from "@/lib/fechas";
@@ -15,8 +15,11 @@ const MAX_ARCHIVO = 15 * 1024 * 1024;
 const MAX_ARCHIVOS = 40;
 
 // POST multipart:
-//   contable      = Registro de Ventas del sistema contable (una pestaña por empresa) y/o
-//                   Libro Diario (compras/egresos). Se detecta solo.
+//   contable      = Registro de Ventas y/o Registro de Compras del sistema contable (una pestaña
+//                   por empresa) y/o Libro Diario (compras/egresos). Se detecta solo.
+//                   TODA pestaña del registro es una empresa de la conciliación, aunque esté
+//                   vacía: lo que no está en contabilidad puede estar en el SIRE.
+//   libro         = (opcional) "ventas" | "compras": conciliar solo ese libro.
 //   periodo       = AAAAMM (opcional; por defecto el mes más frecuente del archivo contable)
 //   sire          = (OPCIONAL) archivos SIRE subidos a mano. Por defecto el SIRE se toma
 //                   de lo YA DESCARGADO en el módulo Detalle SIRE de cada empresa (el
@@ -36,7 +39,8 @@ export async function POST(req: NextRequest) {
   const contables = archivos("contable");
   const sires = archivos("sire");
   const subdiarios = archivos("subdiario");
-  if (!contables.length) return NextResponse.json({ error: "Sube el Registro de Ventas del sistema contable (una pestaña por empresa)." }, { status: 400 });
+  const soloLibro = form.get("libro") === "compras" ? "compras" : form.get("libro") === "ventas" ? "ventas" : "";
+  if (!contables.length) return NextResponse.json({ error: `Sube el Registro de ${soloLibro === "compras" ? "Compras" : "Ventas"} del sistema contable (una pestaña por empresa).` }, { status: 400 });
   if (contables.length + sires.length + subdiarios.length > MAX_ARCHIVOS) return NextResponse.json({ error: `Máximo ${MAX_ARCHIVOS} archivos por vez.` }, { status: 400 });
   const grande = [...contables, ...sires, ...subdiarios].find((f) => f.size > MAX_ARCHIVO);
   if (grande) return NextResponse.json({ error: `"${grande.name}" supera 15 MB.` }, { status: 400 });
@@ -45,22 +49,34 @@ export async function POST(req: NextRequest) {
 
   try {
     // Empresas de la contabilidad (Registro de Ventas y/o Libro Diario).
-    type Emp = { empresa: string; ruc: string; ventas: CompNorm[]; diario: MovDiario[] };
+    // hojaVentas / hojaCompras: la empresa tiene pestaña en ese registro (aunque sin comprobantes).
+    type Emp = { empresa: string; ruc: string; ventas: CompNorm[]; compras: CompNorm[]; diario: MovDiario[]; hojaVentas: boolean; hojaCompras: boolean; titulo: { ventas: string; compras: string } };
     const empresas = new Map<string, Emp>();
     const emp = (nombre: string, hoja: string): Emp => {
       const k = claveEmpresa(nombre) || hoja;
-      return empresas.get(k) ?? empresas.set(k, { empresa: nombre, ruc: "", ventas: [], diario: [] }).get(k)!;
+      return empresas.get(k) ?? empresas.set(k, { empresa: nombre, ruc: "", ventas: [], compras: [], diario: [], hojaVentas: false, hojaCompras: false, titulo: { ventas: "", compras: "" } }).get(k)!;
     };
     for (const f of contables) {
       const buf = Buffer.from(await f.arrayBuffer());
-      for (const h of await parseRegistroVentasHojas(buf)) {
+      for (const h of await parseRegistroVentasHojas(buf, true)) {
         const e = emp(h.empresa, h.hoja);
-        e.ventas.push(...h.comprobantes);
+        e.ventas.push(...h.comprobantes); e.hojaVentas = true;
         if (!e.ruc) e.ruc = h.ruc;
+        if (!e.titulo.ventas) e.titulo.ventas = h.periodoTitulo ?? "";
+      }
+      for (const h of await parseRegistroComprasHojas(buf)) {
+        const e = emp(h.empresa, h.hoja);
+        e.compras.push(...h.comprobantes); e.hojaCompras = true;
+        if (!e.ruc) e.ruc = h.ruc;
+        if (!e.titulo.compras) e.titulo.compras = h.periodoTitulo ?? "";
       }
       for (const h of await parseLibroDiarioHojas(buf)) emp(h.empresa, h.hoja).diario.push(...h.movimientos);
     }
-    if (!empresas.size) return NextResponse.json({ error: "No se reconoció el archivo contable (Registro de Ventas con columnas Documento, Afecto, IGV, Total… o Libro Diario)." }, { status: 422 });
+    if (!empresas.size) return NextResponse.json({ error: "No se reconoció el archivo contable (Registro de Ventas con columnas Documento, Afecto, IGV, Total…; Registro de Compras con Comprob., Proveedor, Total…; o Libro Diario)." }, { status: 422 });
+    // Fechas contables de una empresa en un libro, y periodo de todo el archivo (para las pestañas vacías).
+    const fechasDe = (e: Emp, libro: TipoLibro) => libro === "ventas" ? e.ventas.map((c) => c.fecha) : e.hojaCompras ? e.compras.map((c) => c.fecha) : e.diario.map((m) => m.fecReg || m.fecDoc);
+    const todas = [...empresas.values()];
+    const periodoGlobal = (libro: TipoLibro) => periodoMasFrecuente(todas.flatMap((e) => fechasDe(e, libro))) || todas.map((e) => e.titulo[libro]).find(Boolean) || "";
 
     // Clientes del estudio (para tomar el SIRE ya descargado en Detalle SIRE).
     const clientes = await listClientes(studioId(user));
@@ -86,35 +102,38 @@ export async function POST(req: NextRequest) {
     const resultados: ConciliacionEmpresa[] = [];
     const sinSire: string[] = [];
     // Empresas sin SIRE: no están en Clientes o aún no se descargó su Detalle SIRE del periodo.
-    const faltantes: { empresa: string; ruc: string; libro: TipoLibro; periodo: string; motivo: "sin-cliente" | "sin-detalle"; clienteId?: string }[] = [];
+    const faltantes: { empresa: string; ruc: string; libro: TipoLibro; periodo: string; motivo: "sin-cliente" | "sin-detalle"; clienteId?: string; comprobantes: number; total: number }[] = [];
     let periodoUsado = periodoPedido;
     for (const [k, e] of empresas.entries()) {
-      for (const libro of ["ventas", "compras"] as TipoLibro[]) {
-        const tieneContable = libro === "ventas" ? e.ventas.length > 0 : e.diario.length > 0;
+      for (const libro of (["ventas", "compras"] as TipoLibro[]).filter((l) => !soloLibro || l === soloLibro)) {
+        // Compras: manda el Registro de Compras; si no hay, el Libro Diario.
+        const diarioCompras = libro === "compras" && !e.hojaCompras ? diarioAComprobantes(e.diario) : null;
+        const contable: CompNorm[] = libro === "ventas" ? e.ventas : diarioCompras ? diarioCompras.comprobantes : e.compras;
+        const tieneContable = libro === "ventas" ? e.hojaVentas : e.hojaCompras || e.diario.length > 0;
         let ss = asignados.get(`${k}|${libro}`);
         if (!tieneContable) {
-          if (ss) avisos.push(`${e.empresa}: hay SIRE de ${libro} pero no su ${libro === "ventas" ? "Registro de Ventas" : "Libro Diario"} contable.`);
+          if (ss) avisos.push(`${e.empresa}: hay SIRE de ${libro} pero no su ${libro === "ventas" ? "Registro de Ventas" : "Registro de Compras"} contable.`);
           continue;
         }
-        const periodo = periodoPedido || periodoMasFrecuente(libro === "ventas" ? e.ventas.map((c) => c.fecha) : e.diario.map((m) => m.fecReg || m.fecDoc));
+        const periodo = periodoPedido || periodoMasFrecuente(fechasDe(e, libro)) || e.titulo[libro] || periodoGlobal(libro);
+        const totalContable = Math.round(contable.reduce((a, c) => a + c.total, 0) * 100) / 100;
         if (!periodoUsado) periodoUsado = periodo;
         if (!ss) {
           // SIRE desde el módulo Detalle SIRE (sin subir archivos).
           const cli = (e.ruc && clientes.find((c) => c.ruc === e.ruc)) || clientes.find((c) => claveEmpresa(c.razonSocial) === k);
           if (!e.ruc && cli) e.ruc = cli.ruc;
           const cache = cli?.sireDetalle?.[`${libro}-${periodo}`];
-          if (!cli) { faltantes.push({ empresa: e.empresa, ruc: e.ruc, libro, periodo, motivo: "sin-cliente" }); sinSire.push(e.empresa); continue; }
-          if (!cache || !cache.filas?.length) { faltantes.push({ empresa: e.empresa, ruc: e.ruc, libro, periodo, motivo: "sin-detalle", clienteId: cli.id }); sinSire.push(e.empresa); continue; }
-          const r = sireDesdeDetalle(cache, `detalle:${cli.id}:${libro}`, `Detalle SIRE ${libro} ${periodo} (descargado ${cache.at?.slice(0, 10) ?? ""})`);
+          if (!cli) { faltantes.push({ empresa: e.empresa, ruc: e.ruc, libro, periodo, motivo: "sin-cliente", comprobantes: contable.length, total: totalContable }); sinSire.push(e.empresa); continue; }
+          // Un periodo SIN MOVIMIENTO descargado (0 filas) también es un SIRE válido; lo que falta es el que nunca se descargó.
+          if (!cache || !Array.isArray(cache.filas)) { faltantes.push({ empresa: e.empresa, ruc: e.ruc, libro, periodo, motivo: "sin-detalle", clienteId: cli.id, comprobantes: contable.length, total: totalContable }); sinSire.push(e.empresa); continue; }
+          const r = sireDesdeDetalle(cache, `detalle:${cli.id}:${libro}`, `Detalle SIRE ${libro} ${periodo} (descargado ${cache.at?.slice(0, 10) ?? ""})`, libro);
           if (typeof r === "string") { avisos.push(`${e.empresa}: ${r}`); continue; }
           if (r.libro !== libro) { avisos.push(`${e.empresa}: el Detalle SIRE guardado no es de ${libro}.`); continue; }
           ss = [r];
         }
         if (libro === "ventas") resultados.push(conciliar("ventas", e.empresa, k, e.ventas, ss));
-        else {
-          const d = diarioAComprobantes(e.diario);
-          resultados.push(conciliar("compras", e.empresa, k, d.comprobantes, ss, d.documento, d.excluidos));
-        }
+        else if (diarioCompras) resultados.push(conciliar("compras", e.empresa, k, diarioCompras.comprobantes, ss, diarioCompras.documento, diarioCompras.excluidos));
+        else resultados.push(conciliar("compras", e.empresa, k, e.compras, ss));
         const ult = resultados[resultados.length - 1];
         if (!ult.ruc) ult.ruc = e.ruc;
         if (!ult.periodo) ult.periodo = periodo;
@@ -158,7 +177,8 @@ export async function POST(req: NextRequest) {
     let cierreNoAplica = "";
     for (const [k, e] of empresas.entries()) {
       const rs = resultados.filter((r) => r.clave === k);
-      const per = rs[0]?.periodo || periodoPedido || periodoMasFrecuente(e.ventas.length ? e.ventas.map((c) => c.fecha) : e.diario.map((m) => m.fecReg || m.fecDoc));
+      const libroRef: TipoLibro = soloLibro || (e.hojaVentas ? "ventas" : "compras");
+      const per = rs[0]?.periodo || periodoPedido || periodoMasFrecuente(fechasDe(e, libroRef)) || e.titulo[libroRef] || periodoGlobal(libroRef);
       const ruc = e.ruc || rs[0]?.ruc || "";
       if (!cierreAplica(per, hoy)) { cierreNoAplica = per; continue; }
       const c = analisisCierre(ruc, per, hoy);

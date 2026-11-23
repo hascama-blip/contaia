@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
   const empresas: ConciliacionEmpresa[] = Array.isArray(body?.empresas)
     ? body.empresas.filter((e: any) => e?.cruce && Array.isArray(e.cruce.filas)).slice(0, 40)
     : [];
+  // Empresas de las pestañas sin SIRE todavía: van al resumen para que no falte ninguna.
+  const faltantes: { empresa: string; ruc: string; libro: string; periodo: string; motivo: string; comprobantes: number; total: number }[] = Array.isArray(body?.faltantes)
+    ? body.faltantes.slice(0, 80).map((f: any) => ({ empresa: String(f?.empresa ?? "").slice(0, 120), ruc: String(f?.ruc ?? "").replace(/\D/g, "").slice(0, 11), libro: f?.libro === "compras" ? "compras" : "ventas", periodo: String(f?.periodo ?? "").replace(/\D/g, "").slice(0, 6), motivo: f?.motivo === "sin-cliente" ? "sin-cliente" : "sin-detalle", comprobantes: Number(f?.comprobantes) || 0, total: Number(f?.total) || 0 }))
+    : [];
   if (!empresas.length) return NextResponse.json({ error: "No hay conciliaciones que exportar." }, { status: 400 });
 
   const archivos: Record<string, Uint8Array> = {};
@@ -53,6 +57,7 @@ export async function POST(req: NextRequest) {
     { header: "Días hábiles para regularizar", key: "habiles", width: 15 },
     { header: "Estado de cierre", key: "estadoCierre", width: 16 },
     { header: "RxH excluidos", key: "rh", width: 12 },
+    { header: "Situación", key: "situacion", width: 34 },
   ];
   ws.getRow(1).eachCell((c) => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } }; });
   for (const e of empresas) {
@@ -68,8 +73,18 @@ export async function POST(req: NextRequest) {
       habiles: e.cierre ? (e.cierre.diasCalendario < 0 ? `${-e.cierre.diasCalendario} día(s) de atraso` : e.cierre.diasHabiles) : "",
       estadoCierre: ({ vencido: "VENCIDO", "vence-hoy": "Vence hoy", urgente: "Urgente", "en-plazo": "En plazo" } as Record<string, string>)[e.cierre?.estado ?? ""] ?? "",
       rh: e.excluidos?.honorarios ?? 0,
+      situacion: !c.totalesSire.comprobantes && !c.totalesContable.comprobantes ? "Sin movimiento (ni en contabilidad ni en SIRE)" : !c.totalesContable.comprobantes ? "Nada en contabilidad: todo está solo en SIRE" : !c.totalesSire.comprobantes ? "SIRE sin movimiento: todo está solo en contabilidad" : "Conciliada",
     });
     for (const k of ["tSire", "tCont", "dif"]) row.getCell(k).numFmt = "#,##0.00";
+  }
+  for (const f of faltantes) {
+    const row = ws.addRow({
+      empresa: f.empresa, ruc: f.ruc, libro: f.libro === "compras" ? "Compras" : "Ventas", periodo: f.periodo,
+      nCont: f.comprobantes, tCont: f.total,
+      situacion: f.motivo === "sin-cliente" ? "SIN CONCILIAR: la empresa no está en Clientes" : "SIN CONCILIAR: falta descargar el Detalle SIRE",
+    });
+    row.getCell("tCont").numFmt = "#,##0.00";
+    row.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } }; });
   }
   ws.views = [{ state: "frozen", ySplit: 1 }];
   archivos["00-RESUMEN-conciliacion.xlsx"] = new Uint8Array(await wb.xlsx.writeBuffer());
