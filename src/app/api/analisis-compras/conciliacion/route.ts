@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, studioId } from "@/lib/auth";
 import { listClientes } from "@/lib/db";
 import { parseLibroDiarioHojas, claveEmpresa, type MovDiario } from "@/lib/analisisCompras";
-import { leerSire, conciliar, parseRegistroVentasHojas, parseRegistroComprasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
+import { leerSire, conciliar, parseRegistroVentasHojas, parseRegistroComprasHojas, diarioAComprobantes, sireDesdeDetalle, periodoMasFrecuente, parseSubdiario, aplicarSubdiario, separarMesesAnteriores, type SireLeido, type ConciliacionEmpresa, type DocSubdiario } from "@/lib/conciliacionSire";
 import type { CompNorm, TipoLibro } from "@/lib/cruceSire";
 import { analisisCierre, cierreAplica, type CierrePeriodo } from "@/lib/cronogramaSunat";
 import { hoyLima } from "@/lib/fechas";
@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
         const ult = resultados[resultados.length - 1];
         if (!ult.ruc) ult.ruc = e.ruc;
         if (!ult.periodo) ult.periodo = periodo;
+        // Compras: lo de meses anteriores registrado este mes (y que no está en el SIRE) va a otro cuadro.
+        if (libro === "compras") separarMesesAnteriores(ult, periodo);
       }
     }
     // Subdiario de misceláneos: anula las diferencias "Solo SIRE" que estén registradas ahí.

@@ -30,7 +30,18 @@ export async function POST(req: NextRequest) {
   const archivos: Record<string, Uint8Array> = {};
   for (const [i, e] of empresas.entries()) {
     const libro = e.libro === "compras" ? "compras" : "ventas";
-    const buf = await construirExcelCruce({ periodo: e.periodo, ruc: e.ruc, razonSocial: e.empresa, [libro]: e.cruce, generadoAt: new Date().toISOString() });
+    // Compras: lo de meses anteriores registrado este mes va en su propia hoja (fuera de la conciliación).
+    const ant = Array.isArray(e.anteriores?.filas) ? e.anteriores!.filas.slice(0, 5000) : [];
+    const buf = await construirExcelCruce({ periodo: e.periodo, ruc: e.ruc, razonSocial: e.empresa, [libro]: e.cruce, generadoAt: new Date().toISOString() }, ant.length ? (wb) => {
+      const ws = wb.addWorksheet("Meses anteriores");
+      ws.columns = [{ header: "Fecha de emisión", width: 15 }, { header: "Tipo", width: 7 }, { header: "Serie", width: 9 }, { header: "Número", width: 13 }, { header: "RUC proveedor", width: 14 }, { header: "Proveedor", width: 44 }, { header: "Base", width: 13 }, { header: "IGV", width: 12 }, { header: "Total", width: 13 }];
+      ws.getRow(1).eachCell((c) => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } }; });
+      for (const f of ant) ws.addRow([String(f.fecha ?? ""), String(f.tipoDoc ?? ""), String(f.serie ?? ""), String(f.numero ?? ""), String(f.rucContraparte ?? ""), String(f.razonSocial ?? ""), Number(f.base) || 0, Number(f.igv) || 0, Number(f.total) || 0]);
+      const tot = ws.addRow(["TOTAL", "", "", "", "", `${ant.length} comprobante(s) de meses anteriores: registrados en este periodo, NO entran en la conciliación del mes`, ...(["base", "igv", "total"] as const).map((k) => Math.round(ant.reduce((a, f) => a + (Number(f[k]) || 0), 0) * 100) / 100)]);
+      tot.font = { bold: true };
+      [7, 8, 9].forEach((i) => (ws.getColumn(i).numFmt = "#,##0.00"));
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+    } : undefined);
     archivos[`${String(i + 1).padStart(2, "0")}-${slug(e.empresa)}-${libro}${e.periodo ? `-${e.periodo}` : ""}.xlsx`] = new Uint8Array(buf);
   }
 
@@ -57,6 +68,8 @@ export async function POST(req: NextRequest) {
     { header: "Días hábiles para regularizar", key: "habiles", width: 15 },
     { header: "Estado de cierre", key: "estadoCierre", width: 16 },
     { header: "RxH excluidos", key: "rh", width: 12 },
+    { header: "Meses anteriores (comprob., aparte)", key: "nAnt", width: 16 },
+    { header: "Meses anteriores (S/, aparte)", key: "tAnt", width: 16 },
     { header: "Situación", key: "situacion", width: 34 },
   ];
   ws.getRow(1).eachCell((c) => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102B4D" } }; });
@@ -73,9 +86,10 @@ export async function POST(req: NextRequest) {
       habiles: e.cierre ? (e.cierre.diasCalendario < 0 ? `${-e.cierre.diasCalendario} día(s) de atraso` : e.cierre.diasHabiles) : "",
       estadoCierre: ({ vencido: "VENCIDO", "vence-hoy": "Vence hoy", urgente: "Urgente", "en-plazo": "En plazo" } as Record<string, string>)[e.cierre?.estado ?? ""] ?? "",
       rh: e.excluidos?.honorarios ?? 0,
+      nAnt: Number(e.anteriores?.comprobantes) || 0, tAnt: Number(e.anteriores?.total) || 0,
       situacion: !c.totalesSire.comprobantes && !c.totalesContable.comprobantes ? "Sin movimiento (ni en contabilidad ni en SIRE)" : !c.totalesContable.comprobantes ? "Nada en contabilidad: todo está solo en SIRE" : !c.totalesSire.comprobantes ? "SIRE sin movimiento: todo está solo en contabilidad" : "Conciliada",
     });
-    for (const k of ["tSire", "tCont", "dif"]) row.getCell(k).numFmt = "#,##0.00";
+    for (const k of ["tSire", "tCont", "dif", "tAnt"]) row.getCell(k).numFmt = "#,##0.00";
   }
   for (const f of faltantes) {
     const row = ws.addRow({

@@ -39,6 +39,8 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
       <td><span class="tag" style="background:${color}">${txt}</span></td></tr>`;
   }).join("");
 
+  // Compras: comprobantes de meses anteriores registrados este mes (cuadro aparte, fuera de la conciliación).
+  const hayAnt = empresas.some((e) => n(e.anteriores?.comprobantes) > 0);
   const filasEmp = empresas.map((e) => {
     const c = e.cruce, p = pend(e), dif = c.totalesSire.total - c.totalesContable.total;
     return `<tr><td><strong>${esc(e.empresa)}</strong><div class="mut">RUC ${esc(e.ruc)}${empresas.some((x) => x.libro === "compras") ? ` · ${esc(e.libro)}` : ""}</div></td>
@@ -47,11 +49,11 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
       <td class="num" style="color:${Math.abs(dif) > 1 ? "#dc2626" : "#94a3b8"}">${soles(dif)}</td>
       <td class="num">${n(c.ok)}</td><td class="num">${n(c.difMonto) || "—"}</td><td class="num">${n(c.difFecha) || "—"}</td>
       <td class="num">${n(c.soloSire) || "—"}</td><td class="num">${n(c.soloContable) || "—"}</td>
-      <td class="num">${n(e.subdiario?.conciliados) || "—"}</td>
+      <td class="num">${n(e.subdiario?.conciliados) || "—"}</td>${hayAnt ? `<td class="num">${n(e.anteriores?.comprobantes) ? `${soles(n(e.anteriores?.total))}<div class="mut">${n(e.anteriores?.comprobantes)} comprob.</div>` : "—"}</td>` : ""}
       <td>${!p && !n(c.totalesSire.comprobantes) && !n(c.totalesContable.comprobantes) ? `<span class="tag" style="background:#64748b">Sin movimiento</span>` : `<span class="tag" style="background:${p ? "#b45309" : "#047857"}">${p ? `Revisar ${n(p)}` : "Cuadra"}</span>`}</td></tr>`;
   }).join("") + faltantes.map((f) => `<tr style="color:#64748b"><td><strong>${esc(f.empresa)}</strong><div class="mut">RUC ${esc(f.ruc)}${empresas.some((x) => x.libro === "compras") ? ` · ${esc(f.libro)}` : ""}</div></td>
       <td class="num">—</td><td class="num">${soles(n(f.total))}<div class="mut">${n(f.comprobantes)} comprob.</div></td><td class="num">—</td>
-      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>${hayAnt ? `<td class="num">—</td>` : ""}
       <td><span class="tag" style="background:#64748b">${f.motivo === "sin-cliente" ? "No está en Clientes" : "Falta descargar el SIRE"}</span></td></tr>`).join("");
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"/><style>
@@ -82,9 +84,9 @@ export function informeConciliacionHtml(empresas: ConciliacionEmpresa[], cierre:
   <tbody>${filasCierre}</tbody></table>
   <p class="nota">Vencimiento según el cronograma SUNAT de obligaciones mensuales por último dígito del RUC. Las diferencias deben regularizarse (registro contable o propuesta SIRE) antes de generar el RVIE/RCE y presentar la declaración mensual (PDT 621). Declarar fuera de plazo puede generar multa (art. 176, num. 1 del Código Tributario), con rebaja por gradualidad si se subsana antes de que SUNAT lo detecte.</p>` : ""}
   <h2>Resumen por empresa</h2>
-  <table><thead><tr><th>Empresa</th><th class="num">SIRE</th><th class="num">Contabilidad</th><th class="num">Diferencia</th><th class="num">OK</th><th class="num">Montos</th><th class="num">Fecha</th><th class="num">Solo SIRE</th><th class="num">Solo cont.</th><th class="num">Subdiario</th><th>Estado</th></tr></thead>
+  <table><thead><tr><th>Empresa</th><th class="num">SIRE</th><th class="num">Contabilidad</th><th class="num">Diferencia</th><th class="num">OK</th><th class="num">Montos</th><th class="num">Fecha</th><th class="num">Solo SIRE</th><th class="num">Solo cont.</th><th class="num">Subdiario</th>${hayAnt ? `<th class="num">Meses ant. (aparte)</th>` : ""}<th>Estado</th></tr></thead>
   <tbody>${filasEmp}</tbody></table>
-  <p class="nota">Salen todas las empresas del registro contable, también las que no tienen movimiento. Conciliación factura por factura (${empresas.every((e) => e.libro === "compras") ? "serie + número + RUC del proveedor" : "tipo + serie + número"}) y por monto (base, IGV, total) y fecha, con tolerancia de S/ 1. "Subdiario" = comprobantes encontrados en el subdiario de misceláneos. El detalle comprobante por comprobante está en el Excel de conciliación.</p>
+  <p class="nota">${hayAnt ? `"Meses ant. (aparte)" = facturas con fecha de un mes anterior que contabilidad registró en este periodo y no están en su SIRE: no entran en la conciliación del mes. ` : ""}Salen todas las empresas del registro contable, también las que no tienen movimiento. Conciliación factura por factura (${empresas.every((e) => e.libro === "compras") ? "serie + número + RUC del proveedor" : "tipo + serie + número"}) y por monto (base, IGV, total) y fecha, con tolerancia de S/ 1. "Subdiario" = comprobantes encontrados en el subdiario de misceláneos. El detalle comprobante por comprobante está en el Excel de conciliación.</p>
   <div class="foot">Documento generado automáticamente para uso de gerencia. Cifras en soles (S/).</div>
   </body></html>`;
 }

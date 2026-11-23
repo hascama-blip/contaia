@@ -60,7 +60,7 @@ const ESTADO_FILL: Record<EstadoFila, string | null> = {
 const AZUL = "FF1D4ED8"; // brand-700 aprox.
 
 /** Genera el Excel del comparativo (hojas Resumen, Compras y/o Ventas). */
-export async function construirExcelCruce(res: ResultadoCruce): Promise<Buffer> {
+export async function construirExcelCruce(res: ResultadoCruce, extra?: (wb: ExcelJS.Workbook) => void): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Radar Tributar IA";
   wb.created = new Date();
@@ -70,6 +70,7 @@ export async function construirExcelCruce(res: ResultadoCruce): Promise<Buffer> 
   hojaTipoCambio(wb, res);
   if (res.compras) hojaLibro(wb, "Compras", res.compras);
   if (res.ventas) hojaLibro(wb, "Ventas", res.ventas);
+  extra?.(wb); // hojas adicionales (p. ej. "Meses anteriores" de la conciliación de compras)
 
   const out = await wb.xlsx.writeBuffer();
   return Buffer.from(out as ArrayBuffer);

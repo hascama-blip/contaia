@@ -113,6 +113,13 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   `sireDesdeDetalle(..., libro)`) = "Sin movimiento" o todo "Solo contable"; sin caché o sin cliente = fila gris
   "Falta descargar el SIRE" / "No está en Clientes" (`faltantes` con comprobantes y total contables; van también al
   Excel resumen y al PDF). Periodo de una pestaña vacía = título de la hoja o el más frecuente de todo el archivo.
+  **Compras = solo el mes** (pedido del dueño; `separarMesesAnteriores`, se aplica tras `conciliar` solo en compras):
+  las filas "Solo contable" con fecha de emisión de un mes ANTERIOR al periodo (p. ej. recibos de luz/agua de
+  octubre registrados en noviembre) salen de la conciliación a `ConciliacionEmpresa.anteriores` (cuadro aparte en
+  pantalla, hoja "Meses anteriores" del Excel de la empresa, columnas en el resumen y en el PDF) y se restan de los
+  totales contables y de "Solo contable"; así el bloque del mes sirve para verificar que todo lo del mes está
+  provisionado. Lo que SÍ está en el SIRE del periodo se queda aunque su fecha sea anterior (ese cruce es válido).
+  Caso real: BA nov-2026 = 13 comprobantes del mes + 4 recibos (tipo 14) de octubre por S/ 1,118.68.
   **Análisis de cierre** (`analisisCierre` en `cronogramaSunat.ts`): vencimiento de la DJ mensual
   por último dígito del RUC (cronograma oficial `OFICIAL`, si falta = referencial), días hábiles y
   calendario que quedan desde hoy (Lima) o días de atraso, estado (periodo abierto / en plazo /

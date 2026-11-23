@@ -339,6 +339,38 @@ export interface ConciliacionEmpresa {
   cierre?: import("./cronogramaSunat").CierrePeriodo | null;
   /** Comprobantes "solo SIRE" encontrados en un subdiario aparte (misceláneos). */
   subdiario?: { conciliados: number; conMontoDistinto: number; archivos: string[] };
+  /** Compras: comprobantes de MESES ANTERIORES registrados en la contabilidad de este periodo y que
+   *  no están en su SIRE. Van en un cuadro aparte: NO cuentan en la conciliación del mes. */
+  anteriores?: { filas: CompAnterior[]; comprobantes: number; base: number; igv: number; total: number };
+}
+
+export interface CompAnterior { tipoDoc: string; serie: string; numero: string; rucContraparte: string; razonSocial: string; fecha: string; base: number; igv: number; total: number }
+
+/**
+ * Deja la conciliación SOLO con el mes: saca a un cuadro aparte lo que contabilidad registró en este
+ * periodo pero es de un mes anterior (fecha de emisión) y no figura en el SIRE del periodo. Así el
+ * bloque del mes sirve para verificar que todo lo del mes está provisionado, sin que las facturas
+ * atrasadas (p. ej. de octubre en el registro de noviembre) lo descuadren.
+ * Lo que SÍ está en el SIRE del periodo se queda (aunque su fecha sea anterior): ese cruce es válido.
+ */
+export function separarMesesAnteriores(res: ConciliacionEmpresa, periodo: string): void {
+  if (!/^\d{6}$/.test(periodo)) return;
+  const c = res.cruce;
+  const esAnterior = (f: string) => /^\d{4}-\d{2}/.test(f) && f.slice(0, 4) + f.slice(5, 7) < periodo;
+  const fuera = c.filas.filter((f) => f.estado === "solo-contable" && esAnterior(f.fechaContable));
+  if (!fuera.length) return;
+  c.filas = c.filas.filter((f) => !fuera.includes(f));
+  c.soloContable -= fuera.length;
+  const t = c.totalesContable;
+  t.comprobantes -= fuera.length;
+  t.total = r2(t.total - fuera.reduce((a, f) => a + f.totalContable, 0));
+  t.baseGravada = r2(t.baseGravada - fuera.reduce((a, f) => a + f.baseContable, 0));
+  t.igv = r2(t.igv - fuera.reduce((a, f) => a + f.igvContable, 0));
+  t.noGravado = r2(t.noGravado - fuera.reduce((a, f) => a + f.noGravadoContable, 0));
+  const filas: CompAnterior[] = fuera
+    .map((f) => ({ tipoDoc: f.tipoDoc, serie: f.serie, numero: f.numero, rucContraparte: f.rucContraparte, razonSocial: f.razonSocial, fecha: f.fechaContable, base: f.baseContable, igv: f.igvContable, total: f.totalContable }))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  res.anteriores = { filas, comprobantes: filas.length, base: r2(filas.reduce((a, f) => a + f.base, 0)), igv: r2(filas.reduce((a, f) => a + f.igv, 0)), total: r2(filas.reduce((a, f) => a + f.total, 0)) };
 }
 
 /**

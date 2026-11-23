@@ -168,6 +168,8 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
   const agregarSire = (lista: FileList) => { const n = unir(sires, lista); setSires(n); conciliar(contables, n, asignaciones); };
   // En el panel de compras todo es compras: la columna "Libro" sobra.
   const hayCompras = !esCompras && [...(res?.empresas ?? []), ...(res?.faltantes ?? [])].some((x: any) => x.libro === "compras");
+  // Compras: comprobantes de meses anteriores registrados este mes (van en un cuadro aparte).
+  const hayAnteriores = (res?.empresas ?? []).some((x: any) => x.anteriores?.comprobantes > 0);
   const asignar = (id: string, clave: string) => setAsignaciones((a) => ({ ...a, [id]: clave }));
 
   const e = res?.empresas?.[sel];
@@ -186,7 +188,7 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
             para cada empresa (la registrada en Clientes con el mismo RUC) y el mismo periodo. Se concilia
             <strong> factura por factura</strong> ({esCompras ? "serie + número + RUC del proveedor" : "tipo + serie + número"}) y por <strong>monto</strong> (base, IGV, total) y fecha.
             {" "}<strong>Todas las empresas de las pestañas salen en el análisis</strong>, aunque no tengan nada registrado: lo que no está en contabilidad puede estar en el SIRE.
-            {esCompras ? " También acepta el Libro Diario." : " Con el Libro Diario, concilia compras contra el Detalle SIRE de compras."}
+            {esCompras ? " La conciliación es solo del mes: las facturas de meses anteriores que contabilidad registró en este periodo (y que no están en su SIRE) van en un cuadro aparte y no descuadran el mes. También acepta el Libro Diario." : " Con el Libro Diario, concilia compras contra el Detalle SIRE de compras."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -316,6 +318,7 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
                 <th className="px-2 py-1 text-right" title="Diferencia de fecha">Fecha</th>
                 <th className="px-2 py-1 text-right">Solo SIRE</th>
                 <th className="px-2 py-1 text-right">Solo cont.</th>
+                {hayAnteriores && <th className="px-2 py-1 text-right" title="Comprobantes de meses anteriores registrados en este periodo: van aparte, no entran en la conciliación del mes">Meses ant. (aparte)</th>}
                 <th className="px-2 py-1">Estado</th>
               </tr>
             </thead>
@@ -335,6 +338,7 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
                     <td className={`px-2 py-1.5 text-right tabular-nums ${c.difFecha ? "font-semibold text-amber-700" : "text-slate-400"}`}>{c.difFecha}</td>
                     <td className={`px-2 py-1.5 text-right tabular-nums ${c.soloSire ? "font-semibold text-orange-700" : "text-slate-400"}`}>{c.soloSire}</td>
                     <td className={`px-2 py-1.5 text-right tabular-nums ${c.soloContable ? "font-semibold text-orange-700" : "text-slate-400"}`}>{c.soloContable}</td>
+                    {hayAnteriores && <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{x.anteriores?.comprobantes ? <>{soles(x.anteriores.total)}<div className="text-[10px] text-slate-400">{x.anteriores.comprobantes} comprob.</div></> : "—"}</td>}
                     <td className="px-2 py-1.5">
                       {!p && !c.totalesSire.comprobantes && !c.totalesContable.comprobantes
                         ? <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500" title="Sin comprobantes en contabilidad ni en el SIRE descargado">Sin movimiento</span>
@@ -350,7 +354,7 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
                   {hayCompras && <td className="px-2 py-1.5 capitalize">{f.libro}</td>}
                   <td className="px-2 py-1.5 text-right">—</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{soles(f.total)}<div className="text-[10px] text-slate-400">{f.comprobantes} comprob.</div></td>
-                  <td className="px-2 py-1.5 text-right">—</td><td /><td /><td /><td /><td />
+                  <td className="px-2 py-1.5 text-right">—</td><td /><td /><td /><td /><td />{hayAnteriores && <td />}
                   <td className="px-2 py-1.5"><span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">{f.motivo === "sin-detalle" ? "Falta descargar el SIRE" : "No está en Clientes"}</span></td>
                 </tr>
               ))}
@@ -435,6 +439,35 @@ export default function ConciliacionSireRtp({ libro = "ventas" }: { libro?: "ven
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {e.anteriores?.comprobantes > 0 && (
+            <div className="border-t-2 border-slate-200">
+              <div className="flex flex-wrap items-baseline gap-2 bg-slate-50 px-3 py-2">
+                <span className="mr-auto text-xs font-bold text-slate-700">Meses anteriores · cuadro aparte (no entra en la conciliación de {e.periodo ? `${MESES[Number(e.periodo.slice(4, 6)) - 1]} ${e.periodo.slice(0, 4)}` : "este mes"})</span>
+                <span className="text-[11px] text-slate-500">{e.anteriores.comprobantes} comprobante(s) · base {soles(e.anteriores.base)} · IGV {soles(e.anteriores.igv)} · <strong className="text-slate-700">total {soles(e.anteriores.total)}</strong></span>
+              </div>
+              <p className="px-3 pt-2 text-[11px] text-slate-500">Facturas con fecha de emisión de un mes anterior que contabilidad registró en este periodo y que no están en el SIRE de este periodo. Revísalas contra el SIRE de su propio mes.</p>
+              <div className="max-h-64 overflow-auto px-1 pb-2">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-left text-[10px] uppercase text-slate-400">
+                    <th className="px-2 py-1">Fecha de emisión</th><th className="px-2 py-1">Comprobante</th><th className="px-2 py-1">Proveedor</th>
+                    <th className="px-2 py-1 text-right">Base</th><th className="px-2 py-1 text-right">IGV</th><th className="px-2 py-1 text-right">Total</th>
+                  </tr></thead>
+                  <tbody>
+                    {e.anteriores.filas.map((f: any, i: number) => (
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="whitespace-nowrap px-2 py-1 tabular-nums text-slate-600">{f.fecha}</td>
+                        <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-700"><span className="mr-1 text-[10px] font-normal text-slate-400">{({ "1": "FAC", "3": "BOL", "7": "NC", "8": "ND", "14": "REC" } as Record<string, string>)[f.tipoDoc] ?? f.tipoDoc}</span>{f.serie}-{f.numero}</td>
+                        <td className="px-2 py-1 text-slate-600">{f.rucContraparte}{f.razonSocial && <span className="ml-2 text-[10px] text-slate-400">{f.razonSocial}</span>}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums">{soles(f.base)}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums">{soles(f.igv)}</td>
+                        <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums">{soles(f.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
