@@ -10,6 +10,11 @@ const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "
 // Extrae el DETALLE SIRE (propuesta comprobante por comprobante) de un periodo
 // desde la API oficial de SUNAT y lo muestra en tabla + Excel. `tipo` fija si
 // es Ventas (RVIE) o Compras (RCE) — cada módulo trabaja uno solo.
+//  · Los excluidos / no incluidos son una consulta APARTE y OPCIONAL (botón): SUNAT la demora
+//    varios minutos, así que ya no bloquea la extracción ni la descarga del Excel.
+//  · "Por rango de meses": extrae mes por mes (lo ya guardado no se vuelve a pedir) y baja un
+//    ZIP con un Excel por mes + resumen.
+type EstadoMes = { periodo: string; estado: "pendiente" | "extrayendo" | "ok" | "error"; nota?: string };
 export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { clienteId: string; tipo: "ventas" | "compras"; periodoInicial?: string }) {
   const esVentas = tipo === "ventas";
   const libro = esVentas ? "RVIE (ventas)" : "RCE (compras)";
@@ -29,6 +34,13 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   const [demora, setDemora] = useState<null | "esperando" | "sigue">(null);
   // No incluidos (rechazados / excluidos): se consultan aparte, después del detalle.
   const [niNota, setNiNota] = useState<string | null>(null);
+  const [niBusy, setNiBusy] = useState(false); // la consulta de excluidos corre en segundo plano
+  const periodoVisto = useRef(""); // periodo del detalle en pantalla (por si cambian de mes mientras llegan los excluidos)
+  // Rango de meses → ZIP
+  const [modoRango, setModoRango] = useState(false);
+  const [hMes, setHMes] = useState(mes);
+  const [hAnio, setHAnio] = useState(anio);
+  const [meses, setMeses] = useState<EstadoMes[]>([]);
   const [sunatAcepto, setSunatAcepto] = useState(false); // SUNAT ya recibió el pedido (respondió "en proceso")
   const avisoCerrado = useRef(false); // si la cerró con "Entendido", no se reabre en esta extracción
   const avisarDemora = (estado: "esperando" | "sigue") => {
@@ -44,6 +56,7 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
     const solUser = getSolUser(clienteId);
     // Con caché no hace falta la Clave SOL; sin caché (o refrescar) sí.
     const periodo = `${anio}${String(mes).padStart(2, "0")}`;
+    periodoVisto.current = periodo;
     setBusy(true);
     // La propuesta SIRE es ASÍNCRONA: SUNAT genera el reporte en segundo plano
     // (ticket "En proceso"). Si aún no está, el backend responde { pendiente } y
@@ -122,8 +135,8 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
           ? ` · guardado (${new Date(data.cacheAt).toLocaleString("es-PE")}) — no se reconsultó SUNAT`
           : " · recién extraído de SUNAT (guardado en caché)";
         setInfo(`${b?.comprobantes ?? 0} comprobante(s) de ${libro}${desde}.`);
-        // Si lo guardado ya trae los no incluidos, no se vuelve a preguntar a SUNAT.
-        if (b && !b.noIncluidos) await buscarNoIncluidos(periodo, solUser, solPass, false);
+        // Los excluidos / no incluidos NO se piden solos: SUNAT los demora varios minutos. Se consultan
+        // con su botón (en segundo plano) y, si ya están guardados, salen directo.
         return;
       }
     } catch {
@@ -138,9 +151,15 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
   // p. ej. rechazados; compras: excluidos). No detiene ni invalida el detalle si falla.
   async function buscarNoIncluidos(periodo: string, solUser: string, solPass: string, conDiag: boolean) {
     const que = esVentas ? "no incluidos (rechazados)" : "excluidos";
-    if (!solPass) { setNiNota(`Para consultar los ${que} de este periodo, carga tus accesos SOL (arriba) y vuelve a pulsar Extraer.`); return; }
+    if (!solPass) { setNiNota(`Para consultar los ${que} de este periodo, carga tus accesos SOL (arriba).`); return; }
+    setNiBusy(true);
+    try { await consultarNoIncluidos(periodo, solUser, solPass, conDiag, que); } finally { setNiBusy(false); }
+  }
+  async function consultarNoIncluidos(periodo: string, solUser: string, solPass: string, conDiag: boolean, que: string) {
+    const vigente = () => periodoVisto.current === periodo; // si ya cambiaron de mes, no se pisa lo que está en pantalla
     for (let intento = 0; intento < 6; intento++) {
-      setNiNota(`⏳ Consultando en SUNAT los comprobantes ${que}…`);
+      if (!vigente()) return;
+      setNiNota(`⏳ Consultando en SUNAT los comprobantes ${que}… (puede tardar varios minutos; mientras tanto puedes descargar el Excel o seguir trabajando)`);
       let res: Response;
       try {
         res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
@@ -148,8 +167,9 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, soloNoIncluidos: true, diagnostico: conDiag }),
         });
-      } catch { setNiNota(`No se pudo consultar los ${que} (se cortó la conexión). El detalle sí quedó extraído; vuelve a pulsar Extraer para reintentar.`); return; }
+      } catch { if (vigente()) setNiNota(`No se pudo consultar los ${que} (se cortó la conexión). El detalle sí quedó extraído.`); return; }
       const data = await res.json().catch(() => ({}));
+      if (!vigente()) return;
       if (conDiag) { if (data.diag) setDiag((d) => `${d ?? ""}\n\n// ---- ${que} ----\n${JSON.stringify(data.diag, null, 2)}`); setNiNota(null); return; }
       if (!res.ok) { setNiNota(`No se pudo consultar los ${que}: ${String(data.error ?? "error de SUNAT").replace(/\.+$/, "")}. El detalle sí quedó extraído.`); return; }
       if (data.pendiente) { await new Promise((r) => setTimeout(r, 8000)); continue; }
@@ -158,7 +178,69 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
       setNiNota(data.noDisponible ? `SUNAT no entregó la lista de ${que} de este periodo${ni?.nota ? ` (${ni.nota})` : ""}.` : null);
       return;
     }
-    setNiNota(`SUNAT sigue generando la lista de ${que}. Vuelve a pulsar Extraer en unos minutos para completarla.`);
+    if (vigente()) setNiNota(`SUNAT sigue generando la lista de ${que}. Vuelve a consultarla en unos minutos.`);
+  }
+
+  // ---- Rango de meses → ZIP con un Excel por mes -------------------------------------------
+  const periodosRango = (): string[] => {
+    const out: string[] = [];
+    let y = anio, m = mes;
+    while ((y < hAnio || (y === hAnio && m <= hMes)) && out.length < 24) { out.push(`${y}${String(m).padStart(2, "0")}`); m++; if (m > 12) { m = 1; y++; } }
+    return out;
+  };
+  /** Extrae UN periodo (de lo guardado o de SUNAT, esperando a que SUNAT termine). */
+  async function pedirPeriodo(periodo: string, solUser: string, solPass: string, nota: (t: string) => void): Promise<{ ok: boolean; nota: string }> {
+    let cortes = 0;
+    for (let intento = 0; intento <= 8; intento++) {
+      let res: Response;
+      try {
+        res = await fetch(`/api/clientes/${clienteId}/sire-detalle`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ solUser, solPass, periodo, incluirVentas: esVentas, incluirCompras: !esVentas, refrescar }),
+        });
+      } catch {
+        if (++cortes > 3) return { ok: false, nota: "SUNAT está demorando (se cortó la conexión). Vuelve a intentarlo." };
+        nota("SUNAT demora… reintentando"); await new Promise((r) => setTimeout(r, 8000)); continue;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 400 && !solPass && !data.desdeCache) return { ok: false, nota: "No está guardado: carga tus accesos SOL (arriba) para extraerlo." };
+      if (!res.ok) return { ok: false, nota: String(data.error ?? "No se pudo extraer.").slice(0, 160) };
+      if (data.pendiente) { nota(`SUNAT está generando el archivo… (${intento + 1}/8)`); await new Promise((r) => setTimeout(r, 8000)); continue; }
+      const b = esVentas ? data.ventas : data.compras;
+      return { ok: true, nota: `${b?.comprobantes ?? 0} comprobante(s)${data.desdeCache ? " · ya guardado" : " · extraído de SUNAT"}` };
+    }
+    return { ok: false, nota: "SUNAT sigue generando el archivo. Vuelve a pulsar el botón en unos minutos (lo retoma)." };
+  }
+  async function extraerRango() {
+    const lista = periodosRango();
+    setError(null); setInfo(null); setBloque(null); setNiNota(null); setDiag(null);
+    if (!lista.length) { setError("El mes «Desde» no puede ser posterior al mes «Hasta»."); return; }
+    const solPass = getSolPass(clienteId), solUser = getSolUser(clienteId);
+    let est: EstadoMes[] = lista.map((periodo) => ({ periodo, estado: "pendiente" }));
+    const pon = (periodo: string, c: Partial<EstadoMes>) => { est = est.map((x) => (x.periodo === periodo ? { ...x, ...c } : x)); setMeses(est); };
+    setMeses(est); setBusy(true);
+    try {
+      for (const periodo of lista) {
+        pon(periodo, { estado: "extrayendo", nota: "" });
+        const r = await pedirPeriodo(periodo, solUser, solPass, (t) => pon(periodo, { nota: t }));
+        pon(periodo, { estado: r.ok ? "ok" : "error", nota: r.nota });
+      }
+      const listos = est.filter((x) => x.estado === "ok").map((x) => x.periodo);
+      if (!listos.length) { setError("No se pudo extraer ningún mes del rango."); return; }
+      const res = await fetch("/api/sire-detalle/zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clienteId, tipo, periodos: listos }) });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "No se pudo armar el ZIP."); return; }
+      const blob = await res.blob();
+      const nombre = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") || "")?.[1] ?? `detalle-sire-${tipo}.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = nombre;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      const faltan = est.length - listos.length;
+      setInfo(`ZIP descargado con ${listos.length} mes(es)${faltan ? `. Faltaron ${faltan}: vuelve a pulsar el botón para reintentarlos (los ya extraídos no se vuelven a pedir).` : "."}`);
+    } catch {
+      setError("Error de red al extraer el rango. Vuelve a pulsar el botón: lo ya extraído queda guardado.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function descargar(endpoint: string, nombre: string, extra: any = {}) {
@@ -208,9 +290,14 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         SUNAT (marca <strong>🔄 Refrescar</strong> para forzar una nueva consulta).
       </p>
 
+      <div className="mb-3 inline-flex rounded-lg border border-slate-200 bg-white p-1 text-sm">
+        <button className={`rounded-md px-3 py-1.5 font-semibold transition ${!modoRango ? "bg-brand-600 text-white" : "text-slate-500 hover:text-brand-700"}`} onClick={() => { setModoRango(false); setMeses([]); }} disabled={busy}>Un mes</button>
+        <button className={`rounded-md px-3 py-1.5 font-semibold transition ${modoRango ? "bg-brand-600 text-white" : "text-slate-500 hover:text-brand-700"}`} onClick={() => { setModoRango(true); setBloque(null); setInfo(null); setNiNota(null); setHMes(mes); setHAnio(anio); }} disabled={busy}>Rango de meses (ZIP)</button>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label className="label">Mes</label>
+          <label className="label">{modoRango ? "Desde · mes" : "Mes"}</label>
           <select className="input" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
             {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
@@ -221,15 +308,36 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
             {anios.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
+        {modoRango && (
+          <>
+            <div>
+              <label className="label">Hasta · mes</label>
+              <select className="input" value={hMes} onChange={(e) => setHMes(Number(e.target.value))}>
+                {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Año</label>
+              <select className="input" value={hAnio} onChange={(e) => setHAnio(Number(e.target.value))}>
+                {anios.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <button className="btn-primary" onClick={extraerRango} disabled={busy}>
+              {busy ? "Extrayendo el rango…" : `⬇ Extraer ${periodosRango().length || ""} mes(es) y bajar ZIP`}
+            </button>
+          </>
+        )}
+        {!modoRango && (
         <button className="btn-primary" onClick={extraer} disabled={busy}>
           {busy ? "Extrayendo…" : `⬇ Extraer ${esVentas ? "ventas" : "compras"}`}
         </button>
-        {(hayDatos || nNoIncl > 0) && (
+        )}
+        {!modoRango && (hayDatos || nNoIncl > 0) && (
           <button className="btn-ghost" onClick={descargarExcel} disabled={busy} title={bloque?.noIncluidos ? `El Excel trae una hoja aparte con los ${esVentas ? "no incluidos" : "excluidos"}` : undefined}>
             ⬇ Excel{nNoIncl > 0 ? ` (+${nNoIncl} ${esVentas ? "no incluidos" : "excluidos"})` : ""}
           </button>
         )}
-        {!esVentas && hayDatos && (
+        {!modoRango && !esVentas && hayDatos && (
           <button className="btn-ghost" onClick={descargarPlantilla} disabled={busy} title="Excel con el formato de la plantilla para subir al módulo de Descarga masiva de comprobantes">
             ⬇ Plantilla para XML
           </button>
@@ -244,8 +352,27 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
         )}
       </div>
 
+      {modoRango && (
+        <p className="mt-3 text-xs text-slate-500">
+          Extrae mes por mes (máximo 24) y descarga un <strong>ZIP con un Excel por mes</strong> más un resumen. Los meses ya extraídos salen al instante de lo guardado;
+          solo se pide a SUNAT lo que falta (30 s a 2 min por mes). Si alguno falla, vuelve a pulsar el botón y solo se reintenta ese.
+        </p>
+      )}
+      {modoRango && meses.length > 0 && (
+        <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
+          {meses.map((x) => (
+            <li key={x.periodo} className="flex flex-wrap items-center gap-3 px-3 py-1.5">
+              <span className="w-36 font-medium text-slate-700">{MESES[Number(x.periodo.slice(4)) - 1]} {x.periodo.slice(0, 4)}</span>
+              <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${x.estado === "ok" ? "bg-emerald-100 text-emerald-700" : x.estado === "error" ? "bg-red-100 text-red-700" : x.estado === "extrayendo" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-500"}`}>
+                {x.estado === "ok" ? "Listo" : x.estado === "error" ? "Falló" : x.estado === "extrayendo" ? "Extrayendo…" : "En cola"}
+              </span>
+              <span className="text-xs text-slate-500">{x.nota}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {info && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{info}</div>}
-      {!esVentas && hayDatos && (
+      {!modoRango && !esVentas && hayDatos && (
         <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-xs text-brand-800">
           ➡ Esta relación queda guardada. Para bajar los <strong>XML con glosa</strong> de estas compras, ve a{" "}
           <a href="/herramientas/comprobantes-xml" className="font-semibold underline">Descarga masiva de comprobantes</a>,
@@ -258,6 +385,17 @@ export default function DetalleSirePanel({ clienteId, tipo, periodoInicial }: { 
       <TablaDetalle titulo={esVentas ? "Ventas (RVIE)" : "Compras (RCE)"} bloque={bloque} />
 
       {/* No incluidos (rechazados / excluidos): aparte del detalle */}
+      {!modoRango && bloque && !bloque.noIncluidos && !niBusy && !diagModo && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <span className="mr-auto min-w-[14rem] flex-1">
+            <strong className="text-slate-800">Opcional:</strong> comprobantes que SUNAT dejó fuera de la propuesta ({esVentas ? "no incluidos, p. ej. rechazados" : "excluidos"}).
+            SUNAT los entrega aparte y puede tardar varios minutos; se consultan en segundo plano y van en otra hoja del Excel.
+          </span>
+          <button className="btn-ghost py-1.5 text-xs" onClick={() => buscarNoIncluidos(`${anio}${String(mes).padStart(2, "0")}`, getSolUser(clienteId), getSolPass(clienteId), false)}>
+            Consultar {esVentas ? "no incluidos" : "excluidos"}
+          </button>
+        </div>
+      )}
       {niNota && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{niNota}</div>}
       {bloque?.noIncluidos && !niNota && (
         nNoIncl > 0 ? (

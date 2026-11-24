@@ -177,6 +177,16 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   "no encontrado" genérico = "no confirmado" (nota ámbar, no se guarda). Lo guardado lleva
   `v = VERSION_NO_INCLUIDOS` (2); lo de una versión anterior se vuelve a consultar. Caso real pendiente:
   NC F007-130 (cliente 20429350264) figura como rechazada en SUNAT y la v1 dijo "ninguna".
+  **Los no incluidos/excluidos son OPCIONALES y en segundo plano** (pedido del dueño: la extracción tardaba ~5 min
+  esperando esa 2.ª consulta, incluso con el detalle ya guardado): ya no se piden solos tras extraer; hay un botón
+  "Consultar excluidos / no incluidos" que no bloquea el botón Extraer ni el Excel (`niBusy`, `periodoVisto` evita
+  pisar otro mes). Si ya están guardados (v2) salen directo.
+- **Detalle SIRE — rango de meses → ZIP** (`DetalleSirePanel.tsx`, pestaña "Rango de meses (ZIP)"): Desde/Hasta
+  (máx. 24 meses); extrae mes por mes con la misma ruta (`pedirPeriodo`: lo guardado sale al instante, lo demás se
+  pide a SUNAT esperando el ticket) y al final llama a `POST /api/sire-detalle/zip` `{ clienteId, tipo, periodos }`,
+  que NO consulta SUNAT: arma un Excel por mes desde `Cliente.sireDetalle` (`src/lib/sireDetalleExcel.ts`, el mismo
+  de `/api/sire-detalle/excel`) + `00-RESUMEN.xlsx` (comprobantes, Total CP, excluidos, situación). Si un mes
+  falla, se vuelve a pulsar y solo se reintenta ese.
 - **Detalle SIRE — aviso de demora de SUNAT** (`DetalleSirePanel.tsx`): si la conexión se corta mientras
   SUNAT genera la propuesta, o SUNAT sigue "en proceso" tras el 2.º intento, o el servidor recibe de SUNAT
   `fetch failed`/5xx/429, sale una VENTANA "SUNAT está demorando — Por demoras de carga de SUNAT, las
