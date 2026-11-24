@@ -129,14 +129,15 @@ cmd_codigo() {
     dominio=$(sed -n 's/^DOMINIO=//p' "$TMP/config.env"); correo=$(sed -n 's/^CORREO=//p' "$TMP/config.env")
   fi
   echo "Dominio: ${dominio:-ninguno} · correo del certificado: ${correo:-ninguno}" >&2
-  bash -n "$AQUI/aplicar.sh"; bash -n "$AQUI/instalar-lightsail.sh"
+  bash -n "$AQUI/aplicar.sh"; bash -n "$AQUI/instalar-lightsail.sh"; bash -n "$AQUI/instituto-clave"
+  python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$AQUI/admin-servidor.py"
   local rel="$TMP/release"; mkdir -p "$rel"
   armar_zip "$rel/sitio.zip"
   sed -e "s|__DOMINIO__|$dominio|" -e "s|__CORREO__|$correo|" "$AQUI/aplicar.sh" > "$rel/aplicar.sh"
-  cp "$AQUI/instalar-lightsail.sh" "$rel/"
+  cp "$AQUI/instalar-lightsail.sh" "$AQUI/admin-servidor.py" "$AQUI/instituto-clave" "$rel/"
   local commit; commit=$(git -C "$SITIO" rev-parse --short HEAD 2>/dev/null || echo "sin-git")
   printf '%s · commit %s · sitio %s\n' "$(date -u '+%F %H:%M UTC')" "$commit" "$(sha256sum "$rel/sitio.zip" | cut -c1-8)" > "$rel/VERSION"
-  ( cd "$rel" && zip -X -q "$TMP/version.zip" aplicar.sh instalar-lightsail.sh sitio.zip VERSION )
+  ( cd "$rel" && zip -X -q "$TMP/version.zip" aplicar.sh instalar-lightsail.sh admin-servidor.py instituto-clave sitio.zip VERSION )
   local sha clave url
   sha=$(sha256sum "$TMP/version.zip" | awk '{print $1}')
   clave="versiones/$(date -u +%Y%m%d-%H%M%S)-${sha:0:8}.zip"

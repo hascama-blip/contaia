@@ -16,8 +16,10 @@ ZIP="${1:-}"
 DOMINIO="${2:-}"
 CORREO="${3:-}"
 WEB=/var/www/instituto
+CONT=/var/lib/instituto/contenido   # lo que se publica desde el panel (tiene prioridad)
 CONF=/etc/nginx/sites-available/instituto
 SEG=/etc/nginx/snippets/instituto-seguridad.conf
+LIMITES=/etc/nginx/conf.d/instituto-limites.conf
 
 if [ "$(id -u)" -ne 0 ]; then echo "Ejecuta con sudo: sudo bash $0 $*"; exit 1; fi
 if [ -z "$ZIP" ] || [ ! -f "$ZIP" ]; then echo "No encuentro el ZIP del sitio: '${ZIP}'"; exit 1; fi
@@ -29,9 +31,10 @@ export DEBIAN_FRONTEND=noninteractive
 apt_instalar() { apt-get -o DPkg::Lock::Timeout=600 install -y -q "$@" >/dev/null; }
 
 echo "== 1/4 Paquetes =="
-if ! command -v nginx >/dev/null || ! command -v unzip >/dev/null; then
+if ! command -v nginx >/dev/null || ! command -v unzip >/dev/null || ! command -v ffmpeg >/dev/null; then
+  echo "Instalando Nginx y ffmpeg (para convertir los videos del panel); puede tardar 1 o 2 minutos…"
   apt-get -o DPkg::Lock::Timeout=600 update -y -q >/dev/null
-  apt_instalar nginx unzip
+  apt_instalar nginx unzip ffmpeg
 fi
 echo "Nginx $(nginx -v 2>&1 | sed 's/.*\///')"
 
@@ -83,12 +86,28 @@ escribir_nginx() {
     location / { try_files \$uri \$uri/ =404; }
     # El contenido editable cambia a menudo: el navegador siempre pide la versión nueva.
     location = /index.html { expires -1; }
-    location = /sitio.json { expires -1; }
+    # Lo publicado desde el panel (sitio.json, fotos y videos) va primero; si no existe, la versión desplegada.
+    location = /sitio.json { root $CONT; try_files /sitio.json @web_json; expires -1; }
+    location @web_json { root $WEB; expires -1; }
+    location ^~ /imagenes/ { root $CONT; try_files \$uri @web_media; expires 7d; }
+    location ^~ /videos/ { root $CONT; try_files \$uri @web_media; expires 7d; }
+    location @web_media { root $WEB; expires 7d; }
     location ~* \.(png|jpe?g|webp|gif|svg|ico|mp4|webm)\$ { expires 7d; }
     location ~ /\. { deny all; }
+    # Servicio del panel de administración (solo escucha dentro del servidor).
+    location = /api/admin/login {
+        limit_req zone=instituto_login burst=5 nodelay; limit_req_status 429;
+        proxy_pass http://127.0.0.1:8099; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header Host \$host;
+    }
+    location ^~ /api/admin/ {
+        client_max_body_size 200m; client_body_timeout 300s;
+        proxy_pass http://127.0.0.1:8099; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header Host \$host;
+        proxy_read_timeout 900s; proxy_send_timeout 300s; proxy_request_buffering on;
+    }
 SITIO
 )
   local acme="    location ^~ /.well-known/acme-challenge/ { root $WEB; default_type text/plain; }"
+  echo 'limit_req_zone $binary_remote_addr zone=instituto_login:1m rate=6r/m;' > "$LIMITES"
   if hay_cert; then
     cat > "$CONF" <<NGINX
 # Generado por instalar-lightsail.sh: no editar a mano (se reescribe en cada despliegue).

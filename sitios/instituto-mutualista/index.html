@@ -629,6 +629,7 @@ body.on-contacto .fab-info{display:none}
 .adm-lock p{color:var(--ink-soft)}
 .adm-lock form{display:grid;gap:10px;width:100%}
 .pin-input{height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);text-align:center;font:600 22px/1 var(--font-display);letter-spacing:.4em;color:var(--ink);width:100%}
+.pin-input.is-clave{font-size:18px;letter-spacing:.06em}
 .pin-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
 .lock-err{color:var(--danger);font-weight:600;font-size:14px;min-height:1.4em}
 .adm-app{display:flex;flex-direction:column;flex:1;min-height:0}
@@ -2220,6 +2221,38 @@ track.addEventListener('pointercancel', () => { swipeX = null; });
 const inViewer = !!(window.claude && typeof window.claude.use === 'function');
 const artifactP = inViewer ? new Promise(r => r(window.claude.use('artifact'))).catch(() => null) : Promise.resolve(null);
 const LS_SITE = 'instituto-mutualista-sitio';
+// Servidor propio (p. ej. institutoamsp.com): el panel entra con una contraseña que valida el
+// servidor y publica por /api/admin/ para todas las personas. Sin ese servicio, guarda solo aquí.
+const API = '/api/admin/';
+const serverP = (inViewer || !/^https?:$/.test(location.protocol)) ? Promise.resolve(null)
+  : fetch(API + 'estado', { cache: 'no-store', credentials: 'same-origin' })
+      .then(r => (r.ok && /json/.test(r.headers.get('content-type') || '')) ? r.json() : null)
+      .then(j => (j && j.servidor) ? j : null).catch(() => null);
+let serverMode = false, keepDraft = false;
+async function api(ruta, cuerpo, json) {
+  const headers = { 'X-Instituto': '1' };
+  let body = cuerpo;
+  if (json) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(cuerpo || {}); }
+  else if (cuerpo) headers['Content-Type'] = cuerpo.type || 'application/octet-stream';
+  let r;
+  try { r = await fetch(API + ruta, { method: 'POST', headers: headers, body: body, credentials: 'same-origin', cache: 'no-store' }); }
+  catch (e) { throw { status: 0, msg: 'No se pudo conectar con el servidor. Revisa tu internet e inténtalo de nuevo.' }; }
+  let j = null;
+  try { j = await r.json(); } catch (e) { /* respuesta sin JSON */ }
+  if (!r.ok) throw { status: r.status, msg: (j && j.error) || (r.status === 413 ? 'El archivo pesa demasiado para subirlo.' : r.status === 429 ? 'Demasiados intentos. Espera 15 minutos.' : 'El servidor no pudo completar el guardado (error ' + r.status + ').') };
+  return j || {};
+}
+async function serverSession() {
+  try { const r = await fetch(API + 'estado', { cache: 'no-store', credentials: 'same-origin' }); return !!(await r.json()).sesion; }
+  catch (e) { return false; }
+}
+function setupServerLock() {
+  const inp = $('#lock-pin');
+  $('#adm-lock p').textContent = 'Ingresa la contraseña para editar el sitio. Lo que guardes se publica para todas las personas.';
+  $('label[for="lock-pin"]').textContent = 'Contraseña';
+  inp.setAttribute('inputmode', 'text'); inp.setAttribute('maxlength', '200'); inp.setAttribute('autocomplete', 'current-password');
+  inp.placeholder = 'Contraseña'; inp.classList.add('is-clave');
+}
 let readOnly = false;
 let persisted = new Set();
 let legacyPortada = false;
@@ -2236,7 +2269,9 @@ async function loadSite() {
   }
   let changed = false;
   if (loaded) { site = mergeSite(loaded); persisted = collectPaths(site); changed = true; }
-  if (!inViewer) { const local = store.get(LS_SITE); if (local) { site = mergeSite(local); changed = true; } }
+  serverMode = !!(await serverP);
+  if (serverMode) setupServerLock();
+  else if (!inViewer) { const local = store.get(LS_SITE); if (local) { site = mergeSite(local); changed = true; } }
   if (changed) { applySite(); cur = 0; renderHero(); }
 }
 
@@ -2257,7 +2292,7 @@ async function openAdmin() {
   opening = true;
   try { await siteReady; } finally { opening = false; }
   if (dlgA.open) return;
-  const unlocked = session.get('im-admin') === currentPinHash();
+  const unlocked = serverMode ? await serverSession() : session.get('im-admin') === currentPinHash();
   $('#adm-lock').hidden = unlocked;
   $('#adm-app').hidden = !unlocked;
   $('#lock-err').textContent = '';
@@ -2273,8 +2308,29 @@ function startEditing() {
   renderTabs(); renderPanel();
   describeMode();
 }
+async function loginServer() {
+  const inp = $('#lock-pin'), err = $('#lock-err'), btn = $('#lock-form button[type="submit"]');
+  if (!inp.value) { err.textContent = 'Escribe la contraseña.'; return; }
+  btn.disabled = true; err.textContent = 'Comprobando…';
+  try {
+    await api('login', { clave: inp.value }, true);
+    inp.value = ''; err.textContent = '';
+    $('#adm-lock').hidden = true; $('#adm-app').hidden = false;
+    if (keepDraft && draft) { keepDraft = false; renderTabs(); renderPanel(); setStatus('Sesión renovada. Pulsa “Guardar cambios” de nuevo.'); }
+    else startEditing();
+  } catch (e) { err.textContent = e.msg; inp.select(); }
+  finally { btn.disabled = false; }
+}
+function volverAlCandado(msg, conservar) {
+  keepDraft = !!conservar;
+  if (!conservar) dirty = false;
+  $('#adm-app').hidden = true; $('#adm-lock').hidden = false;
+  $('#lock-err').textContent = msg || ''; $('#lock-pin').value = '';
+  setTimeout(() => $('#lock-pin').focus(), 30);
+}
 $('#lock-form').addEventListener('submit', e => {
   e.preventDefault();
+  if (serverMode) { loginServer(); return; }
   if (Date.now() < lockUntil) { $('#lock-err').textContent = 'Demasiados intentos. Espera unos segundos.'; return; }
   const pin = $('#lock-pin').value.trim();
   if (hashPin(pin) === currentPinHash()) {
@@ -2315,6 +2371,7 @@ function setStatus(msg, kind) {
   $('#adm-status').classList.toggle('is-ok', kind === 'ok');
 }
 async function describeMode() {
+  if (serverMode) { setStatus(store.get(LS_SITE) ? 'Este navegador tiene cambios de antes que nadie más vio: puedes recuperarlos en la pestaña Seguridad. Lo que guardes aquí se publica para todas las personas.' : 'Al guardar, los cambios se publican en este sitio para todas las personas.'); return; }
   if (!inViewer) { setStatus('Vista local: los cambios se guardan en este navegador. En el sitio final se necesita un servidor o gestor de contenidos para que los vean todos.'); return; }
   const art = await artifactP;
   if (art && !readOnly) setStatus('Al guardar, los cambios se publican para todas las personas que abren esta página.');
@@ -2430,12 +2487,13 @@ function panelVideos() {
       : '<div class="empty" style="margin-top:16px">' + icon('video') + '<h3>Aún no hay videos</h3><p>Pulsa “Agregar video” y sube un clip de hasta 30 segundos. Mientras no haya videos, la sección no se muestra en la web.</p></div>');
 }
 // Lee el video subido: revisa formato, peso y duración, y saca una imagen de portada.
-function readVideo(file) {
+function readVideo(file, servidor) {
   return new Promise((resolve, reject) => {
     const okType = /^video\/(mp4|webm|quicktime|x-m4v)$/i.test(file.type) || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-    if (!okType) { reject({ msg: 'Ese archivo no es un video MP4 o WebM.' }); return; }
+    if (!okType) { reject({ msg: 'Ese archivo no es un video MP4 o WebM.', hard: true }); return; }
     const mb = file.size / 1048576;
-    if (mb > MAX_VIDEO_MB) { reject({ msg: 'El video pesa ' + mb.toFixed(1) + ' MB y el máximo es ' + MAX_VIDEO_MB + ' MB. Expórtalo en 720p.' }); return; }
+    const maxMb = servidor ? 200 : MAX_VIDEO_MB;
+    if (mb > maxMb) { reject({ msg: 'El video pesa ' + mb.toFixed(1) + ' MB y el máximo es ' + maxMb + ' MB.' + (servidor ? '' : ' Expórtalo en 720p.'), hard: true }); return; }
     const url = URL.createObjectURL(file);
     const vid = document.createElement('video');
     vid.muted = true; vid.playsInline = true; vid.preload = 'auto';
@@ -2454,7 +2512,7 @@ function readVideo(file) {
     vid.onloadedmetadata = async () => {
       const dur = await getDuration();
       if (!isFinite(dur)) { fail('No se pudo saber cuánto dura el video. Expórtalo como MP4 e inténtalo de nuevo.'); return; }
-      if (dur > MAX_SECONDS + 0.5) { fail('El video dura ' + fmtDur(dur) + '. Sube uno de ' + MAX_SECONDS + ' segundos como máximo.'); return; }
+      if (dur > MAX_SECONDS + 0.5 && !servidor) { fail('El video dura ' + fmtDur(dur) + '. Sube uno de ' + MAX_SECONDS + ' segundos como máximo.'); return; }
       const finish = async () => {
         if (done) return;
         done = true; clearTimeout(timer);
@@ -2624,7 +2682,42 @@ function panelConectores() {
     '<li><span class="quick-ico qi-brand">' + icon('mapPin') + '</span><span>Mapa: se configura en Contacto (enlace de Google Maps o la dirección).</span></li>' +
     '<li><span class="quick-ico qi-brand">' + icon('messenger') + '</span><span>Messenger y redes: se configuran en Redes sociales y se usan en Botones.</span></li></ul>';
 }
+function panelSeguridadServidor() {
+  const local = store.get(LS_SITE);
+  return '<h3>Contraseña del panel</h3><p class="adm-intro">La valida el servidor. Usa al menos 10 caracteres. Al cambiarla se cierran las sesiones abiertas y vuelves a entrar con la nueva.</p>' +
+    '<div class="adm-grid"><label class="ed-f"><span>Contraseña actual</span><input id="clave-actual" type="password" maxlength="200" autocomplete="current-password"></label>' +
+    '<label class="ed-f"><span>Nueva contraseña</span><input id="clave-nueva" type="password" maxlength="200" autocomplete="new-password"></label>' +
+    '<label class="ed-f"><span>Repite la nueva</span><input id="clave-rep" type="password" maxlength="200" autocomplete="new-password"></label></div>' +
+    '<p style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" data-act="clave">' + icon('lock') + 'Cambiar contraseña</button><button class="btn btn-line btn-sm" type="button" data-act="salir">Cerrar sesión</button><span class="adm-hint" id="clave-msg"></span></p>' +
+    (local ? '<h3>Cambios guardados solo en este navegador</h3><p class="adm-intro">Antes este panel guardaba en el navegador y nadie más veía esos cambios. Cárgalos para revisarlos y publicarlos, o descártalos. Los videos de entonces no se guardaron: súbelos de nuevo.</p>' +
+      '<p style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-brand btn-sm" type="button" data-act="local-cargar">Cargar en el panel</button><button class="btn btn-line btn-sm" type="button" data-act="local-descartar">Descartar</button></p>' : '') +
+    '<h3>Cómo entrar al panel</h3><p class="adm-intro">El panel no tiene ningún botón visible ni dirección propia. Se abre solo de estas dos formas:</p><ul class="access-list">' +
+    '<li><span class="quick-ico qi-brand">' + icon('keyboard') + '</span><span>En computadora, presiona <code>Alt</code> + <code>Shift</code> + <code>A</code>.</span></li>' +
+    '<li><span class="quick-ico qi-brand">' + icon('pointer') + '</span><span>Haz clic 5 veces seguidas en el símbolo <code>©</code> del pie de página.</span></li></ul>' +
+    '<p class="adm-note">' + icon('info') + '<span>Tras 5 contraseñas incorrectas, el servidor bloquea los intentos desde esa conexión durante 15 minutos.</span></p>';
+}
+async function accionServidor(act) {
+  if (act === 'clave') {
+    const a = $('#clave-actual').value, n = $('#clave-nueva').value, r = $('#clave-rep').value, msg = $('#clave-msg');
+    if (n.length < 10) { msg.textContent = 'La nueva debe tener al menos 10 caracteres.'; msg.className = 'adm-hint bad'; return; }
+    if (n !== r) { msg.textContent = 'Las dos contraseñas nuevas no coinciden.'; msg.className = 'adm-hint bad'; return; }
+    try { await api('clave', { actual: a, nueva: n }, true); volverAlCandado('Contraseña cambiada. Entra con la nueva.'); }
+    catch (e) { msg.textContent = e.msg; msg.className = 'adm-hint bad'; }
+  } else if (act === 'salir') {
+    try { await api('salir', {}, true); } catch (e) { /* la sesión se cierra igual */ }
+    volverAlCandado('Sesión cerrada.');
+  } else if (act === 'local-cargar') {
+    const local = store.get(LS_SITE);
+    if (local) { draft = cloneSite(mergeSite(local)); markDirty(); }
+    renderTabs(); renderPanel();
+    setStatus('Cambios de este navegador cargados. Revísalos y pulsa “Guardar cambios” para publicarlos.', 'ok');
+  } else if (act === 'local-descartar') {
+    try { localStorage.removeItem(LS_SITE); } catch (e) { /* sin almacenamiento */ }
+    renderPanel(); describeMode();
+  }
+}
 function panelSeguridad() {
+  if (serverMode) return panelSeguridadServidor();
   return '<h3>PIN del administrador</h3><p class="adm-intro">Cambia el PIN de 4 a 12 dígitos que pide este panel. El cambio se aplica al guardar.</p>' +
     '<div class="adm-grid"><label class="ed-f"><span>Nuevo PIN</span><input id="pin-new" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label>' +
     '<label class="ed-f"><span>Repite el nuevo PIN</span><input id="pin-rep" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password"></label></div>' +
@@ -2710,13 +2803,20 @@ admPanel.addEventListener('change', async e => {
     if (!file) return;
     setStatus('Revisando el video…');
     try {
-      const r = await readVideo(file);
+      let r;
+      try { r = await readVideo(file, serverMode); }
+      catch (err) {
+        if (!serverMode || (err && err.hard)) throw err;
+        r = { blob: file, url: URL.createObjectURL(file), type: 'mp4', dur: null, sizeMB: (file.size / 1048576).toFixed(1), poster: null, posterUrl: null };
+      }
       v.archivoBlob = r.blob; v.archivoUrl = r.url; v.archivoType = r.type; v.archivo = null;
-      v.segundos = r.dur; v.sizeMB = r.sizeMB; v.err = '';
+      v.segundos = r.dur ? Math.min(r.dur, MAX_SECONDS) : null; v.sizeMB = r.sizeMB; v.err = '';
       const hasOwnPoster = (v.portadaBlob || v.portada) && !v.autoPoster;
       if (r.poster && !hasOwnPoster) { v.portadaBlob = r.poster; v.portadaUrl = r.posterUrl; v.portada = null; v.autoPoster = true; }
       markDirty(); renderPanel();
-      setStatus('Video listo (' + fmtDur(r.dur) + '). Pulsa “Guardar cambios” para publicarlo.', 'ok');
+      setStatus(serverMode
+        ? 'Video listo. Al guardar, el servidor lo prepara para todos los navegadores' + (r.dur > MAX_SECONDS + 0.5 ? ' y usa sus primeros ' + MAX_SECONDS + ' s' : '') + '. Si no subes portada, la saca del primer segundo.'
+        : 'Video listo (' + fmtDur(r.dur) + '). Pulsa “Guardar cambios” para publicarlo.', 'ok');
     } catch (err) {
       v.err = (err && err.msg) || 'No se pudo leer el video.';
       renderPanel(); setStatus(v.err, 'error');
@@ -2734,6 +2834,7 @@ admPanel.addEventListener('click', e => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   const act = b.dataset.act;
+  if (serverMode && ['clave', 'salir', 'local-cargar', 'local-descartar'].includes(act)) { accionServidor(act); return; }
   if (act.startsWith('faq-')) {
     const fr = b.closest('.faq-row');
     const j = fr ? +fr.dataset.q : -1;
@@ -2884,10 +2985,67 @@ async function publishWithRetry(art, files) {
     throw err;
   }
 }
+// Guardar en el servidor propio: sube fotos y videos nuevos y publica sitio.json para todos.
+const esData = x => typeof x === 'string' && x.startsWith('data:');
+const blobDe = src => fetch(src).then(r => r.blob());
+const subirImagen = async (blob, nombre) => (await api('archivo?tipo=imagen&nombre=' + encodeURIComponent(nombre), blob)).ruta;
+async function saveToServer() {
+  const avisos = [];
+  const nVid = draft.videos.filter(v => v.archivoBlob).length;
+  let iVid = 0;
+  try {
+    setStatus('Guardando…');
+    const slides = [];
+    for (const s of draft.slides) {
+      let img = isPath(s.img) ? s.img : null;
+      if (s.blob) img = await subirImagen(s.blob, s.id);
+      else if (esData(s.img)) img = await subirImagen(await blobDe(s.img), s.id);
+      slides.push(slideMeta(s, img));
+    }
+    let logo = isPath(draft.logo) ? draft.logo : null;
+    if (draft.logoBlob) logo = await subirImagen(draft.logoBlob, 'logo');
+    else if (esData(draft.logo)) logo = await subirImagen(await blobDe(draft.logo), 'logo');
+    const videos = [];
+    for (const v of draft.videos) {
+      let arch = isVideoPath(v.archivo) ? v.archivo : null;
+      let por = isPath(v.portada) ? v.portada : null;
+      const nueva = !!v.archivoBlob;
+      if (nueva) {
+        iVid++;
+        setStatus('Subiendo y preparando el video ' + iVid + ' de ' + nVid + '. Puede tardar uno o dos minutos: no cierres esta ventana.');
+        const r = await api('archivo?tipo=video&nombre=' + encodeURIComponent(v.id), v.archivoBlob);
+        arch = r.archivo; v.segundos = r.segundos;
+        if (r.aviso) avisos.push(r.aviso);
+        // Portada: la propia si la subiste; si no, la del primer segundo que saca el servidor.
+        if (v.autoPoster || !(v.portadaBlob || v.portada)) por = r.portada;
+      }
+      if (!(v.autoPoster && nueva)) {
+        if (v.portadaBlob) por = await subirImagen(v.portadaBlob, v.id);
+        else if (esData(v.portada)) por = await subirImagen(await blobDe(v.portada), v.id);
+      }
+      videos.push(videoMeta(v, por, arch));
+    }
+    setStatus('Publicando…');
+    await api('publicar', { sitio: serialize(draft, slides, logo, videos) }, true);
+    draft.slides.forEach((s, k) => { s.img = slides[k].img; s.blob = null; });
+    draft.logo = logo; draft.logoBlob = null; draft.logoUrl = null;
+    draft.videos.forEach((v, k) => {
+      v.portada = videos[k].portada; v.archivo = videos[k].archivo;
+      v.portadaBlob = null; v.archivoBlob = null; v.portadaUrl = null; v.archivoUrl = null; v.autoPoster = false;
+    });
+    commitDraft(); renderPanel();
+    try { localStorage.removeItem(LS_SITE); } catch (e) { /* sin almacenamiento */ }
+    setStatus('Cambios publicados: ya los ve todo el mundo.' + (avisos.length ? ' ' + avisos.join(' ') : ''), 'ok');
+  } catch (e) {
+    if (e && e.status === 401) { volverAlCandado('La sesión venció. Vuelve a entrar: tus cambios siguen en el panel.', true); return; }
+    setStatus((e && e.msg) || 'No se pudo guardar. Inténtalo de nuevo.', 'error');
+  }
+}
 $('#adm-save').addEventListener('click', async () => {
   const btn = $('#adm-save');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
+    if (serverMode) { await saveToServer(); return; }
     const art = await artifactP;
     if (art && !readOnly) {
       const files = {}, keep = new Set();

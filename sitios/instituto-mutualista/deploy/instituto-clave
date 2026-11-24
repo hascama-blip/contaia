@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Crea o cambia la contraseña del panel de administración del sitio del Instituto Mutualista.
+# Uso en el servidor:  sudo instituto-clave
+# La contraseña se escribe dos veces en la terminal (no se ve) y se guarda solo como huella
+# scrypt en /etc/instituto/admin.json. Cierra las sesiones abiertas del panel.
+set -euo pipefail
+CFG=/etc/instituto/admin.json
+SRV=/usr/local/lib/instituto/admin-servidor.py
+[ "$(id -u)" = 0 ] || { echo "Ejecuta con sudo: sudo instituto-clave"; exit 1; }
+[ -f "$SRV" ] || { echo "Falta el panel ($SRV): aplica primero un código de despliegue."; exit 1; }
+
+leer() {   # leer MENSAJE → la escribe la persona en la terminal sin que se vea
+  local v
+  if [ -z "${CLAVE_DESDE_STDIN:-}" ] && { exec 3</dev/tty; } 2>/dev/null; then
+    read -rs -p "$1" v <&3; echo >/dev/tty; exec 3<&-
+  else
+    read -r v
+  fi
+  printf '%s' "$v"
+}
+echo "Contraseña del panel de administración (mínimo 10 caracteres; letras, números y algún símbolo)."
+for intento in 1 2 3; do
+  a=$(leer "Nueva contraseña: "); b=$(leer "Repítela: ")
+  if [ "${#a}" -lt 10 ]; then echo "Muy corta: usa al menos 10 caracteres."; continue; fi
+  if [ "$a" != "$b" ]; then echo "No coinciden. Inténtalo de nuevo."; continue; fi
+  h=$(printf '%s\n' "$a" | python3 "$SRV" --hash)
+  install -d -m 700 -o instituto-admin -g instituto-admin "$(dirname "$CFG")"
+  HASH="$h" python3 - "$CFG" <<'PY'
+import json, os, sys
+ruta = sys.argv[1]
+try:
+    cfg = json.load(open(ruta, encoding="utf-8"))
+except Exception:
+    cfg = {}
+cfg["hash"] = os.environ["HASH"]
+tmp = ruta + ".nuevo"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, indent=2)
+os.chmod(tmp, 0o600)
+os.replace(tmp, ruta)
+PY
+  chown instituto-admin:instituto-admin "$CFG"
+  if [ -d /run/systemd/system ] && systemctl is-enabled --quiet instituto-admin 2>/dev/null; then systemctl restart instituto-admin; fi
+  echo "Contraseña guardada. Entra al panel con Alt+Shift+A (o 5 clics en el © del pie de página)."
+  exit 0
+done
+echo "No se cambió la contraseña."; exit 1

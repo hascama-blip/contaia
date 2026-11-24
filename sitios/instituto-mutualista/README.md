@@ -72,9 +72,9 @@ El logo de la Asociación Mutualista Sanitaria del Perú (AMSP) está en `imagen
   archivos de la página; lo ven todos los visitantes. Solo quien tiene permiso de edición
   puede guardar.
 - **Abierto como archivo o servidor simple**: se guarda en el navegador (`localStorage`).
-- **Producción (institutoamsp.com)**: el panel oculto guarda solo en el navegador de quien lo usa;
-  los visitantes no ven esos cambios. Los cambios se hacen en los archivos y se publican con un
-  código de despliegue (ver *Publicar en AWS Lightsail*).
+- **Producción (institutoamsp.com)**: el panel entra con una **contraseña que valida el servidor**
+  y "Guardar cambios" publica para todas las personas (servicio `deploy/admin-servidor.py`, ver
+  *Panel de administración en el servidor*). Sin ese servicio, el panel guarda solo en el navegador.
 
 ## Cómo verlo
 ```bash
@@ -102,6 +102,25 @@ Nada se publica solo. Cada cambio llega como un **código de una línea** que se
 en `/var/log/instituto-despliegues.log`. Si el dominio ya apunta al servidor y falta el certificado,
 lo obtiene en ese momento. El dominio y el correo del certificado se guardan en `config.env` del
 bucket privado; para cambiarlos: `codigo DOMINIO CORREO`.
+
+### Panel de administración en el servidor
+`admin-servidor.py` (Python 3, sin dependencias) corre como servicio `instituto-admin`, con usuario
+propio sin privilegios, y solo escucha en `127.0.0.1:8099`; Nginx le pasa `/api/admin/`.
+- **Contraseña**: la pide el primer código de despliegue en la terminal (no se ve ni pasa por el
+  chat) y se cambia con `sudo instituto-clave` o en la pestaña Seguridad del panel. Se guarda como
+  huella scrypt en `/etc/instituto/admin.json`. Sesión de 8 h en cookie `HttpOnly`, `Secure`,
+  `SameSite=Strict`; los POST exigen la cabecera `X-Instituto` y un `Origin` del dominio.
+  Tras 5 contraseñas incorrectas se bloquea esa conexión 15 min (y Nginx limita los intentos).
+- **Lo publicado** (sitio.json, fotos y videos) va a `/var/lib/instituto/contenido`, que Nginx sirve
+  antes que la versión desplegada; un despliegue nuevo no lo toca. Cada publicación guarda el
+  sitio.json anterior en `/var/lib/instituto/historial` (los 30 últimos).
+- **Videos**: el servidor acepta MP4, MOV o WebM de hasta 200 MB (también H.265 de celular), los deja
+  en MP4 H.264 + AAC de hasta 1280 px y 30 s (recorta los más largos) con inicio rápido, y saca la
+  portada del primer segundo si no se sube una propia. Para convertir en el plan nano se activa
+  1 GB de memoria de intercambio.
+- Las fotos se validan por su contenido (JPG, PNG o WebP) y los nombres los pone el servidor.
+- Si el navegador de quien administra tenía cambios de antes (guardados solo ahí), la pestaña
+  Seguridad ofrece cargarlos en el panel para publicarlos o descartarlos.
 
 ### Seguridad del servidor
 - `instalar-lightsail.sh` genera **toda** la configuración de Nginx en cada despliegue, también la de
