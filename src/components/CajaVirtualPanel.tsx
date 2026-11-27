@@ -15,6 +15,13 @@ const fch = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-").r
 const slug = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "sede";
 const EN_PARALELO = 3;
 
+/** Motivos de lo que no se pudo bajar, agrupados (sin la fecha ni el enlace) y con cuántos días afecta cada uno. */
+function motivos(notas: string[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const x of notas) { const k = x.replace(/^\d{2}\/\d{2}\/\d{4} · /, "").replace(/\s*\(https?:[^)]*\)/, "").replace(/"[^"]*"/, "un archivo").replace(/\.$/, ""); m.set(k, (m.get(k) ?? 0) + 1); }
+  return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
+}
+
 interface Avance { hechos: number; total: number; archivos: number; notas: string[]; estado: "bajando" | "listo" | "error"; error?: string }
 
 function mesAnterior(): [string, string] {
@@ -217,7 +224,16 @@ export default function CajaVirtualPanel() {
                         <td className="whitespace-normal px-2 py-1.5">
                           {!a ? <button className="text-xs font-semibold text-brand-600 hover:underline disabled:opacity-40" disabled={!!busy || !s.dias.length} onClick={() => bajar([i])}>⬇ Descargar esta sede</button>
                             : a.estado === "bajando" ? <span className="text-xs text-amber-700">Bajando día {Math.min(a.hechos + 1, a.total)} de {a.total}… ({a.archivos} archivos)</span>
-                            : a.estado === "listo" ? <span className="text-xs text-emerald-700">✓ ZIP descargado · {a.archivos} archivos{a.notas.length ? <span className="text-amber-700"> · {a.notas.length} pendiente(s), ver 00-PENDIENTES.txt</span> : ""}</span>
+                            : a.estado === "listo" ? (
+                              <span className="text-xs text-emerald-700">✓ ZIP descargado · {a.archivos} archivos
+                                {a.notas.length > 0 && (
+                                  <span className="mt-0.5 block text-amber-700">
+                                    {a.notas.length} pendiente(s) (detalle en 00-PENDIENTES.txt):
+                                    {motivos(a.notas).map(([m, n]) => <span key={m} className="block">· {n} día(s): {m}</span>)}
+                                  </span>
+                                )}
+                              </span>
+                            )
                             : <span className="text-xs text-red-600">{a.error ?? "No se completó."} <button className="font-semibold underline" disabled={!!busy} onClick={() => bajar([i])}>Reintentar</button></span>}
                         </td>
                       </tr>

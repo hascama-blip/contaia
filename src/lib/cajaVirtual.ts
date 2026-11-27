@@ -249,16 +249,37 @@ export async function listarCaja(sid: string, duenio: string, p: { empresa: stri
 const limpio = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.() -]+/g, "_").replace(/\s+/g, " ").trim().slice(0, 90) || "archivo";
 const nombreDe = (res: Response) => { const cd = res.headers.get("content-disposition") ?? ""; const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd); try { return m ? decodeURIComponent(m[1]) : ""; } catch { return m?.[1] ?? ""; } };
 
-/** Carpeta PÚBLICA de Drive: lista sus archivos sin cuenta de Google (vista incrustada). */
-export async function listarDrive(key: string): Promise<{ archivos: { id: string; nombre: string }[]; publica: boolean }> {
-  if (!/^[\w-]{10,}$/.test(key)) return { archivos: [], publica: false };
-  const res = await fetch(`https://drive.google.com/embeddedfolderview?id=${key}`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(30000) });
-  if (!res.ok || /accounts\.google\.com/.test(res.url)) return { archivos: [], publica: false };
+/** El dato de la caja puede ser el código de la carpeta o su enlace completo. */
+function idDrive(key: string): string {
+  const k = key.trim();
+  return /\/folders\/([\w-]{10,})/.exec(k)?.[1] ?? /[?&]id=([\w-]{10,})/.exec(k)?.[1] ?? (/^[\w-]{10,}$/.test(k) ? k : "");
+}
+export type EstadoDrive = "ok" | "sin-codigo" | "no-existe" | "privada" | "error";
+/** Carpeta PÚBLICA de Drive: lista sus archivos sin cuenta de Google (vista incrustada). Entra también
+ *  a las subcarpetas (dos niveles). Distingue: no existe · privada · Google no respondió. */
+export async function listarDrive(key: string, nivel = 0, prefijo = ""): Promise<{ archivos: { id: string; nombre: string }[]; publica: boolean; estado: EstadoDrive; detalle: string }> {
+  const id = idDrive(key);
+  if (!id) return { archivos: [], publica: false, estado: "sin-codigo", detalle: `código no reconocido: "${key.slice(0, 60)}"` };
+  let res: Response | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    res = await fetch(`https://drive.google.com/embeddedfolderview?id=${id}`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(30000) }).catch(() => null);
+    // 429 / 5xx / sin respuesta: Google está limitando; se espera y se reintenta.
+    if (res && res.status !== 429 && res.status < 500) break;
+    await new Promise((r) => setTimeout(r, 2000 * (intento + 1)));
+  }
+  if (!res) return { archivos: [], publica: false, estado: "error", detalle: "Google Drive no respondió" };
+  if (res.status === 404) return { archivos: [], publica: false, estado: "no-existe", detalle: "la carpeta no existe (fue borrada o el código está mal)" };
+  if (res.status === 401 || res.status === 403 || /accounts\.google\.com|ServiceLogin/.test(res.url)) return { archivos: [], publica: false, estado: "privada", detalle: "la carpeta no está compartida como pública" };
+  if (!res.ok) return { archivos: [], publica: false, estado: "error", detalle: `Google Drive respondió HTTP ${res.status}` };
   const html = await res.text();
-  const archivos = Array.from(html.matchAll(/id="entry-([\w-]+)"[\s\S]*?href="([^"]+)"[\s\S]*?flip-entry-title">([^<]*)/g))
-    .filter((m) => /\/file\/d\//.test(m[2]))   // solo archivos (las subcarpetas no se bajan)
-    .map((m) => ({ id: m[1], nombre: m[3].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() }));
-  return { archivos, publica: true };
+  const des = (x: string) => x.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+  const entradas = Array.from(html.matchAll(/id="entry-([\w-]+)"[\s\S]*?href="([^"]+)"[\s\S]*?flip-entry-title">([^<]*)/g));
+  const archivos = entradas.filter((m) => /\/file\/d\//.test(m[2])).map((m) => ({ id: m[1], nombre: prefijo + des(m[3]) }));
+  if (nivel < 2) for (const m of entradas.filter((x) => /\/folders\/|embeddedfolderview/.test(x[2])).slice(0, 15)) {
+    const sub = await listarDrive(m[1], nivel + 1, `${prefijo}${des(m[3]).replace(/[\\/]+/g, "-")}/`);
+    archivos.push(...sub.archivos);
+  }
+  return { archivos, publica: true, estado: "ok", detalle: "" };
 }
 async function bajarDrive(id: string): Promise<Buffer | null> {
   for (const url of [`https://drive.google.com/uc?export=download&id=${id}`, `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`]) {
@@ -307,14 +328,16 @@ export async function archivosDelDia(sid: string, duenio: string, p: { empresa: 
     else {
       try {
         const lista = await listarDrive(d.drive);
-        if (!lista.publica) notas.push(`Drive: la carpeta no es pública o ya no existe (https://drive.google.com/drive/folders/${d.drive}).`);
+        if (!lista.publica) notas.push(`Drive: ${lista.detalle} (https://drive.google.com/drive/folders/${idDrive(d.drive) || d.drive}).`);
         else if (!lista.archivos.length) notas.push("Drive: la carpeta está vacía.");
         const usados = new Set<string>();
         for (const a of lista.archivos.slice(0, 40)) {
           const buf = await bajarDrive(a.id);
           if (!buf) { notas.push(`Drive: no se pudo bajar "${a.nombre}".`); continue; }
-          let nombre = limpio(a.nombre);
-          for (let i = 2; usados.has(nombre.toLowerCase()); i++) nombre = limpio(a.nombre.replace(/(\.\w+)?$/, ` (${i})$1`));
+          // Las subcarpetas de Drive se conservan como carpetas dentro de "drive/".
+          const ruta = (x: string) => x.split("/").map(limpio).join("/");
+          let nombre = ruta(a.nombre);
+          for (let i = 2; usados.has(nombre.toLowerCase()); i++) nombre = ruta(a.nombre.replace(/(\.\w+)?$/, ` (${i})$1`));
           usados.add(nombre.toLowerCase());
           archivos.push({ nombre: `drive/${nombre}`, data: buf });
         }

@@ -237,8 +237,7 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   captcha; base ajustable con `CAJA_VIRTUAL_URL`). Con UNA sesión baja, de cada sede (cada "lupa" de Consulta Ingreso →
   Totales por Mes) y cada día del rango: el **PDF** y el **Excel** del reporte de ingresos y los archivos de la
   **carpeta pública de Google Drive** de ese día (REPORTE, DEPÓSITO, YAPE).
-  Mecánica (leída del JavaScript de la web; **calibrada solo contra una réplica local: falta la primera prueba con
-  accesos reales**, el `diag` del supremo muestra cada paso): ingreso `GET data/clsusuario.php?tarea=1&usuario=&pass=` →
+  Mecánica (leída del JavaScript de la web y probada contra una réplica local; el `diag` del supremo muestra cada paso): ingreso `GET data/clsusuario.php?tarea=1&usuario=&pass=` →
   "true"; selección `…?tarea=2&empresa=&sede=&fecha=DD/MM/AAAA&tc=3.22&nomempresa=&nomsede=&rubro=`; consulta
   `POST data/clsingreso.php tarea=5&cedula=3|2&idresponsable=&fechaini=&fechafinal=&idcorredor=&codempresa=&codrubro=`
   (3 = totales por mes, una fila por sede; 2 = días de esa sede; responde un objeto JavaScript, a veces con llaves sin
@@ -248,7 +247,11 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   (`#cboEmpresa → #cboRubro → #cboSede`); después todo son pedidos directos con la cookie, que queda en memoria 30 min
   (`sesiones`, ligada al usuario de Radar). `entrar` lee de `caja.php?web=caja_consultaingreso…` el rol, `codempresa`,
   `codrubro` y las rutas de PDF/Excel (así sirve para las otras empresas si su pantalla usa otros nombres).
-  Drive sin cuenta: lista con `drive.google.com/embeddedfolderview?id=` y baja con `uc?export=download&id=`.
+  Drive sin cuenta: lista con `drive.google.com/embeddedfolderview?id=` y baja con `uc?export=download&id=`;
+  `listarDrive` acepta el código o el enlace completo, entra a subcarpetas (2 niveles), reintenta ante 429/5xx y
+  distingue no existe / privada / sin código (el motivo sale agrupado en pantalla y en `00-PENDIENTES.txt`).
+  **Primera corrida real (nov-2026): OK** — ingreso, 7 empresas con sus rubros y sedes, RTP Andahuaylas oct-2026
+  = 26 días y 131 archivos; RTP ATE bajó PDF y Excel de 20 días pero ninguna carpeta de Drive (motivo por confirmar).
   La clave NO se guarda. El navegador arma **un ZIP por sede** día por día (`accion: "dia"` devuelve un ZIP chico;
   3 en paralelo, reintento por día): carpeta `AAAA-MM-DD/` con PDF, Excel y `drive/`, más `00-RESUMEN.csv` y
   `00-PENDIENTES.txt` con lo que no se pudo bajar. Límite: 12 conexiones por hora por usuario.
