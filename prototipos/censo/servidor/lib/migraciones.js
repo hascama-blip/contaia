@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PLANO } from "../../src/plano.js";
+import { inquilinoDeNota, indiceNombres, fichaPorNombre } from "../../src/lib/padron.js";
 
 /**
  * Regla: toda ficha cuyos datos ya se confirmaron con RENIEC queda con estado
@@ -106,6 +107,33 @@ export function standsDeLaAsociacion(almacen, codigos = STANDS_ASOCIACION_2026) 
   return r;
 }
 
+/**
+ * Regla: quien ocupa un stand de la Asociación es su inquilino. El libro lo anota "APCCIC-NOMBRE"
+ * (stand.asociacionNota): ese mismo nombre, con el prefijo, queda como inquilino del stand, y el
+ * stand pasa a "alquilado". Toma DNI y celular de la ficha de esa persona si la tiene. No toca los
+ * stands que ya tienen inquilino ni los que el libro anota como libres. Usa solo lo que ya está en
+ * la base: aquí no hay nombres.
+ * @returns {{ inquilinos:number, conFicha:number, libres:number, yaTenian:number }}
+ */
+export function inquilinosDeLaAsociacion(almacen) {
+  const ahora = new Date().toISOString();
+  const indice = indiceNombres(almacen.listar("asociados").map(({ id, data }) => ({ ...data, id })));
+  const r = { inquilinos: 0, conFicha: 0, libres: 0, yaTenian: 0 };
+  for (const { id: codigo, data: s } of almacen.listar("stands")) {
+    if (!s?.deAsociacion || s.propietarioId) continue;
+    if (String(s.inquilino?.nombre || "").trim()) { r.yaTenian++; continue; }
+    const nombre = inquilinoDeNota(s.asociacionNota);
+    if (!nombre) { r.libres++; continue; }
+    const ficha = fichaPorNombre(nombre, indice);
+    almacen.actualizar("stands", codigo, {
+      inquilino: { nombre, dni: /^\d{8}$/.test(ficha?.dni || "") ? ficha.dni : "", celular: /^9\d{8}$/.test(ficha?.celular || "") ? ficha.celular : "" },
+      estado: !s.estado || s.estado === "propietario" ? "alquilado" : s.estado, actualizadoAt: ahora,
+    });
+    r.inquilinos++; if (ficha) r.conFicha++;
+  }
+  return r;
+}
+
 /** Corre `fn` solo si esa regla aún no se aplicó en estos datos; anota el resultado. Devuelve null si ya estaba. */
 function unaVez(almacen, id, fn) {
   const ruta = path.join(almacen.dir, "migraciones.json");
@@ -127,5 +155,7 @@ export function aplicarMigraciones(almacen) {
   if (r.fichasVerificadasPorReniec || r.traspasos.length) almacen.vaciar();
   r.standsAsociacion = unaVez(almacen, "2026-11-stands-asociacion", () => standsDeLaAsociacion(almacen));
   if (r.standsAsociacion) console.log(`Migración: stands de la asociación · ${r.standsAsociacion.marcados} marcados (${r.standsAsociacion.creados} creados)${r.standsAsociacion.conDueno.length ? ` · con dueño, sin tocar: ${r.standsAsociacion.conDueno.join(", ")}` : ""}.`);
+  r.inquilinosAsociacion = unaVez(almacen, "2026-11-inquilinos-asociacion", () => inquilinosDeLaAsociacion(almacen));
+  if (r.inquilinosAsociacion) console.log(`Migración: inquilinos de los stands de la asociación · ${r.inquilinosAsociacion.inquilinos} registrados (${r.inquilinosAsociacion.conFicha} con ficha) · ${r.inquilinosAsociacion.libres} sin nombre o libres.`);
   return r;
 }

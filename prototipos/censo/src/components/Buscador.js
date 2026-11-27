@@ -95,8 +95,8 @@ export function opcionesStands(stands, porId) {
     return {
       valor: s.codigo,
       titulo: `${s.codigo} · ${propietarioTexto(s, porId)}`,
-      detalle: [a && `DNI ${a.dni}`, s.giro].filter(Boolean).join(" · "),
-      pajar: normalizar(`${s.codigo} ${a ? `${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${a.numero}` : ""} ${s.giro || ""} ${esDeAsociacion(s) ? "asociacion" : ""}`),
+      detalle: [a && `DNI ${a.dni}`, s.inquilino?.nombre && `Inquilino: ${s.inquilino.nombre}`, s.giro].filter(Boolean).join(" · "),
+      pajar: normalizar(`${s.codigo} ${a ? `${a.dni} ${a.nombres} ${a.apellidoPaterno} ${a.apellidoMaterno} ${a.numero}` : ""} ${s.giro || ""} ${esDeAsociacion(s) ? "asociacion" : ""} ${s.inquilino?.nombre || ""} ${s.inquilino?.dni || ""}`),
     };
   });
 }

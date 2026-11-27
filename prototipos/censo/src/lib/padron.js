@@ -25,6 +25,26 @@ export const esDeAsociacion = (s) => Boolean(s && s.deAsociacion && !s.propietar
 export const PREFIJO_ASOCIACION = "APCCIC-";
 /** Clave de nombre: palabras sin tildes y ordenadas (no importa el orden nombres/apellidos). */
 const claveNombre = (s) => normalizar(s).replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
+const sinPrefijo = (s) => String(s || "").replace(/^\s*APCCIC\s*-?\s*/i, "").replace(/\s+/g, " ").trim();
+const SIN_INQUILINO = /^(libre|vac[ií]o|desocupado|sin inquilino|ninguno|-+)$/i;
+/**
+ * Quien ocupa un stand de la Asociación es su inquilino y se anota con el prefijo:
+ * "APCCIC- JUAN PEREZ" → "APCCIC-JUAN PEREZ". null si el libro dice que está libre o no hay nombre.
+ */
+export function inquilinoDeNota(nota) {
+  const nombre = sinPrefijo(nota);
+  return !nombre || SIN_INQUILINO.test(nombre) ? null : `${PREFIJO_ASOCIACION}${nombre}`;
+}
+/** ¿Es la misma persona? No importan el prefijo APCCIC-, las tildes ni el orden de nombres y apellidos. */
+export const mismoNombre = (a, b) => Boolean(sinPrefijo(a)) && claveNombre(sinPrefijo(a)) === claveNombre(sinPrefijo(b));
+/** La ficha de una persona por su nombre (con o sin prefijo APCCIC-); null si no hay o hay dos iguales. */
+export const fichaPorNombre = (nombre, indice) => (indice && sinPrefijo(nombre) ? indice.get(claveNombre(sinPrefijo(nombre))) || null : null);
+/** Todos los inquilinos registrados en los stands: [{ stand, nombre, dni, celular, ficha }] por número de stand. */
+export function listaInquilinos(stands, indice) {
+  return stands.filter((s) => String(s.inquilino?.nombre || "").trim())
+    .map((s) => ({ stand: s, nombre: s.inquilino.nombre.trim(), dni: s.inquilino.dni || "", celular: s.inquilino.celular || "", ficha: fichaPorNombre(s.inquilino.nombre, indice) }))
+    .sort((a, b) => compararCodigos(a.stand.codigo, b.stand.codigo));
+}
 /** Índice nombre → ficha, para ubicar a una persona por cómo figura en el libro (null si hay dos iguales). */
 export function indiceNombres(asociados) {
   const mapa = new Map();
@@ -40,7 +60,7 @@ export function indiceNombres(asociados) {
  */
 export function fichaDeAsociacion(stand, porId, indice) {
   if (!esDeAsociacion(stand)) return null;
-  const nombre = String(stand.asociacionNota || "").replace(/^\s*APCCIC\s*-?\s*/i, "");
+  const nombre = sinPrefijo(stand.asociacionNota || stand.inquilino?.nombre);
   const porNombre = nombre && indice ? indice.get(claveNombre(nombre)) : null;
   if (porNombre) return porNombre;
   const tramo = [...(stand.historial || [])].reverse().find((t) => t.asociadoId && porId.get(t.asociadoId));
@@ -48,7 +68,7 @@ export function fichaDeAsociacion(stand, porId, indice) {
 }
 /** Cómo se muestra un stand de la Asociación: "APCCIC-NOMBRES APELLIDOS" ("" si no se sabe a nombre de quién figura). */
 export function nombreEnAsociacion(stand, persona) {
-  const nota = String(stand?.asociacionNota || "").trim();
+  const nota = String(stand?.asociacionNota || stand?.inquilino?.nombre || "").trim();
   if (nota) return /^APCCIC/i.test(nota) ? nota : `${PREFIJO_ASOCIACION}${nota}`;
   if (!persona) return "";
   return `${PREFIJO_ASOCIACION}${[persona.nombres, persona.apellidoPaterno, persona.apellidoMaterno].filter(Boolean).join(" ").toUpperCase()}`;

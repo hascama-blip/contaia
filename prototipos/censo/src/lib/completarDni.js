@@ -19,7 +19,7 @@ const clave = (ps) => [...ps].sort().join(" ");
 export function indicePersonas({ asociados = [], stands = [] }) {
   const lista = [];
   const agregar = (nombre, dni, fuente, detalle) => {
-    const ps = palabras(nombre);
+    const ps = palabras(limpiarNombre(nombre));
     if (ps.length < 2) return;
     lista.push({ palabras: ps, sonidos: ps.map(sonido), dni: esDni(dni) ? String(dni).trim() : "", nombre: String(nombre).replace(/\s+/g, " ").trim(), fuente, detalle });
   };

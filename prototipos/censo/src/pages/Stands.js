@@ -4,12 +4,12 @@ import { CabPagina, Kpi, BadgeStand, Badge, Vacio, Panel, Campo, Entrada, Select
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_STAND } from "../lib/types.js";
-import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar, esDeAsociacion, etiquetaNumero, fichaDeAsociacion, nombreEnAsociacion } from "../lib/padron.js";
+import { compararCodigos, nombreCompleto, nombreCorto, nombreGaleria, normalizar, esDeAsociacion, etiquetaNumero, fichaDeAsociacion, nombreEnAsociacion, mismoNombre } from "../lib/padron.js";
 import { editarStand, marcarStandsAsociacion, quitarDeAsociacion } from "../api/stands.js";
 import { PanelTraspaso, HistorialPropietarios } from "../components/Traspaso.js";
 import { PanelStandsAsociacion } from "../components/StandsAsociacion.js";
 
-function PanelStand({ stand, onCerrar, onTraspaso }) {
+export function PanelStand({ stand, onCerrar, onTraspaso }) {
   const { avisar, datos, derivados, usuario } = useApp();
   const eraAsoc = esDeAsociacion(stand);
   const [asoc, setAsoc] = useState(eraAsoc);
@@ -133,6 +133,8 @@ export function Stands() {
                 const anterior = s.historial?.[s.historial.length - 1];
                 const persona = fichaDeAsociacion(s, derivados.porId, derivados.indiceNombres); // solo en stands de la asociación
                 const apccic = esDeAsociacion(s) ? nombreEnAsociacion(s, persona) : "";
+                const inquilino = String(s.inquilino?.nombre || "").trim();
+                const inqEsApccic = Boolean(apccic && inquilino) && mismoNombre(inquilino, apccic); // ya figura como inquilino: no se repite bajo «Asociación»
                 return html`<tr key=${s.codigo} className=${puedeEscribir !== false ? "clic" : ""} onClick=${() => puedeEscribir !== false && setEditando(s)}>
                   <td className="fuerte num">${s.codigo}</td>
                   <td>${nombreGaleria(s.galeria)}</td>
@@ -140,11 +142,11 @@ export function Stands() {
                   <td>${s.giro || "—"}</td>
                   <td>
                     ${dueno ? html`<a href=${`#ficha-${dueno.id}`} onClick=${(e) => e.stopPropagation()}>${nombreCorto(dueno)}</a>`
-                      : esDeAsociacion(s) ? html`<${Badge} tono="asoc">Asociación<//>${apccic ? html`<span className="celda-sub">${persona ? html`<a href=${`#ficha-${persona.id}`} onClick=${(e) => e.stopPropagation()}>${apccic}</a>` : apccic}</span>` : ""}`
+                      : esDeAsociacion(s) ? html`<${Badge} tono="asoc">Asociación<//>${apccic && !inqEsApccic ? html`<span className="celda-sub">${persona ? html`<a href=${`#ficha-${persona.id}`} onClick=${(e) => e.stopPropagation()}>${apccic}</a>` : apccic}</span>` : ""}`
                       : html`<span className="muted">Sin propietario</span>`}
                     ${anterior && !(persona && anterior.asociadoId === persona.id) && html`<span className="celda-sub">Antes: ${anterior.nombre}</span>`}
                   </td>
-                  <td>${s.inquilino?.nombre || "—"}</td>
+                  <td>${!inquilino ? "—" : inqEsApccic && persona ? html`<a href=${`#ficha-${persona.id}`} title="Ver su ficha" onClick=${(e) => e.stopPropagation()}>${inquilino}</a>` : inquilino}${inquilino && s.inquilino.dni ? html`<span className="celda-sub num">DNI ${s.inquilino.dni}</span>` : ""}</td>
                   <td><${BadgeStand} estado=${s.estado} /></td>
                 </tr>`;
               })}

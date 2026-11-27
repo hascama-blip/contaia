@@ -1,5 +1,6 @@
 // Marcar stands como propios de la Asociación, de a muchos: desde el Excel de revisión del libro
 // (filas que dicen "STAND DE LA ASOCIACION") o pegando los números. Primero muestra qué pasará.
+// Quien ocupa el stand (en el libro, "APCCIC-NOMBRE") queda como su inquilino, con ese mismo nombre.
 import { html, useState, useMemo } from "./html.js";
 import { Panel, Badge, Barra } from "./ui.js";
 import { useApp } from "./contexto.js";
@@ -7,8 +8,8 @@ import { leerPrimeraHoja } from "../lib/xlsx.js";
 import { standsDesdeFilas, standsDesdeTexto, planAsociacion } from "../lib/standsAsociacion.js";
 import { marcarStandsAsociacion } from "../api/stands.js";
 
-const TONO = { crear: "asoc", marcar: "asoc", dueno: "alerta", nota: "info", ya: "neutro" };
-const TEXTO = { crear: "Se crea", marcar: "Se marca", dueno: "Tenía dueño", nota: "Se anota", ya: "Ya estaba" };
+const TONO = { crear: "asoc", marcar: "asoc", dueno: "alerta", inquilino: "info", nota: "info", ya: "neutro" };
+const TEXTO = { crear: "Se crea", marcar: "Se marca", dueno: "Tenía dueño", inquilino: "Inquilino", nota: "Se anota", ya: "Ya estaba" };
 
 export function PanelStandsAsociacion({ onCerrar }) {
   const { datos, derivados, usuario, avisar } = useApp();
@@ -18,8 +19,13 @@ export function PanelStandsAsociacion({ onCerrar }) {
   const [aviso, setAviso] = useState("");
   const [avance, setAvance] = useState(null);
   const [hecho, setHecho] = useState(null);
-  const plan = useMemo(() => planAsociacion(items, datos.stands, derivados.porId), [items, datos.stands, derivados.porId]);
+  const plan = useMemo(() => planAsociacion(items, datos.stands, derivados.porId, derivados.indiceNombres), [items, datos.stands, derivados.porId, derivados.indiceNombres]);
   const pendientes = plan.filter((p) => p.accion !== "ya");
+  const nuevosInquilinos = pendientes.filter((p) => p.inquilino).length;
+  const porMarcar = pendientes.filter((p) => p.accion === "crear" || p.accion === "marcar" || p.accion === "dueno").length;
+  const n = (k, uno, varios) => `${k} ${k === 1 ? uno : varios}`;
+  const etiqueta = porMarcar ? `Marcar ${n(porMarcar, "stand", "stands")}${nuevosInquilinos ? ` y registrar ${n(nuevosInquilinos, "inquilino", "inquilinos")}` : ""}`
+    : nuevosInquilinos ? `Registrar ${n(nuevosInquilinos, "inquilino", "inquilinos")}` : `Anotar ${n(pendientes.length, "stand", "stands")}`;
 
   async function cargarExcel(e) {
     const archivo = e.target.files?.[0];
@@ -39,25 +45,30 @@ export function PanelStandsAsociacion({ onCerrar }) {
   }
   async function aplicar() {
     const conDueno = plan.filter((p) => p.accion === "dueno").length;
-    const soloNotas = pendientes.every((p) => p.accion === "nota");
-    if (!confirm(soloNotas ? `Se anotará cómo figuran en el libro ${pendientes.length} stands de la asociación. ¿Continuar?` : `Se marcarán ${pendientes.length} stands como de la asociación${conDueno ? `; ${conDueno} figuraban a nombre de un asociado, que pasa al historial del stand` : ""}. ¿Continuar?`)) return;
+    const partes = [
+      porMarcar ? `Stands que pasan a ser de la asociación: ${porMarcar}${conDueno ? ` (${conDueno} a nombre de un asociado, que pasa al historial del stand)` : ""}` : "",
+      nuevosInquilinos ? `${porMarcar ? "i" : "I"}nquilinos que se registran con el nombre del libro (APCCIC-…): ${nuevosInquilinos}` : "",
+      !porMarcar && !nuevosInquilinos ? `Stands de la asociación en los que se anota cómo figuran en el libro: ${pendientes.length}` : "",
+    ].filter(Boolean);
+    if (!confirm(`${partes.join("; ")}. ¿Continuar?`)) return;
     setAvance({ hechos: 0, total: pendientes.length });
-    const r = await marcarStandsAsociacion(pendientes.map(({ codigo, nota }) => ({ codigo, nota })), {
+    const r = await marcarStandsAsociacion(pendientes.map(({ codigo, nota, inquilino }) => ({ codigo, nota, inquilino })), {
       asociados: datos.asociados, por: usuario?.id, documento: origen ? `Revisión del libro (${origen})` : "",
       onAvance: (hechos, total) => setAvance({ hechos, total }),
     });
     setAvance(null); setHecho(r);
-    avisar(r.errores.length ? `Marcados ${r.marcados}; ${r.errores.length} con error.` : `Listo: ${r.marcados + r.anotados} stands de la asociación actualizados.`, r.errores.length ? "error" : "ok");
+    avisar(r.errores.length ? `Marcados ${r.marcados}; ${r.errores.length} con error.` : `Listo: ${r.marcados + r.anotados} stands de la asociación actualizados${r.inquilinos ? `, ${r.inquilinos} inquilinos registrados` : ""}.`, r.errores.length ? "error" : "ok");
   }
 
   return html`
     <${Panel} titulo="Stands de la asociación" onCerrar=${avance ? () => {} : onCerrar}
       pie=${html`<button className="btn btn-ghost" disabled=${!!avance} onClick=${onCerrar}>Cerrar</button>
-        ${!hecho && html`<button className="btn btn-primary" disabled=${!pendientes.length || !!avance} onClick=${aplicar}>${avance ? `Guardando ${avance.hechos} de ${avance.total}…` : pendientes.length && pendientes.every((p) => p.accion === "nota") ? `Anotar ${pendientes.length} stands` : `Marcar ${pendientes.length} stands`}</button>`}`}>
+        ${!hecho && html`<button className="btn btn-primary" disabled=${!pendientes.length || !!avance} onClick=${aplicar}>${avance ? `Guardando ${avance.hechos} de ${avance.total}…` : etiqueta}</button>`}`}>
       <p className="ayuda" style=${{ marginTop: 0 }}>
         Un stand de la asociación no tiene a un asociado como dueño: en Stands, el plano y los reportes figura como
         <b> Asociación (stand propio)</b>. Si figuraba a nombre de un asociado, ese asociado pasa al historial del stand (no se borra)
-        y su ficha queda «por revisar».
+        y su ficha queda «por revisar». Quien lo ocupa (en el libro, <b>APCCIC-NOMBRE</b>) queda como <b>inquilino</b> del stand,
+        con ese mismo nombre; si esa persona tiene ficha, se copian su DNI y su celular.
       </p>
       <label className="btn btn-ghost" style=${{ cursor: "pointer" }}>Cargar Excel de revisión del libro (.xlsx)…
         <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr" onChange=${cargarExcel} disabled=${!!avance} /></label>
@@ -69,16 +80,16 @@ export function PanelStandsAsociacion({ onCerrar }) {
       ${aviso && html`<div className="aviso aviso-alerta" style=${{ marginTop: 10 }}><span>${aviso}</span></div>`}
       ${avance && html`<div style=${{ marginTop: 10 }}><${Barra} pct=${Math.round((avance.hechos / Math.max(1, avance.total)) * 100)} tono="ok" /></div>`}
       ${hecho && html`<div className=${`aviso ${hecho.errores.length ? "aviso-alerta" : "aviso-ok"}`} style=${{ marginTop: 10 }}><span>
-        <b>Guardado.</b> ${hecho.marcados} stands marcados${hecho.creados ? ` (${hecho.creados} creados)` : ""}${hecho.conDueno ? ` · ${hecho.conDueno} con dueño anterior en el historial` : ""}${hecho.anotados ? ` · ${hecho.anotados} con su nota del libro` : ""}${hecho.yaEstaban ? ` · ${hecho.yaEstaban} ya estaban` : ""}.
+        <b>Guardado.</b> ${hecho.marcados} stands marcados${hecho.creados ? ` (${hecho.creados} creados)` : ""}${hecho.conDueno ? ` · ${hecho.conDueno} con dueño anterior en el historial` : ""}${hecho.inquilinos ? ` · ${hecho.inquilinos} inquilinos registrados` : ""}${hecho.anotados ? ` · ${hecho.anotados} que ya eran de la asociación, actualizados` : ""}${hecho.yaEstaban ? ` · ${hecho.yaEstaban} ya estaban` : ""}.
         ${hecho.errores.length ? html`<br />${hecho.errores.join(" · ")}` : ""}</span></div>`}
       ${plan.length > 0 && html`
-        <p className="ayuda" style=${{ marginTop: 12 }}>${origen ? html`Archivo <b>${origen}</b>: ` : ""}${plan.length} stands · ${pendientes.length} por marcar${plan.length - pendientes.length ? ` · ${plan.length - pendientes.length} ya estaban` : ""}.</p>
+        <p className="ayuda" style=${{ marginTop: 12 }}>${origen ? html`Archivo <b>${origen}</b>: ` : ""}${plan.length} stands · ${porMarcar} por marcar${nuevosInquilinos ? ` · ${nuevosInquilinos} inquilinos por registrar` : ""}${plan.length - pendientes.length ? ` · ${plan.length - pendientes.length} ya estaban` : ""}.</p>
         <div className="tabla-caja"><table className="tabla">
           <thead><tr><th>Stand</th><th>En el libro</th><th>Qué pasa</th></tr></thead>
           <tbody>${plan.map((p) => html`<tr key=${p.codigo}>
             <td className="fuerte num">${p.codigo}</td>
             <td>${p.nota || html`<span className="muted">—</span>`}</td>
-            <td><${Badge} tono=${TONO[p.accion]}>${TEXTO[p.accion]}<//><span className="celda-sub">${p.texto}</span></td>
+            <td><${Badge} tono=${TONO[p.accion]}>${TEXTO[p.accion]}<//><span className="celda-sub">${p.texto}</span>${p.textoInq && html`<span className="celda-sub">${p.textoInq}</span>`}</td>
           </tr>`)}</tbody>
         </table></div>`}
     <//>`;

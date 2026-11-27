@@ -134,7 +134,7 @@ export function Ficha({ id }) {
       bloqueado=${!editable} secciones=${["conyuge", "hijos", "familiares"]} />`,
     stands: html`
       ${deAsociacion.length > 0 && html`<div className="aviso aviso-info" style=${{ marginBottom: 12 }}><span>
-        <strong>Stands de la asociación:</strong> ${deAsociacion.map((s) => s.codigo).join(", ")}. Figuran como <strong>${nombreEnAsociacion(deAsociacion[0], a)}</strong>: son propiedad de la Asociación, no de esta persona.</span></div>`}
+        <strong>Stands de la asociación:</strong> ${deAsociacion.map((s) => s.codigo).join(", ")}. ${deAsociacion.every((s) => s.inquilino?.nombre) ? "Los ocupa como inquilino; figura" : "Figuran"} como <strong>${nombreEnAsociacion(deAsociacion[0], a)}</strong>: son propiedad de la Asociación, no de esta persona.</span></div>`}
       ${!stands.length && html`<${Vacio}>${anteriores.length ? "Hoy no tiene stands a su nombre." : "Sin stands asignados."}<//>`}
       ${stands.length > 0 && html`
         <div className="tabla-caja"><table className="tabla">

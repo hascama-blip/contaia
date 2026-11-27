@@ -44,7 +44,8 @@ export function Reportes() {
     ["Stands e inquilinos", () => bajar("stands", [
       { titulo: "Stand", valor: (s) => s.codigo }, { titulo: "Galería", valor: (s) => nombreGaleria(s.galeria) }, { titulo: "Área m2", valor: (s) => s.area ?? "" },
       { titulo: "Giro", valor: (s) => s.giro }, { titulo: "Propietario", valor: (s) => propietarioTexto(s, porId) },
-      { titulo: "Inquilino", valor: (s) => s.inquilino?.nombre || "" }, { titulo: "Estado", valor: (s) => ESTADOS_STAND[s.estado]?.label },
+      { titulo: "Inquilino", valor: (s) => s.inquilino?.nombre || "" }, { titulo: "DNI del inquilino", valor: (s) => s.inquilino?.dni || "" },
+      { titulo: "Celular del inquilino", valor: (s) => s.inquilino?.celular || "" }, { titulo: "Estado", valor: (s) => ESTADOS_STAND[s.estado]?.label },
     ], datos.stands)],
     ["Incidencias", () => bajar("incidencias", [
       { titulo: "Fecha", valor: (i) => i.fecha }, { titulo: "Stand", valor: (i) => i.stand }, { titulo: "Involucrado", valor: (i) => i.involucrado },

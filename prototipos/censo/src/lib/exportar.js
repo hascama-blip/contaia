@@ -3,7 +3,7 @@
 import { INSTITUCION } from "../config.js";
 import { ESTADOS_ASOCIADO, ESTADOS_CENSO, ESTADOS_STAND } from "./types.js";
 import { fecha, hoy } from "./formato.js";
-import { nombreCompleto, nombreGaleria, faltantes } from "./padron.js";
+import { nombreCompleto, nombreGaleria, faltantes, propietarioTexto, etiquetaNumero } from "./padron.js";
 import { archivoComoDataURL } from "./archivos.js";
 import { crearZip, nombreArchivoSeguro } from "./zip.js";
 
@@ -247,6 +247,19 @@ export async function pdfFicha(a, { stands = [] } = {}) {
 
   return doc.output("blob");
 }
+
+/** Filas de listaInquilinos(): { stand, nombre, dni, celular, ficha }. */
+export const COLUMNAS_INQUILINOS = (porId) => [
+  { titulo: "Stand", valor: (i) => i.stand.codigo },
+  { titulo: "Galería", valor: (i) => nombreGaleria(i.stand.galeria) },
+  { titulo: "Inquilino", valor: (i) => i.nombre },
+  { titulo: "DNI", valor: (i) => i.dni },
+  { titulo: "Celular", valor: (i) => i.celular },
+  { titulo: "Propietario del stand", valor: (i) => propietarioTexto(i.stand, porId) },
+  { titulo: "Giro comercial", valor: (i) => i.stand.giro || "" },
+  { titulo: "Estado del stand", valor: (i) => ESTADOS_STAND[i.stand.estado]?.label || "" },
+  { titulo: "Tiene ficha de asociado", valor: (i) => (i.ficha ? etiquetaNumero(i.ficha) : "") },
+];
 
 export const COLUMNAS_PADRON = (mapaStands, atraso) => [
   { titulo: "N°", valor: (a) => a.numero },

@@ -1,14 +1,18 @@
-// Padrón de asociados: búsqueda, filtros y exportación.
-import { html, useState, useMemo } from "../components/html.js";
+// Padrón de asociados: búsqueda, filtros y exportación. La pestaña «Inquilinos» lista a quienes
+// ocupan un stand sin ser su dueño (los de stands de la Asociación figuran como "APCCIC-NOMBRE").
+import { html, useState, useMemo, useRef, useCallback } from "../components/html.js";
 import { CabPagina, BadgeCenso, BadgeAtraso, Vacio, mensajeError } from "../components/ui.js";
 import { useApp } from "../components/contexto.js";
 import { GALERIAS } from "../config.js";
 import { ESTADOS_CENSO } from "../lib/types.js";
-import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero, faltantes, observacionFaltantes } from "../lib/padron.js";
-import { aCSV, descargar, COLUMNAS_PADRON, pdfTodasLasFichas } from "../lib/exportar.js";
+import { filtrarPadron, nombreCompleto, nombreGaleria, ordenarPorNumero, etiquetaNumero, tieneNumero, faltantes, observacionFaltantes, listaInquilinos } from "../lib/padron.js";
+import { aCSV, descargar, COLUMNAS_PADRON, COLUMNAS_INQUILINOS, pdfTodasLasFichas } from "../lib/exportar.js";
 import { Paginador, usePaginacion } from "../components/Paginador.js";
 import { VerificacionMasiva } from "../components/VerificacionMasiva.js";
 import { PanelCompletarDni } from "../components/CompletarDni.js";
+import { TablaInquilinos } from "../components/Inquilinos.js";
+import { PanelTraspaso } from "../components/Traspaso.js";
+import { PanelStand } from "./Stands.js";
 import { reniecActivo } from "../lib/reniec.js";
 import { hoy } from "../lib/formato.js";
 
@@ -23,10 +27,21 @@ export function Padron() {
     [datos.asociados, derivados.mapaStands, filtro],
   );
   const cambia = (k) => (e) => setFiltro((f) => ({ ...f, [k]: e.target.value }));
+  const [vista, setVista] = useState("asociados"); // asociados | inquilinos
+  const inquilinos = useMemo(() => listaInquilinos(datos.stands, derivados.indiceNombres), [datos.stands, derivados.indiceNombres]);
+  const inquilinosVisibles = useRef(inquilinos); // lo que deja el filtro de la pestaña, para exportar lo que se ve
+  const alFiltrarInquilinos = useCallback((filas) => { inquilinosVisibles.current = filas; }, []);
+  const [standAbierto, setStandAbierto] = useState(null);
+  const [traspaso, setTraspaso] = useState(null);
 
   const pag = usePaginacion(lista);
   async function exportar() {
     try {
+      if (vista === "inquilinos") {
+        await descargar(`inquilinos-${hoy().iso}.csv`, aCSV(COLUMNAS_INQUILINOS(derivados.porId), inquilinosVisibles.current));
+        avisar("Lista de inquilinos exportada.");
+        return;
+      }
       const csv = aCSV(COLUMNAS_PADRON(derivados.mapaStands, derivados.atraso), lista);
       await descargar(`padron-asociados-${hoy().iso}.csv`, csv);
       avisar("Padrón exportado.");
@@ -54,7 +69,7 @@ export function Padron() {
   return html`
     <div className="pagina">
       <${CabPagina} miga=${{ href: "#inicio", texto: "Inicio" }} titulo="Padrón de asociados"
-        sub=${`${datos.asociados.length} asociados registrados`}
+        sub=${`${datos.asociados.length} asociados registrados${inquilinos.length ? ` · ${inquilinos.length} inquilinos` : ""}`}
         acciones=${html`
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${exportar}>Exportar a Excel (CSV)</button>`}
           ${caps.descargas && html`<button className="btn btn-ghost" onClick=${() => setCompletando(true)}>Completar DNI en un Excel…</button>`}
@@ -65,7 +80,18 @@ export function Padron() {
       ${verificando && html`<${VerificacionMasiva} asociados=${lista} onCerrar=${() => setVerificando(false)} />`}
       ${completando && html`<${PanelCompletarDni} onCerrar=${() => setCompletando(false)} />`}
 
-      <section className="card">
+      <div className="pestanas" role="tablist" aria-label="Qué ver del padrón">
+        <button role="tab" id="pad-tab-asociados" aria-selected=${vista === "asociados"} onClick=${() => setVista("asociados")}>Asociados (${datos.asociados.length})</button>
+        <button role="tab" id="pad-tab-inquilinos" aria-selected=${vista === "inquilinos"} onClick=${() => setVista("inquilinos")}>Inquilinos (${inquilinos.length})</button>
+      </div>
+      ${vista === "inquilinos" && html`<section className="card">
+        <${TablaInquilinos} inquilinos=${inquilinos} onLista=${alFiltrarInquilinos} onAbrir=${puedeEscribir !== false ? setStandAbierto : null} />
+      </section>`}
+      ${standAbierto && html`<${PanelStand} stand=${standAbierto} onCerrar=${() => setStandAbierto(null)}
+        onTraspaso=${() => { setTraspaso(standAbierto); setStandAbierto(null); }} />`}
+      ${traspaso && html`<${PanelTraspaso} stand=${traspaso} onCerrar=${() => setTraspaso(null)} />`}
+
+      ${vista === "asociados" && html`<section className="card">
         <div className="filtros">
           <label className="sr" htmlFor="pad-buscar">Buscar</label>
           <input id="pad-buscar" className="input buscar" type="search" placeholder="Buscar por DNI, nombre, N° de asociado o stand"
@@ -109,6 +135,6 @@ export function Padron() {
           <span>Mostrando ${pag.desde}–${pag.hasta} de ${lista.length} asociados${lista.length !== datos.asociados.length ? ` (${datos.asociados.length} en total)` : ""}</span>
           <${Paginador} pagina=${pag.pagina} total=${pag.total} onPagina=${pag.setPagina} />
         </div>
-      </section>
+      </section>`}
     </div>`;
 }

@@ -1,6 +1,6 @@
 // Stands propios de la Asociación: qué stands marcar (desde el Excel de revisión del libro o
 // una lista de números) y qué pasará con cada uno antes de guardar. Lógica pura.
-import { existeStand, nombreCompleto, etiquetaNumero, compararCodigos } from "./padron.js";
+import { existeStand, nombreCompleto, etiquetaNumero, compararCodigos, inquilinoDeNota, mismoNombre, fichaPorNombre } from "./padron.js";
 
 export const MARCA_ASOCIACION = /STAND\s+DE\s+LA\s+ASOCIACI[OÓ]N/i;
 
@@ -31,20 +31,40 @@ export function standsDesdeTexto(texto) {
   return { items: validos.sort((a, b) => compararCodigos(a.codigo, b.codigo)), invalidos };
 }
 
-/** Qué pasará con cada stand: crear | marcar | dueno (pasa al historial) | nota (ya marcado, se anota cómo figura en el libro) | ya. */
-export function planAsociacion(items, stands, porId) {
+/**
+ * Quien ocupa el stand ("APCCIC-NOMBRE" en el libro) queda como su inquilino, con ese mismo nombre.
+ * Toma DNI y celular de su ficha si la tiene. No pisa a otro inquilino ya registrado.
+ * @returns {{ inquilino: object|null, textoInq: string }}  inquilino = lo que hay que guardar (null si nada)
+ */
+function planInquilino(nota, stand, indice) {
+  const nombre = inquilinoDeNota(nota);
+  if (!nombre) return { inquilino: null, textoInq: nota ? "El libro lo anota como libre: queda sin inquilino." : "" };
+  const actual = String(stand?.inquilino?.nombre || "").trim() ? stand.inquilino : null;
+  const ficha = fichaPorNombre(nombre, indice);
+  const deFicha = { dni: /^\d{8}$/.test(ficha?.dni || "") ? ficha.dni : "", celular: /^9\d{8}$/.test(ficha?.celular || "") ? ficha.celular : "" };
+  if (!actual) return { inquilino: { nombre, ...deFicha }, textoInq: `Se registra como inquilino: ${nombre}${deFicha.dni ? ` (DNI ${deFicha.dni}, de su ficha)` : ""}.` };
+  if (!mismoNombre(actual.nombre, nombre)) return { inquilino: null, textoInq: `Ya tiene otro inquilino (${actual.nombre}): no se cambia.` };
+  const nuevo = { nombre, dni: actual.dni || deFicha.dni, celular: actual.celular || deFicha.celular };
+  const cambia = nuevo.nombre !== actual.nombre || nuevo.dni !== (actual.dni || "") || nuevo.celular !== (actual.celular || "");
+  return cambia ? { inquilino: nuevo, textoInq: `Se actualiza el inquilino: ${nombre}.` } : { inquilino: null, textoInq: `Ya figura como inquilino: ${nombre}.` };
+}
+
+/** Qué pasará con cada stand: crear | marcar | dueno (pasa al historial) | inquilino | nota (se anota cómo figura en el libro) | ya. */
+export function planAsociacion(items, stands, porId, indice = null) {
   return items.map(({ codigo, nota }) => {
     const s = stands.find((x) => x.codigo === codigo);
-    if (!s) return { codigo, nota, accion: "crear", texto: "No estaba registrado: se crea como stand de la asociación." };
+    const inq = planInquilino(nota, s, indice);
+    if (!s) return { codigo, nota, ...inq, accion: "crear", texto: "No estaba registrado: se crea como stand de la asociación." };
     if (s.deAsociacion && !s.propietarioId) {
+      if (inq.inquilino) return { codigo, nota, ...inq, accion: "inquilino", texto: "Ya figura como stand de la asociación." };
       return nota && !s.asociacionNota
-        ? { codigo, nota, accion: "nota", texto: "Ya figura como stand de la asociación: se anota cómo figura en el libro." }
-        : { codigo, nota, accion: "ya", texto: "Ya figura como stand de la asociación." };
+        ? { codigo, nota, ...inq, accion: "nota", texto: "Ya figura como stand de la asociación: se anota cómo figura en el libro." }
+        : { codigo, nota, ...inq, accion: "ya", texto: "Ya figura como stand de la asociación." };
     }
     if (s.propietarioId) {
       const a = porId.get(s.propietarioId);
-      return { codigo, nota, accion: "dueno", dueno: a || null, texto: `Figura a nombre de ${a ? `${nombreCompleto(a)} (${etiquetaNumero(a)})` : "una ficha que ya no existe"}: pasa al historial del stand y su ficha queda «por revisar».` };
+      return { codigo, nota, ...inq, accion: "dueno", dueno: a || null, texto: `Figura a nombre de ${a ? `${nombreCompleto(a)} (${etiquetaNumero(a)})` : "una ficha que ya no existe"}: pasa al historial del stand y su ficha queda «por revisar».` };
     }
-    return { codigo, nota, accion: "marcar", texto: "Estaba sin propietario: se marca como stand de la asociación." };
+    return { codigo, nota, ...inq, accion: "marcar", texto: "Estaba sin propietario: se marca como stand de la asociación." };
   });
 }

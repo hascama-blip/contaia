@@ -82,27 +82,32 @@ export async function transferirStand(codigo, t, { asociados, stands, mapaStands
 /**
  * Marca stands como propios de la Asociación. Si el stand figuraba a nombre de un asociado,
  * ese asociado pasa al historial del stand (nunca se borra) y su ficha queda «por revisar».
- * Si el stand no existía en la base, se crea.
- * @param {{codigo:string, nota?:string}[]} items
+ * Si el stand no existía en la base, se crea. Si el ítem trae `inquilino` (quien lo ocupa según el
+ * libro, "APCCIC-NOMBRE"; lo arma planAsociacion), queda como inquilino del stand y el stand pasa a alquilado.
+ * @param {{codigo:string, nota?:string, inquilino?:{nombre:string, dni?:string, celular?:string}|null}[]} items
  * @param {{ asociados, por, documento, onAvance }} op
- * @returns {Promise<{ marcados:number, creados:number, conDueno:number, yaEstaban:number, errores:string[] }>}
+ * @returns {Promise<{ marcados:number, creados:number, conDueno:number, anotados:number, inquilinos:number, yaEstaban:number, errores:string[] }>}
  */
 export async function marcarStandsAsociacion(items, { asociados = [], por = null, documento = "", onAvance } = {}) {
-  const r = { marcados: 0, creados: 0, conDueno: 0, anotados: 0, yaEstaban: 0, errores: [] };
+  const r = { marcados: 0, creados: 0, conDueno: 0, anotados: 0, inquilinos: 0, yaEstaban: 0, errores: [] };
   const hoyIso = hoy().iso;
-  for (const [i, { codigo, nota = "" }] of items.entries()) {
+  for (const [i, { codigo, nota = "", inquilino = null }] of items.entries()) {
     onAvance?.(i + 1, items.length, codigo);
     try {
       const ahora = ahoraISO();
       const s = await db.leerStand(codigo);
       const marca = { deAsociacion: true, asociacionNota: String(nota || "").trim(), asociacionDesde: hoyIso, actualizadoAt: ahora };
+      // Quien ocupa un stand de la Asociación es su inquilino: el stand pasa a "alquilado" (salvo que esté cerrado o en litigio).
+      const conInquilino = inquilino ? { inquilino: { nombre: String(inquilino.nombre).trim(), dni: soloDigitos(inquilino.dni), celular: soloDigitos(inquilino.celular) }, estado: !s?.estado || s.estado === "propietario" ? "alquilado" : s.estado } : {};
+      if (inquilino) r.inquilinos++;
       if (!s) {
-        await db.guardarStand(codigo, { codigo, galeria: galeriaDeCodigo(codigo), area: null, giro: "", propietarioId: null, propietarioDesde: null, inquilino: null, estado: "propietario", historial: [], creadoAt: ahora, ...marca });
+        await db.guardarStand(codigo, { codigo, galeria: galeriaDeCodigo(codigo), area: null, giro: "", propietarioId: null, propietarioDesde: null, inquilino: null, estado: "propietario", historial: [], creadoAt: ahora, ...marca, ...conInquilino });
         r.creados++; r.marcados++;
         continue;
       }
       if (s.deAsociacion && !s.propietarioId) {
-        if (marca.asociacionNota && !s.asociacionNota) { await db.actualizarStand(codigo, { asociacionNota: marca.asociacionNota }); r.anotados++; }
+        const cambios = { ...(marca.asociacionNota && !s.asociacionNota ? { asociacionNota: marca.asociacionNota } : {}), ...conInquilino };
+        if (Object.keys(cambios).length) { await db.actualizarStand(codigo, { ...cambios, actualizadoAt: ahora }); r.anotados++; }
         else r.yaEstaban++;
         continue;
       }
@@ -112,7 +117,7 @@ export async function marcarStandsAsociacion(items, { asociados = [], por = null
           hasta: hoyIso, motivo: "Stand de la asociación", documento,
           observacion: marca.asociacionNota ? `En el libro figura como «${marca.asociacionNota}».` : "", por, ahora,
         });
-        await db.actualizarStand(codigo, { ...marca, propietarioId: null, propietarioDesde: null, historial: [...(s.historial || []), tramo] });
+        await db.actualizarStand(codigo, { ...marca, ...conInquilino, propietarioId: null, propietarioDesde: null, historial: [...(s.historial || []), tramo] });
         if (anterior) {
           const linea = `El stand ${codigo} figura como stand de la asociación (${fechaTxt(hoyIso)}); quedó en el historial del stand. Revisar.`;
           await db.actualizarAsociado(anterior.id, { revisar: true, observaciones: [anterior.observaciones, linea].filter(Boolean).join("\n"), actualizadoAt: ahora });
@@ -120,7 +125,7 @@ export async function marcarStandsAsociacion(items, { asociados = [], por = null
         r.conDueno++; r.marcados++;
         continue;
       }
-      await db.actualizarStand(codigo, marca);
+      await db.actualizarStand(codigo, { ...marca, ...conInquilino });
       r.marcados++;
     } catch (e) {
       r.errores.push(`${codigo}: ${e?.message || "no se pudo marcar."}`);

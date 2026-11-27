@@ -6,7 +6,7 @@ import { BadgeCenso, BadgeAtraso, BadgeStand } from "./ui.js";
 import { useApp } from "./contexto.js";
 import { PLANO } from "../plano.js";
 import { standsDelPlano, tonoStand, LEYENDAS, ZOOMS } from "../lib/plano.js";
-import { nombreCompleto, nombreGaleria, galeriaDeCodigo, fichaDeAsociacion, nombreEnAsociacion, etiquetaNumero } from "../lib/padron.js";
+import { nombreCompleto, nombreGaleria, galeriaDeCodigo, fichaDeAsociacion, nombreEnAsociacion, etiquetaNumero, mismoNombre } from "../lib/padron.js";
 import { registrosDe, deudaStand } from "../lib/pagos.js";
 import { soles } from "../lib/formato.js";
 
@@ -129,12 +129,15 @@ export function Plano({ modo, resaltar, enfocar, onVerificar }) {
             // Stand de la Asociación: figura como "APCCIC-NOMBRE"; si esa persona tiene ficha, se abre desde aquí.
             const persona = fichaDeAsociacion(stand, derivados.porId, derivados.indiceNombres);
             const nombre = nombreEnAsociacion(stand, persona);
+            const inq = String(stand.inquilino?.nombre || "").trim() ? stand.inquilino : null;
+            const esInquilino = Boolean(inq && nombre) && mismoNombre(inq.nombre, nombre); // quien figura en el libro es el inquilino
             return html`
-              <p className="burbuja-nombre">${nombre || "Stand de la asociación"}</p>
-              <p className="burbuja-dato">Stand de la asociación${stand.giro ? ` · ${stand.giro}` : ""}</p>
+              <p className="burbuja-nombre">${esInquilino ? inq.nombre.trim() : nombre || "Stand de la asociación"}</p>
+              <p className="burbuja-dato">${esInquilino ? "Inquilino · stand de la asociación" : "Stand de la asociación"}${stand.giro ? ` · ${stand.giro}` : ""}</p>
+              ${esInquilino && !persona && (inq.dni || inq.celular) && html`<p className="burbuja-dato">${[inq.dni && `DNI ${inq.dni}`, inq.celular && `Cel. ${inq.celular}`].filter(Boolean).join(" · ")}</p>`}
               ${persona && html`<p className="burbuja-dato">Ficha: ${nombreCompleto(persona)} · ${etiquetaNumero(persona)}${persona.dni ? ` · DNI ${persona.dni}` : ""}</p>`}
               <div className="burbuja-badges"><${BadgeStand} estado=${stand.estado} /></div>
-              ${stand.inquilino?.nombre && html`<p className="burbuja-dato">Inquilino: ${stand.inquilino.nombre}</p>`}
+              ${inq && !esInquilino && html`<p className="burbuja-dato">Inquilino: ${inq.nombre}</p>`}
               ${persona && html`<div className="burbuja-acciones"><a className="btn btn-primary btn-sm" href=${`#ficha-${persona.id}`}>Ver ficha</a></div>`}`;
           })()
           : html`

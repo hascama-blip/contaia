@@ -157,6 +157,17 @@ claude.ai (base de datos, archivos, usuario, avisos en vivo) para correr el port
   ficha que tuvo antes con el prefijo). `fichaDeAsociacion` ubica esa ficha (por el nombre del libro, sin importar orden ni
   tildes, o la última del historial): el mapa y Stands enlazan a ella («Ver ficha») y la ficha avisa qué stands de la
   asociación figuran a su nombre. Un stand **sin ficha** ya no ofrece «Registrar ficha» en el mapa (se usa «+ Nueva ficha»).
+- **Inquilinos** (`stand.inquilino = { nombre, dni, celular }`): quien ocupa un stand sin ser su dueño. En un stand de
+  la asociación, la persona que el libro anota como "APCCIC-NOMBRE" **es su inquilino y conserva ese nombre con el prefijo**
+  (`inquilinoDeNota` en `src/lib/padron.js`; "APCCIC-LIBRE" o vacío = sin inquilino). Entran al cargar el Excel en Stands →
+  «Stands de la asociación…» (el plan muestra «Se registra como inquilino: …»; el stand pasa a *alquilado*; si esa persona
+  tiene ficha se copian su DNI y celular; no se pisa a otro inquilino ya anotado) y, **una sola vez al arrancar**
+  (`inquilinosDeLaAsociacion`, regla `2026-11-inquilinos-asociacion`), para los stands que ya tenían la nota del libro.
+  Los nombres nunca van en el código: salen del Excel o de la base. Se ven en **Padrón → pestaña «Inquilinos»**
+  (`src/components/Inquilinos.js`: stand, nombre, DNI, celular, de quién es el stand; filtro "en stands de la asociación";
+  tocar una fila abre el stand para completar DNI/celular; «Exportar a Excel (CSV)» baja la lista que se ve), en Stands
+  (columna «Inquilino actual») y en la burbuja del plano («Inquilino · stand de la asociación»). «Completar DNI en un
+  Excel» y el buscador de stands también los encuentran, con o sin el prefijo.
 - **Actualizar con fichas del libro** (solo admin): Padrón → "Actualizar con fichas del libro" o
   Administración → `/portal#actualizar`. Carga un JSON `{ tipo: "censo-fichas-libro", fechaDocumento, fichas[], omitidas[] }`
   con la transcripción de las fichas manuscritas del Libro de Padrón y la foto de cada una (data URL). Motor puro en
