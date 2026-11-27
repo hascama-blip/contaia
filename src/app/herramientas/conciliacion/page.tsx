@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser, esSupremo, modulosDelEstudio } from "@/lib/auth";
 import ConciliacionPanel from "@/components/ConciliacionPanel";
 import ComparativoIngresosPanel from "@/components/ComparativoIngresosPanel";
+import OperacionesCajaPanel from "@/components/OperacionesCajaPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conciliación bancaria — Radar Tributario" };
@@ -24,6 +25,14 @@ export default async function Page() {
         </p>
       </div>
       <ConciliacionPanel />
+
+      <div className="flex items-center gap-3 pt-2">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">operaciones de la caja virtual (vouchers)</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <OperacionesCajaPanel />
 
       <div className="flex items-center gap-3 pt-2">
         <div className="h-px flex-1 bg-slate-200" />

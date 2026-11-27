@@ -251,10 +251,27 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   `listarDrive` acepta el código o el enlace completo, entra a subcarpetas (2 niveles), reintenta ante 429/5xx y
   distingue no existe / privada / sin código (el motivo sale agrupado en pantalla y en `00-PENDIENTES.txt`).
   **Primera corrida real (nov-2026): OK** — ingreso, 7 empresas con sus rubros y sedes, RTP Andahuaylas oct-2026
-  = 26 días y 131 archivos; RTP ATE bajó PDF y Excel de 20 días pero ninguna carpeta de Drive (motivo por confirmar).
+  = 26 días y 131 archivos; RTP ATE bajó PDF y Excel de 20 días pero ninguna carpeta de Drive: sus carpetas existen pero están vacías.
   La clave NO se guarda. El navegador arma **un ZIP por sede** día por día (`accion: "dia"` devuelve un ZIP chico;
   3 en paralelo, reintento por día): carpeta `AAAA-MM-DD/` con PDF, Excel y `drive/`, más `00-RESUMEN.csv` y
   `00-PENDIENTES.txt` con lo que no se pudo bajar. Límite: 12 conexiones por hora por usuario.
+- **Relación N° de operación ↔ comprobantes** (en Conciliación bancaria: `OperacionesCajaPanel.tsx`,
+  `/api/conciliacion/operaciones`, `src/lib/cajaOperaciones.ts`). Entrada = los ZIP de "Caja virtual · reportes por
+  sede" (uno por sede; el navegador manda solo el Excel de cada día y los PDF del Drive que no son `REPORTE…`).
+  **Excel del día** ("REPORTE DE CAJA DIARIO", `leerReporteCaja`): encabezado en la fila que empieza con "Item."; por
+  comprobante: Doc. (FAC/BOL) · Nro. Comprob. · Tipo Pago (EFECTIVO · YAPE · DEPOSITO · VISA · DEV. NOTA CREDITO) ·
+  Banco/Fecha Visa · Nro. Operacion (vacío en efectivo; en Visa "AP-442013") · Cobro Total; un comprobante puede
+  salir en dos filas. **Voucher del depósito** (`drive/DEPOSITO dd-mm-aaaa.pdf`, escaneado): `paginasDelPdf`
+  (`pdftoppm` de poppler-utils —agregado al Dockerfile—; si no está, los JPEG incrustados) → OCR (`crearLector`,
+  tesseract "spa"; `TESSDATA_DIR` para usar el modelo local) → `leerVoucher`: BBVA cajero "02/10/2026 11:59:09 2456
+  000000041549" + "MONTO DEPOSITADO : S/ 1,630.00"; BBVA ventanilla sin N° (se muestra "CLAVE …"); BCP "OP-0916720".
+  `operacionLimpia` quita los ceros de relleno y corrige el primer 0 leído como 9; `numOcr` tolera "1.810.00".
+  Regla: **todo el EFECTIVO del día = el depósito del voucher de ese día** (estado Cuadra / Diferencia / Sin voucher,
+  con la nota del voucher si explica la diferencia); lo demás sale con el N° de operación del reporte ("Según caja
+  virtual"). Excel: Comprobantes por operación · Operaciones · Resumen · Sin operación · Otros documentos del Drive.
+  Caso real: RTP Andahuaylas oct-2026 = 26 depósitos leídos, 25 cuadran y 1 con S/ 80 de diferencia explicada en el
+  voucher (boleta anulada); RTP ATE = 19 días de efectivo sin voucher (sus carpetas de Drive están vacías).
+  Pendiente (2.º paso pedido por el dueño): usar esta relación en la conciliación contra el banco.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
