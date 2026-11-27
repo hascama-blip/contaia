@@ -232,6 +232,26 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   "Solo lo no conciliado" y buscador), Extracto conciliado y Por fecha. Caso real de calibración:
   RTV San Cristóbal oct-2026 (1,640 comprobantes → 1,493 conciliados). Limitación: el N° de operación de la
   caja casi nunca está en el extracto del BBVA y el concepto viene cortado a 28 caracteres.
+- **Caja virtual · reportes por sede** (UTILITARIO, clave `caja-virtual`, `/herramientas/caja-virtual`; `src/lib/cajaVirtual.ts`,
+  `CajaVirtualPanel.tsx`, `/api/caja-virtual`). Automatiza `cajavirtualvip.com` (web propia del grupo: PHP + jQuery, sin
+  captcha; base ajustable con `CAJA_VIRTUAL_URL`). Con UNA sesión baja, de cada sede (cada "lupa" de Consulta Ingreso →
+  Totales por Mes) y cada día del rango: el **PDF** y el **Excel** del reporte de ingresos y los archivos de la
+  **carpeta pública de Google Drive** de ese día (REPORTE, DEPÓSITO, YAPE).
+  Mecánica (leída del JavaScript de la web; **calibrada solo contra una réplica local: falta la primera prueba con
+  accesos reales**, el `diag` del supremo muestra cada paso): ingreso `GET data/clsusuario.php?tarea=1&usuario=&pass=` →
+  "true"; selección `…?tarea=2&empresa=&sede=&fecha=DD/MM/AAAA&tc=3.22&nomempresa=&nomsede=&rubro=`; consulta
+  `POST data/clsingreso.php tarea=5&cedula=3|2&idresponsable=&fechaini=&fechafinal=&idcorredor=&codempresa=&codrubro=`
+  (3 = totales por mes, una fila por sede; 2 = días de esa sede; responde un objeto JavaScript, a veces con llaves sin
+  comillas → `leerLista`); PDF `pdf/pdf_reporteIngresoMatriculaResponsablertp.php?idingreso=&respon=&sede=&fechaing=&estadoing=&vempresa=&codrubro=`;
+  Excel `caja_reporteingresomatricularesponsableexcelx.php?…`; Drive = `keygoogledrive` de cada día.
+  `conectarCaja` usa el navegador (Playwright) SOLO para ingresar y leer los combos dependientes de `index2.php`
+  (`#cboEmpresa → #cboRubro → #cboSede`); después todo son pedidos directos con la cookie, que queda en memoria 30 min
+  (`sesiones`, ligada al usuario de Radar). `entrar` lee de `caja.php?web=caja_consultaingreso…` el rol, `codempresa`,
+  `codrubro` y las rutas de PDF/Excel (así sirve para las otras empresas si su pantalla usa otros nombres).
+  Drive sin cuenta: lista con `drive.google.com/embeddedfolderview?id=` y baja con `uc?export=download&id=`.
+  La clave NO se guarda. El navegador arma **un ZIP por sede** día por día (`accion: "dia"` devuelve un ZIP chico;
+  3 en paralelo, reintento por día): carpeta `AAAA-MM-DD/` con PDF, Excel y `drive/`, más `00-RESUMEN.csv` y
+  `00-PENDIENTES.txt` con lo que no se pudo bajar. Límite: 12 conexiones por hora por usuario.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.
