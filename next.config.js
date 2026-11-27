@@ -24,6 +24,9 @@ const nextConfig = {
   // Next 15: paquetes externos del servidor (antes experimental.serverComponentsExternalPackages).
   // src/instrumentation.ts (planificador de la tarea nocturna) ya es estable: no
   // necesita la opción instrumentationHook.
+  // Next 15.5 corta en 10 MB el cuerpo de todo pedido que pasa por el middleware (y el formulario llega
+  // vacío): las rutas de la web aceptan archivos de 15 a 80 MB (Excel, PDF, ZIP), así que se sube el tope.
+  experimental: { middlewareClientMaxBodySize: "100mb" },
   serverExternalPackages: ["unpdf", "tesseract.js", "exceljs", "fast-xml-parser", "playwright-core", "@sparticuz/chromium", "pg"],
 };
 

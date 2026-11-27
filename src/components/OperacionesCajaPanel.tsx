@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { unzipSync, zipSync } from "fflate";
+import { analizarZipCaja } from "@/lib/cajaZipCliente";
 import type { ResultadoOperaciones, OperacionCaja } from "@/lib/cajaOperaciones";
 
 // Relación N° DE OPERACIÓN ↔ COMPROBANTES. Se suben los ZIP que baja "Caja virtual · reportes por
@@ -12,23 +12,6 @@ const soles = (n: number | null) => (n == null ? "—" : `S/ ${Number(n).toLocal
 const fch = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-").reverse().join("/") : iso);
 type Filtro = "efectivo" | "todas" | "revisar";
 const ESTADO: Record<string, string> = { Cuadra: "bg-emerald-100 text-emerald-700", Diferencia: "bg-red-100 text-red-700", "Sin voucher": "bg-amber-100 text-amber-800", "Según caja virtual": "bg-slate-100 text-slate-500" };
-
-/** Deja del ZIP solo el Excel de cada día y los PDF del Drive que no son el reporte escaneado
- *  (un mes de una sede baja de ~30 MB a ~4 MB). */
-function reducir(buf: ArrayBuffer): Uint8Array {
-  const conDrive = new Set<string>();
-  const util = unzipSync(new Uint8Array(buf), {
-    filter: (f) => {
-      const m = /(?:^|\/)(\d{4}-\d{2}-\d{2})\/(.+)$/.exec(f.name);
-      if (!m) return false;
-      if (/^drive\//i.test(m[2])) conDrive.add(m[1]);
-      return (!m[2].includes("/") && /\.xlsx$/i.test(m[2])) || (/^drive\/[^/]+\.pdf$/i.test(m[2]) && !/^drive\/REPORTE/i.test(m[2]));
-    },
-  });
-  // Marca de "la sede sí subió algo al Drive ese día" aunque no haya PDF de depósito (sin mandar esos archivos).
-  for (const d of Array.from(conDrive)) if (!Object.keys(util).some((k) => k.includes(`${d}/drive/`))) util[`${d}/drive/_sin-deposito.txt`] = new Uint8Array([32]);
-  return zipSync(util, { level: 0 });
-}
 
 export default function OperacionesCajaPanel() {
   const [sedes, setSedes] = useState<ResultadoOperaciones[]>([]);
@@ -44,14 +27,8 @@ export default function OperacionesCajaPanel() {
     try {
       for (const [i, f] of Array.from(lista).entries()) {
         setBusy(`Leyendo ${f.name} (${i + 1} de ${lista.length}): se leen los vouchers escaneados, puede tardar cerca de un minuto por sede…`);
-        let cuerpo: Uint8Array;
-        try { cuerpo = reducir(await f.arrayBuffer()); } catch { setError(`"${f.name}" no es un ZIP válido.`); continue; }
-        const fd = new FormData();
-        fd.append("zip", new Blob([cuerpo as unknown as BlobPart], { type: "application/zip" }), f.name);
-        const r = await fetch("/api/conciliacion/operaciones", { method: "POST", body: fd });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) { setError(`${f.name}: ${d.error ?? "no se pudo analizar."}`); continue; }
-        nuevas.push(d.sede);
+        try { nuevas.push(await analizarZipCaja(f, (t) => setBusy(`(${i + 1} de ${lista.length}) ${t}`))); }
+        catch (e) { setError(e instanceof Error ? e.message : `${f.name}: no se pudo analizar.`); }
       }
       if (nuevas.length) setSedes((prev) => [...prev.filter((p) => !nuevas.some((n) => n.sede === p.sede)), ...nuevas]);
     } catch { setError("Error de red al analizar el ZIP."); }

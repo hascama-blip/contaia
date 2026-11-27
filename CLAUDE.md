@@ -271,7 +271,34 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   virtual"). Excel: Comprobantes por operación · Operaciones · Resumen · Sin operación · Otros documentos del Drive.
   Caso real: RTP Andahuaylas oct-2026 = 26 depósitos leídos, 25 cuadran y 1 con S/ 80 de diferencia explicada en el
   voucher (boleta anulada); RTP ATE = 19 días de efectivo sin voucher (sus carpetas de Drive están vacías).
-  Pendiente (2.º paso pedido por el dueño): usar esta relación en la conciliación contra el banco.
+  **Conciliación en 3 fases con los ZIP + bancos en PDF/Word** (pedido del dueño: contabilidad ↔ caja virtual por
+  el COMPROBANTE; caja virtual ↔ bancos por el N° DE OPERACIÓN). En `ConciliacionPanel` la casilla 2 acepta los ZIP
+  por sede (todas a la vez) o el Excel de tramas, y la 3 acepta `.xlsx`, `.pdf` y `.docx`.
+  · `src/lib/cajaZipCliente.ts` (navegador): `analizarZipCaja` reduce cada ZIP y lo manda a
+    `/api/conciliacion/operaciones` POR TANDAS (≤ 5 MB / 8 días), une las partes y guarda el resultado en memoria
+    (el mismo ZIP no se vuelve a leer; lo comparte con `OperacionesCajaPanel`). El análisis viaja luego en el campo
+    `cajaZip` (JSON) de `/api/conciliacion` (`sanearSedes`).
+  · `src/lib/conciliacionEntradas.ts`: `cobrosDeCajaZip` (efectivo = un cobro por día y sede con su `voucher`
+    {operacion, fecha, monto, diferencia, obs}; Yape/depósito/Visa = un cobro por N° de operación; "DEV. NOTA
+    CREDITO" = aplica la NC; filas con cobro 0 se ignoran) · `movsDePdf` (1.º BCP con `parseEstadoBcp`; si no, lectura
+    genérica por líneas `movsDeLineas`, que COMPRUEBA cada fila con la cadena de saldos y, si no puede, lo avisa) ·
+    `movsDeWord` (tablas del .docx leídas del XML con fflate —p. ej. FECHA · DESCRIPCIÓN · NUM OP · HORA · CARGO /
+    ABONO · SALDO, el formato del utilitario banco-word—; tablas partidas por página se unen; sin tablas = por líneas).
+    Fechas sin año ("02-10") = "0000-MM-DD" hasta fijar el año con el periodo del extracto o el de las ventas.
+  · Motor (`conciliarTresVias`): pases nuevos (V1) N° de operación del voucher + monto depositado, (V2) fecha y monto
+    del voucher (0–3 días; el extracto no siempre trae el N°), (G) todos los cobros de un medio y día de una sede = un
+    solo abono (lote de Yape). Los Yape con código con letras ("7B1C03CAE9DD") se buscan tal cual. Depósito ≠ efectivo
+    del día: la fila concilia pero con la observación de la diferencia y la nota del voucher. Motivos: "Cobrado con
+    YAPE/VISA/DEPOSITO, sin abono en el banco".
+  · `conciliarArchivos(archivos, extra)`: los ZIP mandan sobre las tramas; un Registro de Ventas con VARIAS empresas
+    (una pestaña por empresa, las series se repiten entre empresas) usa solo la que más comprobantes comparte con la
+    caja; avisa las series de la contabilidad que no están en la caja subida (falta el ZIP de esa sede) y los cobros
+    de comprobantes de numeración anterior al periodo (venta de un mes anterior cobrada en este).
+  Caso real (oct-2026, RTP SAN CRISTOBAL, Registro de Ventas real + ZIP de Andahuaylas y ATE): fase 1 = 1,182 de 1,186
+  comprobantes cobrados en la caja están en el registro (los otros 4: 3 de numeración anterior al periodo y un E001). La fase bancos se probó con extractos
+  ARMADOS desde los vouchers (Word y PDF): **falta calibrar con un extracto real de RTP en PDF y en Word**.
+- **Subidas de más de 10 MB**: Next 15.5 corta en 10 MB todo pedido que pasa por el middleware (el formulario llega
+  vacío). `next.config.js` → `experimental.middlewareClientMaxBodySize: "100mb"`. No quitarlo.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
 - El informe termina con **"Observaciones para la toma de decisiones"** (consolida SUNAT, deudas,
   buzón, declaración vs SIRE y DJ anual) + sección de **Deudas tributarias**.

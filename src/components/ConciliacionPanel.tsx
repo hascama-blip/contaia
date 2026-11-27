@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { ResumenConciliacion, FilaUnica, FilaFecha, FilaBanco } from "@/lib/conciliacionCaja";
+import type { ResultadoOperaciones } from "@/lib/cajaOperaciones";
+import { analizarZipCaja } from "@/lib/cajaZipCliente";
 
 const soles = (n: unknown) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fch = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "");
@@ -10,11 +12,16 @@ interface Respuesta { resumen: ResumenConciliacion; unificada: FilaUnica[]; banc
 const TOPE = 400; // filas en pantalla (el Excel trae todas)
 
 // Conciliación bancaria de 3 vías: Contabilidad (Registro de Ventas y/o Libro Diario) ↔ Caja virtual
-// (cobranzas) ↔ Bancos. Vincula cada comprobante con su cobro y su depósito; lo que no
-// se logra vincular sale como "No conciliado".
+// (cobranzas) ↔ Bancos. Vincula cada comprobante con su cobro (punto en común: el comprobante) y el
+// cobro con su depósito o abono (punto en común: el N° de operación); lo que no se logra vincular sale
+// como "No conciliado". La caja virtual entra como los ZIP por sede del utilitario "Caja virtual ·
+// reportes por sede" (se analizan antes, por tandas) o como el Excel de tramas; los bancos, en Excel,
+// PDF o Word.
 export default function ConciliacionPanel() {
   const [fCont, setFCont] = useState<File[]>([]);
-  const [fCaja, setFCaja] = useState<File | null>(null);
+  const [fCaja, setFCaja] = useState<File[]>([]);
+  const [sedes, setSedes] = useState<ResultadoOperaciones[]>([]);
+  const [paso, setPaso] = useState("");
   const [fBancos, setFBancos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,19 +32,31 @@ export default function ConciliacionPanel() {
   const [cuenta, setCuenta] = useState("");
 
   async function conciliar() {
-    if (!fCont.length && !fCaja && !fBancos.length) return setError("Adjunta los Excel de contabilidad, caja virtual y bancos.");
-    setBusy(true); setError(null); setRes(null);
+    if (!fCont.length && !fCaja.length && !fBancos.length) return setError("Adjunta la contabilidad, la caja virtual y los bancos.");
+    setBusy(true); setError(null); setRes(null); setSedes([]);
     try {
+      // 1) Los ZIP de la caja virtual (uno por sede): se leen el reporte de cada día y los vouchers.
+      const zips = fCaja.filter((f) => /\.zip$/i.test(f.name));
+      const analizadas: ResultadoOperaciones[] = [];
+      for (const [i, f] of zips.entries()) {
+        setPaso(`Caja virtual, sede ${i + 1} de ${zips.length}: ${f.name}…`);
+        try { analizadas.push(await analizarZipCaja(f, (t) => setPaso(`Caja virtual, sede ${i + 1} de ${zips.length} · ${t}`))); }
+        catch (e) { setError(e instanceof Error ? e.message : `${f.name}: no se pudo analizar.`); return; }
+      }
+      setSedes(analizadas);
+      // 2) La conciliación.
+      setPaso("Conciliando contabilidad, caja virtual y bancos…");
       const fd = new FormData();
       for (const f of fCont) fd.append("contabilidad", f);
-      if (fCaja) fd.append("caja", fCaja);
+      for (const f of fCaja.filter((x) => !/\.zip$/i.test(x.name))) fd.append("caja", f);
+      if (analizadas.length) fd.append("cajaZip", JSON.stringify(analizadas.map((s) => ({ ...s, otros: [] }))));
       for (const f of fBancos) fd.append("bancos", f);
       const r = await fetch("/api/conciliacion", { method: "POST", body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setError(data.error ?? "No se pudo conciliar."); return; }
       setRes(data); setVista("conciliacion"); setSoloNo(false); setBuscar(""); setCuenta("");
     } catch { setError("Error de red (¿archivo muy pesado?)."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setPaso(""); }
   }
 
   function descargar() {
@@ -65,16 +84,34 @@ export default function ConciliacionPanel() {
       <div className="card p-5">
         <div className="grid gap-4 md:grid-cols-3">
           <Uploader titulo="1 · Contabilidad" detalle="Registro de Ventas del mes y/o Libro Diario de ventas (Excel de StarSoft). Puedes subir los dos." multiple file={fCont} onPick={setFCont} />
-          <Uploader titulo="2 · Caja virtual" detalle="Tramas de cobranza: cada cobro con los comprobantes que cancela (Excel)." file={fCaja ? [fCaja] : []} onPick={(fs) => setFCaja(fs[0] ?? null)} />
-          <Uploader titulo="3 · Bancos" detalle="Extractos en Excel. Puedes subir varios archivos, o uno con una pestaña por cuenta." multiple file={fBancos} onPick={setFBancos} />
+          <Uploader titulo="2 · Caja virtual" detalle="Los ZIP por sede que descarga «Caja virtual · reportes por sede» (todas las sedes a la vez: traen el N° de operación y el voucher del depósito). También sirve el Excel de tramas de cobranza." multiple acepta=".zip,.xlsx" tipos=".zip o .xlsx" file={fCaja} onPick={setFCaja} />
+          <Uploader titulo="3 · Bancos" detalle="Extractos de cada cuenta en Excel, PDF (el original del banco) o Word (.docx). Puedes subir varios." multiple acepta=".xlsx,.pdf,.docx" tipos=".xlsx, .pdf o .docx" file={fBancos} onPick={setFBancos} />
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          Cada pestaña se reconoce por su contenido: si tienes todo en <b>un solo Excel</b> (contabilidad, caja y bancos en pestañas), súbelo en cualquiera de las tres casillas.
+          <b>Tres fases:</b> contabilidad ↔ caja virtual por el <b>comprobante</b>, y caja virtual ↔ bancos por el <b>N° de operación</b> (en el efectivo, el del voucher del depósito). Si las tres coinciden, el comprobante queda conciliado.
+          Cada pestaña de Excel se reconoce por su contenido: si tienes todo en un solo Excel, súbelo en cualquiera de las tres casillas.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button className="btn-primary" onClick={conciliar} disabled={busy}>{busy ? "Conciliando…" : "⚖️ Conciliar"}</button>
           {res?.excelBase64 && <button className="btn-accent" onClick={descargar}>⬇ Descargar Excel conciliado</button>}
         </div>
+        {busy && paso && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">⏳ {paso}{/vouchers|sede/.test(paso) ? " Se leen los vouchers escaneados: cerca de un minuto por sede." : ""}</div>}
+        {sedes.length > 0 && (
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full whitespace-nowrap text-xs">
+              <thead><tr className="bg-slate-50 text-left uppercase text-slate-500"><th className="px-3 py-1.5">Caja virtual · sede</th><th className="px-2 py-1.5 text-right">Días</th><th className="px-2 py-1.5 text-right">Comprobantes</th><th className="px-2 py-1.5 text-right">Cobrado</th><th className="px-2 py-1.5 text-right">Efectivo: días con voucher</th><th className="px-2 py-1.5 text-right">Con diferencia</th><th className="px-3 py-1.5 text-right">Sin voucher</th></tr></thead>
+              <tbody>{sedes.map((x) => {
+                const ef = x.operaciones.filter((o) => o.medio.startsWith("EFECTIVO")); const n = (e: string) => ef.filter((o) => o.estado === e).length;
+                return (
+                  <tr key={x.sede} className="border-t border-slate-100"><td className="px-3 py-1.5 font-semibold text-slate-700">{x.sede}</td><td className="px-2 py-1.5 text-right tabular-nums">{x.dias}</td><td className="px-2 py-1.5 text-right tabular-nums">{x.comprobantes}</td><td className="px-2 py-1.5 text-right tabular-nums">{soles(x.total)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-emerald-700">{n("Cuadra") + n("Diferencia")} de {ef.length}</td>
+                    <td className={`px-2 py-1.5 text-right tabular-nums ${n("Diferencia") ? "font-semibold text-red-600" : "text-slate-400"}`}>{n("Diferencia")}</td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${n("Sin voucher") ? "font-semibold text-amber-700" : "text-slate-400"}`}>{n("Sin voucher")}</td></tr>
+                );
+              })}</tbody>
+            </table>
+          </div>
+        )}
         {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
       </div>
 
@@ -150,14 +187,14 @@ export default function ConciliacionPanel() {
   );
 }
 
-function Uploader({ titulo, detalle, file, onPick, multiple }: { titulo: string; detalle: string; file: File[]; onPick: (f: File[]) => void; multiple?: boolean }) {
+function Uploader({ titulo, detalle, file, onPick, multiple, acepta = ".xlsx", tipos = ".xlsx" }: { titulo: string; detalle: string; file: File[]; onPick: (f: File[]) => void; multiple?: boolean; acepta?: string; tipos?: string }) {
   return (
     <label className="block cursor-pointer rounded-xl border-2 border-dashed border-slate-300 p-4 transition hover:border-brand-400 hover:bg-brand-50/30">
       <p className="text-sm font-semibold text-slate-800">{titulo}</p>
       <p className="mt-0.5 text-xs text-slate-500">{detalle}</p>
-      <input type="file" accept=".xlsx" multiple={multiple} className="hidden" onChange={(e) => onPick(Array.from(e.target.files ?? []))} />
+      <input type="file" accept={acepta} multiple={multiple} className="hidden" onChange={(e) => onPick(Array.from(e.target.files ?? []))} />
       <p className={`mt-3 truncate text-xs ${file.length ? "font-medium text-emerald-700" : "text-brand-600"}`}>
-        {file.length ? `✓ ${file.map((f) => f.name).join(", ")}` : `Elegir archivo${multiple ? "(s)" : ""} .xlsx`}
+        {file.length ? `✓ ${file.length > 3 ? `${file.length} archivos: ` : ""}${file.map((f) => f.name).join(", ")}` : `Elegir archivo${multiple ? "(s)" : ""} ${tipos}`}
       </p>
     </label>
   );

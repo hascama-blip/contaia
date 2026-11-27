@@ -18,10 +18,10 @@ export default async function Page() {
         <Link href="/" className="text-sm text-brand-600 hover:underline">← Menú</Link>
         <h1 className="mt-1 text-2xl font-bold text-slate-800">Conciliación bancaria</h1>
         <p className="text-sm text-slate-500">
-          Sube tres Excel: la <b>contabilidad</b> (Registro de Ventas), la <b>caja virtual</b> (cobranzas) y los
-          <b> bancos</b> (extractos, una o varias cuentas). El sistema vincula cada comprobante con su cobro y con su
-          depósito o abono en el banco, y te dice qué quedó <b>no conciliado</b>: comprobantes sin cobro, cobros sin
-          depósito y abonos del banco sin cobro. Entrega el Excel con todo el detalle.
+          Sube la <b>contabilidad</b> (Registro de Ventas), la <b>caja virtual</b> (los ZIP por sede, o el Excel de cobranzas) y los
+          <b> bancos</b> (extractos en Excel, PDF o Word, una o varias cuentas). El sistema vincula cada comprobante con su cobro
+          —por el <b>comprobante</b>— y cada cobro con su depósito o abono en el banco —por el <b>N° de operación</b>—, y te dice qué quedó
+          <b> no conciliado</b>: comprobantes sin cobro, cobros sin depósito y abonos del banco sin cobro. Entrega el Excel con todo el detalle.
         </p>
       </div>
       <ConciliacionPanel />
