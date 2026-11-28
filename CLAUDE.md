@@ -285,18 +285,35 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
     `movsDeWord` (tablas del .docx leídas del XML con fflate —p. ej. FECHA · DESCRIPCIÓN · NUM OP · HORA · CARGO /
     ABONO · SALDO, el formato del utilitario banco-word—; tablas partidas por página se unen; sin tablas = por líneas).
     Fechas sin año ("02-10") = "0000-MM-DD" hasta fijar el año con el periodo del extracto o el de las ventas.
-  · Motor (`conciliarTresVias`): pases nuevos (V1) N° de operación del voucher + monto depositado, (V2) fecha y monto
-    del voucher (0–3 días; el extracto no siempre trae el N°), (G) todos los cobros de un medio y día de una sede = un
-    solo abono (lote de Yape). Los Yape con código con letras ("7B1C03CAE9DD") se buscan tal cual. Depósito ≠ efectivo
-    del día: la fila concilia pero con la observación de la diferencia y la nota del voucher. Motivos: "Cobrado con
-    YAPE/VISA/DEPOSITO, sin abono en el banco".
+  · Motor (`conciliarTresVias`), reglas para la caja por ZIP (`Cobro.origen === "reporte"`; las tramas no cambian):
+    (V1) N° de operación del voucher + monto depositado · (V2) fecha y monto del voucher (0–3 días), prefiriendo la
+    oficina del banco de esa sede. El efectivo CON voucher solo se cruza por (V); si el voucher es posterior al último
+    movimiento del extracto, lo dice ("figurará en el extracto siguiente"). Efectivo SIN voucher: solo monto exacto en
+    0–7 días contra abonos en efectivo y queda con "Verificar" (sin dos depósitos ni depósito tardío). `apto(c, m)`:
+    canal del abono (`canal`: efectivo = "DEPOS. EN CTA" / "INGRESO EN EFECTIVO"; billetera = "PLIN QR" / "ABONO
+    INMEDIATO"; otro), oficina → sede (`sedeDeOficina`: "OFICINA ANDAH" = ANDAHUAYLAS, por nombre o aprendida de los
+    vouchers) y banco (`entidadDeTexto`: un "DEPOSITO BCP" no se busca en una cuenta del BBVA). **Yape / Plin: solo por
+    N° de operación o por el nombre del cliente, nunca por fecha y monto solos**; tarjetas (VISA…): solo por N° de
+    operación (el procesador abona en lotes). Los Yape con código con letras ("7B1C03CAE9DD") se buscan tal cual.
+    Depósito ≠ efectivo del día: la fila concilia con la observación de la diferencia y la nota del voucher. Avisos
+    cuando un medio de pago casi no aparece en los extractos (falta esa cuenta).
   · `conciliarArchivos(archivos, extra)`: los ZIP mandan sobre las tramas; un Registro de Ventas con VARIAS empresas
     (una pestaña por empresa, las series se repiten entre empresas) usa solo la que más comprobantes comparte con la
     caja; avisa las series de la contabilidad que no están en la caja subida (falta el ZIP de esa sede) y los cobros
     de comprobantes de numeración anterior al periodo (venta de un mes anterior cobrada en este).
-  Caso real (oct-2026, RTP SAN CRISTOBAL, Registro de Ventas real + ZIP de Andahuaylas y ATE): fase 1 = 1,182 de 1,186
-  comprobantes cobrados en la caja están en el registro (los otros 4: 3 de numeración anterior al periodo y un E001). La fase bancos se probó con extractos
-  ARMADOS desde los vouchers (Word y PDF): **falta calibrar con un extracto real de RTP en PDF y en Word**.
+  · **Bancos de RTP = estado de cuenta del BBVA en Excel** ("Consulta de Estado de Cuenta", una pestaña por cuenta:
+    8271 dólares, 0550 ahorros, 9157 corriente): ~20 filas de cabecera ("MONEDA: SOLES/DOLARES US"), encabezado FECHA
+    OPER. · FECHA VALOR · DESCRIPCIÓN · OFICINA · CAN · N° OPER. · CARGO/ABONO (con signo) · ITF · SALDO CONTABLE; fechas
+    "01-10" sin año (se toma el del periodo de las ventas). `tipoDeHoja` busca el encabezado en las primeras 40 filas;
+    `parseBanco` une DESCRIPCIÓN · OFICINA, marca `entidad: "BBVA"` y `moneda: "USD"` (la cuenta en dólares se lista
+    como "8271 (US$)" y no se cruza). ⚠️ El "N° OPER." del BBVA es el CORRELATIVO de la cuenta (20086, 20088…), no el
+    número del voucher (41549) ni el del Yape: con el BBVA la fase caja ↔ banco no puede ser por N° de operación.
+  Caso real (oct-2026, RTP SAN CRISTOBAL: Registro de Ventas + ZIP de Andahuaylas y ATE + bancos BBVA): fase 1 = 1,182
+  de 1,186 comprobantes cobrados en la caja están en el registro (los otros 4: 3 de numeración anterior y un E001).
+  Fase bancos: efectivo de Andahuaylas = 22 de 26 depósitos ubicados en la 9157 por fecha y monto del voucher
+  ("OFICINA ANDAH"; los otros 4 vouchers son del 02/11); ATE sin vouchers; de 280 Yape solo 6 aparecen (por nombre):
+  no se abonan en estas cuentas → falta el extracto de la cuenta de los Yape y el del BCP (17 depósitos). Bancos en
+  PDF/Word: probados solo con extractos armados; el formato real de RTP es este Excel.
 - **Subidas de más de 10 MB**: Next 15.5 corta en 10 MB todo pedido que pasa por el middleware (el formulario llega
   vacío). `next.config.js` → `experimental.middlewareClientMaxBodySize: "100mb"`. No quitarlo.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
