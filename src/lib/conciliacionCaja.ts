@@ -389,25 +389,26 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
   const esTarjeta = (c: Cobro) => /VISA|MASTER|TARJETA|\bPOS\b|NIUBIZ|IZIPAY|CULQI|AMEX|DINERS/.test(c.medio.toUpperCase());
   const entidadMov = (m: MovBanco) => m.entidad || entidadDeTexto(m.banco);
   const esBilletera = (c: Cobro) => /YAPE|PLIN/i.test(c.medio);
-  /** `porNombre`: el pase exige además el nombre del cliente en el concepto del banco. */
-  const apto = (c: Cobro, m: MovBanco, porNombre = false): boolean => {
+  // Abono de la liquidación de tarjetas (Niubiz = "COMPAÑIA PERUANA DE MEDIOS DE PAGO", Izipay…): es un lote.
+  const esLiquidacion = (m: MovBanco) => /COMPA.?.?IA PERUANA|MEDIOS DE PAGO|NIUBIZ|VISANET|IZIPAY|PROCESOS DE MEDIOS|CULQI/.test(sinAcentos(m.desc).toUpperCase());
+  /** `modo` del pase: "nombre" = exige el nombre del cliente en el concepto del banco · "dia" = MISMA fecha y
+   *  mismo monto · "cerca" = mismo monto en otra fecha. */
+  const apto = (c: Cobro, m: MovBanco, modo: "nombre" | "dia" | "cerca" = "cerca"): boolean => {
     if (c.origen !== "reporte") return true;
-    // "DEPOSITO BCP": la caja dice a qué banco fue; no se busca en la cuenta de otro banco.
-    const bc = entidadDeTexto(c.medio), bm = entidadMov(m);
-    if (bc && bm && bc !== bm) return false;
     if (c.tipo === "efectivo") {
       if (c.voucher?.monto != null) return false; // el voucher manda: solo los pases (V)
       if (hayCanalEfectivo && canal(m) !== "efectivo") return false;
       const s = sedeDeOficina(m); return !s || s === c.sede;
     }
-    if (esTarjeta(c)) return false; // el procesador abona en lotes y con la comisión descontada
-    // Yape / Plin: muchos cobros chicos del mismo monto cada día. Sin el N° de operación ni el nombre del
-    // cliente en el banco, la fecha y el monto solos no prueban nada (caso real: los Yape de RTP no se
-    // abonan en las cuentas del BBVA y aun así "calzaban" con abonos de otras sedes).
-    if (esBilletera(c)) return porNombre && canal(m) !== "efectivo";
-    return true;
+    if (esTarjeta(c) || esLiquidacion(m)) return false; // el procesador abona en lotes y con la comisión descontada
+    // Pagos directos del cliente a la cuenta (Yape, Plin, depósito o transferencia): regla del dueño =
+    // el abono se ve en el banco EL MISMO DÍA y por el mismo monto. En otra fecha solo vale con el nombre
+    // del cliente; un abono de otro día sin nombre queda como pista, no como conciliado.
+    if (modo === "cerca") return false;
+    // Un Yape / Plin no es un depósito en efectivo hecho en una oficina del banco.
+    return !(esBilletera(c) && canal(m) === "efectivo");
   };
-  const candidatos = (c: Cobro, porNombre = false) => disponibles().filter((m) => apto(c, m, porNombre));
+  const candidatos = (c: Cobro, modo: "nombre" | "dia" | "cerca" = "cerca") => disponibles().filter((m) => apto(c, m, modo));
   // (A) Transferencias por N° de operación (si el banco lo trae).
   // Los Yape traen a veces un código con letras ("7B1C03CAE9DD"): ese se busca tal cual.
   for (const c of transf) {
@@ -419,14 +420,14 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
   // (A2) Transferencias por NOMBRE: el concepto del banco trae al cliente (2 o más palabras) con el
   // mismo monto, aunque el abono sea de un día cercano. Va antes que "fecha y monto" porque es más seguro.
   for (const c of transf.filter((x) => !enlace.has(x.id))) {
-    const m = candidatos(c, true).filter((x) => igual(x.abono, c.importe) && Math.abs(dias(c.fecha, x.fecha)) <= 3 && puntosNombre(c, x) >= 2)
+    const m = candidatos(c, "nombre").filter((x) => igual(x.abono, c.importe) && Math.abs(dias(c.fecha, x.fecha)) <= 3 && puntosNombre(c, x) >= 2)
       .sort((a, b) => puntosNombre(c, b) - puntosNombre(c, a) || Math.abs(dias(c.fecha, a.fecha)) - Math.abs(dias(c.fecha, b.fecha)))[0];
     if (m) tomar(c, [m], m.fecha === c.fecha ? "Fecha, monto y nombre del cliente" : "Monto y nombre del cliente");
   }
   // (A3) Una sola palabra del nombre (p. ej. el apellido) también vale si no hay duda: ese abono es el
   // único con su nombre para ese cobro, y ese cobro el único pendiente que calza con ese abono.
   for (const c of transf.filter((x) => !enlace.has(x.id))) {
-    const calza = (x: Cobro, m: MovBanco) => apto(x, m, true) && igual(m.abono, x.importe) && Math.abs(dias(x.fecha, m.fecha)) <= 3 && puntosNombre(x, m) >= 1;
+    const calza = (x: Cobro, m: MovBanco) => apto(x, m, "nombre") && igual(m.abono, x.importe) && Math.abs(dias(x.fecha, m.fecha)) <= 3 && puntosNombre(x, m) >= 1;
     const ms = disponibles().filter((m) => calza(c, m));
     if (ms.length !== 1) continue;
     if (transf.filter((x) => !enlace.has(x.id) && calza(x, ms[0])).length !== 1) continue;
@@ -474,11 +475,11 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
   const pend = () => transf.filter((c) => !enlace.has(c.id));
   // (C) Transferencias del mismo día y monto; si hay varias iguales, por el nombre del cliente.
   const grupos = new Map<string, Cobro[]>();
-  const clase = (c: Cobro) => (c.origen !== "reporte" ? "" : esTarjeta(c) ? "tarjeta" : esBilletera(c) ? "billetera" : `otro ${entidadDeTexto(c.medio)}`);
+  const clase = (c: Cobro) => (c.origen !== "reporte" ? "" : esTarjeta(c) ? "tarjeta" : esBilletera(c) ? "billetera" : "directo");
   for (const c of pend()) { const k = `${c.fecha}|${c.importe.toFixed(2)}|${clase(c)}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(c); }
   for (const [k, cs] of Array.from(grupos.entries())) {
     const [fecha, imp] = k.split("|");
-    let ms = candidatos(cs[0]).filter((m) => m.fecha === fecha && igual(m.abono, Number(imp)));
+    let ms = candidatos(cs[0], "dia").filter((m) => m.fecha === fecha && igual(m.abono, Number(imp)));
     if (!ms.length) continue;
     if (cs.length === 1 && ms.length === 1) { tomar(cs[0], [ms[0]], "Fecha y monto"); continue; }
     const puntos = puntosNombre;
@@ -506,6 +507,16 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     const iguales = pend().filter((x) => igual(x.importe, c.importe));
     const ms = candidatos(c).filter((x) => igual(x.abono, c.importe) && dias(c.fecha, x.fecha) >= 0);
     if (iguales.length === 1 && ms.length === 1) tomar(c, [ms[0]], "Monto exacto único, abono posterior");
+  }
+  // Pagos directos de la caja por ZIP sin abono ese día: si hay uno del mismo monto en un día cercano se
+  // muestra como pista (no concilia: la regla es misma fecha y monto).
+  const pistaUsada = new Set<number>();
+  for (const c of pend().filter((x) => x.origen === "reporte" && !esTarjeta(x))) {
+    const m = disponibles().filter((x) => !pistaUsada.has(x.id) && apto(c, x, "dia") && igual(x.abono, c.importe) && Math.abs(dias(c.fecha, x.fecha)) <= 3)
+      .sort((a, b) => Math.abs(dias(c.fecha, a.fecha)) - Math.abs(dias(c.fecha, b.fecha)))[0];
+    if (!m) continue;
+    pistaUsada.add(m.id);
+    pistaCobro.set(c.id, `Sin abono ese día. Hay uno del mismo monto el ${dmy(m.fecha)}: ${m.banco} · ${m.desc.slice(0, 50)} (posible, verificar)`);
   }
   // (E) Efectivo depositado en DOS partes dentro de los 7 días siguientes.
   for (const c of efectivo.filter((x) => !enlace.has(x.id) && x.origen !== "reporte")) {
@@ -552,8 +563,8 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
     if (cs.length < 3 || ok / cs.length >= 0.5) continue;
     const bc = entidadDeTexto(medio);
     if (esTarjeta(cs[0])) avisos.push(`${cs.length} cobro(s) con ${medio} por S/ ${total.toFixed(2)}: los pagos con tarjeta los abona el procesador en lotes y con la comisión descontada, así que no se cruzan uno por uno con el banco. Quedan como "sin abono" para revisarlos con la liquidación del procesador.`);
-    else if (medio === "YAPE / PLIN") avisos.push(`${cs.length} cobro(s) por Yape / Plin por S/ ${total.toFixed(2)}: solo ${ok} figuran en los extractos subidos (por el N° de operación o el nombre del cliente). Los demás no están en estas cuentas: falta el extracto de la cuenta donde se abonan los Yape (o su reporte de operaciones). No se cruzan solo por fecha y monto porque hay muchos del mismo importe cada día.`);
-    else if (bc && entidades.size && !entidades.has(bc)) avisos.push(`${cs.length} cobro(s) por ${medio} por S/ ${total.toFixed(2)}: ningún extracto subido es del ${bc} (los subidos son de ${Array.from(entidades).join(", ")}). Falta el extracto de esa cuenta.`);
+    else if (medio === "YAPE / PLIN") avisos.push(`${cs.length} cobro(s) por Yape / Plin por S/ ${total.toFixed(2)}: ${ok} tienen un abono del mismo monto el mismo día en los extractos subidos; los otros ${cs.length - ok} no. Si los Yape se abonan en otra cuenta, falta su extracto.`);
+    else if (bc && entidades.size && !entidades.has(bc)) avisos.push(`${cs.length} cobro(s) por ${medio} por S/ ${total.toFixed(2)}: ${ok} tienen un abono del mismo monto el mismo día, pero ningún extracto subido es del ${bc} (los subidos son de ${Array.from(entidades).join(", ")}). Falta el extracto de esa cuenta.`);
   }
   if (cobros.some((c) => c.origen === "reporte") && !Array.from(enlace.values()).some((e) => /^N° de operación/.test(e.criterio)) && entidades.has("BBVA"))
     avisos.push(`Ningún N° de operación de la caja virtual figura en los extractos: el "N° OPER." del estado de cuenta del BBVA es el correlativo de la cuenta, no el número del voucher. El efectivo se cruzó por la fecha y el monto del voucher del depósito (y la oficina del banco); los depósitos de clientes, por fecha, monto y nombre.`);
@@ -635,10 +646,12 @@ export function conciliarTresVias(ventas: Venta[], cobros: Cobro[], movs: MovBan
       const e = enlace.get(c.id)!, cliente = ventaDe.get(c.docs[0]?.clave ?? "")?.nombre ?? "";
       if (/cobros iguales/.test(e.criterio)) obs = "Varios cobros del mismo monto ese día: cuadran en conjunto, no se puede asegurar cuál abono es de cuál comprobante.";
       if (e.criterio !== "N° de operación" && cliente && puntosNombre(c, m) === 0) obs = `El nombre que trae el banco no es el del cliente (${cliente}): conciliado solo por fecha y monto. Verificar.`;
+      const bc = c.origen === "reporte" ? entidadDeTexto(c.medio) : "", bm = entidadMov(m);
+      if (bc && bm && bc !== bm) obs = `${obs} La caja virtual dice ${bc} y el abono está en una cuenta del ${bm}.`.trim();
     } else if (c && c.tipo === "efectivo" && c.voucher && Math.abs(c.voucher.diferencia) >= 0.01) obs = difVoucher(c);
     else if (c && c.tipo === "efectivo" && c.origen === "reporte" && !c.voucher) obs = SIN_VOUCHER;
     else if (c && c.tipo === "efectivo" && (enlace.get(c.id)?.movs.length ?? 0) > 1) obs = `El efectivo de ese día (${c.importe.toFixed(2)}) se depositó en dos partes.`;
-    const sinCobro = pistaMov.get(m.id) ?? (m.abono > 0 && esInicioDeMes(m.fecha) ? `Sin cobro en la caja de este periodo (${NOTA_INICIO})` : m.abono > 0 ? "Sin cobro en la caja virtual" : "");
+    const sinCobro = pistaMov.get(m.id) ?? (m.abono > 0 && esLiquidacion(m) ? "Liquidación de tarjetas (Niubiz u otro procesador): son los cobros con tarjeta de varios días, en lote y con la comisión descontada" : null) ?? (m.abono > 0 && esInicioDeMes(m.fecha) ? `Sin cobro en la caja de este periodo (${NOTA_INICIO})` : m.abono > 0 ? "Sin cobro en la caja virtual" : "");
     if (!c && !esCargo) obs = sinCobro;
     return {
       conciliacion: esCargo ? sugerirCargo(m.desc) : c ? c.glosa.replace(/\s+/g, " ").trim() : "", obs,
