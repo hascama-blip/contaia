@@ -26,11 +26,13 @@ export function sanearSedes(v: unknown): ResultadoOperaciones[] {
       sede: S(o?.sede, 80), fechaVenta: ISO(o?.fechaVenta), medio: S(o?.medio, 60), banco: S(o?.banco, 40), operacion: S(o?.operacion, 80),
       fechaOperacion: ISO(o?.fechaOperacion), horaOperacion: S(o?.horaOperacion, 10), montoVoucher: o?.montoVoucher == null ? null : N(o.montoVoucher),
       sumaComprobantes: N(o?.sumaComprobantes), diferencia: o?.diferencia == null ? null : N(o.diferencia),
-      comprobantes: (Array.isArray(o?.comprobantes) ? o.comprobantes : []).slice(0, 2000).map((c: any) => ({ tipoDoc: S(c?.tipoDoc, 6), comprobante: S(c?.comprobante, 30), importe: N(c?.importe) })),
+      comprobantes: (Array.isArray(o?.comprobantes) ? o.comprobantes : []).slice(0, 2000).map((c: any) => ({ tipoDoc: S(c?.tipoDoc, 6), comprobante: S(c?.comprobante, 30), importe: N(c?.importe), cliente: S(c?.cliente, 90), placa: S(c?.placa, 10) })),
       estado: S(o?.estado, 30) as ResultadoOperaciones["operaciones"][number]["estado"], obs: S(o?.obs, 600), archivo: S(o?.archivo, 200),
+      ...(o?.ticket && typeof o.ticket === "object" ? { ticket: { operacion: S(o.ticket.operacion, 30), fecha: ISO(o.ticket.fecha), hora: S(o.ticket.hora, 8), monto: o.ticket.monto == null ? null : N(o.ticket.monto), destino: S(o.ticket.destino, 30), origen: S(o.ticket.origen, 30), archivo: S(o.ticket.archivo, 200), por: o.ticket.por === "monto" ? "monto" as const : "referencia" as const } } : {}),
     })),
     sinOperacion: (Array.isArray(s.sinOperacion) ? s.sinOperacion : []).slice(0, 5000).map((c: any) => ({ tipoDoc: S(c?.tipoDoc, 6), comprobante: S(c?.comprobante, 30), importe: N(c?.importe), fecha: ISO(c?.fecha), motivo: S(c?.motivo, 120) })),
     otros: [], avisos: (Array.isArray(s.avisos) ? s.avisos : []).slice(0, 200).map((a: unknown) => S(a, 300)),
+    tickets: { leidos: N(s.tickets?.leidos), vinculados: N(s.tickets?.vinculados), sueltos: (Array.isArray(s.tickets?.sueltos) ? s.tickets.sueltos : []).slice(0, 500).map((t: any) => ({ fecha: ISO(t?.fecha), archivo: S(t?.archivo, 200), operacion: S(t?.operacion, 30), monto: t?.monto == null ? null : N(t.monto), destino: S(t?.destino, 30) })) },
   }));
 }
 
@@ -49,7 +51,8 @@ export function cobrosDeCajaZip(sedes: ResultadoOperaciones[]): { cobros: Cobro[
   const docsDe = (cs: { tipoDoc: string; comprobante: string; importe: number }[]): DocCobro[] => cs.map((c) => { const clave = claveDoc(c.comprobante); return { clave, doc: docVisible(clave), td: tdDe(c.tipoDoc), importe: r2(c.importe) }; });
   for (const s of sedes) {
     const corta = s.sede.replace(/\s+/g, " ").trim();
-    let conVoucher = 0, sinVoucher = 0, conDif = 0;
+    let conVoucher = 0, sinVoucher = 0, conDif = 0, otros = 0, conTicket = 0;
+    const nombresDe = (cs: { cliente?: string; placa?: string }[]) => ({ nombres: Array.from(new Set(cs.map((c) => c.cliente ?? "").filter(Boolean))), placas: Array.from(new Set(cs.map((c) => c.placa ?? "").filter((x) => x.length >= 5))) });
     for (const o of s.operaciones) {
       if (!o.fechaVenta || !o.comprobantes.length) continue;
       const docs = docsDe(o.comprobantes);
@@ -70,8 +73,10 @@ export function cobrosDeCajaZip(sedes: ResultadoOperaciones[]): { cobros: Cobro[
         cobros.push({
           id: idUnico(`${corta} ${f} ${o.medio} ${o.operacion}`), fecha: o.fechaVenta, tipo: "transferencia", medio, sede: corta, op: o.operacion,
           importe: r2(o.sumaComprobantes), glosa: `CANCELA ${docs.map((d) => `${PREF[d.td] ?? ""} ${d.doc}`.trim()).slice(0, 4).join(", ")}${docs.length > 4 ? "…" : ""} - ${medio} ${corta}`,
-          docs, origen: "reporte", nota: "",
+          docs, origen: "reporte", nota: o.ticket ? "" : o.obs, ...nombresDe(o.comprobantes),
+          ...(o.ticket ? { ticket: { operacion: o.ticket.operacion, fecha: o.ticket.fecha, hora: o.ticket.hora, monto: o.ticket.monto, destino: o.ticket.destino, origen: o.ticket.origen, por: o.ticket.por, obs: o.obs } } : {}),
         });
+        otros++; if (o.ticket) conTicket++;
       }
     }
     // Lo que el reporte trae sin N° de operación.
@@ -87,7 +92,7 @@ export function cobrosDeCajaZip(sedes: ResultadoOperaciones[]): { cobros: Cobro[
         conCobro.add(clave);
       } else if (!conCobro.has(clave)) notasSinCobro[clave] = `En la caja virtual (${corta}, ${dmy(x.fecha)}) figura con cobro 0.00 y sin medio de pago`;
     }
-    avisos.push(`Caja virtual ${corta}: ${s.dias} día(s), ${s.comprobantes} comprobantes por S/ ${s.total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}. Efectivo: ${conVoucher} día(s) con voucher de depósito leído${conDif ? ` (${conDif} con diferencia entre el depósito y el efectivo del día)` : ""}${sinVoucher ? ` y ${sinVoucher} día(s) SIN voucher en el Drive (se buscan en el banco por monto)` : ""}.`);
+    avisos.push(`Caja virtual ${corta}: ${s.dias} día(s), ${s.comprobantes} comprobantes por S/ ${s.total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}. Efectivo: ${conVoucher} día(s) con voucher de depósito leído${conDif ? ` (${conDif} con diferencia entre el depósito y el efectivo del día)` : ""}${sinVoucher ? ` y ${sinVoucher} día(s) SIN voucher en el Drive (se buscan en el banco por monto)` : ""}.${otros ? ` Yape, depósitos y tarjetas: ${otros} cobro(s), ${conTicket} con su ticket leído del Drive (el N° de operación del ticket termina en la referencia de la caja)${s.tickets?.sueltos.length ? `; ${s.tickets.sueltos.length} ticket(s) del Drive no calzan con ningún cobro` : ""}.` : ""}`);
     for (const a of s.avisos.slice(0, 5)) avisos.push(`Caja virtual ${corta}: ${a}`);
   }
   return { cobros, avisos, notasSinCobro };

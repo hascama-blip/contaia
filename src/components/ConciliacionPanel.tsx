@@ -121,7 +121,7 @@ export default function ConciliacionPanel() {
             <p className="text-sm font-semibold text-slate-800">{s.empresa} <span className="font-normal text-slate-500">· RUC {s.ruc} · {s.periodo}</span></p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi t="Comprobantes conciliados" v={`${s.ventas.conciliados} de ${s.ventas.total}`} sub={soles(s.ventas.importeConciliado)} tono="verde" />
-              <Kpi t="Comprobantes NO conciliados" v={String(s.ventas.noConciliados)} sub={soles(s.ventas.importeNoConciliado)} tono={s.ventas.noConciliados ? "rojo" : "verde"} />
+              <Kpi t="Comprobantes NO conciliados" v={String(s.ventas.noConciliados)} sub={`${soles(s.ventas.importeNoConciliado)}${s.ventas.conTicket ? ` · ${s.ventas.conTicket} con ticket verificado` : ""}`} tono={s.ventas.noConciliados ? "rojo" : "verde"} />
               <Kpi t="Cobros de caja sin banco" v={`${s.cobros.noConciliados} de ${s.cobros.total}`} sub={soles(s.cobros.importeNoConciliado)} tono={s.cobros.noConciliados ? "rojo" : "verde"} />
               <Kpi t="Abonos del banco sin cobro" v={String(s.bancos.reduce((a, b) => a + b.noConciliados, 0))} sub={soles(s.bancos.reduce((a, b) => a + b.importeNoConciliado, 0))} tono={s.bancos.some((b) => b.noConciliados) ? "ambar" : "verde"} />
             </div>
@@ -212,7 +212,7 @@ function Kpi({ t, v, sub, tono }: { t: string; v: string; sub: string; tono: "ve
 }
 
 const Est = ({ e }: { e: string }) => (
-  <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${e === "Conciliado" ? "bg-emerald-100 text-emerald-700" : e === "No conciliado" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500"}`}>{e}</span>
+  <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${e === "Conciliado" ? "bg-emerald-100 text-emerald-700" : e === "No conciliado" ? "bg-red-100 text-red-700" : e === "Con ticket" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-500"}`}>{e}</span>
 );
 const Mas = ({ n, cols }: { n: number; cols: number }) => (n > TOPE ? <tr><td colSpan={cols} className="px-2 py-2 text-slate-400">… y {n - TOPE} filas más (están todas en el Excel)</td></tr> : null);
 const Vacio = ({ cols }: { cols: number }) => <tr><td colSpan={cols} className="px-2 py-3 text-slate-500">Sin filas.</td></tr>;
@@ -231,30 +231,30 @@ function TablaUnica({ filas }: { filas: FilaUnica[] }) {
         <thead className="sticky top-0 z-10">
           <tr className="text-[11px] font-bold uppercase tracking-wide text-white">
             <th colSpan={4} className="bg-brand-700 px-2 py-1.5 text-left">Contabilidad</th>
-            <th colSpan={5} className={`bg-sky-800 px-2 py-1.5 text-left ${g}`}>Caja virtual</th>
+            <th colSpan={6} className={`bg-sky-800 px-2 py-1.5 text-left ${g}`}>Caja virtual</th>
             <th colSpan={4} className={`bg-teal-700 px-2 py-1.5 text-left ${g}`}>Bancos</th>
             <th colSpan={3} className={`bg-slate-600 px-2 py-1.5 text-left ${g}`}>Resultado</th>
           </tr>
           <tr className="bg-slate-50 text-[10px] uppercase text-slate-500">
             <th className={th}>Fecha</th><th className={`${th} ${oro}`}>Comprobante ★</th><th className={th}>Cliente</th><th className={`${th} text-right`}>Total</th>
-            <th className={`${th} ${oro} ${g}`}>Comprobante ★</th><th className={th}>Cobro · medio</th><th className={`${th} ${oro}`}>Fecha ◆</th><th className={`${th} text-right`}>Cobrado</th><th className={`${th} ${oro} text-right`}>Total del cobro ◆</th>
+            <th className={`${th} ${oro} ${g}`}>Comprobante ★</th><th className={th}>Cobro · medio</th><th className={`${th} ${oro}`}>Fecha ◆</th><th className={`${th} text-right`}>Cobrado</th><th className={`${th} ${oro} text-right`}>Total del cobro ◆</th><th className={th}>Ticket / voucher</th>
             <th className={`${th} ${g}`}>Cuenta</th><th className={`${th} ${oro}`}>Fecha ◆</th><th className={th}>Concepto</th><th className={`${th} ${oro} text-right`}>Importe ◆</th>
             <th className={`${th} ${g}`}>Estado</th><th className={th}>Punto en común caja ↔ banco</th><th className={th}>Observación</th>
           </tr>
         </thead>
         <tbody>
           {filas.slice(0, TOPE).map((f, i) => (
-            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/50" : f.estado === "Cargo" ? "bg-slate-50 text-slate-400" : ""}`}>
+            <tr key={i} className={`border-t border-slate-100 ${f.estado === "No conciliado" ? "bg-red-50/50" : f.estado === "Con ticket" ? "bg-amber-50/60" : f.estado === "Cargo" ? "bg-slate-50 text-slate-400" : ""}`}>
               <td className={`${td} whitespace-nowrap`}>{fch(f.cFecha)}</td><td className={`${td} whitespace-nowrap ${f.cDoc ? pc : ""}`}>{f.cDoc}</td>
               <td className={td}><span className="line-clamp-1">{f.cCliente}</span></td><td className={tdr}>{m(f.cTotal)}</td>
               <td className={`${td} whitespace-nowrap ${g} ${f.vDoc ? pc : ""}`}>{f.vDoc}</td><td className={`${td} whitespace-nowrap`}>{[f.vCobro, f.vMedio].filter(Boolean).join(" · ")}</td>
-              <td className={`${td} whitespace-nowrap ${f.vFecha ? pc : ""}`}>{fch(f.vFecha)}</td><td className={tdr}>{m(f.vImporte)}</td><td className={`${tdr} ${f.vTotalCobro != null ? pc : ""}`}>{m(f.vTotalCobro)}</td>
+              <td className={`${td} whitespace-nowrap ${f.vFecha ? pc : ""}`}>{fch(f.vFecha)}</td><td className={tdr}>{m(f.vImporte)}</td><td className={`${tdr} ${f.vTotalCobro != null ? pc : ""}`}>{m(f.vTotalCobro)}</td><td className={`${td} whitespace-nowrap ${f.vTicket?.startsWith("✔") ? "text-emerald-700" : "text-slate-400"}`}>{f.vTicket}</td>
               <td className={`${td} whitespace-nowrap ${g}`}>{f.bBanco}</td><td className={`${td} whitespace-nowrap ${f.bFecha ? pc : ""}`}>{fch(f.bFecha)}</td>
               <td className={td}><span className="line-clamp-1">{f.bDesc}</span></td><td className={`${tdr} ${f.bImporte != null ? pc : ""}`}>{m(f.bImporte)}</td>
               <td className={`${td} ${g}`}><Est e={f.estado} /></td><td className={td}>{f.punto2}</td><td className={td}>{f.obs}</td>
             </tr>
           ))}
-          {!filas.length && <Vacio cols={16} />}<Mas n={filas.length} cols={16} />
+          {!filas.length && <Vacio cols={17} />}<Mas n={filas.length} cols={17} />
         </tbody>
       </table>
       <p className="border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-500">

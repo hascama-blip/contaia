@@ -318,6 +318,22 @@ Marca: **ASENCO** (azul `brand-700`) + **IA** (negro). Logo cuadrado "A".
   ("OFICINA ANDAH"; los otros 4 vouchers son del 02/11); ATE sin vouchers; de 280 Yape, 33 tienen abono del mismo monto el mismo día
   (0550) y 247 no → falta el extracto de la cuenta de los Yape y el del BCP (17 depósitos), y los ZIP de 3 sedes. Bancos en
   PDF/Word: probados solo con extractos armados; el formato real de RTP es este Excel.
+  · **Tickets de pago y cruce por nombre** (nov-2026; EN REVISIÓN por el dueño con el Excel: está en la rama de
+    trabajo, **no en `main`** hasta que confirme). La sede sube al Drive `YAPE dd-mm-aaaa.docx` = FOTOS de los
+    tickets dentro de un Word (`imagenesDelDocx`; se leen con OCR probando de frente y de costado,
+    `lector.leer(img, giro)`). `leerTicket`: Yape ("¡Yapeaste! … Destino Yape · Nro. de operación 19747200"),
+    Banco de la Nación → Yape ("Nro. de transferencia 000000000005134"), transferencia BCP ("Número de operación
+    01589147"). **La caja virtual anota los ÚLTIMOS 6 dígitos** (747200, 005134, 589147): el ticket calza si algún
+    número de la foto TERMINA en la referencia (`operacionesDelDia`: por referencia → un dígito distinto → por monto
+    único); queda en `OperacionCaja.ticket` / `Cobro.ticket` y en la columna "Ticket / voucher del Drive". El nombre
+    y la placa de cada comprobante salen del PDF del reporte del día (`clientesDeLineas`; el Excel los trae vacíos).
+    Motor: el pago directo concilia con el banco solo si el NOMBRE del banco se parece al del cliente en contabilidad
+    o en la caja (≥ 2 palabras, tolera una letra; la placa en el concepto vale por 2) o por N° de operación (también
+    el completo del ticket); con otro nombre no se considera aunque calcen fecha y monto (pista "con otro nombre").
+    Ticket con "Destino: Yape" → no se busca en cuentas de otro banco. Estado nuevo en la hoja única: **"Con
+    ticket"** (ámbar) = cobrado y con ticket verificado, falta el extracto de su cuenta (`resumen.ventas.conTicket`).
+    Caso real Andahuaylas oct-2026: 119 pagos no efectivo → 92 con ticket (72 dicen destino Yape); los Yape NO se
+    abonan en el BBVA (las coincidencias de fecha y monto con la 0550 eran de otros clientes).
 - **Subidas de más de 10 MB**: Next 15.5 corta en 10 MB todo pedido que pasa por el middleware (el formulario llega
   vacío). `next.config.js` → `experimental.middlewareClientMaxBodySize: "100mb"`. No quitarlo.
 - `src/lib/diagnostico.ts` — motor de hallazgos/score (incluye consistencia declaración vs SIRE).
